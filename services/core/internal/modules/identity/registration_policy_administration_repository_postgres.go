@@ -87,28 +87,7 @@ func (repository *PostgresRegistrationPolicyAdministrationRepository) UpdateRegi
 		return RegistrationPolicy{}, ErrRegistrationPolicyVersionConflict
 	}
 
-	row, err := queries.UpdateRegistrationPolicy(ctx, identitydb.UpdateRegistrationPolicyParams{
-		Mode:                                     string(command.Mode),
-		MemberInvitesEnabled:                     command.MemberInvitesEnabled,
-		InviteValidDays:                          int16(command.InviteValidDays),
-		MaxInvitesPerMember:                      int16(command.MaxInvitesPerMember),
-		MinimumInviteAccountAgeDays:              int16(command.MinimumInviteAccountAgeDays),
-		MinimumInviteLevel:                       int16(command.MinimumInviteLevel),
-		UsernameMinCharacters:                    int16(command.UsernameMinCharacters),
-		UsernameMaxCharacters:                    int16(command.UsernameMaxCharacters),
-		ReservedUsernames:                        append([]string(nil), command.ReservedUsernames...),
-		EmailDomainMode:                          string(command.EmailDomainMode),
-		EmailDomains:                             append([]string(nil), command.EmailDomains...),
-		SessionValidHours:                        int16(command.SessionValidHours),
-		RememberSessionValidHours:                int16(command.RememberSessionValidHours),
-		HumanVerificationProvider:                string(command.HumanVerificationProvider),
-		HumanVerificationSiteKey:                 command.HumanVerificationSiteKey,
-		HumanVerificationRegistrationEnabled:     command.HumanVerificationRegistrationEnabled,
-		HumanVerificationLoginEnabled:            command.HumanVerificationLoginEnabled,
-		HumanVerificationPasswordRecoveryEnabled: command.HumanVerificationPasswordRecoveryEnabled,
-		UpdatedAt:                                registrationPolicyTimestamp(command.OccurredAt),
-		ExpectedVersion:                          command.ExpectedVersion,
-	})
+	row, err := queries.UpdateRegistrationPolicy(ctx, registrationPolicyUpdateParams(command))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RegistrationPolicy{}, ErrRegistrationPolicyVersionConflict
 	}
@@ -144,6 +123,31 @@ func (repository *PostgresRegistrationPolicyAdministrationRepository) UpdateRegi
 		return RegistrationPolicy{}, fmt.Errorf("commit registration policy update: %w", err)
 	}
 	return after, nil
+}
+
+func registrationPolicyUpdateParams(command UpdateRegistrationPolicyCommand) identitydb.UpdateRegistrationPolicyParams {
+	return identitydb.UpdateRegistrationPolicyParams{
+		Mode:                                     string(command.Mode),
+		MemberInvitesEnabled:                     command.MemberInvitesEnabled,
+		InviteValidDays:                          int16(command.InviteValidDays),
+		MaxInvitesPerMember:                      int16(command.MaxInvitesPerMember),
+		MinimumInviteAccountAgeDays:              int16(command.MinimumInviteAccountAgeDays),
+		MinimumInviteLevel:                       int16(command.MinimumInviteLevel),
+		UsernameMinCharacters:                    int16(command.UsernameMinCharacters),
+		UsernameMaxCharacters:                    int16(command.UsernameMaxCharacters),
+		ReservedUsernames:                        copyRegistrationPolicyEntries(command.ReservedUsernames),
+		EmailDomainMode:                          string(command.EmailDomainMode),
+		EmailDomains:                             copyRegistrationPolicyEntries(command.EmailDomains),
+		SessionValidHours:                        int16(command.SessionValidHours),
+		RememberSessionValidHours:                int16(command.RememberSessionValidHours),
+		HumanVerificationProvider:                string(command.HumanVerificationProvider),
+		HumanVerificationSiteKey:                 command.HumanVerificationSiteKey,
+		HumanVerificationRegistrationEnabled:     command.HumanVerificationRegistrationEnabled,
+		HumanVerificationLoginEnabled:            command.HumanVerificationLoginEnabled,
+		HumanVerificationPasswordRecoveryEnabled: command.HumanVerificationPasswordRecoveryEnabled,
+		UpdatedAt:                                registrationPolicyTimestamp(command.OccurredAt),
+		ExpectedVersion:                          command.ExpectedVersion,
+	}
 }
 
 func registrationPolicyFromValues(
@@ -225,9 +229,9 @@ func registrationPolicyAuditState(policy RegistrationPolicy) RegistrationPolicyA
 		MinimumInviteLevel:          policy.MinimumInviteLevel,
 		UsernameMinCharacters:       policy.UsernameMinCharacters,
 		UsernameMaxCharacters:       policy.UsernameMaxCharacters,
-		ReservedUsernames:           append([]string(nil), policy.ReservedUsernames...),
+		ReservedUsernames:           copyRegistrationPolicyEntries(policy.ReservedUsernames),
 		EmailDomainMode:             policy.EmailDomainMode,
-		EmailDomains:                append([]string(nil), policy.EmailDomains...),
+		EmailDomains:                copyRegistrationPolicyEntries(policy.EmailDomains),
 		SessionValidHours:           policy.SessionValidHours,
 		RememberSessionValidHours:   policy.RememberSessionValidHours, Version: policy.Version,
 		HumanVerificationProvider:                policy.HumanVerificationProvider,
@@ -236,6 +240,10 @@ func registrationPolicyAuditState(policy RegistrationPolicy) RegistrationPolicyA
 		HumanVerificationLoginEnabled:            policy.HumanVerificationLoginEnabled,
 		HumanVerificationPasswordRecoveryEnabled: policy.HumanVerificationPasswordRecoveryEnabled,
 	}
+}
+
+func copyRegistrationPolicyEntries(values []string) []string {
+	return append(make([]string, 0, len(values)), values...)
 }
 
 func registrationPolicyTimestamp(value time.Time) pgtype.Timestamptz {

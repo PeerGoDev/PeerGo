@@ -160,7 +160,7 @@ func New(dependencies Dependencies, logger *slog.Logger) (http.Handler, error) {
 				httpapi.WriteProblem(w, r, http.StatusBadRequest, "invalid_request", "请求参数无效", "请求无法按 API 契约解析。")
 			},
 			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-				logger.ErrorContext(r.Context(), "core request failed", "error", err)
+				logger.ErrorContext(r.Context(), "core request failed", "request_id", middleware.GetReqID(r.Context()), "error", err)
 				httpapi.WriteProblem(w, r, http.StatusInternalServerError, "internal_error", "服务暂时不可用", "请稍后重试，并在反馈时附上 request_id。")
 			},
 		},
