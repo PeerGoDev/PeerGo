@@ -203,6 +203,50 @@ smtp_from_address="$(bootstrap_or_existing PEERGO_SMTP_FROM_ADDRESS PEERGO_BOOTS
 smtp_from_name="$(bootstrap_or_existing PEERGO_SMTP_FROM_NAME PEERGO_BOOTSTRAP_SMTP_FROM_NAME PeerGo)"
 smtp_tls_mode="$(bootstrap_or_existing PEERGO_SMTP_TLS_MODE PEERGO_BOOTSTRAP_SMTP_TLS_MODE starttls)"
 
+# A side-by-side cutover keeps the legacy Web/API listeners online until the
+# HTTPS proxy switches traffic. Bootstrap overrides make those loopback ports
+# explicit without changing container-to-container addresses.
+web_host_port="$(bootstrap_or_existing PEERGO_WEB_HOST_PORT PEERGO_BOOTSTRAP_WEB_HOST_PORT 8080 8080)"
+vault_host_port="$(bootstrap_or_existing PEERGO_VAULT_HOST_PORT PEERGO_BOOTSTRAP_VAULT_HOST_PORT 8081 8081)"
+audit_host_port="$(bootstrap_or_existing PEERGO_AUDIT_HOST_PORT PEERGO_BOOTSTRAP_AUDIT_HOST_PORT 8082 8082)"
+tracker_host_port="$(bootstrap_or_existing PEERGO_TRACKER_HOST_PORT PEERGO_BOOTSTRAP_TRACKER_HOST_PORT 8083 8083)"
+tracker_metrics_host_port="$(bootstrap_or_existing PEERGO_TRACKER_METRICS_HOST_PORT PEERGO_BOOTSTRAP_TRACKER_METRICS_HOST_PORT 9093 9093)"
+settlement_control_host_port="$(bootstrap_or_existing PEERGO_SETTLEMENT_CONTROL_HOST_PORT PEERGO_BOOTSTRAP_SETTLEMENT_CONTROL_HOST_PORT 8085 8085)"
+email_relay_host_port="$(bootstrap_or_existing PEERGO_EMAIL_RELAY_HOST_PORT PEERGO_BOOTSTRAP_EMAIL_RELAY_HOST_PORT 8086 8086)"
+
+claimed_host_port_values=()
+claimed_host_port_names=()
+for host_port_specification in \
+    "PEERGO_WEB_HOST_PORT:${web_host_port}" \
+    "PEERGO_VAULT_HOST_PORT:${vault_host_port}" \
+    "PEERGO_AUDIT_HOST_PORT:${audit_host_port}" \
+    "PEERGO_TRACKER_HOST_PORT:${tracker_host_port}" \
+    "PEERGO_TRACKER_METRICS_HOST_PORT:${tracker_metrics_host_port}" \
+    "PEERGO_SETTLEMENT_CONTROL_HOST_PORT:${settlement_control_host_port}" \
+    "PEERGO_EMAIL_RELAY_HOST_PORT:${email_relay_host_port}"; do
+    host_port_name="${host_port_specification%%:*}"
+    host_port_value="${host_port_specification#*:}"
+    [[ "${host_port_value}" =~ ^[1-9][0-9]{0,4}$ ]] &&
+        ((10#${host_port_value} <= 65535)) ||
+        fail "${host_port_name} must be an integer between 1 and 65535"
+    for claimed_host_port_index in "${!claimed_host_port_values[@]}"; do
+        [[ "${claimed_host_port_values[${claimed_host_port_index}]}" != "${host_port_value}" ]] ||
+            fail "${host_port_name} conflicts with ${claimed_host_port_names[${claimed_host_port_index}]} on port ${host_port_value}"
+    done
+    claimed_host_port_values+=("${host_port_value}")
+    claimed_host_port_names+=("${host_port_name}")
+done
+
+# H&R projection records are compact and materially lower-volume than announce
+# or traffic events. The cluster profile keeps its 50 GiB default; one-node
+# production uses 10 GiB so all five JetStream reservations fit below the
+# single NATS node's 200 GB file-store ceiling with operational headroom.
+hnr_stream_max_bytes="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_HNR_STREAM_MAX_BYTES \
+    PEERGO_BOOTSTRAP_SETTLEMENT_HNR_STREAM_MAX_BYTES \
+    10737418240 \
+    53687091200)"
+
 nats_username=peergo
 if [[ -f "${nats_credentials_file}" ]]; then
     [[ "$(head -n 1 "${nats_credentials_file}" | tr -d '\r')" == "peergo-single-server-user-password-v1" ]] ||
@@ -283,6 +327,13 @@ set_env PEERGO_WEB_ORIGINS "${public_origin}"
 set_env PEERGO_WEBAUTHN_RP_ID "${rp_id}"
 set_env PEERGO_WEBAUTHN_ORIGINS "${public_origin}"
 set_env PEERGO_TRACKER_CANONICAL_ORIGIN "${public_origin}"
+set_env PEERGO_WEB_HOST_PORT "${web_host_port}"
+set_env PEERGO_VAULT_HOST_PORT "${vault_host_port}"
+set_env PEERGO_AUDIT_HOST_PORT "${audit_host_port}"
+set_env PEERGO_TRACKER_HOST_PORT "${tracker_host_port}"
+set_env PEERGO_TRACKER_METRICS_HOST_PORT "${tracker_metrics_host_port}"
+set_env PEERGO_SETTLEMENT_CONTROL_HOST_PORT "${settlement_control_host_port}"
+set_env PEERGO_EMAIL_RELAY_HOST_PORT "${email_relay_host_port}"
 set_env PEERGO_EMAIL_VERIFICATION_PUBLIC_URL "${public_origin}/verify-email"
 set_env PEERGO_PASSWORD_RECOVERY_PUBLIC_URL "${public_origin}/reset-password"
 set_env PEERGO_SMTP_HOST "${smtp_host}"
@@ -317,6 +368,7 @@ set_env PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL 30s
 set_env PEERGO_TORRENT_STORAGE_DRIVER filesystem
 set_env PEERGO_TORRENT_STORAGE_FILESYSTEM_ROOT /var/lib/peergo/objects
 set_env PEERGO_IMAGE_DERIVATIVE_TEMP_DIR /var/lib/peergo/image-derivative-tmp
+set_env PEERGO_SETTLEMENT_HNR_STREAM_MAX_BYTES "${hnr_stream_max_bytes}"
 
 nats_url_names=(
     PEERGO_TRACKER_NATS_URLS

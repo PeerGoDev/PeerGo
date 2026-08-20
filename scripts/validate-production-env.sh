@@ -69,6 +69,28 @@ case "${deployment_mode}" in
         [[ -f "${nats_config}" && ! -L "${nats_config}" ]] || fail "NATS server config must be a non-symlink regular file"
         nats_credentials="$(env_get PEERGO_SECRET_DIR)/peergo-single-server-nats.creds"
         [[ -f "${nats_credentials}" && ! -L "${nats_credentials}" ]] || fail "NATS client credentials must be a non-symlink regular file"
+
+        # JetStream reserves configured stream maxima when admitting a new
+        # stream. Keep this synchronized with bootstrap's 200 GB one-node
+        # file-store ceiling and stop before Compose starts any service.
+        nats_stream_budget_names=(
+            PEERGO_TRACKER_ANNOUNCE_STREAM_MAX_BYTES
+            PEERGO_TRACKER_SWARM_STREAM_MAX_BYTES
+            PEERGO_SETTLEMENT_SEEDING_EVIDENCE_STREAM_MAX_BYTES
+            PEERGO_SETTLEMENT_TRAFFIC_STREAM_MAX_BYTES
+            PEERGO_SETTLEMENT_HNR_STREAM_MAX_BYTES
+        )
+        nats_stream_reserved_bytes=0
+        for name in "${nats_stream_budget_names[@]}"; do
+            stream_max_bytes="$(env_get "${name}")"
+            [[ "${stream_max_bytes}" =~ ^[1-9][0-9]*$ ]] ||
+                fail "${name} must be a positive integer byte count"
+            nats_stream_reserved_bytes=$((nats_stream_reserved_bytes + 10#${stream_max_bytes}))
+        done
+        nats_file_store_bytes=200000000000
+        nats_required_headroom_bytes=10000000000
+        ((nats_stream_reserved_bytes <= nats_file_store_bytes - nats_required_headroom_bytes)) ||
+            fail "JetStream stream reservations total ${nats_stream_reserved_bytes} bytes; single-server permits at most $((nats_file_store_bytes - nats_required_headroom_bytes)) bytes so the 200 GB store retains 10 GB headroom"
         ;;
     *) fail "PEERGO_DEPLOYMENT_MODE must be cluster or single-server" ;;
 esac

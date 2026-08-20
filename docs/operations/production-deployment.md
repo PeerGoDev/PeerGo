@@ -67,6 +67,22 @@ PEERGO_SINGLE_SERVER_PUBLIC_ORIGIN='https://rousi.pro' \
   make single-server-bootstrap
 ```
 
+旧站仍占用宿主机端口时，不要停止旧站来迁就 PeerGo。通过 bootstrap 覆盖为 PeerGo
+分配并记录一组临时 loopback 端口；容器私网地址不会改变。例如 RousiPro 并行验收使用：
+
+```bash
+PEERGO_BOOTSTRAP_WEB_HOST_PORT=18080 \
+PEERGO_BOOTSTRAP_VAULT_HOST_PORT=18081 \
+PEERGO_BOOTSTRAP_TRACKER_HOST_PORT=18083 \
+PEERGO_BOOTSTRAP_TRACKER_METRICS_HOST_PORT=19093 \
+  make single-server-bootstrap
+```
+
+正式切流时让 HTTPS 入口改为反代这些端口即可，不必再把它们换回 8080/8083。脚本还会
+拒绝 PeerGo 自身重复或越界的宿主机端口。单机 NATS 的文件上限为 200 GB；bootstrap
+把低流量 H&R stream 限为 10 GiB，`production-ready` 会在启动前校验全部 stream 的
+最大预留合计至少保留 10 GB 余量。集群配置仍使用 `.env.example` 中的独立容量规划。
+
 可在首次执行时同时提供 SMTP；未提供则 `.env.production` 明确保留 `CHANGE_ME`，
 `make production-up` 会拒绝启动：
 

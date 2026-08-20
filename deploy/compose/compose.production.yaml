@@ -52,6 +52,17 @@ services:
     <<: *runtime
     command: ["peergo-preflight"]
     restart: "no"
+    # Startup proves that schemas and mandatory runtime baselines are usable.
+    # Activation policy expectations live in the separate activation-check
+    # service below. Explicitly clear them here because env_file also carries
+    # the operator's eventual activation choices.
+    environment:
+      PEERGO_PREFLIGHT_STRICT_POLICIES: "false"
+      PEERGO_PREFLIGHT_REGISTRATION_MODE: ""
+      PEERGO_PREFLIGHT_NEWCOMER_STATE: "any"
+      PEERGO_PREFLIGHT_REQUIRE_SETTLEMENT_POLICY: "false"
+      PEERGO_PREFLIGHT_REQUIRE_HNR_POLICY: "false"
+      PEERGO_PREFLIGHT_REQUIRE_EMAIL_DELIVERY: "false"
     depends_on:
       core-migrate:
         condition: service_completed_successfully
