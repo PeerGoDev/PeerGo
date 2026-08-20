@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/peergo/peergo/contracts/go/deploymentv1"
 	"github.com/peergo/peergo/contracts/go/trackerannouncev1"
 	"github.com/peergo/peergo/services/settlement/internal/jetstreamconsumer"
 )
@@ -216,13 +217,18 @@ func natsURLs(environment string) ([]string, error) {
 	}
 	seen := make(map[string]struct{})
 	result := make([]string, 0, strings.Count(value, ",")+1)
+	mode, modeErr := deploymentv1.Load()
+	if modeErr != nil {
+		return nil, modeErr
+	}
 	for _, raw := range strings.Split(value, ",") {
 		parsed, parseErr := url.Parse(strings.TrimSpace(raw))
+		allowedSingleServerURL := parseErr == nil && parsed != nil && environment == "production" && mode == deploymentv1.SingleServer && parsed.Scheme == "nats" && parsed.Host == "peergo-nats:4222"
 		if parseErr != nil || parsed.Host == "" || parsed.User != nil || parsed.Path != "" ||
 			parsed.RawQuery != "" || parsed.Fragment != "" ||
 			(parsed.Scheme != "nats" && parsed.Scheme != "tls") ||
-			(environment == "production" && parsed.Scheme != "tls") {
-			return nil, errors.New("PEERGO_SETTLEMENT_NATS_URLS must contain comma-separated credential-free nats:// URLs, or tls:// URLs required in production")
+			(environment == "production" && parsed.Scheme != "tls" && !allowedSingleServerURL) {
+			return nil, errors.New("PEERGO_SETTLEMENT_NATS_URLS must use credential-free tls:// URLs in production, except nats://peergo-nats:4222 in single-server mode")
 		}
 		canonical := parsed.String()
 		if _, duplicate := seen[canonical]; duplicate {
@@ -266,7 +272,13 @@ func validateDatabaseURL(value, environment string) error {
 		return errors.New("invalid PostgreSQL URL")
 	}
 	if environment == "production" && parsed.Query().Get("sslmode") == "disable" {
-		return errors.New("PostgreSQL TLS cannot be disabled in production")
+		mode, modeErr := deploymentv1.Load()
+		if modeErr != nil {
+			return modeErr
+		}
+		if mode != deploymentv1.SingleServer || parsed.Host != "postgresql:5432" {
+			return errors.New("PostgreSQL TLS can only be disabled for postgresql:5432 in single-server production")
+		}
 	}
 	return nil
 }

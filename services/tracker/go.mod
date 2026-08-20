@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/nats-io/nats.go v1.52.0
 	github.com/peergo/peergo/contracts/go v0.0.0
+	github.com/peergo/peergo/libraries/natsauth v0.0.0
 	github.com/prometheus/client_golang v1.24.1
 )
 
@@ -24,3 +25,5 @@ require (
 )
 
 replace github.com/peergo/peergo/contracts/go => ../../contracts/go
+
+replace github.com/peergo/peergo/libraries/natsauth => ../../libraries/natsauth

@@ -46,6 +46,24 @@ func TestLoadServerRequiresAuthenticatedTLSNATSInProduction(t *testing.T) {
 	}
 }
 
+func TestLoadServerAllowsFixedSingleServerNATS(t *testing.T) {
+	values := serverTestValues(t.TempDir())
+	values["PEERGO_ENV"] = "production"
+	values["PEERGO_DEPLOYMENT_MODE"] = "single-server"
+	values["PEERGO_TRACKER_NATS_URLS"] = "nats://peergo-nats:4222"
+	values["PEERGO_TRACKER_NATS_CREDENTIALS_FILE"] = filepath.Join(t.TempDir(), "single-server.creds")
+	for name, value := range values {
+		t.Setenv(name, value)
+	}
+	if _, err := LoadServer(); err != nil {
+		t.Fatalf("single-server NATS rejected: %v", err)
+	}
+	t.Setenv("PEERGO_TRACKER_NATS_URLS", "nats://other-nats:4222")
+	if _, err := LoadServer(); err == nil {
+		t.Fatal("single-server accepted another clear-text NATS host")
+	}
+}
+
 func serverTestValues(directory string) map[string]string {
 	publicKey := make([]byte, ed25519.PublicKeySize)
 	return map[string]string{

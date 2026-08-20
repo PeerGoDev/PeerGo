@@ -92,10 +92,12 @@ type RelayTransactionalEmailSender struct {
 	client       *http.Client
 }
 
-func NewRelayTransactionalEmailSender(endpoint, serviceToken string, timeout time.Duration) (*RelayTransactionalEmailSender, error) {
+func NewRelayTransactionalEmailSender(endpoint, serviceToken string, timeout time.Duration, allowSingleServerPrivateHTTP bool) (*RelayTransactionalEmailSender, error) {
 	parsed, err := url.Parse(endpoint)
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return nil, errors.New("email delivery relay URL must be an absolute https URL without user info, query or fragment")
+	allowedPrivateHTTP := allowSingleServerPrivateHTTP && parsed != nil && parsed.Scheme == "http" &&
+		parsed.Host == "email-relay:8086" && parsed.Path == "/internal/v1/deliveries/transactional"
+	if err != nil || parsed == nil || (parsed.Scheme != "https" && !allowedPrivateHTTP) || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, errors.New("email delivery relay URL must use https, except the fixed single-server private HTTP origin")
 	}
 	if len(serviceToken) < 32 {
 		return nil, errors.New("email delivery relay token must contain at least 32 bytes")

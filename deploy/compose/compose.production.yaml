@@ -1,8 +1,9 @@
 name: peergo
 
-# This manifest orchestrates PeerGo application processes. PostgreSQL, NATS
-# JetStream and the public HTTPS reverse proxy remain operator-owned services;
-# their TLS endpoints and credentials are supplied through .env.production.
+# This manifest orchestrates PeerGo application processes. The cluster profile
+# expects operator-owned PostgreSQL and NATS. compose.single-server.yaml adds a
+# private NATS node and a dedicated external network without changing the
+# default cluster security boundary.
 x-runtime: &runtime
   image: ${PEERGO_RUNTIME_IMAGE:-peergo/runtime:local}
   build:
@@ -13,10 +14,10 @@ x-runtime: &runtime
   init: true
   stop_grace_period: 20s
   volumes:
-    - peergo_objects:/var/lib/peergo/objects
-    - peergo_tracker:/var/lib/peergo/tracker
-    - peergo_audit:/var/lib/peergo/audit
-    - peergo_image_derivatives:/var/lib/peergo/image-derivative-tmp
+    - ${PEERGO_OBJECTS_VOLUME_SOURCE:-peergo_objects}:/var/lib/peergo/objects
+    - ${PEERGO_TRACKER_VOLUME_SOURCE:-peergo_tracker}:/var/lib/peergo/tracker
+    - ${PEERGO_AUDIT_VOLUME_SOURCE:-peergo_audit}:/var/lib/peergo/audit
+    - ${PEERGO_IMAGE_DERIVATIVES_VOLUME_SOURCE:-peergo_image_derivatives}:/var/lib/peergo/image-derivative-tmp
     - ${PEERGO_SECRET_DIR:-../../.local/production-secrets}:/run/secrets:ro
 
 x-long-running: &long-running

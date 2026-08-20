@@ -31,9 +31,9 @@ make rousi-restore-production-prepare \
   CONFIRM_ROUSI_PRODUCTION=PREPARE_ROUSI_PRODUCTION \
   ROUSI_BACKUP_REFERENCE='backup-2026-08-20T2200+08' \
   ROUSI_WRITES_STOPPED_AT='2026-08-20T22:00:00+08:00' \
-  ROUSI_DUMP='/srv/peergo/input/rousi_20260820220000.sql.gz' \
-  ROUSI_TORRENTS='/srv/peergo/input/torrents.zip' \
-  ROUSI_UPLOADS='/srv/peergo/input/uploads.zip'
+  ROUSI_DUMP='/opt/peergo/input/rousi_20260820220000.sql.gz' \
+  ROUSI_TORRENTS='/opt/peergo/input/torrents.zip' \
+  ROUSI_UPLOADS='/opt/peergo/input/uploads.zip'
 ```
 
 该阶段会：
@@ -47,8 +47,11 @@ make rousi-restore-production-prepare \
 运行证据位于：
 
 ```text
-.local/production-cutovers/<run-id>/
+/opt/peergo/cutovers/<run-id>/
 ```
+
+上述是 `bootstrap-single-server.sh` 写入的默认位置；集群模式可通过
+`PEERGO_PRODUCTION_CUTOVER_ROOT` 使用其它绝对路径。
 
 若存在物理缺失，会生成 `torrent-exclusions.candidate.tsv` 与对应 `.sha256`。逐行核对
 旧 SQL ID、对象键和缺失原因；脚本不会像本地演练一样自动批准。
@@ -64,9 +67,9 @@ make rousi-restore-production-apply \
   ROUSI_WRITES_STOPPED_AT='2026-08-20T22:00:00+08:00' \
   ROUSI_OPERATOR_REFERENCE='change/peergo-cutover-001' \
   CONFIRM_ROUSI_MISSING_TORRENTS='APPROVE:<candidate-sha256>' \
-  ROUSI_DUMP='/srv/peergo/input/rousi_20260820220000.sql.gz' \
-  ROUSI_TORRENTS='/srv/peergo/input/torrents.zip' \
-  ROUSI_UPLOADS='/srv/peergo/input/uploads.zip'
+  ROUSI_DUMP='/opt/peergo/input/rousi_20260820220000.sql.gz' \
+  ROUSI_TORRENTS='/opt/peergo/input/torrents.zip' \
+  ROUSI_UPLOADS='/opt/peergo/input/uploads.zip'
 ```
 
 Apply 按固定顺序执行：
@@ -89,9 +92,9 @@ Apply 按固定顺序执行：
 
 ```bash
 make rousi-restore-production-status \
-  ROUSI_DUMP='/srv/peergo/input/rousi_20260820220000.sql.gz' \
-  ROUSI_TORRENTS='/srv/peergo/input/torrents.zip' \
-  ROUSI_UPLOADS='/srv/peergo/input/uploads.zip'
+  ROUSI_DUMP='/opt/peergo/input/rousi_20260820220000.sql.gz' \
+  ROUSI_TORRENTS='/opt/peergo/input/torrents.zip' \
+  ROUSI_UPLOADS='/opt/peergo/input/uploads.zip'
 ```
 
 只有运行目录中的 `ready-to-activate.env` 明确包含：

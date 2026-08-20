@@ -1,0 +1,58 @@
+name: peergo
+
+# Explicit single-host production overlay. All application traffic to NATS and
+# PostgreSQL stays on this dedicated Docker network; neither service is
+# published by this file. The public Web and Tracker ports remain loopback
+# bindings from compose.production.yaml for the host HTTPS proxy.
+services:
+  peergo-nats:
+    image: ${PEERGO_SINGLE_SERVER_NATS_IMAGE:-nats:2.14.3-alpine3.22}
+    user: "1000:1000"
+    command: ["-c", "/etc/nats/nats-server.conf"]
+    init: true
+    read_only: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - ${PEERGO_SINGLE_SERVER_NATS_DATA_PATH:?set by bootstrap-single-server.sh}:/data
+      - ${PEERGO_SINGLE_SERVER_NATS_CONFIG_PATH:?set by bootstrap-single-server.sh}:/etc/nats/nats-server.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  tracker-announce-stream-init:
+    depends_on:
+      peergo-nats:
+        condition: service_healthy
+
+  tracker-swarm-stream-init:
+    depends_on:
+      peergo-nats:
+        condition: service_healthy
+
+  settlement-traffic-stream-init:
+    depends_on:
+      peergo-nats:
+        condition: service_healthy
+
+  settlement-seeding-evidence-stream-init:
+    depends_on:
+      peergo-nats:
+        condition: service_healthy
+
+  settlement-hnr-stream-init:
+    depends_on:
+      peergo-nats:
+        condition: service_healthy
+
+networks:
+  default:
+    external: true
+    name: ${PEERGO_SINGLE_SERVER_NETWORK:-peergo-single}

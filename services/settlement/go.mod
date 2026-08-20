@@ -7,6 +7,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/nats-io/nats.go v1.52.0
 	github.com/peergo/peergo/contracts/go v0.0.0
+	github.com/peergo/peergo/libraries/natsauth v0.0.0
 )
 
 require (
@@ -23,3 +24,5 @@ require (
 )
 
 replace github.com/peergo/peergo/contracts/go => ../../contracts/go
+
+replace github.com/peergo/peergo/libraries/natsauth => ../../libraries/natsauth

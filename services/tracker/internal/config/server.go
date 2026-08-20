@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/peergo/peergo/contracts/go/deploymentv1"
 	"github.com/peergo/peergo/contracts/go/trackerswarmv1"
 	"github.com/peergo/peergo/services/tracker/internal/jetstreampublisher"
 	"github.com/peergo/peergo/services/tracker/internal/swarm"
@@ -278,11 +279,16 @@ func parseNATSURLs(environment string) ([]string, error) {
 	}
 	seen := make(map[string]struct{})
 	result := make([]string, 0, strings.Count(value, ",")+1)
+	mode, modeErr := deploymentv1.Load()
+	if modeErr != nil {
+		return nil, modeErr
+	}
 	for _, raw := range strings.Split(value, ",") {
 		parsed, err := url.Parse(strings.TrimSpace(raw))
+		allowedSingleServerURL := err == nil && parsed != nil && environment == "production" && mode == deploymentv1.SingleServer && parsed.Scheme == "nats" && parsed.Host == "peergo-nats:4222"
 		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" ||
-			(parsed.Scheme != "nats" && parsed.Scheme != "tls") || (environment == "production" && parsed.Scheme != "tls") {
-			return nil, errors.New("PEERGO_TRACKER_NATS_URLS must contain comma-separated credential-free nats:// URLs, or tls:// URLs required in production")
+			(parsed.Scheme != "nats" && parsed.Scheme != "tls") || (environment == "production" && parsed.Scheme != "tls" && !allowedSingleServerURL) {
+			return nil, errors.New("PEERGO_TRACKER_NATS_URLS must use credential-free tls:// URLs in production, except nats://peergo-nats:4222 in single-server mode")
 		}
 		canonical := parsed.String()
 		if _, duplicate := seen[canonical]; duplicate {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/peergo/peergo/libraries/natsauth"
 )
 
 type ConnectionConfig struct {
@@ -49,7 +50,11 @@ func Connect(config ConnectionConfig, logger *slog.Logger) (*nats.Conn, jetstrea
 		}),
 	}
 	if config.CredentialsFile != "" {
-		options = append(options, nats.UserCredentials(config.CredentialsFile))
+		authOption, err := natsauth.OptionFromCredentialsFile(config.CredentialsFile)
+		if err != nil {
+			return nil, nil, errors.Join(ErrConfig, err)
+		}
+		options = append(options, authOption)
 	}
 	if config.RootCAFile != "" {
 		options = append(options, nats.RootCAs(config.RootCAFile))

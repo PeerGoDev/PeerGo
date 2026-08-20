@@ -33,3 +33,11 @@ func TestLoadPromotionWorkerRejectsProductionRoutableHTTP(t *testing.T) {
 		t.Fatalf("expected production HTTP rejection, got %v", err)
 	}
 }
+
+func TestLoadPromotionWorkerAllowsFixedSingleServerService(t *testing.T) {
+	setPromotionWorkerEnvironment(t, "http://settlement-control-api:8085")
+	t.Setenv("PEERGO_DEPLOYMENT_MODE", "single-server")
+	if _, err := LoadPromotionWorker(); err != nil {
+		t.Fatalf("single-server Settlement service rejected: %v", err)
+	}
+}

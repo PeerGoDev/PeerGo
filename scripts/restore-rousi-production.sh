@@ -9,10 +9,21 @@ set -Eeuo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "${script_dir}/.." && pwd -P)"
-production_compose="${repo_root}/deploy/compose/compose.production.yaml"
-cutover_compose="${repo_root}/deploy/compose/compose.cutover.yaml"
+compose_wrapper="${repo_root}/scripts/production-compose.sh"
 env_file="${PEERGO_PRODUCTION_ENV_FILE:-${repo_root}/.env.production}"
-default_run_root="${repo_root}/.local/production-cutovers"
+env_cutover_root=""
+if [[ -f "${env_file}" ]]; then
+    env_cutover_root="$(awk '
+        /^[[:space:]]*PEERGO_PRODUCTION_CUTOVER_ROOT[[:space:]]*=/ {
+            line = $0
+            sub("^[[:space:]]*PEERGO_PRODUCTION_CUTOVER_ROOT[[:space:]]*=[[:space:]]*", "", line)
+            sub("[[:space:]]*$", "", line)
+            print line
+            exit
+        }
+    ' "${env_file}")"
+fi
+default_run_root="${PEERGO_PRODUCTION_CUTOVER_ROOT:-${env_cutover_root:-${repo_root}/.local/production-cutovers}}"
 
 usage() {
     cat <<'EOF'
@@ -123,11 +134,7 @@ write_or_verify_host_manifest() {
 }
 
 compose() {
-    docker compose \
-        --env-file "${env_file}" \
-        -f "${production_compose}" \
-        -f "${cutover_compose}" \
-        "$@"
+    PEERGO_PRODUCTION_ENV_FILE="${env_file}" "${compose_wrapper}" --cutover "$@"
 }
 
 [[ "$#" == '4' ]] || {

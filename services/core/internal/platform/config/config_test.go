@@ -93,6 +93,28 @@ func TestLoadUsesSecureCookiePrefixesInProduction(t *testing.T) {
 	}
 }
 
+func TestLoadAllowsOnlyFixedSingleServerServiceOrigins(t *testing.T) {
+	setValidCoreEnvironment(t)
+	t.Setenv("PEERGO_ENV", "production")
+	t.Setenv("PEERGO_DEPLOYMENT_MODE", "single-server")
+	t.Setenv("PEERGO_CORE_DATABASE_URL", "postgres://peergo_core:secret@postgresql:5432/peergo_core?sslmode=disable")
+	t.Setenv("PEERGO_VAULT_URL", "http://vault-api:8081")
+	t.Setenv("PEERGO_SETTLEMENT_CONTROL_URL", "http://settlement-control-api:8085")
+	t.Setenv("PEERGO_WEB_ORIGINS", "https://rousi.pro")
+	t.Setenv("PEERGO_PUBLIC_ORIGIN", "https://rousi.pro")
+	t.Setenv("PEERGO_WEBAUTHN_RP_ID", "rousi.pro")
+	t.Setenv("PEERGO_WEBAUTHN_ORIGINS", "https://rousi.pro")
+	t.Setenv("PEERGO_TRACKER_CANONICAL_ORIGIN", "https://rousi.pro")
+	t.Setenv("PEERGO_COOKIE_SECURE", "true")
+	if _, err := Load(); err != nil {
+		t.Fatalf("single-server service origins rejected: %v", err)
+	}
+	t.Setenv("PEERGO_VAULT_URL", "http://vault-api.evil:8081")
+	if _, err := Load(); err == nil {
+		t.Fatal("single-server accepted a non-fixed Vault host")
+	}
+}
+
 func setValidCoreEnvironment(t *testing.T) {
 	t.Helper()
 	t.Setenv("PEERGO_ENV", "development")

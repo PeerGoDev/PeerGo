@@ -22,11 +22,16 @@ func projectionNATSURLs(name, environment string) ([]string, error) {
 	}
 	seen := make(map[string]struct{})
 	urls := make([]string, 0, strings.Count(value, ",")+1)
+	singleServer, modeErr := isSingleServerDeployment()
+	if modeErr != nil {
+		return nil, modeErr
+	}
 	for _, raw := range strings.Split(value, ",") {
 		parsed, parseErr := url.Parse(strings.TrimSpace(raw))
+		allowedSingleServerURL := parseErr == nil && parsed != nil && environment == "production" && singleServer && parsed.Scheme == "nats" && parsed.Host == "peergo-nats:4222"
 		if parseErr != nil || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" ||
-			(parsed.Scheme != "nats" && parsed.Scheme != "tls") || (environment == "production" && parsed.Scheme != "tls") {
-			return nil, fmt.Errorf("%s must contain comma-separated credential-free nats:// URLs, or tls:// URLs required in production", name)
+			(parsed.Scheme != "nats" && parsed.Scheme != "tls") || (environment == "production" && parsed.Scheme != "tls" && !allowedSingleServerURL) {
+			return nil, fmt.Errorf("%s must contain credential-free tls:// URLs in production, except nats://peergo-nats:4222 in single-server mode", name)
 		}
 		canonical := parsed.String()
 		if _, duplicate := seen[canonical]; duplicate {

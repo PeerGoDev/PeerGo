@@ -47,3 +47,22 @@ func TestLoadStreamProvisionerRequiresThreeProductionReplicas(t *testing.T) {
 		t.Fatalf("LoadStreamProvisioner() error = %v", err)
 	}
 }
+
+func TestLoadStreamProvisionerAllowsOneSingleServerReplica(t *testing.T) {
+	values := serverTestValues(t.TempDir())
+	values["PEERGO_ENV"] = "production"
+	values["PEERGO_DEPLOYMENT_MODE"] = "single-server"
+	values["PEERGO_TRACKER_NATS_URLS"] = "nats://peergo-nats:4222"
+	for name, value := range values {
+		t.Setenv(name, value)
+	}
+	t.Setenv("PEERGO_TRACKER_NATS_PROVISION_CREDENTIALS_FILE", filepath.Join(t.TempDir(), "operator.creds"))
+	t.Setenv("PEERGO_TRACKER_ANNOUNCE_STREAM_PROVISION_TIMEOUT", "10s")
+	t.Setenv("PEERGO_TRACKER_ANNOUNCE_STREAM_MAX_BYTES", "1073741824")
+	t.Setenv("PEERGO_TRACKER_ANNOUNCE_STREAM_MAX_AGE", "168h")
+	t.Setenv("PEERGO_TRACKER_ANNOUNCE_STREAM_DUPLICATE_WINDOW", "10m")
+	t.Setenv("PEERGO_TRACKER_ANNOUNCE_STREAM_REPLICAS", "1")
+	if _, err := LoadStreamProvisioner(); err != nil {
+		t.Fatalf("single-server replica count rejected: %v", err)
+	}
+}

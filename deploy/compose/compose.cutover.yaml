@@ -16,7 +16,6 @@ services:
       - ${PEERGO_ENV_FILE:-../../.env.production}
     init: true
     read_only: true
-    network_mode: bridge
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 30s
@@ -42,9 +41,9 @@ services:
       PEERGO_TRACKER_SUBJECT_SNAPSHOT_PATH: /var/lib/peergo/tracker/subjects.snapshot
       PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_PATH: /var/lib/peergo/tracker/runtime-policy.snapshot
     volumes:
-      - peergo_objects:/var/lib/peergo/objects
-      - peergo_tracker:/var/lib/peergo/tracker
-      - peergo_image_derivatives:/var/lib/peergo/image-derivative-tmp
+      - ${PEERGO_OBJECTS_VOLUME_SOURCE:-peergo_objects}:/var/lib/peergo/objects
+      - ${PEERGO_TRACKER_VOLUME_SOURCE:-peergo_tracker}:/var/lib/peergo/tracker
+      - ${PEERGO_IMAGE_DERIVATIVES_VOLUME_SOURCE:-peergo_image_derivatives}:/var/lib/peergo/image-derivative-tmp
       - ${PEERGO_SECRET_DIR:-../../.local/production-secrets}:/run/secrets:ro
       - ${PEERGO_CUTOVER_DUMP_HOST_PATH:?set by restore-rousi-production.sh}:/cutover/input/rousi.sql.gz:ro
       - ${PEERGO_CUTOVER_TORRENTS_HOST_PATH:?set by restore-rousi-production.sh}:/cutover/input/torrents.zip:ro

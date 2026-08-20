@@ -17,11 +17,14 @@ require (
 	github.com/oapi-codegen/nethttp-middleware v1.2.0
 	github.com/oapi-codegen/runtime v1.6.0
 	github.com/peergo/peergo/contracts/go v0.0.0
+	github.com/peergo/peergo/libraries/natsauth v0.0.0
 	golang.org/x/image v0.25.0
 	golang.org/x/sys v0.47.0
 )
 
 replace github.com/peergo/peergo/contracts/go => ../../contracts/go
+
+replace github.com/peergo/peergo/libraries/natsauth => ../../libraries/natsauth
 
 require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect

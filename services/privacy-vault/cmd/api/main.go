@@ -95,6 +95,7 @@ func main() {
 			settings.EmailDeliveryURL,
 			settings.EmailDeliveryServiceToken,
 			3*time.Second,
+			settings.EmailDeliveryPrivateHTTP,
 		)
 	}
 	if err != nil {

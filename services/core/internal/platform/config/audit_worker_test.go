@@ -25,3 +25,14 @@ func TestLoadAuditWorkerValidatesProductionTransport(t *testing.T) {
 		t.Fatalf("LoadAuditWorker(production HTTPS) error = %v", err)
 	}
 }
+
+func TestLoadAuditWorkerAllowsFixedSingleServerSink(t *testing.T) {
+	t.Setenv("PEERGO_ENV", "production")
+	t.Setenv("PEERGO_DEPLOYMENT_MODE", "single-server")
+	t.Setenv("PEERGO_CORE_DATABASE_URL", "postgres://peergo_core:secret@postgresql:5432/peergo_core?sslmode=disable")
+	t.Setenv("PEERGO_AUDIT_SINK_URL", "http://audit-sink:8082")
+	t.Setenv("PEERGO_AUDIT_SERVICE_TOKEN", "peergo-test-audit-service-token-2026")
+	if _, err := LoadAuditWorker(); err != nil {
+		t.Fatalf("single-server audit sink rejected: %v", err)
+	}
+}

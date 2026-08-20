@@ -44,8 +44,14 @@ func LoadPromotionWorker() (PromotionWorkerConfig, error) {
 		// container and reaches it only through a kernel loopback address. Keep
 		// clear-text traffic forbidden for every routable production endpoint.
 		address := net.ParseIP(parsed.Hostname())
-		if parsed.Scheme != "http" || address == nil || !address.IsLoopback() {
-			return PromotionWorkerConfig{}, errors.New("PEERGO_SETTLEMENT_CONTROL_URL must use https or an IP loopback HTTP origin in production")
+		loopback := parsed.Scheme == "http" && address != nil && address.IsLoopback()
+		singleServer, modeErr := isSingleServerDeployment()
+		if modeErr != nil {
+			return PromotionWorkerConfig{}, modeErr
+		}
+		privateService := singleServer && parsed.Scheme == "http" && parsed.Host == "settlement-control-api:8085"
+		if !loopback && !privateService {
+			return PromotionWorkerConfig{}, errors.New("PEERGO_SETTLEMENT_CONTROL_URL must use https, IP loopback HTTP, or the fixed single-server service origin")
 		}
 	}
 	token, err := required("PEERGO_SETTLEMENT_CONTROL_SERVICE_TOKEN")

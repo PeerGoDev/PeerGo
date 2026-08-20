@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/peergo/peergo/contracts/go/deploymentv1"
 	"github.com/peergo/peergo/contracts/go/trackerswarmv1"
 )
 
@@ -73,7 +74,11 @@ func LoadSwarmStreamProvisioner() (StreamProvisionerConfig, error) {
 	if err != nil {
 		return StreamProvisionerConfig{}, err
 	}
-	if environment == "production" && replicas < 3 {
+	mode, modeErr := deploymentv1.Load()
+	if modeErr != nil {
+		return StreamProvisionerConfig{}, modeErr
+	}
+	if environment == "production" && mode != deploymentv1.SingleServer && replicas < 3 {
 		return StreamProvisionerConfig{}, errors.New("PEERGO_TRACKER_SWARM_STREAM_REPLICAS must be at least 3 in production")
 	}
 	return StreamProvisionerConfig{

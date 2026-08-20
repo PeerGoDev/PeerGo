@@ -33,7 +33,13 @@ func validateCoreDatabaseURL(value, environment string) error {
 		return errors.New("invalid PostgreSQL URL")
 	}
 	if environment == "production" && parsed.Query().Get("sslmode") == "disable" {
-		return errors.New("PostgreSQL TLS cannot be disabled in production")
+		singleServer, modeErr := isSingleServerDeployment()
+		if modeErr != nil {
+			return modeErr
+		}
+		if !singleServer || parsed.Host != "postgresql:5432" {
+			return errors.New("PostgreSQL TLS can only be disabled for postgresql:5432 in single-server production")
+		}
 	}
 	return nil
 }
@@ -49,7 +55,13 @@ func ValidateCutoverDatabaseURL(value, environment string) error {
 		return errors.New("invalid PostgreSQL cutover URL")
 	}
 	if environment == "production" && parsed.Query().Get("sslmode") != "verify-full" {
-		return errors.New("production cutover PostgreSQL URLs must use sslmode=verify-full")
+		singleServer, modeErr := isSingleServerDeployment()
+		if modeErr != nil {
+			return modeErr
+		}
+		if !singleServer || parsed.Host != "postgresql:5432" || parsed.Query().Get("sslmode") != "disable" {
+			return errors.New("production cutover PostgreSQL URLs must use sslmode=verify-full, except postgresql:5432 in single-server mode")
+		}
 	}
 	return nil
 }

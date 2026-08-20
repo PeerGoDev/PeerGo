@@ -39,7 +39,13 @@ func LoadAuditWorker() (AuditWorkerConfig, error) {
 		return AuditWorkerConfig{}, errors.New("PEERGO_AUDIT_SINK_URL must use http or https")
 	}
 	if environment == "production" && parsed.Scheme != "https" {
-		return AuditWorkerConfig{}, errors.New("PEERGO_AUDIT_SINK_URL must use https in production")
+		singleServer, modeErr := isSingleServerDeployment()
+		if modeErr != nil {
+			return AuditWorkerConfig{}, modeErr
+		}
+		if !singleServer || parsed.Scheme != "http" || parsed.Host != "audit-sink:8082" {
+			return AuditWorkerConfig{}, errors.New("PEERGO_AUDIT_SINK_URL must use https, except http://audit-sink:8082 in single-server production")
+		}
 	}
 	serviceToken, err := required("PEERGO_AUDIT_SERVICE_TOKEN")
 	if err != nil {

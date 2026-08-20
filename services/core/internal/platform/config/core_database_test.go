@@ -33,3 +33,19 @@ func TestValidateCutoverDatabaseURLRequiresHostnameVerificationInProduction(t *t
 		t.Fatalf("development cutover URL rejected: %v", err)
 	}
 }
+
+func TestSingleServerDatabaseExceptionIsExact(t *testing.T) {
+	t.Setenv("PEERGO_ENV", "production")
+	t.Setenv("PEERGO_DEPLOYMENT_MODE", "single-server")
+	t.Setenv("PEERGO_CORE_DATABASE_URL", "postgres://peergo_core:secret@postgresql:5432/peergo_core?sslmode=disable")
+	if _, err := LoadCoreDatabaseProcess(); err != nil {
+		t.Fatalf("single-server database rejected: %v", err)
+	}
+	if err := ValidateCutoverDatabaseURL("postgres://peergo_core:secret@postgresql:5432/peergo_core?sslmode=disable", "production"); err != nil {
+		t.Fatalf("single-server cutover database rejected: %v", err)
+	}
+	t.Setenv("PEERGO_CORE_DATABASE_URL", "postgres://peergo_core:secret@other-db:5432/peergo_core?sslmode=disable")
+	if _, err := LoadCoreDatabaseProcess(); err == nil {
+		t.Fatal("single-server accepted a different clear-text database host")
+	}
+}

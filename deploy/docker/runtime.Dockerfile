@@ -5,6 +5,7 @@ FROM golang:1.26-alpine3.22 AS build
 WORKDIR /src
 COPY go.work go.work.sum ./
 COPY contracts/go ./contracts/go
+COPY libraries ./libraries
 COPY services ./services
 COPY tools/devtools ./tools/devtools
 COPY tools/migrator ./tools/migrator

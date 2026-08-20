@@ -52,6 +52,9 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	if err := validateCoreDatabaseURL(databaseURL, environment); err != nil {
+		return Config{}, err
+	}
 	vaultURL, err := required("PEERGO_VAULT_URL")
 	if err != nil {
 		return Config{}, err
@@ -61,7 +64,13 @@ func Load() (Config, error) {
 		return Config{}, errors.New("PEERGO_VAULT_URL must be an absolute URL without user info")
 	}
 	if environment == "production" && parsedVaultURL.Scheme != "https" {
-		return Config{}, errors.New("PEERGO_VAULT_URL must use https in production")
+		singleServer, modeErr := isSingleServerDeployment()
+		if modeErr != nil {
+			return Config{}, modeErr
+		}
+		if !singleServer || parsedVaultURL.Scheme != "http" || parsedVaultURL.Host != "vault-api:8081" {
+			return Config{}, errors.New("PEERGO_VAULT_URL must use https, except http://vault-api:8081 in single-server production")
+		}
 	}
 	vaultServiceToken, err := required("PEERGO_VAULT_SERVICE_TOKEN")
 	if err != nil {
@@ -202,7 +211,13 @@ func Load() (Config, error) {
 		return Config{}, errors.New("PEERGO_SETTLEMENT_CONTROL_URL must use http or https")
 	}
 	if environment == "production" && parsedSettlementURL.Scheme != "https" {
-		return Config{}, errors.New("PEERGO_SETTLEMENT_CONTROL_URL must use https in production")
+		singleServer, modeErr := isSingleServerDeployment()
+		if modeErr != nil {
+			return Config{}, modeErr
+		}
+		if !singleServer || parsedSettlementURL.Scheme != "http" || parsedSettlementURL.Host != "settlement-control-api:8085" {
+			return Config{}, errors.New("PEERGO_SETTLEMENT_CONTROL_URL must use https, except http://settlement-control-api:8085 in single-server production")
+		}
 	}
 	settlementControlURL = parsedSettlementURL.Scheme + "://" + parsedSettlementURL.Host
 	settlementServiceToken, err := required("PEERGO_SETTLEMENT_CONTROL_SERVICE_TOKEN")

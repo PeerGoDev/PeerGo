@@ -1,24 +1,28 @@
 # PeerGo 首版生产部署
 
-本文描述单机首版应用编排。PostgreSQL、NATS JetStream、HTTPS 入口、DNS、
-Prometheus/告警与备份仍由运维环境负责，不能用开发 Compose 替代。
+本文提供两种明确模式：默认 `cluster` 保持 PostgreSQL/NATS 全链路 TLS 与多副本；
+`single-server` 面向当前 RousiPro 主机，复用 1Panel PostgreSQL，并由 PeerGo 编排一个
+不暴露宿主机端口的单节点 NATS。两种模式的公网 Web/Tracker 都必须经过 HTTPS 入口。
 
 ## 1. 发布基线
 
 生产服务器只从明确提交部署，不直接复制开发目录：
 
 ```bash
-git clone --branch dev https://github.com/PeerGoDev/PeerGo.git
-cd PeerGo
+install -d /opt/peergo
+git clone --branch dev --single-branch \
+  https://github.com/PeerGoDev/PeerGo.git /opt/peergo/app
+cd /opt/peergo/app
 git rev-parse HEAD
 ```
 
-记录提交 SHA，并保留上一版本的镜像、环境文件、数据库快照和入口配置。正式切流前不要
-删除 RousiPro。
+代码只放在 `/opt/peergo/app`。三包放 `/opt/peergo/input`，运行数据分别落到
+`/opt/peergo/storage`、`tracker`、`audit`、`nats` 和 `cutovers`；更新代码不会覆盖数据。
+记录提交 SHA，并保留上一版本镜像、环境文件、数据库快照和入口配置。正式切流前不要删除 RousiPro。
 
 ## 2. 外部依赖
 
-准备以下资源：
+`cluster` 模式准备以下资源：
 
 1. Core、Privacy Vault、Tracker Ledger 三个独立 PostgreSQL 数据库、owner 和运行角色；
    生产连接必须使用 TLS。另建一个临时空 PostgreSQL 数据库作为 Rousi 只读源库，恢复
@@ -32,7 +36,53 @@ git rev-parse HEAD
 5. SMTP、SPF、DKIM、DMARC，以及仅私网可达的邮件 Relay HTTPS 入口。
 6. 三库 PITR、对象卷、Tracker WAL/签名快照、Audit 日志和密钥材料的恢复演练。
 
+当前单机首版使用 `single-server`。它仍保持三个目标 database、一个隔离源 database 和五个
+独立角色，但可共用已经运行的 PostgreSQL 物理实例。NATS 使用单副本 JetStream；这是明确的
+单机故障域，不伪装成高可用。内部明文只允许以下固定 Docker DNS 端点：
+`postgresql:5432`、`peergo-nats:4222`、`vault-api:8081`、`audit-sink:8082`、
+`settlement-control-api:8085` 和
+`email-relay:8086/internal/v1/deliveries/transactional`。普通 `cluster` 配置不会获得这些例外。
+
 ## 3. 生产配置
+
+### 3.1 当前单机主机一键准备
+
+确认现有 PostgreSQL 容器名仍为 `1Panel-postgresql-kXaY`，然后执行：
+
+```bash
+cd /opt/peergo/app
+make single-server-bootstrap
+```
+
+脚本是幂等的：创建缺失目录、随机密钥、专用 Docker 网络、数据库和角色；已有 PeerGo 数据库
+owner 不符合预期时会停止，不会 drop、truncate 或重置 1Panel PostgreSQL。它把现有 PostgreSQL
+额外接入 `peergo-single` 网络并仅在该网络登记别名 `postgresql`，原 `1panel-network` 不变。
+
+非默认容器、根目录或域名通过环境变量显式传入：
+
+```bash
+PEERGO_SINGLE_SERVER_POSTGRES_CONTAINER='1Panel-postgresql-kXaY' \
+PEERGO_SINGLE_SERVER_ROOT='/opt/peergo' \
+PEERGO_SINGLE_SERVER_PUBLIC_ORIGIN='https://rousi.pro' \
+  make single-server-bootstrap
+```
+
+可在首次执行时同时提供 SMTP；未提供则 `.env.production` 明确保留 `CHANGE_ME`，
+`make production-up` 会拒绝启动：
+
+```bash
+PEERGO_BOOTSTRAP_SMTP_HOST='smtp.example.net' \
+PEERGO_BOOTSTRAP_SMTP_USERNAME='account' \
+PEERGO_BOOTSTRAP_SMTP_PASSWORD='app-password' \
+PEERGO_BOOTSTRAP_SMTP_FROM_ADDRESS='noreply@rousi.pro' \
+  make single-server-bootstrap
+```
+
+脚本生成 `/opt/peergo/app/.env.production`（mode `0600`）和
+`/opt/peergo/secrets/peergo-single-server-nats.creds`，不会把密钥提交 Git。重复执行会复用已有
+数据库密码、应用密钥、Tracker 签名密钥、NATS 密码和已经填写的 SMTP 配置。
+
+### 3.2 集群模式手工准备
 
 ```bash
 cp .env.example .env.production
@@ -57,6 +107,10 @@ chmod 600 .env.production
 ```bash
 make production-config
 ```
+
+这一步允许 SMTP 和 Tracker 切换时刻尚未填写，便于先构建和执行迁移。真正启动前
+`make production-up` 还会运行 readiness 检查，要求真实 SMTP 和精确的
+`PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT=YYYY-MM-DDTHH:00:00Z`。
 
 构建运行镜像：
 

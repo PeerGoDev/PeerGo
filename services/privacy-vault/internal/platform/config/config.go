@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/peergo/peergo/contracts/go/deploymentv1"
 )
 
 // Config is fully validated before Privacy Vault opens a listener.
@@ -25,6 +27,7 @@ type Config struct {
 	EmailOutboxPath             string
 	EmailDeliveryURL            string
 	EmailDeliveryServiceToken   string
+	EmailDeliveryPrivateHTTP    bool
 }
 
 // Load reads the Vault process configuration without hidden credential
@@ -39,6 +42,9 @@ func Load() (Config, error) {
 	}
 	databaseURL, err := required("PEERGO_VAULT_DATABASE_URL")
 	if err != nil {
+		return Config{}, err
+	}
+	if err := validateDatabaseURL(databaseURL, environment); err != nil {
 		return Config{}, err
 	}
 	identifierKey, err := required("PEERGO_VAULT_IDENTIFIER_KEY")
@@ -114,6 +120,7 @@ func Load() (Config, error) {
 	}
 
 	var emailOutboxPath, emailDeliveryURL, emailDeliveryServiceToken string
+	var emailDeliveryPrivateHTTP bool
 	if environment == "development" {
 		emailOutboxPath, err = required("PEERGO_EMAIL_OUTBOX_PATH")
 		if err != nil {
@@ -125,9 +132,19 @@ func Load() (Config, error) {
 			return Config{}, err
 		}
 		parsedDeliveryURL, parseErr := url.Parse(emailDeliveryURL)
-		if parseErr != nil || parsedDeliveryURL.Scheme != "https" || parsedDeliveryURL.Host == "" || parsedDeliveryURL.User != nil || parsedDeliveryURL.RawQuery != "" || parsedDeliveryURL.Fragment != "" {
-			return Config{}, errors.New("PEERGO_EMAIL_DELIVERY_URL must be an absolute https URL without user info, query or fragment")
+		if parseErr != nil || parsedDeliveryURL.Host == "" || parsedDeliveryURL.User != nil || parsedDeliveryURL.RawQuery != "" || parsedDeliveryURL.Fragment != "" {
+			return Config{}, errors.New("PEERGO_EMAIL_DELIVERY_URL must be an absolute service URL without user info, query or fragment")
 		}
+		mode, modeErr := deploymentv1.Load()
+		if modeErr != nil {
+			return Config{}, modeErr
+		}
+		allowedSingleServerURL := mode == deploymentv1.SingleServer && parsedDeliveryURL.Scheme == "http" &&
+			parsedDeliveryURL.Host == "email-relay:8086" && parsedDeliveryURL.Path == "/internal/v1/deliveries/transactional"
+		if parsedDeliveryURL.Scheme != "https" && !allowedSingleServerURL {
+			return Config{}, errors.New("PEERGO_EMAIL_DELIVERY_URL must use https, except the fixed single-server Relay endpoint")
+		}
+		emailDeliveryPrivateHTTP = allowedSingleServerURL
 		emailDeliveryServiceToken, err = required("PEERGO_EMAIL_DELIVERY_SERVICE_TOKEN")
 		if err != nil {
 			return Config{}, err
@@ -157,7 +174,26 @@ func Load() (Config, error) {
 		EmailOutboxPath:             emailOutboxPath,
 		EmailDeliveryURL:            emailDeliveryURL,
 		EmailDeliveryServiceToken:   emailDeliveryServiceToken,
+		EmailDeliveryPrivateHTTP:    emailDeliveryPrivateHTTP,
 	}, nil
+}
+
+func validateDatabaseURL(value, environment string) error {
+	parsed, err := url.Parse(value)
+	if err != nil || (parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") || parsed.Host == "" ||
+		strings.Trim(parsed.Path, "/") == "" || parsed.Fragment != "" {
+		return errors.New("PEERGO_VAULT_DATABASE_URL must be a PostgreSQL connection URL with a database name")
+	}
+	if environment == "production" && parsed.Query().Get("sslmode") == "disable" {
+		mode, modeErr := deploymentv1.Load()
+		if modeErr != nil {
+			return modeErr
+		}
+		if mode != deploymentv1.SingleServer || parsed.Host != "postgresql:5432" {
+			return errors.New("PostgreSQL TLS can only be disabled for postgresql:5432 in single-server production")
+		}
+	}
+	return nil
 }
 
 func required(name string) (string, error) {

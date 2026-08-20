@@ -53,6 +53,20 @@ func TestProductionRequiresTLSAndSeparateCredentials(t *testing.T) {
 	}
 }
 
+func TestSingleServerAcceptsOnlyItsPrivateNATSAndDatabaseNames(t *testing.T) {
+	setConfigValues(t, "production")
+	t.Setenv("PEERGO_DEPLOYMENT_MODE", "single-server")
+	t.Setenv("PEERGO_SETTLEMENT_NATS_URLS", "nats://peergo-nats:4222")
+	t.Setenv("PEERGO_TRACKER_DATABASE_URL", "postgres://peergo_tracker:secret@postgresql:5432/peergo_tracker?sslmode=disable")
+	if _, err := LoadRuntime(); err != nil {
+		t.Fatalf("single-server runtime rejected: %v", err)
+	}
+	t.Setenv("PEERGO_SETTLEMENT_NATS_URLS", "nats://other-nats:4222")
+	if _, err := LoadRuntime(); err == nil {
+		t.Fatal("single-server accepted another clear-text NATS host")
+	}
+}
+
 func TestConsumerAckWaitMustContainProcessingAndConfirmedAck(t *testing.T) {
 	setConfigValues(t, "development")
 	t.Setenv("PEERGO_SETTLEMENT_CONSUMER_ACK_WAIT", "15s")

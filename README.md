@@ -1639,7 +1639,9 @@ export PEERGO_TRACKER_SNAPSHOT_MAX_FUTURE_SKEW='30s'
 Core/Vault schema migration 版本、源用户/种子计数和固定 `occurred_at`。全新导入只接受没有
 旧用户、Vault 凭据、种子、ID 映射及 migration run 的目标；中断续跑只接受可归属于同一
 `run_id` 的目标记录，并拒绝换 snapshot、mapping version、时间锚点、种子/图片归档或对象存储 backend。
-`PEERGO_ENV=production` 时三个 PostgreSQL URL 都必须显式使用 `sslmode=verify-full`。
+`PEERGO_ENV=production` 的默认 `cluster` 模式要求三个 PostgreSQL URL 显式使用
+`sslmode=verify-full`。只有同时显式设置 `PEERGO_DEPLOYMENT_MODE=single-server` 时，才允许
+Docker 私网固定端点 `postgresql:5432` 使用 `sslmode=disable`；其它主机仍会失败关闭。
 filesystem 根目录必须已由运维预先创建；S3-compatible 后端必须允许只读 `HeadBucket`。
 预检不会创建/删除 canary 对象，真正的写入权限和逐对象完整性仍由 import 的
 `PutIfAbsent -> Open -> SHA-256/长度` 流程证明。
@@ -1870,14 +1872,19 @@ core-postgres + vault-postgres + tracker-postgres + web-valkey + nats + minio + 
 `rousi.sql.gz + torrents.zip + uploads.zip` 的正式迁移见
 [RousiPro 三包生产迁移](./docs/operations/rousi-cutover.md)。
 
-`deploy/compose/compose.production.yaml` 是单机/首版应用进程编排，不替代生产
-PostgreSQL、NATS JetStream、HTTPS 入口和备份设施。它会按依赖顺序执行三库 migration、
+`deploy/compose/compose.production.yaml` 是首版应用进程编排，不替代 HTTPS 入口和备份设施。
+默认 `cluster` 模式仍使用外部 TLS PostgreSQL/NATS；显式 `single-server` 模式叠加
+`compose.single-server.yaml`，复用同机 PostgreSQL 并启动不发布宿主机端口的单节点 NATS。
+两种模式都会按依赖顺序执行三库 migration、
 幂等创建或核对 JetStream stream/durable、生成首份 Tracker 签名快照，再启动 Web、Core、
 Vault、Audit、Tracker、Settlement 和全部 projector/worker。长期进程使用
 `restart: unless-stopped`；Core、Vault、Audit、Tracker 与 Web 均有有界健康检查。Core 的
 `/healthz` 只代表进程存活，`/readyz` 还会探测 Core PostgreSQL，数据库不可用时返回 503。
 
-部署前从 `.env.example` 复制一份不纳入 Git 的 `.env.production`，至少完成以下准备：
+集群部署前从 `.env.example` 复制一份不纳入 Git 的 `.env.production`。当前 RousiPro 单机
+部署可在 `/opt/peergo/app` 执行 `make single-server-bootstrap`：它幂等准备
+`/opt/peergo/{input,storage,tracker,audit,nats,secrets,cutovers}`、专用数据库/角色、私有网络和
+随机密钥，不删除现有 1Panel 数据。两种模式都至少完成以下准备：
 
 1. 为 Core、Vault、Tracker Ledger 准备独立数据库与 TLS 连接串，并先完成备份/PITR 演练。
 2. 准备启用 TLS、JetStream 和三副本 stream 的 NATS 集群；把各运行时/初始化身份的
@@ -1886,7 +1893,8 @@ Vault、Audit、Tracker、Settlement 和全部 projector/worker。长期进程�
    端口只绑定宿主机 `127.0.0.1`，由私有 HTTPS 入口转发；对应 URL 不得指向公网管理面。
 4. 配置持久对象存储与 Tracker 快照签名密钥。Filesystem 模式必须把 Compose volume 一并
    纳入快照；S3-compatible 模式必须启用服务端加密、版本和生命周期保护。
-5. 配置 HTTPS 邮件 Relay；Vault 生产模式不会回退到本地 JSONL 邮箱。
+5. 配置邮件 Relay 和加密 SMTP；单机模式只允许 Vault 通过固定 Docker 私网地址访问 Relay，
+   集群模式仍要求 HTTPS。Vault 生产模式不会回退到本地 JSONL 邮箱。
 
 ```bash
 # 只校验 Compose 和变量展开，不修改数据库。
@@ -1895,7 +1903,8 @@ make production-config
 # 构建全部 Go 运行命令（含 goose/libvips）和 React Router 静态站点。
 make production-build
 
-# migration 与 JetStream 初始化都是幂等操作；任一漂移会阻止后续服务启动。
+# 还会拒绝 CHANGE_ME SMTP 和缺失的精确 Tracker UTC 切换整点；migration 与
+# JetStream 初始化都是幂等操作，任一漂移会阻止后续服务启动。
 make production-up
 make production-status
 ```
