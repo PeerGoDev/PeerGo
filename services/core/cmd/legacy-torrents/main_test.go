@@ -1,9 +1,76 @@
 package main
 
 import (
+	"context"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+const acceptanceSnapshotRefreshEnvironment = "PEERGO_LEGACY_ACCEPTANCE_SNAPSHOT_REFRESH_BINARY"
+
+func TestLoadAcceptanceSnapshotRefresherDisabled(t *testing.T) {
+	t.Setenv(acceptanceSnapshotRefreshEnvironment, "")
+
+	refresh, err := loadAcceptanceSnapshotRefresher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refresh != nil {
+		t.Fatal("snapshot refresher was composed while disabled")
+	}
+}
+
+func TestLoadAcceptanceSnapshotRefresherRejectsUnsafeExecutable(t *testing.T) {
+	t.Setenv(acceptanceSnapshotRefreshEnvironment, "relative/publisher")
+	if _, err := loadAcceptanceSnapshotRefresher(); err == nil {
+		t.Fatal("snapshot refresher accepted a relative executable")
+	}
+
+	path := filepath.Join(t.TempDir(), "publisher")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o722); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o722); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(acceptanceSnapshotRefreshEnvironment, path)
+	if _, err := loadAcceptanceSnapshotRefresher(); err == nil {
+		t.Fatal("snapshot refresher accepted a group-writable executable")
+	}
+}
+
+func TestLoadAcceptanceSnapshotRefresherRunsPublisherInOneShotMode(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "publisher")
+	output := filepath.Join(directory, "observed-interval")
+	script := "#!/bin/sh\nprintf '%s' \"${PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL-unset}\" > \"$PEERGO_TEST_SNAPSHOT_REFRESH_OUTPUT\"\n"
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(acceptanceSnapshotRefreshEnvironment, path)
+	t.Setenv("PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL", "30s")
+	t.Setenv("PEERGO_TEST_SNAPSHOT_REFRESH_OUTPUT", output)
+
+	refresh, err := loadAcceptanceSnapshotRefresher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refresh == nil {
+		t.Fatal("snapshot refresher was not composed")
+	}
+	if err := refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(raw)) != "" {
+		t.Fatalf("publisher interval = %q, want empty one-shot mode", raw)
+	}
+}
 
 func TestLoadSettingsStatusDoesNotRequireSourceDatabase(t *testing.T) {
 	t.Setenv("PEERGO_CORE_DATABASE_URL", "postgres://core.example/peergo")

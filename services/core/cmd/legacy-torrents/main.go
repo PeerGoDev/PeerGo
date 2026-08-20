@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -547,6 +549,10 @@ func runCutoverAcceptance(
 	if err != nil {
 		return err
 	}
+	refreshTrackerSnapshots, err := loadAcceptanceSnapshotRefresher()
+	if err != nil {
+		return err
+	}
 	if acceptanceSettings.Environment != storageSettings.Environment {
 		return errors.New("acceptance and storage environments do not match")
 	}
@@ -612,6 +618,7 @@ func runCutoverAcceptance(
 			TrackerSnapshotMaxAge:      acceptanceSettings.SnapshotMaxAge,
 			TrackerSubjectMaxAge:       acceptanceSettings.SubjectMaxAge,
 			TrackerMaxFutureSkew:       acceptanceSettings.MaxFutureSkew,
+			RefreshTrackerSnapshots:    refreshTrackerSnapshots,
 			ProgressEvery:              config.ProgressEvery,
 		},
 		func(progress legacytorrents.CutoverAcceptanceProgress) {
@@ -651,6 +658,45 @@ func runCutoverAcceptance(
 		"manifest_sha256", hex.EncodeToString(manifestSHA256[:]),
 	)
 	return nil
+}
+
+// loadAcceptanceSnapshotRefresher keeps the verifier on public keys while an
+// immutable, separately built publisher owns the signing key. The child is
+// forced into one-shot mode and is invoked synchronously at the exact barrier
+// chosen by InspectCutoverAcceptance.
+func loadAcceptanceSnapshotRefresher() (func(context.Context) error, error) {
+	const environmentName = "PEERGO_LEGACY_ACCEPTANCE_SNAPSHOT_REFRESH_BINARY"
+	path := strings.TrimSpace(os.Getenv(environmentName))
+	if path == "" {
+		return nil, nil
+	}
+	if !filepath.IsAbs(path) {
+		return nil, errors.New(environmentName + " must be absolute")
+	}
+	path = filepath.Clean(path)
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 ||
+		info.Mode().Perm()&0o022 != 0 || info.Mode().Perm()&0o111 == 0 {
+		return nil, errors.New(environmentName + " must be a protected executable regular file")
+	}
+	return func(ctx context.Context) error {
+		refreshCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+		defer cancel()
+		command := exec.CommandContext(refreshCtx, path)
+		command.Stdout = os.Stdout
+		command.Stderr = os.Stderr
+		command.Env = make([]string, 0, len(os.Environ())+1)
+		for _, value := range os.Environ() {
+			if !strings.HasPrefix(value, "PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL=") {
+				command.Env = append(command.Env, value)
+			}
+		}
+		command.Env = append(command.Env, "PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL=")
+		if err := command.Run(); err != nil {
+			return fmt.Errorf("one-shot Tracker snapshot refresh failed: %w", err)
+		}
+		return nil
+	}, nil
 }
 
 func loadSettings(action string) (settings, error) {

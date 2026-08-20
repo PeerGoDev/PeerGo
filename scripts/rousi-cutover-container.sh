@@ -138,6 +138,9 @@ prepare_environment() {
 
     export PEERGO_ENV=production
     export PEERGO_LEGACY_BIN_DIR="${binary_root}"
+    # Acceptance invokes this immutable one-shot publisher only after its
+    # expensive object read-back, creating a race-free freshness barrier.
+    export PEERGO_LEGACY_ACCEPTANCE_SNAPSHOT_REFRESH_BINARY="${binary_root}/core-snapshot-publisher"
     export PEERGO_LEGACY_SNAPSHOT_SHA256="${dump_sha256}"
     # Bind the archive compatibility gate in migrate-ptyes.sh to the exact
     # read-only inputs already hashed by this cutover container.

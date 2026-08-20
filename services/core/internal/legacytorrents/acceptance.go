@@ -53,6 +53,10 @@ type CutoverAcceptanceConfig struct {
 	TrackerSnapshotMaxAge      time.Duration
 	TrackerSubjectMaxAge       time.Duration
 	TrackerMaxFutureSkew       time.Duration
+	// RefreshTrackerSnapshots is a production-cutover freshness barrier. When
+	// supplied, it runs after all expensive immutable-object reads and must
+	// synchronously publish the three signed snapshots before verification.
+	RefreshTrackerSnapshots func(context.Context) error
 	// ProgressEvery bounds operational log volume while acceptance streams
 	// every immutable torrent and image object through SHA-256 verification.
 	// Zero keeps the package default so older callers remain compatible.
@@ -334,6 +338,11 @@ WHERE id = $1 AND state = 'reconciled'`, config.Inventory.RunID).Scan(&reconcile
 	)
 	if err != nil {
 		return CutoverAcceptanceReport{}, err
+	}
+	if config.RefreshTrackerSnapshots != nil {
+		if err := config.RefreshTrackerSnapshots(ctx); err != nil {
+			return CutoverAcceptanceReport{}, fmt.Errorf("refresh Tracker snapshots at acceptance barrier: %w", err)
+		}
 	}
 	checkedAt := config.Now().UTC().Truncate(time.Microsecond)
 	if checkedAt.Before(startedAt) {
