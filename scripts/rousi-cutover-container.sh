@@ -276,9 +276,20 @@ drain_workgroup_benefits() (
 )
 
 build_tracker_snapshots() {
-    mkdir -p "$(dirname "${PEERGO_TRACKER_SNAPSHOT_PATH}")" \
-        "$(dirname "${PEERGO_TRACKER_SUBJECT_SNAPSHOT_PATH}")" \
-        "$(dirname "${PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_PATH}")"
+    local snapshot_path parent
+    for snapshot_path in \
+        "${PEERGO_TRACKER_SNAPSHOT_PATH}" \
+        "${PEERGO_TRACKER_SUBJECT_SNAPSHOT_PATH}" \
+        "${PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_PATH}"; do
+        parent="$(dirname "${snapshot_path}")"
+        [[ "${parent}" != '/' && ! -L "${parent}" ]] ||
+            fail "Tracker snapshot parent is unsafe"
+        mkdir -p "${parent}"
+        # The filesystem publisher intentionally rejects group/world-readable
+        # parents. Harden an existing single-server bind mount as well as a
+        # freshly created cluster volume before composing the publisher.
+        chmod 0700 "${parent}"
+    done
     note "building one-shot signed Tracker control snapshots"
     PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL='' \
         "${binary_root}/core-snapshot-publisher" |

@@ -121,6 +121,11 @@ make production-build
 这两个命令不代表可以切流。首次迁移先执行
 [Rousi 三包生产迁移](./rousi-cutover.md)，取得 `ready_to_activate=true`。
 
+三包迁移的 WebP 阶段默认使用 4 个协作处理器，并按 CPU 数量分配 libvips 线程；至少
+8 核且内存、磁盘吞吐充足的单机可在 `.env.production` 设置
+`PEERGO_IMAGE_DERIVATIVE_CONCURRENCY=8`。支持范围为 1–16，调高不会并行化需要保持顺序的
+数据库账本与验收阶段。
+
 ## 4. 非公开启动
 
 迁移验收通过后启动全套服务；此时 Web/Tracker 仍只绑定宿主机 loopback，公网入口尚未切换：

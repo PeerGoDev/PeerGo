@@ -65,7 +65,11 @@ nats_config_file="${nats_dir}/nats-server.conf"
 install -d -m 0755 "${install_root}"
 install -d -m 0700 "${input_dir}" "${cutover_dir}"
 install -d -m 0750 -o 10001 -g 10001 \
-    "${objects_dir}" "${tracker_dir}" "${audit_dir}" "${image_tmp_dir}"
+    "${objects_dir}" "${audit_dir}" "${image_tmp_dir}"
+# Signed Tracker snapshots and their advisory lock files are deliberately
+# rejected when the parent grants any group/other access. Runtime services all
+# use uid 10001, so this directory does not need a shared group permission.
+install -d -m 0700 -o 10001 -g 10001 "${tracker_dir}"
 install -d -m 0750 -o root -g 1000 "${nats_dir}"
 install -d -m 0750 -o 1000 -g 1000 "${nats_data_dir}"
 install -d -m 0750 -o root -g 10001 "${secret_dir}"
