@@ -1,0 +1,233 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries:
+      - internal/modules/catalog/repository_postgres.sql
+      - internal/modules/catalog/torrent_bookmark_repository_postgres.sql
+    gen:
+      go:
+        package: catalogdb
+        out: internal/generated/catalogdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/identity/repository_postgres.sql
+    gen:
+      go:
+        package: identitydb
+        out: internal/generated/identitydb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/authz/repository_postgres.sql
+    gen:
+      go:
+        package: authzdb
+        out: internal/generated/authzdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/audit/repository_postgres.sql
+    gen:
+      go:
+        package: auditdb
+        out: internal/generated/auditdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries:
+      - internal/modules/torrents/download_repository_postgres.sql
+      - internal/modules/torrents/administration_repository_postgres.sql
+      - internal/modules/torrents/read_repository_postgres.sql
+      - internal/modules/torrents/storage_repository_postgres.sql
+      - internal/modules/torrents/upload_repository_postgres.sql
+    gen:
+      go:
+        package: torrentdb
+        out: internal/generated/torrentdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries:
+      - internal/modules/review/repository_postgres.sql
+      - internal/modules/review/resubmission_repository_postgres.sql
+    gen:
+      go:
+        package: reviewdb
+        out: internal/generated/reviewdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/notifications/repository_postgres.sql
+    gen:
+      go:
+        package: notificationdb
+        out: internal/generated/notificationdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/trackercontrol/repository_postgres.sql
+    gen:
+      go:
+        package: trackercontroldb
+        out: internal/generated/trackercontroldb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/traffic/repository_postgres.sql
+    gen:
+      go:
+        package: trafficdb
+        out: internal/generated/trafficdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/economy/seedingreward/evidence_repository_postgres.sql
+    gen:
+      go:
+        package: seedingrewarddb
+        out: internal/generated/seedingrewarddb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/promotions/repository_postgres.sql
+    gen:
+      go:
+        package: promotiondb
+        out: internal/generated/promotiondb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/rss/repository_postgres.sql
+    gen:
+      go:
+        package: rssdb
+        out: internal/generated/rssdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries: internal/modules/swarmprojection/repository_postgres.sql
+    gen:
+      go:
+        package: swarmdb
+        out: internal/generated/swarmdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+  - engine: postgresql
+    schema: ../../db/core/migrations
+    queries:
+      - internal/modules/social/repository_postgres.sql
+      - internal/modules/social/report_repository_postgres.sql
+      - internal/modules/social/post_repository_postgres.sql
+    gen:
+      go:
+        package: socialdb
+        out: internal/generated/socialdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID

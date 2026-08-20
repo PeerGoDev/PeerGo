@@ -1,0 +1,35 @@
+# Replace the logical placeholder with repository teams before enabling required
+# CODEOWNER reviews on the remote. The machine-readable ownership map lives at
+# /ownership.yaml and is already split by module/API boundary.
+* @peergo/maintainers
+
+/apps/web/ @peergo/web
+/contracts/openapi/ @peergo/core @peergo/web
+/contracts/openapi/v1/domains/identity.yaml @peergo/core @peergo/web @peergo/security
+/contracts/openapi/v1/schemas/identity.yaml @peergo/core @peergo/web @peergo/security
+/contracts/openapi/v1/domains/traffic.yaml @peergo/core @peergo/web @peergo/tracker @peergo/economy @peergo/security
+/contracts/openapi/v1/schemas/traffic.yaml @peergo/core @peergo/web @peergo/tracker @peergo/economy @peergo/security
+/services/core/ @peergo/core
+/db/core/ @peergo/core
+/services/core/internal/modules/torrents/ @peergo/core @peergo/product @peergo/tracker @peergo/security
+/db/core/migrations/*torrent* @peergo/core @peergo/product @peergo/tracker @peergo/security
+/services/core/internal/modules/identity/ @peergo/core @peergo/security
+/db/core/migrations/*identity* @peergo/core @peergo/security
+/db/core/migrations/*account_restriction* @peergo/core @peergo/security
+/db/core/migrations/*staff_webauthn* @peergo/core @peergo/security @peergo/governance
+/db/core/migrations/*staff_authority* @peergo/core @peergo/security @peergo/governance
+/services/core/internal/modules/authz/ @peergo/core @peergo/security
+/db/core/migrations/*authz* @peergo/core @peergo/security
+/services/core/internal/modules/audit/ @peergo/core @peergo/security
+/services/core/internal/platform/auditsink/ @peergo/core @peergo/security
+/services/audit-sink/ @peergo/security @peergo/privacy
+/contracts/events/audit/ @peergo/core @peergo/security
+/db/core/migrations/*audit* @peergo/core @peergo/security
+/services/settlement/ @peergo/tracker @peergo/economy @peergo/security
+/tools/traffic-corpus/ @peergo/core @peergo/tracker @peergo/economy @peergo/security
+/contracts/events/tracker-announce/ @peergo/tracker @peergo/economy
+/contracts/events/traffic-settled/ @peergo/tracker @peergo/economy @peergo/security
+/services/core/internal/modules/traffic/ @peergo/core @peergo/tracker @peergo/economy @peergo/security
+/services/core/internal/trafficconsumer/ @peergo/core @peergo/tracker @peergo/economy @peergo/security
+/db/core/migrations/*traffic* @peergo/core @peergo/tracker @peergo/economy @peergo/security
+/db/tracker/ @peergo/tracker @peergo/economy

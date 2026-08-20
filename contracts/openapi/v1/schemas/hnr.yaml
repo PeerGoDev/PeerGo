@@ -1,0 +1,150 @@
+HNRPolicyMode:
+  type: string
+  enum: [disabled, exempt, enforced]
+
+HNRPolicyInput:
+  type: object
+  additionalProperties: false
+  required:
+    [mode, required_seed_seconds, required_ratio_basis_points, assessment_window_seconds, grace_period_seconds, max_interval_credit_seconds]
+  properties:
+    mode:
+      $ref: "#/HNRPolicyMode"
+    required_seed_seconds:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 315360000
+    required_ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    assessment_window_seconds:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 315360000
+    grace_period_seconds:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 31536000
+    max_interval_credit_seconds:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 86400
+
+HNRPolicyRevision:
+  allOf:
+    - $ref: "#/HNRPolicyInput"
+    - type: object
+      additionalProperties: false
+      required:
+        [id, rule_id, rule_version, effective_at, reason, created_at, delivery_state, delivery_attempts, last_delivery_error, delivered_at, timeline_state, replayed]
+      properties:
+        id:
+          type: string
+          format: uuid
+        rule_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        rule_version:
+          type: integer
+          format: int64
+          minimum: 1
+        effective_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        created_at:
+          type: string
+          format: date-time
+        delivery_state:
+          type: string
+          enum: [pending, retrying, delivered]
+        delivery_attempts:
+          type: integer
+          minimum: 0
+        last_delivery_error:
+          type: string
+          maxLength: 64
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        timeline_state:
+          type: string
+          enum: [scheduled, active]
+        replayed:
+          type: boolean
+
+HNRPolicyRevisionPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset, minimum_effective_from, current, global_ratio_watch_connected]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/HNRPolicyRevision"
+    total:
+      $ref: "operations.yaml#/OperationsCount"
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+    minimum_effective_from:
+      type: string
+      format: date-time
+    current:
+      $ref: "operations.yaml#/HNRPolicySettings"
+    global_ratio_watch_connected:
+      type: boolean
+
+IssueHNRPolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [policy, effective_at, reason]
+  properties:
+    policy:
+      $ref: "#/HNRPolicyInput"
+    effective_at:
+      type: string
+      format: date-time
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+HNRPolicyPreview:
+  type: object
+  additionalProperties: false
+  required:
+    [policy, completion_at, assessment_due_at, grace_ends_at, continuous_seed_satisfied_at]
+  properties:
+    policy:
+      $ref: "#/HNRPolicyInput"
+    completion_at:
+      type: string
+      format: date-time
+    assessment_due_at:
+      type: string
+      format: date-time
+    grace_ends_at:
+      type: string
+      format: date-time
+    continuous_seed_satisfied_at:
+      type: string
+      format: date-time
+      nullable: true

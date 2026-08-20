@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v1/grant-revocation-recorded.schema.json",
+  "title": "Grant revocation recorded v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "request_id",
+    "grant_id",
+    "expected_grant_version",
+    "actor_pseudonym",
+    "target_pseudonym",
+    "pseudonym_key_epoch",
+    "transition",
+    "reason_sha256",
+    "before_sha256",
+    "after_sha256",
+    "decision_id",
+    "policy_version",
+    "authority"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_type": { "const": "authz.grant-revocation.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "request_id": { "type": "string", "format": "uuid" },
+    "grant_id": { "type": "string", "format": "uuid" },
+    "expected_grant_version": { "type": "integer", "minimum": 1 },
+    "resulting_grant_version": { "type": "integer", "minimum": 2 },
+    "actor_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "target_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pseudonym_key_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "transition": {
+      "enum": [
+        "proposed",
+        "governance_approved",
+        "security_approved",
+        "rejected",
+        "applied",
+        "conflicted",
+        "expired"
+      ]
+    },
+    "reason_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "before_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "after_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "decision_id": { "type": "string", "format": "uuid" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "grant_id", "grant_version", "mandate_id", "effective_until"],
+      "properties": {
+        "role_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "grant_id": { "type": "string", "format": "uuid" },
+        "grant_version": { "type": "integer", "minimum": 1 },
+        "mandate_id": { "type": "string", "format": "uuid" },
+        "effective_until": { "type": "string", "format": "date-time" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "domain", "decision"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "domain": { "enum": ["governance", "security"] },
+        "decision": { "enum": ["approve", "reject"] }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "transition": { "const": "applied" } }, "required": ["transition"] },
+      "then": { "required": ["resulting_grant_version", "review"] },
+      "else": { "not": { "required": ["resulting_grant_version"] } }
+    },
+    {
+      "if": {
+        "properties": {
+          "transition": {
+            "enum": ["governance_approved", "security_approved", "rejected", "applied"]
+          }
+        },
+        "required": ["transition"]
+      },
+      "then": { "required": ["review"] },
+      "else": { "not": { "required": ["review"] } }
+    }
+  ]
+}

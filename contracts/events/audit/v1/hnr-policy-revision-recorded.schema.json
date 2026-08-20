@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v1/hnr-policy-revision-recorded.schema.json",
+  "title": "H&R policy revision recorded v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "event_type", "event_id", "occurred_at",
+    "revision_id", "rule_id", "rule_version", "mode", "effective_at",
+    "command_sha256", "reason_sha256", "actor_pseudonym",
+    "pseudonym_key_epoch", "decision_id", "policy_version", "authority"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_type": { "const": "hnr.policy-revision.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "revision_id": { "type": "string", "format": "uuid" },
+    "rule_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "rule_version": { "type": "integer", "minimum": 1 },
+    "mode": { "enum": ["disabled", "exempt", "enforced"] },
+    "effective_at": { "type": "string", "format": "date-time" },
+    "command_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "reason_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "actor_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pseudonym_key_epoch": {
+      "type": "string", "minLength": 1, "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "decision_id": { "type": "string", "format": "uuid" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "grant_id", "grant_version", "mandate_id", "effective_until"],
+      "properties": {
+        "role_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "grant_id": { "type": "string", "format": "uuid" },
+        "grant_version": { "type": "integer", "minimum": 1 },
+        "mandate_id": { "type": "string", "format": "uuid" },
+        "effective_until": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

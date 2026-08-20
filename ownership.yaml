@@ -1,0 +1,190 @@
+version: 1
+
+# Logical owners are intentionally repository roles rather than personal handles.
+# CODEOWNERS can map these roles to real teams when the remote repository exists.
+modules:
+  web:
+    owners: [web]
+    paths:
+      - apps/web/**
+  core-catalog:
+    owners: [core, product]
+    paths:
+      - services/core/internal/modules/catalog/**
+      - db/core/migrations/*catalog*
+  core-torrents:
+    owners: [core, product, tracker, security]
+    paths:
+      - services/core/internal/modules/torrents/**
+      - db/core/migrations/*torrent*
+  core-social:
+    owners: [core, product, governance]
+    paths:
+      - services/core/internal/modules/social/**
+      - db/core/migrations/*social*
+      - db/core/migrations/202608100001_core_catalog_announcement_discussion.sql
+  core-tracker-control:
+    owners: [core, tracker, security]
+    paths:
+      - services/core/internal/modules/trackercontrol/**
+      - services/core/internal/platform/trackersnapshot/**
+      - services/core/cmd/projector/**
+      - services/core/cmd/snapshot-builder/**
+      - contracts/events/tracker-control/**
+  core-traffic:
+    owners: [core, tracker, economy, security]
+    paths:
+      - services/core/internal/modules/traffic/**
+      - services/core/internal/trafficconsumer/**
+      - services/core/cmd/traffic-*/**
+      - db/core/migrations/*traffic*
+  tracker-control-contract:
+    owners: [core, tracker, security]
+    paths:
+      - contracts/go/trackercontrolv1/**
+      - contracts/snapshots/tracker-control/**
+  tracker:
+    owners: [tracker, security]
+    paths:
+      - services/tracker/**
+  core-identity:
+    owners: [core, security]
+    paths:
+      - services/core/internal/modules/identity/**
+      - db/core/migrations/*identity*
+      - db/core/migrations/*account_restriction*
+      - db/core/migrations/*staff_webauthn*
+      - db/core/migrations/*staff_authority*
+  core-authz:
+    owners: [core, security, governance]
+    paths:
+      - services/core/internal/modules/authz/**
+      - db/core/migrations/*authz*
+      - db/core/migrations/*staff_webauthn*
+      - db/core/migrations/*staff_authority*
+      - db/core/migrations/202608100001_core_catalog_announcement_discussion.sql
+  core-audit:
+    owners: [core, security, governance]
+    paths:
+      - services/core/internal/modules/audit/**
+      - services/core/internal/platform/auditsink/**
+      - db/core/migrations/*audit*
+      - contracts/events/audit/**
+  audit-sink:
+    owners: [security, privacy]
+    paths:
+      - services/audit-sink/**
+  privacy-vault:
+    owners: [security, privacy]
+    paths:
+      - services/privacy-vault/**
+      - db/vault/**
+  settlement:
+    owners: [tracker, economy, security]
+    paths:
+      - services/settlement/**
+      - contracts/events/tracker-announce/**
+      - contracts/events/traffic-settled/**
+      - db/tracker/**
+  traffic-corpus:
+    owners: [core, tracker, economy, security]
+    paths:
+      - tools/traffic-corpus/**
+  api-contract:
+    owners: [core, web]
+    paths:
+      - contracts/openapi/**
+
+api:
+  /api/v1/session:
+    owners: [core, security]
+  /api/v1/staff/elevation/options:
+    owners: [core, security, governance]
+  /api/v1/staff/elevation:
+    owners: [core, security, governance]
+  /api/v1/admin/session:
+    owners: [core, security, governance]
+  /api/v1/me/capabilities:
+    owners: [core, security, governance]
+  /api/v1/me/traffic:
+    owners: [core, tracker, economy, web]
+  /api/v1/site:
+    owners: [core]
+  /api/v1/announcements/latest:
+    owners: [core, product]
+  /api/v1/announcements/{announcement_id}:
+    owners: [core, product, web]
+  /api/v1/announcements/{announcement_id}/comments:
+    owners: [core, product, web]
+  /api/v1/categories:
+    owners: [core, product]
+  /api/v1/admin/catalog/categories:
+    owners: [core, product, web]
+  /api/v1/admin/catalog/categories/{category_id}:
+    owners: [core, product, web]
+  /api/v1/admin/catalog/announcements:
+    owners: [core, product, web]
+  /api/v1/admin/catalog/announcements/{announcement_id}:
+    owners: [core, product, web]
+  /api/v1/admin/catalog/announcements/{announcement_id}/publication:
+    owners: [core, product, security, web]
+  /api/v1/admin/catalog/announcements/{announcement_id}/revisions:
+    owners: [core, product, web]
+  /api/v1/admin/settings/site:
+    owners: [core, product, web]
+  /api/v1/admin/users:
+    owners: [core, security, web]
+  /api/v1/admin/users/{user_id}:
+    owners: [core, security, web]
+  /api/v1/admin/users/{user_id}/account-restrictions:
+    owners: [core, security, web]
+  /api/v1/admin/users/{user_id}/account-restrictions/{restriction_id}/revocations:
+    owners: [core, security, web]
+  /api/v1/admin/settings/medals:
+    owners: [core, economy, product, web]
+  /api/v1/admin/settings/medals/{medal_id}:
+    owners: [core, economy, product, web]
+  /api/v1/torrents:
+    owners: [core, product]
+  /api/v1/torrents/{torrent_id}/comments:
+    owners: [core, product, web]
+  /api/v1/comments/{comment_id}:
+    owners: [core, product, governance, web]
+  /api/v1/comments/{comment_id}/reports:
+    owners: [core, product, governance, web]
+  /api/v1/admin/social/comment-moderation-cases:
+    owners: [core, product, governance, web]
+  /api/v1/admin/social/comment-moderation-cases/{case_id}/decisions:
+    owners: [core, product, governance, security, web]
+
+high_risk:
+  paths:
+    - services/core/internal/modules/traffic/**
+    - services/core/internal/trafficconsumer/**
+    - services/core/internal/modules/identity/**
+    - services/core/internal/modules/authz/**
+    - services/core/internal/modules/audit/**
+    - services/core/internal/platform/auditsink/**
+    - services/audit-sink/**
+    - services/settlement/**
+    - tools/traffic-corpus/**
+    - services/core/internal/modules/torrents/**
+    - services/core/internal/modules/trackercontrol/**
+    - services/core/internal/platform/trackersnapshot/**
+    - services/tracker/**
+    - contracts/go/trackercontrolv1/**
+    - contracts/snapshots/tracker-control/**
+    - db/core/migrations/*torrent*
+    - db/core/migrations/*traffic*
+    - contracts/events/audit/**
+    - contracts/events/tracker-announce/**
+    - contracts/events/traffic-settled/**
+    - db/tracker/**
+    - db/core/migrations/*staff_webauthn*
+    - db/core/migrations/*staff_authority*
+    - db/core/migrations/*account_restriction*
+    - db/core/migrations/*social_comment_moderation*
+    - db/core/migrations/202608100001_core_catalog_announcement_discussion.sql
+    - db/core/migrations/202608100002_core_catalog_announcement_administration.sql
+    - services/core/internal/modules/economy/**
+  required_owner_reviews: 2

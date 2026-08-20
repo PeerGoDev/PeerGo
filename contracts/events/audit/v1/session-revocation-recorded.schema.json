@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peergo.local/contracts/events/audit/v1/session-revocation-recorded.schema.json",
+  "title": "Session revocation recorded v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "revocation_id",
+    "scope",
+    "user_pseudonym",
+    "pseudonym_key_epoch",
+    "revoked_web_sessions",
+    "revoked_staff_sessions",
+    "current_session_revoked",
+    "decision_id",
+    "policy_version",
+    "authority"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_type": { "const": "identity.session-revocation.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "revocation_id": { "type": "string", "format": "uuid" },
+    "scope": { "enum": ["single", "others"] },
+    "user_pseudonym": { "type": "string", "minLength": 43, "maxLength": 43 },
+    "target_session_pseudonym": { "type": "string", "minLength": 43, "maxLength": 43 },
+    "pseudonym_key_epoch": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "revoked_web_sessions": { "type": "integer", "minimum": 0 },
+    "revoked_staff_sessions": { "type": "integer", "minimum": 0 },
+    "current_session_revoked": { "type": "boolean" },
+    "decision_id": { "type": "string", "format": "uuid" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "grant_id", "grant_version", "mandate_id", "effective_until"],
+      "properties": {
+        "role_id": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "grant_id": { "type": "string", "format": "uuid" },
+        "grant_version": { "type": "integer", "minimum": 1 },
+        "mandate_id": { "type": "string", "format": "uuid" },
+        "effective_until": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "scope": { "const": "single" } } },
+      "then": { "required": ["target_session_pseudonym"] },
+      "else": { "not": { "required": ["target_session_pseudonym"] } }
+    }
+  ]
+}

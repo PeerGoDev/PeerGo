@@ -1,0 +1,20 @@
+# PeerGo 参考实现检出清单
+
+本目录只用于架构研究、协议核对和基准测试，不是 PeerGo 的源码依赖，也不得从 PeerGo 运行时代码中 import、链接或调用。各项目保留自己的 Git 历史和许可证；PeerGo 根仓库通过 `.gitignore` 忽略这些嵌套仓库，只跟踪本清单。
+
+检出时间：2026-07-31（Asia/Shanghai）。所有仓库均以 `--depth 1 --filter=blob:none` 从当时默认分支拉取。
+
+| 本地目录 | 上游 | 分支 | 检出提交 |
+|---|---|---|---|
+| `unit3d` | <https://github.com/HDInnovations/UNIT3D> | `master` | `8b88f4c8182eb3d3912ffef425c3224dcfd596f4` |
+| `nexusphp` | <https://github.com/xiaomlove/nexusphp> | `php8` | `1afbffccb91b38b33a85515f652a9ad421d5b3d7` |
+| `torrust-tracker` | <https://github.com/torrust/torrust-tracker> | `develop` | `c1ea42325fbb090ee8f16549a6b307d101235fa7` |
+| `torrust-index` | <https://github.com/torrust/torrust-index> | `develop` | `843aafff6b459a9ade4097273fbc430b7ecb959e` |
+| `aquatic` | <https://github.com/greatest-ape/aquatic> | `master` | `a2ddc4b323c5aaf844ce32b655b0ffc8c4836cde` |
+| `reunit3d-announce` | <https://github.com/ReUnit3d/ReUnit3d-Announce> | `main` | `fcd189e9aebf07a12a1f8cc39500819c3870925b` |
+
+## 更新方式
+
+参考目录是可替换的本地研究资料。更新单个项目时，在对应目录执行 `git fetch --depth 1 origin <branch>`，核对变更后再 fast-forward；更新完成后必须同步修改本清单中的提交，并重新审阅 PeerGo `README.md` 中受影响的结论。
+
+不要把这些仓库作为 Git submodule 提交，也不要复制其实现代码到 PeerGo。若确需采用代码，必须先核对许可证、记录 ADR，并以独立依赖或合规重写方式引入。

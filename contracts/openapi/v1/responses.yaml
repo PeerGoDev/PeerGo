@@ -1,0 +1,6 @@
+ProblemResponse:
+  description: 使用稳定 code 和 request_id 表达的 API 错误。
+  content:
+    application/problem+json:
+      schema:
+        $ref: "./schemas/problem.yaml#/Problem"

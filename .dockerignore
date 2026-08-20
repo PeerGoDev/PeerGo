@@ -1,0 +1,11 @@
+.git
+.local
+.air
+node_modules
+apps/web/node_modules
+apps/web/build
+coverage
+dist
+docs/design
+references
+*.log

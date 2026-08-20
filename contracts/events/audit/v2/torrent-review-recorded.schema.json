@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v2/torrent-review-recorded.schema.json",
+  "title": "Torrent review recorded v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "event_type", "event_id", "occurred_at", "review_decision_id",
+    "torrent_id", "review_decision", "reason_code", "reason_sha256", "reviewer_pseudonym",
+    "uploader_pseudonym", "pseudonym_key_epoch", "expected_version", "resulting_version",
+    "before_sha256", "after_sha256", "authorization_decision_id", "policy_version", "authority"
+  ],
+  "properties": {
+    "schema_version": { "const": "2.0.0" },
+    "event_type": { "const": "review.torrent-review.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "review_decision_id": { "type": "string", "format": "uuid" },
+    "torrent_id": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+    "review_decision": { "enum": ["approve", "reject"] },
+    "reason_code": {
+      "enum": [
+        "meets_requirements", "metadata_incomplete", "duplicate_or_superseded",
+        "content_policy_violation", "quality_requirements_not_met", "uploader_action_required", "other"
+      ]
+    },
+    "reason_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "reviewer_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "uploader_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pseudonym_key_epoch": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "expected_version": { "type": "integer", "minimum": 1 },
+    "resulting_version": { "type": "integer", "minimum": 2 },
+    "before_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "after_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "authorization_decision_id": { "type": "string", "format": "uuid" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "grant_id", "grant_version", "mandate_id", "effective_until"],
+      "properties": {
+        "role_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "grant_id": { "type": "string", "format": "uuid" },
+        "grant_version": { "type": "integer", "minimum": 1 },
+        "mandate_id": { "type": "string", "format": "uuid" },
+        "effective_until": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

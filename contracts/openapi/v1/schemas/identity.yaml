@@ -1,0 +1,1872 @@
+RegistrationMode:
+  type: string
+  enum: [open, invite, closed]
+
+EmailDomainMode:
+  type: string
+  enum: [any, allowlist, blocklist]
+
+HumanVerificationProvider:
+  type: string
+  enum: [disabled, turnstile]
+
+RegistrationPolicySettings:
+  type: object
+  additionalProperties: false
+  required:
+    - mode
+    - member_invites_enabled
+    - invite_valid_days
+    - max_invites_per_member
+    - minimum_invite_account_age_days
+    - minimum_invite_level
+    - username_min_characters
+    - username_max_characters
+    - reserved_usernames
+    - email_domain_mode
+    - email_domains
+    - session_valid_hours
+    - remember_session_valid_hours
+    - human_verification_provider
+    - human_verification_site_key
+    - human_verification_registration_enabled
+    - human_verification_login_enabled
+    - human_verification_password_recovery_enabled
+    - human_verification_secret_configured
+    - version
+    - updated_at
+  properties:
+    mode:
+      $ref: "#/RegistrationMode"
+    member_invites_enabled:
+      type: boolean
+    invite_valid_days:
+      type: integer
+      minimum: 1
+      maximum: 90
+    max_invites_per_member:
+      type: integer
+      minimum: 0
+      maximum: 100
+    minimum_invite_account_age_days:
+      type: integer
+      minimum: 0
+      maximum: 3650
+    minimum_invite_level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    username_min_characters:
+      type: integer
+      minimum: 3
+      maximum: 32
+    username_max_characters:
+      type: integer
+      minimum: 3
+      maximum: 32
+    reserved_usernames:
+      type: array
+      maxItems: 200
+      uniqueItems: true
+      items:
+        type: string
+        pattern: '^[a-z0-9][a-z0-9_-]{2,31}$'
+    email_domain_mode:
+      $ref: "#/EmailDomainMode"
+    email_domains:
+      type: array
+      maxItems: 100
+      uniqueItems: true
+      items:
+        type: string
+        maxLength: 253
+        pattern: '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$'
+    session_valid_hours:
+      type: integer
+      minimum: 1
+      maximum: 720
+    remember_session_valid_hours:
+      type: integer
+      minimum: 24
+      maximum: 2160
+    human_verification_provider:
+      $ref: "#/HumanVerificationProvider"
+    human_verification_site_key:
+      type: string
+      maxLength: 128
+      description: 公开的 Turnstile site key；关闭人机验证时为空。
+    human_verification_registration_enabled:
+      type: boolean
+    human_verification_login_enabled:
+      type: boolean
+    human_verification_password_recovery_enabled:
+      type: boolean
+    human_verification_secret_configured:
+      type: boolean
+      readOnly: true
+      description: 仅表示 Core 已从部署密钥载入服务端 secret，不返回 secret 内容。
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    updated_at:
+      type: string
+      format: date-time
+
+UpdateRegistrationPolicySettingsRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - mode
+    - member_invites_enabled
+    - invite_valid_days
+    - max_invites_per_member
+    - minimum_invite_account_age_days
+    - minimum_invite_level
+    - username_min_characters
+    - username_max_characters
+    - reserved_usernames
+    - email_domain_mode
+    - email_domains
+    - session_valid_hours
+    - remember_session_valid_hours
+    - human_verification_provider
+    - human_verification_site_key
+    - human_verification_registration_enabled
+    - human_verification_login_enabled
+    - human_verification_password_recovery_enabled
+    - expected_version
+    - reason
+  properties:
+    mode:
+      $ref: "#/RegistrationMode"
+    member_invites_enabled:
+      type: boolean
+    invite_valid_days:
+      type: integer
+      minimum: 1
+      maximum: 90
+    max_invites_per_member:
+      type: integer
+      minimum: 0
+      maximum: 100
+    minimum_invite_account_age_days:
+      type: integer
+      minimum: 0
+      maximum: 3650
+    minimum_invite_level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    username_min_characters:
+      type: integer
+      minimum: 3
+      maximum: 32
+    username_max_characters:
+      type: integer
+      minimum: 3
+      maximum: 32
+    reserved_usernames:
+      type: array
+      maxItems: 200
+      uniqueItems: true
+      items:
+        type: string
+        pattern: '^[a-z0-9][a-z0-9_-]{2,31}$'
+    email_domain_mode:
+      $ref: "#/EmailDomainMode"
+    email_domains:
+      type: array
+      maxItems: 100
+      uniqueItems: true
+      items:
+        type: string
+        maxLength: 253
+        pattern: '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$'
+    session_valid_hours:
+      type: integer
+      minimum: 1
+      maximum: 720
+    remember_session_valid_hours:
+      type: integer
+      minimum: 24
+      maximum: 2160
+    human_verification_provider:
+      $ref: "#/HumanVerificationProvider"
+    human_verification_site_key:
+      type: string
+      maxLength: 128
+    human_verification_registration_enabled:
+      type: boolean
+    human_verification_login_enabled:
+      type: boolean
+    human_verification_password_recovery_enabled:
+      type: boolean
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+
+InvitationStatus:
+  type: string
+  enum: [available, claimed, used, expired, revoked]
+
+InvitationEligibilityBlocker:
+  type: string
+  enum:
+    - none
+    - disabled
+    - account_unavailable
+    - email_unverified
+    - account_age
+    - level
+    - quota_exhausted
+
+InvitationEligibility:
+  type: object
+  additionalProperties: false
+  required:
+    - enabled
+    - eligible
+    - blocker
+    - invite_valid_days
+    - max_invites_per_member
+    - used_invites
+    - remaining_invites
+    - minimum_account_age_days
+    - current_account_age_days
+    - minimum_level
+    - current_level
+    - email_verified
+  properties:
+    enabled:
+      type: boolean
+    eligible:
+      type: boolean
+    blocker:
+      $ref: "#/InvitationEligibilityBlocker"
+    invite_valid_days:
+      type: integer
+      minimum: 1
+      maximum: 90
+    max_invites_per_member:
+      type: integer
+      minimum: 0
+      maximum: 100
+    used_invites:
+      type: integer
+      minimum: 0
+      maximum: 100
+    remaining_invites:
+      type: integer
+      minimum: 0
+      maximum: 100
+    minimum_account_age_days:
+      type: integer
+      minimum: 0
+      maximum: 3650
+    current_account_age_days:
+      type: integer
+      minimum: 0
+    minimum_level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    current_level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    email_verified:
+      type: boolean
+
+MemberInvitation:
+  type: object
+  additionalProperties: false
+  required: [id, status, created_at, expires_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    status:
+      $ref: "#/InvitationStatus"
+    invitee_username:
+      type: string
+      minLength: 3
+      maxLength: 32
+    created_at:
+      type: string
+      format: date-time
+    expires_at:
+      type: string
+      format: date-time
+    claimed_at:
+      type: string
+      format: date-time
+    consumed_at:
+      type: string
+      format: date-time
+    revoked_at:
+      type: string
+      format: date-time
+
+InvitationOverview:
+  type: object
+  additionalProperties: false
+  required: [eligibility, items, total, limit, offset, observed_at]
+  properties:
+    eligibility:
+      $ref: "#/InvitationEligibility"
+    items:
+      type: array
+      items:
+        $ref: "#/MemberInvitation"
+    total:
+      type: integer
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999
+    observed_at:
+      type: string
+      format: date-time
+
+InvitationIssueResult:
+  type: object
+  additionalProperties: false
+  required: [invitation, token]
+  properties:
+    invitation:
+      $ref: "#/MemberInvitation"
+    token:
+      type: string
+      minLength: 43
+      maxLength: 43
+      pattern: "^[A-Za-z0-9_-]{43}$"
+      description: 只在成功签发响应中返回一次，之后无法找回。
+
+CreateRegistrationRequest:
+  type: object
+  additionalProperties: false
+  required: [username, display_name, email, password]
+  properties:
+    username:
+      type: string
+      minLength: 3
+      maxLength: 32
+      pattern: "^[a-z0-9][a-z0-9_-]{2,31}$"
+      description: 登录名；服务端统一转为小写。
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    email:
+      type: string
+      format: email
+      maxLength: 254
+      writeOnly: true
+    password:
+      type: string
+      minLength: 12
+      maxLength: 1024
+      writeOnly: true
+    invitation_token:
+      type: string
+      minLength: 43
+      maxLength: 43
+      pattern: "^[A-Za-z0-9_-]{43}$"
+      description: 邀请注册时必填；开放注册时可选，提供后仍会校验、消费并记录邀请关系。
+      writeOnly: true
+    human_verification_token:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      writeOnly: true
+      description: 当前注册政策启用人机验证时，由浏览器小组件签发的一次性令牌。
+
+RegistrationResult:
+  type: object
+  additionalProperties: false
+  required: [user, admission_mode, email_verification_required, completed_at]
+  properties:
+    user:
+      $ref: "#/SessionUser"
+    admission_mode:
+      $ref: "#/RegistrationMode"
+    email_verification_required:
+      type: boolean
+    completed_at:
+      type: string
+      format: date-time
+
+RequestEmailVerificationRequest:
+  type: object
+  additionalProperties: false
+  required: [email]
+  properties:
+    email:
+      type: string
+      format: email
+      maxLength: 254
+      writeOnly: true
+      description: >-
+        必须重新输入当前账户保存的邮箱；Core 仅转发到 Vault，不持久化。
+
+EmailVerificationDispatch:
+  type: object
+  additionalProperties: false
+  required: [accepted_at, next_request_at, already_verified]
+  properties:
+    accepted_at:
+      type: string
+      format: date-time
+    next_request_at:
+      type: string
+      format: date-time
+    already_verified:
+      type: boolean
+
+ConfirmEmailVerificationRequest:
+  type: object
+  additionalProperties: false
+  required: [token]
+  properties:
+    token:
+      type: string
+      minLength: 43
+      maxLength: 43
+      pattern: "^[A-Za-z0-9_-]{43}$"
+      writeOnly: true
+
+EmailVerificationResult:
+  type: object
+  additionalProperties: false
+  required: [user, verified_at, already_verified]
+  properties:
+    user:
+      $ref: "#/SessionUser"
+    verified_at:
+      type: string
+      format: date-time
+    already_verified:
+      type: boolean
+
+RequestPasswordRecoveryRequest:
+  type: object
+  additionalProperties: false
+  required: [email]
+  properties:
+    email:
+      type: string
+      format: email
+      maxLength: 254
+      writeOnly: true
+      description: >-
+        重新输入的注册邮箱；Core 只转发到 Vault，不持久化或返回。
+    human_verification_token:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      writeOnly: true
+
+PasswordRecoveryDispatch:
+  type: object
+  additionalProperties: false
+  required: [accepted_at, next_request_at]
+  properties:
+    accepted_at:
+      type: string
+      format: date-time
+    next_request_at:
+      type: string
+      format: date-time
+
+ConfirmPasswordRecoveryRequest:
+  type: object
+  additionalProperties: false
+  required: [token, new_password]
+  properties:
+    token:
+      type: string
+      minLength: 43
+      maxLength: 43
+      pattern: "^[A-Za-z0-9_-]{43}$"
+      writeOnly: true
+    new_password:
+      type: string
+      minLength: 12
+      maxLength: 1024
+      writeOnly: true
+
+PasswordRecoveryResult:
+  type: object
+  additionalProperties: false
+  required: [completed_at, already_completed]
+  properties:
+    completed_at:
+      type: string
+      format: date-time
+    already_completed:
+      type: boolean
+
+CreateSessionRequest:
+  type: object
+  additionalProperties: false
+  required: [identifier, password, remember_me]
+  properties:
+    identifier:
+      type: string
+      minLength: 1
+      maxLength: 254
+      description: 用户名或邮箱；服务端不会在错误响应中暴露命中情况。
+    password:
+      type: string
+      minLength: 1
+      maxLength: 1024
+      writeOnly: true
+    second_factor_code:
+      type: string
+      minLength: 6
+      maxLength: 32
+      description: 六位 TOTP 或一次性恢复码；只有启用两步验证的账户需要。
+      writeOnly: true
+    remember_me:
+      type: boolean
+    human_verification_token:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      writeOnly: true
+
+AccountAccessCredentialProof:
+  type: object
+  additionalProperties: false
+  required: [identifier, password]
+  properties:
+    identifier:
+      type: string
+      minLength: 1
+      maxLength: 254
+    password:
+      type: string
+      minLength: 1
+      maxLength: 1024
+      writeOnly: true
+    second_factor_code:
+      type: string
+      minLength: 6
+      maxLength: 32
+      writeOnly: true
+
+InspectAccountAccessRequest:
+  type: object
+  additionalProperties: false
+  required: [credentials]
+  properties:
+    credentials:
+      $ref: "#/AccountAccessCredentialProof"
+
+SubmitAccountAccessAppealRequest:
+  type: object
+  additionalProperties: false
+  required: [credentials, statement]
+  properties:
+    credentials:
+      $ref: "#/AccountAccessCredentialProof"
+    statement:
+      type: string
+      minLength: 20
+      maxLength: 1000
+
+AccountAccessSourceKind:
+  type: string
+  enum: [temporary_restriction, disabled_account, manual_download_restriction]
+
+AccountAccessAppealStatus:
+  type: string
+  enum: [pending, approved, rejected, source_resolved]
+
+AccountAccessRestriction:
+  type: object
+  additionalProperties: false
+  required: [source_kind, reason_code, reason_summary, starts_at, expires_at, source_version]
+  properties:
+    source_kind: { $ref: "#/AccountAccessSourceKind" }
+    reason_code: { type: string, minLength: 1, maxLength: 80 }
+    reason_summary: { type: string, minLength: 2, maxLength: 500 }
+    starts_at: { type: string, format: date-time }
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+    source_version: { type: integer, format: int64, minimum: 1 }
+
+AccountAccessAppeal:
+  type: object
+  additionalProperties: false
+  required:
+    [id, user_id, user_numeric_id, username, restriction, statement, status,
+     response, created_at, resolved_at, source_active, replayed]
+  properties:
+    id: { type: string, format: uuid }
+    user_id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    restriction: { $ref: "#/AccountAccessRestriction" }
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+    status: { $ref: "#/AccountAccessAppealStatus" }
+    response: { type: string, maxLength: 1000 }
+    created_at: { type: string, format: date-time }
+    resolved_at:
+      type: string
+      format: date-time
+      nullable: true
+    source_active: { type: boolean }
+    replayed: { type: boolean }
+
+AccountAccessStatus:
+  type: object
+  additionalProperties: false
+  required: [restricted, restriction, appeal, can_appeal]
+  properties:
+    restricted: { type: boolean }
+    restriction:
+      type: object
+      allOf: [{ $ref: "#/AccountAccessRestriction" }]
+      nullable: true
+    appeal:
+      type: object
+      allOf: [{ $ref: "#/AccountAccessAppeal" }]
+      nullable: true
+    can_appeal: { type: boolean }
+
+DownloadRestrictionSources:
+  type: object
+  additionalProperties: false
+  required: [manual_or_legacy, ratio_watch, hit_and_run]
+  properties:
+    manual_or_legacy: { type: boolean }
+    ratio_watch: { type: boolean }
+    hit_and_run: { type: boolean }
+
+DownloadRestrictionStatus:
+  type: object
+  additionalProperties: false
+  required: [restricted, sources, restriction, appeal, can_appeal]
+  properties:
+    restricted: { type: boolean }
+    sources: { $ref: "#/DownloadRestrictionSources" }
+    restriction:
+      type: object
+      allOf: [{ $ref: "#/AccountAccessRestriction" }]
+      nullable: true
+    appeal:
+      type: object
+      allOf: [{ $ref: "#/AccountAccessAppeal" }]
+      nullable: true
+    can_appeal: { type: boolean }
+
+SubmitDownloadRestrictionAppealRequest:
+  type: object
+  additionalProperties: false
+  required: [statement]
+  properties:
+    statement:
+      type: string
+      minLength: 20
+      maxLength: 1000
+
+AccountAccessAppealFilter:
+  type: string
+  enum: [all, pending, resolved]
+
+AccountAccessAppealPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items: { $ref: "#/AccountAccessAppeal" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 50 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+DecideAccountAccessAppealRequest:
+  type: object
+  additionalProperties: false
+  required: [decision, expected_source_version, response]
+  properties:
+    decision:
+      type: string
+      enum: [approved, rejected]
+    expected_source_version: { type: integer, format: int64, minimum: 1 }
+    response: { type: string, minLength: 10, maxLength: 1000 }
+
+SessionUser:
+  type: object
+  additionalProperties: false
+  required: [id, username, display_name, email_verified]
+  properties:
+    id:
+      type: string
+      format: uuid
+    username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    email_verified:
+      type: boolean
+
+UpdateMyProfileRequest:
+  type: object
+  additionalProperties: false
+  required: [display_name]
+  properties:
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 40
+      description: 公开昵称；服务端会移除首尾空白。
+
+AvatarRevision:
+  type: object
+  additionalProperties: false
+  required: [revision, updated_at]
+  properties:
+    revision:
+      type: string
+      minLength: 64
+      maxLength: 64
+      pattern: "^[0-9a-f]{64}$"
+      description: 公开缓存版本；不暴露对象存储位置。
+    updated_at:
+      type: string
+      format: date-time
+
+WebSession:
+  type: object
+  additionalProperties: false
+  required: [user, expires_at, csrf_token]
+  properties:
+    user:
+      $ref: "#/SessionUser"
+    expires_at:
+      type: string
+      format: date-time
+    csrf_token:
+      type: string
+      minLength: 43
+      maxLength: 43
+      description: 仅用于同源写请求；它不是身份凭据。
+
+PublicUserProfile:
+  type: object
+  additionalProperties: false
+  required: [username, display_name, joined_at, published_torrent_count]
+  properties:
+    username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    joined_at:
+      type: string
+      format: date-time
+    published_torrent_count:
+      type: integer
+      format: int64
+      minimum: 0
+      description: 当前可公开且非匿名发布的种子数量。
+
+AccountSecurityOverview:
+  type: object
+  additionalProperties: false
+  required: [email_verified, password_changed_at, two_factor]
+  properties:
+    email_verified:
+      type: boolean
+    password_changed_at:
+      type: string
+      format: date-time
+    two_factor:
+      $ref: "#/TwoFactorStatus"
+
+TwoFactorStatus:
+  type: object
+  additionalProperties: false
+  required: [enabled, enabled_at, recovery_codes_remaining]
+  properties:
+    enabled:
+      type: boolean
+    enabled_at:
+      type: string
+      format: date-time
+      nullable: true
+    recovery_codes_remaining:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 32
+
+StartTOTPEnrollmentRequest:
+  type: object
+  additionalProperties: false
+  required: [password]
+  properties:
+    password:
+      type: string
+      minLength: 1
+      maxLength: 1024
+      writeOnly: true
+
+TOTPEnrollmentStart:
+  type: object
+  additionalProperties: false
+  required: [enrollment_id, secret, provisioning_uri, expires_at]
+  properties:
+    enrollment_id:
+      type: string
+      format: uuid
+    secret:
+      type: string
+      minLength: 16
+      maxLength: 128
+      readOnly: true
+    provisioning_uri:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      readOnly: true
+    expires_at:
+      type: string
+      format: date-time
+
+ConfirmTOTPEnrollmentRequest:
+  type: object
+  additionalProperties: false
+  required: [code]
+  properties:
+    code:
+      type: string
+      pattern: "^[0-9]{6}$"
+      writeOnly: true
+
+TOTPEnrollmentResult:
+  type: object
+  additionalProperties: false
+  required: [change_id, enabled_at, recovery_codes]
+  properties:
+    change_id:
+      type: string
+      format: uuid
+    enabled_at:
+      type: string
+      format: date-time
+    recovery_codes:
+      $ref: "#/RecoveryCodeList"
+
+TwoFactorReauthenticationRequest:
+  type: object
+  additionalProperties: false
+  required: [password, second_factor_code]
+  properties:
+    password:
+      type: string
+      minLength: 1
+      maxLength: 1024
+      writeOnly: true
+    second_factor_code:
+      type: string
+      minLength: 6
+      maxLength: 32
+      writeOnly: true
+
+RecoveryCodeRotationResult:
+  type: object
+  additionalProperties: false
+  required: [change_id, changed_at, recovery_codes]
+  properties:
+    change_id:
+      type: string
+      format: uuid
+    changed_at:
+      type: string
+      format: date-time
+    recovery_codes:
+      $ref: "#/RecoveryCodeList"
+
+TwoFactorDisableResult:
+  type: object
+  additionalProperties: false
+  required: [change_id, changed_at]
+  properties:
+    change_id:
+      type: string
+      format: uuid
+    changed_at:
+      type: string
+      format: date-time
+
+RecoveryCodeList:
+  type: array
+  minItems: 10
+  maxItems: 10
+  items:
+    type: string
+    pattern: "^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$"
+    readOnly: true
+
+UserWebSession:
+  type: object
+  additionalProperties: false
+  required: [id, current, created_at, last_seen_at, expires_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: 与 bearer token 及其摘要无关的浏览器安全标识。
+    current:
+      type: boolean
+    created_at:
+      type: string
+      format: date-time
+    last_seen_at:
+      type: string
+      format: date-time
+      description: 最多每五分钟合并更新，不构成逐请求活动轨迹。
+    expires_at:
+      type: string
+      format: date-time
+
+UserWebSessionList:
+  type: object
+  additionalProperties: false
+  required: [items]
+  properties:
+    items:
+      type: array
+      maxItems: 256
+      items:
+        $ref: "#/UserWebSession"
+
+WebAuthnCredentialDescriptor:
+  type: object
+  additionalProperties: false
+  required: [type, id]
+  properties:
+    type:
+      type: string
+      enum: [public-key]
+    id:
+      type: string
+      minLength: 1
+      maxLength: 1400
+      pattern: "^[A-Za-z0-9_-]+$"
+    transports:
+      type: array
+      maxItems: 16
+      items:
+        type: string
+        minLength: 1
+        maxLength: 32
+
+WebAuthnRequestOptions:
+  type: object
+  additionalProperties: false
+  required: [challenge, timeout, rpId, allowCredentials, userVerification]
+  properties:
+    challenge:
+      type: string
+      minLength: 22
+      maxLength: 1024
+      pattern: "^[A-Za-z0-9_-]+$"
+    timeout:
+      type: integer
+      minimum: 1000
+      maximum: 600000
+    rpId:
+      type: string
+      minLength: 1
+      maxLength: 253
+    allowCredentials:
+      type: array
+      minItems: 1
+      maxItems: 32
+      items:
+        $ref: "#/WebAuthnCredentialDescriptor"
+    userVerification:
+      type: string
+      enum: [required]
+    hints:
+      type: array
+      maxItems: 8
+      items:
+        type: string
+        minLength: 1
+        maxLength: 32
+    extensions:
+      type: object
+      description: 标准 WebAuthn client extension inputs；由 RP library 生成。
+      additionalProperties: true
+
+StaffElevationOptions:
+  type: object
+  additionalProperties: false
+  required: [challenge_id, expires_at, public_key]
+  properties:
+    challenge_id:
+      type: string
+      format: uuid
+    expires_at:
+      type: string
+      format: date-time
+    public_key:
+      $ref: "#/WebAuthnRequestOptions"
+
+WebAuthnAuthenticatorAssertionResponse:
+  type: object
+  additionalProperties: false
+  required: [clientDataJSON, authenticatorData, signature]
+  properties:
+    clientDataJSON:
+      type: string
+      minLength: 1
+      maxLength: 8192
+      pattern: "^[A-Za-z0-9_-]+$"
+    authenticatorData:
+      type: string
+      minLength: 1
+      maxLength: 8192
+      pattern: "^[A-Za-z0-9_-]+$"
+    signature:
+      type: string
+      minLength: 1
+      maxLength: 8192
+      pattern: "^[A-Za-z0-9_-]+$"
+    userHandle:
+      type: string
+      nullable: true
+      maxLength: 1024
+      pattern: "^[A-Za-z0-9_-]*$"
+
+WebAuthnCredentialAssertion:
+  type: object
+  additionalProperties: false
+  required: [id, rawId, type, response, clientExtensionResults]
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 1400
+      pattern: "^[A-Za-z0-9_-]+$"
+    rawId:
+      type: string
+      minLength: 1
+      maxLength: 1400
+      pattern: "^[A-Za-z0-9_-]+$"
+    type:
+      type: string
+      enum: [public-key]
+    authenticatorAttachment:
+      type: string
+      nullable: true
+      enum: [platform, cross-platform]
+    response:
+      $ref: "#/WebAuthnAuthenticatorAssertionResponse"
+    clientExtensionResults:
+      type: object
+      description: 标准 WebAuthn client extension outputs；由 RP library 校验。
+      additionalProperties: true
+
+CompleteStaffElevationRequest:
+  type: object
+  additionalProperties: false
+  required: [challenge_id, credential]
+  properties:
+    challenge_id:
+      type: string
+      format: uuid
+    credential:
+      $ref: "#/WebAuthnCredentialAssertion"
+
+StaffSession:
+  type: object
+  additionalProperties: false
+  required: [user, expires_at, authentication_method, authenticated_at, csrf_token]
+  properties:
+    user:
+      $ref: "#/SessionUser"
+    expires_at:
+      type: string
+      format: date-time
+    authentication_method:
+      type: string
+      enum: [account_session, passkey]
+      description: 普通账号登录，或可选的通行密钥增强验证。
+    authenticated_at:
+      type: string
+      format: date-time
+      description: 当前管理员身份最近一次完成验证的时间。
+    webauthn_authenticated_at:
+      type: string
+      format: date-time
+      nullable: true
+      deprecated: true
+      description: 兼容字段；仅通行密钥会话返回。
+    csrf_token:
+      type: string
+      minLength: 43
+      maxLength: 43
+      description: 仅用于同源 staff 写请求；它不是身份凭据。
+
+StaffBootstrapToken:
+  type: string
+  minLength: 43
+  maxLength: 43
+  pattern: "^[A-Za-z0-9_-]{43}$"
+  writeOnly: true
+  description: operator CLI 仅返回一次的 256-bit bootstrap token。
+
+BeginStaffEnrollmentRequest:
+  type: object
+  additionalProperties: false
+  required: [bootstrap_token, label]
+  properties:
+    bootstrap_token:
+      $ref: "#/StaffBootstrapToken"
+    label:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+WebAuthnRelyingPartyEntity:
+  type: object
+  additionalProperties: false
+  required: [id, name]
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 253
+    name:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+WebAuthnUserEntity:
+  type: object
+  additionalProperties: false
+  required: [id, name, displayName]
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 1024
+      pattern: "^[A-Za-z0-9_-]+$"
+    name:
+      type: string
+      minLength: 1
+      maxLength: 64
+    displayName:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+WebAuthnCredentialParameter:
+  type: object
+  additionalProperties: false
+  required: [type, alg]
+  properties:
+    type:
+      type: string
+      enum: [public-key]
+    alg:
+      type: integer
+      minimum: -65536
+      maximum: 65535
+
+WebAuthnAuthenticatorSelection:
+  type: object
+  additionalProperties: false
+  required: [residentKey, requireResidentKey, userVerification]
+  properties:
+    authenticatorAttachment:
+      type: string
+      enum: [platform, cross-platform]
+    residentKey:
+      type: string
+      enum: [preferred]
+    requireResidentKey:
+      type: boolean
+    userVerification:
+      type: string
+      enum: [required]
+
+WebAuthnCreationOptions:
+  type: object
+  additionalProperties: false
+  required:
+    - rp
+    - user
+    - challenge
+    - pubKeyCredParams
+    - timeout
+    - authenticatorSelection
+    - attestation
+  properties:
+    rp:
+      $ref: "#/WebAuthnRelyingPartyEntity"
+    user:
+      $ref: "#/WebAuthnUserEntity"
+    challenge:
+      type: string
+      minLength: 22
+      maxLength: 1024
+      pattern: "^[A-Za-z0-9_-]+$"
+    pubKeyCredParams:
+      type: array
+      minItems: 1
+      maxItems: 32
+      items:
+        $ref: "#/WebAuthnCredentialParameter"
+    timeout:
+      type: integer
+      minimum: 1000
+      maximum: 600000
+    excludeCredentials:
+      type: array
+      maxItems: 32
+      items:
+        $ref: "#/WebAuthnCredentialDescriptor"
+    authenticatorSelection:
+      $ref: "#/WebAuthnAuthenticatorSelection"
+    hints:
+      type: array
+      maxItems: 8
+      items:
+        type: string
+        minLength: 1
+        maxLength: 32
+    attestation:
+      type: string
+      enum: [none]
+    extensions:
+      type: object
+      additionalProperties: true
+
+StaffEnrollmentOptions:
+  type: object
+  additionalProperties: false
+  required: [challenge_id, expires_at, public_key]
+  properties:
+    challenge_id:
+      type: string
+      format: uuid
+    expires_at:
+      type: string
+      format: date-time
+    public_key:
+      $ref: "#/WebAuthnCreationOptions"
+
+WebAuthnAuthenticatorAttestationResponse:
+  type: object
+  additionalProperties: false
+  required: [clientDataJSON, attestationObject]
+  properties:
+    clientDataJSON:
+      type: string
+      minLength: 1
+      maxLength: 8192
+      pattern: "^[A-Za-z0-9_-]+$"
+    attestationObject:
+      type: string
+      minLength: 1
+      maxLength: 32768
+      pattern: "^[A-Za-z0-9_-]+$"
+    transports:
+      type: array
+      maxItems: 16
+      items:
+        type: string
+        minLength: 1
+        maxLength: 32
+    authenticatorData:
+      type: string
+      maxLength: 8192
+      pattern: "^[A-Za-z0-9_-]*$"
+    publicKey:
+      type: string
+      maxLength: 8192
+      pattern: "^[A-Za-z0-9_-]*$"
+    publicKeyAlgorithm:
+      type: integer
+
+WebAuthnCredentialCreation:
+  type: object
+  additionalProperties: false
+  required: [id, rawId, type, response, clientExtensionResults]
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 1400
+      pattern: "^[A-Za-z0-9_-]+$"
+    rawId:
+      type: string
+      minLength: 1
+      maxLength: 1400
+      pattern: "^[A-Za-z0-9_-]+$"
+    type:
+      type: string
+      enum: [public-key]
+    authenticatorAttachment:
+      type: string
+      nullable: true
+      enum: [platform, cross-platform]
+    response:
+      $ref: "#/WebAuthnAuthenticatorAttestationResponse"
+    clientExtensionResults:
+      type: object
+      additionalProperties: true
+
+CompleteStaffEnrollmentRequest:
+  type: object
+  additionalProperties: false
+  required: [bootstrap_token, challenge_id, credential]
+  properties:
+    bootstrap_token:
+      $ref: "#/StaffBootstrapToken"
+    challenge_id:
+      type: string
+      format: uuid
+    credential:
+      $ref: "#/WebAuthnCredentialCreation"
+
+StaffCredentialEnrollment:
+  type: object
+  additionalProperties: false
+  required: [label, enrolled_at]
+  properties:
+    label:
+      type: string
+      minLength: 1
+      maxLength: 80
+    enrolled_at:
+      type: string
+      format: date-time
+
+ManagedUserStatus:
+  type: string
+  enum: [active, disabled, pending]
+
+ManagedUserDirectoryFilter:
+  type: string
+  enum: [active, banned, pending, vip, download_restricted, unverified]
+
+ManagedUserSummary:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - numeric_id
+    - username
+    - display_name
+    - email
+    - email_verified
+    - banned
+    - download_restricted
+    - vip_enabled
+    - vip_active
+    - status
+    - version
+    - active_restriction_count
+    - uploaded_bytes
+    - downloaded_bytes
+    - magic_balance
+    - level
+    - role_names
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: PeerGo 规范 UUID；用于接口路径和跨模块引用。
+    numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+      description: 后台数字 ID；迁移用户沿用 PtYes ID，新用户由 PeerGo 递增分配。
+    username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    email:
+      type: string
+      format: email
+      minLength: 3
+      maxLength: 254
+      description: 仅对具有 user.account.read 的后台身份返回；地址由 Privacy Vault 按需提供，Core 不持久化。
+    email_verified:
+      type: boolean
+    banned:
+      type: boolean
+      description: 账户是否处于封禁状态；旧站封禁迁移为 disabled 账户。
+    download_restricted:
+      type: boolean
+      description: 是否禁止发起新的种子下载；与整站账户封禁相互独立。
+    vip_enabled:
+      type: boolean
+      description: 是否存在 VIP 授予记录，包括已经到期的记录。
+    vip_active:
+      type: boolean
+      description: VIP 授予在当前服务端时刻是否仍然有效。
+    vip_until:
+      type: string
+      format: date-time
+      nullable: true
+      description: VIP 到期时间；启用且为空表示永久 VIP。
+    status:
+      $ref: "#/ManagedUserStatus"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+    active_restriction_count:
+      type: integer
+      format: int64
+      minimum: 0
+    uploaded_bytes:
+      type: string
+      pattern: "^[0-9]+$"
+      description: 实际累计上传字节数；使用十进制字符串避免前端整数精度损失。
+    downloaded_bytes:
+      type: string
+      pattern: "^[0-9]+$"
+      description: 实际累计下载字节数；使用十进制字符串避免前端整数精度损失。
+    magic_balance:
+      type: string
+      pattern: "^-?[0-9]+$"
+      description: 唯一站内资产魔力值，始终为整数。
+    level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    role_names:
+      type: array
+      minItems: 1
+      maxItems: 32
+      uniqueItems: true
+      items:
+        type: string
+        minLength: 1
+        maxLength: 80
+    last_active_at:
+      type: string
+      format: date-time
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+ManagedUserPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, page, page_size, summary]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/ManagedUserSummary"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    page:
+      type: integer
+      minimum: 1
+      maximum: 100000
+    page_size:
+      type: integer
+      minimum: 1
+      maximum: 50
+    summary:
+      $ref: "#/ManagedUserDirectorySummary"
+
+ManagedUserDirectorySummary:
+  type: object
+  additionalProperties: false
+  required: [total, active, banned, vip, download_restricted, unverified]
+  properties:
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    active:
+      type: integer
+      format: int64
+      minimum: 0
+    banned:
+      type: integer
+      format: int64
+      minimum: 0
+    vip:
+      type: integer
+      format: int64
+      minimum: 0
+    download_restricted:
+      type: integer
+      format: int64
+      minimum: 0
+    unverified:
+      type: integer
+      format: int64
+      minimum: 0
+
+CurrentAccountRestriction:
+  type: object
+  additionalProperties: false
+  required: [id, kind, reason_code, reason_summary, starts_at, expires_at, version]
+  properties:
+    id:
+      type: string
+      format: uuid
+    kind:
+      type: string
+      enum: [account_access]
+    reason_code:
+      type: string
+      pattern: "^[a-z][a-z0-9_]{0,63}$"
+    reason_summary:
+      type: string
+      minLength: 10
+      maxLength: 240
+    starts_at:
+      type: string
+      format: date-time
+    expires_at:
+      type: string
+      format: date-time
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+
+ManagedUserDetail:
+  allOf:
+    - $ref: "#/ManagedUserSummary"
+    - type: object
+      additionalProperties: false
+      required:
+        - active_restrictions
+        - manual_download_restriction
+        - manual_download_restriction_history
+        - vip_state
+        - vip_history
+      properties:
+        active_restrictions:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/CurrentAccountRestriction"
+        manual_download_restriction:
+          $ref: "#/ManualDownloadRestrictionState"
+        manual_download_restriction_history:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/ManualDownloadRestrictionTransition"
+        vip_state:
+          $ref: "#/VIPState"
+        vip_history:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/VIPTransition"
+
+VIPState:
+  type: object
+  additionalProperties: false
+  required: [enabled, active, version]
+  properties:
+    enabled:
+      type: boolean
+    active:
+      type: boolean
+    until:
+      type: string
+      format: date-time
+      nullable: true
+    version:
+      type: integer
+      format: int64
+      minimum: 0
+
+VIPTransition:
+  type: object
+  additionalProperties: false
+  required:
+    - transition
+    - origin
+    - reason_summary
+    - enabled
+    - state_version
+    - occurred_at
+  properties:
+    transition:
+      type: string
+      enum: [granted, renewed, revoked]
+    origin:
+      type: string
+      enum: [legacy_migration, system_backfill, staff]
+    reason_summary:
+      type: string
+      minLength: 10
+      maxLength: 500
+    enabled:
+      type: boolean
+    until:
+      type: string
+      format: date-time
+      nullable: true
+    state_version:
+      type: integer
+      format: int64
+      minimum: 1
+    occurred_at:
+      type: string
+      format: date-time
+    actor_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+    actor_username:
+      type: string
+      minLength: 1
+      maxLength: 40
+
+ChangeVIPRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - enabled
+    - reason
+    - expected_user_version
+    - expected_state_version
+  properties:
+    enabled:
+      type: boolean
+    duration_days:
+      type: integer
+      minimum: 1
+      maximum: 3650
+      description: 限期 VIP 从提交时刻起的自然日数；省略表示永久 VIP。
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+    expected_user_version:
+      type: integer
+      format: int64
+      minimum: 1
+    expected_state_version:
+      type: integer
+      format: int64
+      minimum: 0
+
+ManualDownloadRestrictionOrigin:
+  type: string
+  enum: [legacy_migration, system_backfill, staff, appeal]
+
+ManualDownloadRestrictionReasonCode:
+  type: string
+  enum: [manual_review, policy_violation, abuse_prevention]
+
+ManualDownloadRestrictionRevocationReasonCode:
+  type: string
+  enum: [review_completed, restriction_no_longer_needed]
+
+ManualDownloadRestrictionState:
+  type: object
+  additionalProperties: false
+  required: [active, version]
+  properties:
+    active:
+      type: boolean
+    version:
+      type: integer
+      format: int64
+      minimum: 0
+    origin:
+      $ref: "#/ManualDownloadRestrictionOrigin"
+    reason_code:
+      type: string
+      pattern: "^[a-z][a-z0-9_]{0,63}$"
+    reason_summary:
+      type: string
+      minLength: 10
+      maxLength: 500
+    started_at:
+      type: string
+      format: date-time
+
+ManualDownloadRestrictionTransition:
+  type: object
+  additionalProperties: false
+  required:
+    - transition
+    - origin
+    - reason_code
+    - reason_summary
+    - state_version
+    - occurred_at
+  properties:
+    transition:
+      type: string
+      enum: [restricted, updated, revoked]
+    origin:
+      $ref: "#/ManualDownloadRestrictionOrigin"
+    reason_code:
+      type: string
+      pattern: "^[a-z][a-z0-9_]{0,63}$"
+    reason_summary:
+      type: string
+      minLength: 10
+      maxLength: 500
+    state_version:
+      type: integer
+      format: int64
+      minimum: 1
+    occurred_at:
+      type: string
+      format: date-time
+    actor_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+    actor_username:
+      type: string
+      minLength: 1
+      maxLength: 40
+
+ChangeManualDownloadRestrictionRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - reason_code
+    - reason
+    - expected_user_version
+    - expected_state_version
+  properties:
+    reason_code:
+      $ref: "#/ManualDownloadRestrictionReasonCode"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+    expected_user_version:
+      type: integer
+      format: int64
+      minimum: 1
+    expected_state_version:
+      type: integer
+      format: int64
+      minimum: 0
+
+RevokeManualDownloadRestrictionRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - reason_code
+    - reason
+    - expected_user_version
+    - expected_state_version
+  properties:
+    reason_code:
+      $ref: "#/ManualDownloadRestrictionRevocationReasonCode"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+    expected_user_version:
+      type: integer
+      format: int64
+      minimum: 1
+    expected_state_version:
+      type: integer
+      format: int64
+      minimum: 1
+
+AccountRestrictionReasonCode:
+  type: string
+  enum: [manual_review, security_incident]
+
+AccountRestrictionRevocationReasonCode:
+  type: string
+  enum: [review_completed, restriction_no_longer_needed]
+
+CreateAccountRestrictionRequest:
+  type: object
+  additionalProperties: false
+  required: [reason_code, reason, duration_hours, expected_user_version]
+  properties:
+    reason_code:
+      $ref: "#/AccountRestrictionReasonCode"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 240
+    duration_hours:
+      type: integer
+      minimum: 1
+      maximum: 168
+    expected_user_version:
+      type: integer
+      format: int64
+      minimum: 1
+
+RevokeAccountRestrictionRequest:
+  type: object
+  additionalProperties: false
+  required: [reason_code, reason, expected_user_version, expected_restriction_version]
+  properties:
+    reason_code:
+      $ref: "#/AccountRestrictionRevocationReasonCode"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+    expected_user_version:
+      type: integer
+      format: int64
+      minimum: 1
+    expected_restriction_version:
+      type: integer
+      format: int64
+      minimum: 1

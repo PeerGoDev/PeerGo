@@ -1,0 +1,98 @@
+SeedboxReportIDPathParameter:
+  name: report_id
+  in: path
+  required: true
+  schema: { type: string, format: uuid }
+
+MySeedboxReportsPath:
+  get:
+    operationId: listMySeedboxReports
+    summary: 查看自己的盒子申报和审核结果
+    tags: [seedbox]
+    x-audience: [web]
+    x-owner: core-tracker-control
+    x-permission: tracker.seedbox.read.self
+    x-credential-audience: web-session
+    parameters:
+      - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+    responses:
+      "200":
+        description: 当前用户的申报记录。
+        content: { application/json: { schema: { $ref: "../schemas/seedbox.yaml#/SeedboxReportPage" } } }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: createMySeedboxReport
+    summary: 申报自己的单个盒子地址等待人工审核
+    tags: [seedbox]
+    x-audience: [web]
+    x-owner: core-tracker-control
+    x-permission: tracker.seedbox.report.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content: { application/json: { schema: { $ref: "../schemas/seedbox.yaml#/CreateSeedboxReportRequest" } } }
+    responses:
+      "201":
+        description: 申报已经记录，尚未获得盒子分类。
+        content: { application/json: { schema: { $ref: "../schemas/seedbox.yaml#/SeedboxReport" } } }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminSeedboxReportsPath:
+  get:
+    operationId: listAdminSeedboxReports
+    summary: 查看盒子申报审核队列和历史结果
+    tags: [seedbox]
+    x-audience: [staff]
+    x-owner: core-tracker-control
+    x-permission: tracker.seedbox.registry.read
+    x-credential-audience: staff-session
+    parameters:
+      - { name: status, in: query, schema: { $ref: "../schemas/seedbox.yaml#/SeedboxReportStatus" } }
+      - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+    responses:
+      "200":
+        description: 待处理优先的申报队列。
+        content: { application/json: { schema: { $ref: "../schemas/seedbox.yaml#/SeedboxReportPage" } } }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminSeedboxReportDecisionPath:
+  post:
+    operationId: decideAdminSeedboxReport
+    summary: 批准或驳回盒子申报
+    tags: [seedbox]
+    x-audience: [staff]
+    x-owner: core-tracker-control
+    x-permission: tracker.seedbox.report.decide
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/SeedboxReportIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content: { application/json: { schema: { $ref: "../schemas/seedbox.yaml#/DecideSeedboxReportRequest" } } }
+    responses:
+      "200":
+        description: 决定已记录；批准时用户绑定规则与决定原子提交。
+        content: { application/json: { schema: { $ref: "../schemas/seedbox.yaml#/SeedboxReport" } } }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

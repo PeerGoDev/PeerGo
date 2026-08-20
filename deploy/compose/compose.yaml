@@ -1,0 +1,70 @@
+name: peergo
+
+services:
+  core-postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: peergo_core
+      POSTGRES_USER: peergo_core
+      POSTGRES_PASSWORD: peergo_local_only
+    ports:
+      - "127.0.0.1:${PEERGO_CORE_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peergo_core -d peergo_core"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - core-postgres-data:/var/lib/postgresql
+
+  vault-postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: peergo_vault
+      POSTGRES_USER: peergo_vault
+      POSTGRES_PASSWORD: peergo_vault_local_only
+    ports:
+      - "127.0.0.1:${PEERGO_VAULT_POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peergo_vault -d peergo_vault"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - vault-postgres-data:/var/lib/postgresql
+
+  tracker-postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_DB: peergo_tracker
+      POSTGRES_USER: peergo_tracker
+      POSTGRES_PASSWORD: peergo_tracker_local_only
+    ports:
+      - "127.0.0.1:${PEERGO_TRACKER_POSTGRES_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peergo_tracker -d peergo_tracker"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - tracker-postgres-data:/var/lib/postgresql
+
+  nats:
+    image: nats:2.14.3-alpine3.22
+    command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222"]
+    ports:
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - 'http://127.0.0.1:8222/healthz?js-enabled-only=true' | grep -q ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - nats-data:/data
+
+volumes:
+  core-postgres-data:
+  vault-postgres-data:
+  tracker-postgres-data:
+  nats-data:

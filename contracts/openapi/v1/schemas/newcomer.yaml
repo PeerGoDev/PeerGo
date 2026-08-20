@@ -1,0 +1,176 @@
+NewcomerAssessmentStatus:
+  type: string
+  enum: [active, download_restricted, passed, exempted]
+
+NewcomerPolicyInput:
+  type: object
+  additionalProperties: false
+  required:
+    [enabled, duration_seconds, minimum_credited_upload_bytes, minimum_seeding_active_seconds]
+  properties:
+    enabled: { type: boolean }
+    duration_seconds:
+      type: integer
+      format: int64
+      minimum: 604800
+      maximum: 7776000
+    minimum_credited_upload_bytes:
+      $ref: "traffic.yaml#/TrafficByteCount"
+    minimum_seeding_active_seconds:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 315360000
+
+NewcomerPolicyRevision:
+  allOf:
+    - $ref: "#/NewcomerPolicyInput"
+    - type: object
+      additionalProperties: false
+      required: [id, revision, source_kind, effective_at, reason, created_at, timeline_state, replayed]
+      properties:
+        id: { type: string, format: uuid }
+        revision: { type: integer, format: int64, minimum: 1 }
+        source_kind: { type: string, enum: [opening, staff] }
+        effective_at: { type: string, format: date-time }
+        reason: { type: string, minLength: 10, maxLength: 1000 }
+        created_at: { type: string, format: date-time }
+        timeline_state: { type: string, enum: [scheduled, active] }
+        replayed: { type: boolean }
+
+IssueNewcomerPolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [policy, effective_at, reason]
+  properties:
+    policy: { $ref: "#/NewcomerPolicyInput" }
+    effective_at: { type: string, format: date-time }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+NewcomerAssessmentSummary:
+  type: object
+  additionalProperties: false
+  required: [active, download_restricted, passed, exempted]
+  properties:
+    active: { $ref: "operations.yaml#/OperationsCount" }
+    download_restricted: { $ref: "operations.yaml#/OperationsCount" }
+    passed: { $ref: "operations.yaml#/OperationsCount" }
+    exempted: { $ref: "operations.yaml#/OperationsCount" }
+
+NewcomerWorkerState:
+  type: object
+  additionalProperties: false
+  required:
+    [last_started_at, last_completed_at, last_error_code, last_examined, last_transitioned, run_count]
+  properties:
+    last_started_at: { type: string, format: date-time, nullable: true }
+    last_completed_at: { type: string, format: date-time, nullable: true }
+    last_error_code: { type: string, maxLength: 64 }
+    last_examined: { $ref: "operations.yaml#/OperationsCount" }
+    last_transitioned: { $ref: "operations.yaml#/OperationsCount" }
+    run_count: { $ref: "operations.yaml#/OperationsCount" }
+
+NewcomerPolicyPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset, minimum_effective_from, current, summary, worker]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/NewcomerPolicyRevision" }
+    total: { $ref: "operations.yaml#/OperationsCount" }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+    minimum_effective_from: { type: string, format: date-time }
+    current:
+      type: object
+      allOf: [{ $ref: "#/NewcomerPolicyRevision" }]
+      nullable: true
+    summary: { $ref: "#/NewcomerAssessmentSummary" }
+    worker: { $ref: "#/NewcomerWorkerState" }
+
+NewcomerAssessmentFilter:
+  type: string
+  enum: [all, active, download_restricted, resolved]
+
+NewcomerAssessment:
+  type: object
+  additionalProperties: false
+  required:
+    [id, user_id, user_numeric_id, username, display_name, policy_revision_id,
+     policy_revision, status, started_at, deadline_at,
+     minimum_credited_upload_bytes, minimum_seeding_active_seconds,
+     current_credited_upload_bytes, current_seeding_active_seconds,
+     restriction_started_at, resolved_at, resolution_code, version, updated_at]
+  properties:
+    id: { type: string, format: uuid }
+    user_id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    display_name: { type: string, minLength: 1, maxLength: 80 }
+    policy_revision_id: { type: string, format: uuid }
+    policy_revision: { type: integer, format: int64, minimum: 1 }
+    status: { $ref: "#/NewcomerAssessmentStatus" }
+    started_at: { type: string, format: date-time }
+    deadline_at: { type: string, format: date-time }
+    minimum_credited_upload_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    minimum_seeding_active_seconds: { type: integer, format: int64, minimum: 0 }
+    current_credited_upload_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    current_seeding_active_seconds: { type: integer, format: int64, minimum: 0 }
+    restriction_started_at: { type: string, format: date-time, nullable: true }
+    resolved_at: { type: string, format: date-time, nullable: true }
+    resolution_code: { type: string, maxLength: 64 }
+    version: { type: integer, format: int64, minimum: 1 }
+    updated_at: { type: string, format: date-time }
+
+NewcomerAssessmentPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/NewcomerAssessment" }
+    total: { $ref: "operations.yaml#/OperationsCount" }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+MyNewcomerAssessment:
+  type: object
+  additionalProperties: false
+  required:
+    [status, started_at, deadline_at, minimum_credited_upload_bytes,
+     minimum_seeding_active_seconds, current_credited_upload_bytes,
+     current_seeding_active_seconds, restriction_started_at, resolved_at, updated_at]
+  properties:
+    status: { $ref: "#/NewcomerAssessmentStatus" }
+    started_at: { type: string, format: date-time }
+    deadline_at: { type: string, format: date-time }
+    minimum_credited_upload_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    minimum_seeding_active_seconds: { type: integer, format: int64, minimum: 0 }
+    current_credited_upload_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    current_seeding_active_seconds: { type: integer, format: int64, minimum: 0 }
+    restriction_started_at: { type: string, format: date-time, nullable: true }
+    resolved_at: { type: string, format: date-time, nullable: true }
+    updated_at: { type: string, format: date-time }
+
+MyNewcomerAssessmentStatus:
+  type: object
+  additionalProperties: false
+  required: [observed_at, assessment]
+  properties:
+    observed_at: { type: string, format: date-time }
+    assessment:
+      type: object
+      allOf: [{ $ref: "#/MyNewcomerAssessment" }]
+      nullable: true
+
+ExemptNewcomerAssessmentRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, reason]
+  properties:
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    reason: { type: string, minLength: 10, maxLength: 1000 }

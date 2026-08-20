@@ -1,0 +1,977 @@
+MyEconomyPath:
+  get:
+    operationId: getMyEconomy
+    summary: 查看自己的魔力值账本、经验与等级进度
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+    responses:
+      "200":
+        description: 仅当前会话成员的整数魔力值账本和精确经验投影。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/EconomyOverview"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyMedalsPath:
+  get:
+    operationId: getMyMedals
+    summary: 查看自己的勋章、有效加成和勋章商店
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.medal.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 返回当前持有、佩戴顺序、购买状态和封顶后的总加成。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/economy.yaml#/MemberMedalOverview" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyMedalPurchasePath:
+  parameters:
+    - name: medal_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  post:
+    operationId: purchaseMyMedal
+    summary: 使用整数魔力值原子购买一枚勋章
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.medal.purchase.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    responses:
+      "201":
+        description: 扣款、持有记录、库存和购买收据已经在同一事务提交。
+        content:
+          application/json:
+            schema:
+              { $ref: "../schemas/economy.yaml#/MemberMedalPurchaseReceipt" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyMedalWearingPath:
+  parameters:
+    - name: medal_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  put:
+    operationId: updateMyMedalWearing
+    summary: 佩戴或取下一枚自己的勋章
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.medal.wear.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/economy.yaml#/MemberMedalWearingRequest" }
+    responses:
+      "200":
+        description: 佩戴状态与未来奖励权益修订已经提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/economy.yaml#/MemberMedalHolding" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyMedalPriorityPath:
+  parameters:
+    - name: medal_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  put:
+    operationId: updateMyMedalPriority
+    summary: 上移或下移一枚已佩戴勋章
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.medal.wear.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            { $ref: "../schemas/economy.yaml#/MemberMedalPriorityRequest" }
+    responses:
+      "200":
+        description: 新展示顺序已经提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/economy.yaml#/MemberMedalHolding" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyMemberGiftsPath:
+  get:
+    operationId: getMyMemberGifts
+    summary: 查看自己的成员赠送规则、当日额度与最近收发记录
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.membergift.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+    responses:
+      "200":
+        description: 返回当前不可变赠送政策、本人当日已赠金额和最近收发记录。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/MemberGiftOverview"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: createMyMemberGift
+    summary: 按成员数字 ID 原子赠送整数魔力值
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.membergift.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/CreateMemberGiftRequest"
+    responses:
+      "201":
+        description: 赠送收据和全部平衡账本分录已在同一事务提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/MemberGiftRecord"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MemberGiftPoliciesPath:
+  get:
+    operationId: listMemberGiftPolicies
+    summary: 查询不可变成员赠送政策时间线
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.membergift.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 当前及历史赠送规则；第一项是当前立即生效修订。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/MemberGiftPolicyPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: issueMemberGiftPolicy
+    summary: 签发立即生效的不可变成员赠送政策
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.membergift.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/IssueMemberGiftPolicyRequest"
+    responses:
+      "201":
+        description: 新修订已追加并立即成为后续赠送的规则。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/MemberGiftPolicy"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyContentTipsPath:
+  get:
+    operationId: getMyContentTips
+    summary: 查看自己的内容打赏规则、当日额度与最近收发记录
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.contenttip.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+    responses:
+      "200":
+        description: 当前不可变内容打赏政策、本人当日已支出和最近收发回执。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ContentTipOverview"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentContentTipsPath:
+  parameters:
+    - $ref: "../domains/torrents.yaml#/TorrentIDPathParameter"
+  post:
+    operationId: createTorrentContentTip
+    summary: 给一条已发布种子的上传者打赏整数魔力值
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.contenttip.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/CreateContentTipRequest"
+    responses:
+      "201":
+        description: 回执、种子强类型绑定与平衡账本已原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ContentTipRecord"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+PostContentTipsPath:
+  parameters:
+    - $ref: "../domains/social.yaml#/SocialPostIDPathParameter"
+  post:
+    operationId: createPostContentTip
+    summary: 给一条可见动态的作者打赏整数魔力值
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.contenttip.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/CreateContentTipRequest"
+    responses:
+      "201":
+        description: 回执、动态强类型绑定与平衡账本已原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ContentTipRecord"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+CommentContentTipsPath:
+  parameters:
+    - $ref: "../domains/comments.yaml#/CommentIDPathParameter"
+  post:
+    operationId: createCommentContentTip
+    summary: 给一条可见评论的作者打赏整数魔力值
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.contenttip.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/CreateContentTipRequest"
+    responses:
+      "201":
+        description: 回执、评论强类型绑定与平衡账本已原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ContentTipRecord"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ContentTipPoliciesPath:
+  get:
+    operationId: listContentTipPolicies
+    summary: 查询不可变内容打赏政策时间线
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.contenttip.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      - name: offset
+        in: query
+        required: false
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 当前及历史内容打赏政策，第一项是当前修订。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ContentTipPolicyPage"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: issueContentTipPolicy
+    summary: 签发立即生效的不可变内容打赏政策
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.contenttip.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/IssueContentTipPolicyRequest"
+    responses:
+      "201":
+        description: 新政策已追加并立即用于后续内容打赏。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ContentTipPolicy"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyAttendancePath:
+  get:
+    operationId: getMyAttendance
+    summary: 查看自己的今日签到状态与最近签到历史
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.attendance.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 返回当前不可变政策、今日状态和个人连续签到统计。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/AttendanceOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: claimMyAttendance
+    summary: 完成今天的签到并领取整数魔力值与经验
+    tags: [economy]
+    x-audience: [member]
+    x-owner: core-economy
+    x-permission: economy.attendance.claim.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/ClaimAttendanceRequest"
+    responses:
+      "201":
+        description: 签到记录、魔力值账本和经验账本已原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/AttendanceRecord"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+AttendancePoliciesPath:
+  get:
+    operationId: listAttendancePolicies
+    summary: 查询不可变签到政策时间线
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.attendance.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 当前与未来的签到规则，以及下一次允许的生效边界。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/AttendancePolicyPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: issueAttendancePolicy
+    summary: 签发下一个自然日生效的签到政策
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.attendance.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/IssueAttendancePolicyRequest"
+    responses:
+      "201":
+        description: 新政策已追加；服务端负责生成修订号和生效时刻。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/AttendancePolicy"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+SeedingRewardPoliciesPath:
+  get:
+    operationId: listSeedingRewardPolicies
+    summary: 查询不可变做种奖励政策时间线
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.seedingreward.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 当前与未来的完整公式快照及最早可生效时刻。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/SeedingRewardPolicyPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: issueSeedingRewardPolicy
+    summary: 签发未来生效的不可变做种奖励政策
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.seedingreward.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/IssueSeedingRewardPolicyRequest"
+    responses:
+      "201":
+        description: 新公式已追加到时间线；既有记录不会改变。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/SeedingRewardPolicy"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+SeedingRewardPolicyPreviewPath:
+  post:
+    operationId: previewSeedingRewardPolicy
+    summary: 用固定代表场景预览做种奖励政策
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.seedingreward.policy.read
+    x-credential-audience: staff-session
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/SeedingRewardPolicyInput"
+    responses:
+      "200":
+        description: 只执行纯计算，不写入政策或账本。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/SeedingRewardPolicyPreview"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ContributionExperiencePoliciesPath:
+  get:
+    operationId: listContributionExperiencePolicies
+    summary: 查询上传、发种与账号时长经验政策时间线
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-progression
+    x-permission: progression.contribution.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 返回当前与未来的不可变经验来源政策，以及最早可生效时刻。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ContributionExperiencePolicyPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: issueContributionExperiencePolicy
+    summary: 签发未来整点生效的经验来源政策
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-progression
+    x-permission: progression.contribution.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/IssueContributionExperiencePolicyRequest"
+    responses:
+      "201":
+        description: 新政策已追加到不可变时间线；历史经验账本不会重算。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ContributionExperiencePolicy"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+LevelPoliciesPath:
+  get:
+    operationId: listLevelPolicies
+    summary: 查看经验等级阶梯、定时版本与全站生效状态
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-progression
+    x-permission: progression.level.policy.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 返回 Core 数据库中的不可变等级版本、经验门槛、做种权益和当前用户分布。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/LevelPolicyList"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: issueLevelPolicy
+    summary: 签发未来整点生效的完整等级阶梯
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-progression
+    x-permission: progression.level.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/IssueLevelPolicyRequest"
+    responses:
+      "201":
+        description: 完整等级阶梯已写入不可变时间线，生效后由等级政策 Worker 原子重算用户投影。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/LevelPolicy"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MedalDefinitionsPath:
+  get:
+    operationId: listMedalDefinitions
+    summary: 查看勋章定义、图片地址和持有数量
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.medal.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 返回全部可编辑勋章定义和当前聚合数量。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/economy.yaml#/MedalDefinitionOverview" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  put:
+    operationId: updateMedalSettings
+    summary: 更新全站勋章启用状态和权益上限
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.medal.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/economy.yaml#/MedalSettingsWriteRequest" }
+    responses:
+      "200":
+        description: 新的全站勋章规则和受影响用户的未来权益输入已经原子提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/economy.yaml#/MedalSettings" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: createMedalDefinition
+    summary: 创建一个勋章定义
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.medal.create
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            { $ref: "../schemas/economy.yaml#/MedalDefinitionWriteRequest" }
+    responses:
+      "201":
+        description: 勋章定义和首个不可变修订已经提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/economy.yaml#/MedalDefinition" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MedalDefinitionPath:
+  parameters:
+    - name: medal_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+  put:
+    operationId: updateMedalDefinition
+    summary: 以乐观并发更新勋章定义和图片地址
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.medal.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            { $ref: "../schemas/economy.yaml#/MedalDefinitionWriteRequest" }
+    responses:
+      "200":
+        description: 新版本和受影响用户的未来奖励权益修订已经原子提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/economy.yaml#/MedalDefinition" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

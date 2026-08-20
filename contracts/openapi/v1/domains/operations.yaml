@@ -1,0 +1,347 @@
+TrackerOperationsPath:
+  get:
+    operationId: getTrackerOperations
+    summary: 查看 Tracker 控制面与 Core 投影状态
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-operations
+    x-permission: operations.monitor.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: Core 自有控制面、群集、证据窗口和消费投影状态。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/TrackerOperationsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TrackerSettingsPath:
+  get:
+    operationId: getTrackerSettings
+    summary: 查看 Tracker 已配置政策、实际生效政策与容量边界
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-tracker-control
+    x-permission: tracker.policy.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 同时返回 Core 最新政策和 Tracker 已验证生效政策，便于识别待发布状态。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/TrackerSettingsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  put:
+    operationId: issueTrackerPolicy
+    summary: 签发新的 Tracker 运行政策
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-tracker-control
+    x-permission: tracker.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/operations.yaml#/IssueTrackerPolicyRequest"
+    responses:
+      "201":
+        description: 新政策已写入不可变时间线，等待签名快照发布并由 Tracker 热加载。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/TrackerPolicyRevision"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentSettingsPath:
+  get:
+    operationId: getTorrentSettings
+    summary: 查看新种子上传、截图和原始文件处理规则
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 返回 Core 当前真正执行的上传规则；不把迁移兼容策略应用到新上传。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/TorrentSettingsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  put:
+    operationId: updateTorrentPurchasePolicySettings
+    summary: 更新全站种子购买开关与手续费
+    tags: [operations, economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: torrent.purchase.manage.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/UpdateTorrentPurchasePolicyRequest"
+    responses:
+      "200":
+        description: 新规则已作为不可变版本生效；历史购买收据不受影响。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPurchasePolicySettings"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentUploadPolicyRevisionsPath:
+  post:
+    operationId: issueTorrentUploadPolicyRevision
+    summary: 签发定时生效的新种子上传规则版本
+    tags: [operations, torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.upload.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/operations.yaml#/IssueTorrentUploadPolicyRequest"
+    responses:
+      "201":
+        description: 新规则已写入不可变时间线；到达生效时间后新上传与截图修改共同使用该版本。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/TorrentUploadPolicyRevision"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+SettlementSettingsPath:
+  get:
+    operationId: getSettlementSettings
+    summary: 查看 H&R、分享率观察和盒子折算的真实接入状态
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: settlement-operations
+    x-permission: operations.monitor.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 返回当前全站 H&R 政策与盒子结算接入状态，不返回用户级证据或流量明细。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/SettlementSettingsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+EconomySettingsPath:
+  get:
+    operationId: getEconomySettings
+    summary: 查看签到活动与魔力值使用规则的真实接入状态
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.seedingreward.policy.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 返回整数魔力值规则、成员功能接入状态和不含用户信息的账本汇总。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/EconomySettingsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+WorkerOperationsPath:
+  get:
+    operationId: getWorkerOperations
+    summary: 查看 Core Worker 队列积压、重试与死信
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-operations
+    x-permission: operations.monitor.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 只读队列状态；本接口不执行重启、清空或重放。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/WorkerOperationsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StorageOperationsPath:
+  get:
+    operationId: getStorageOperations
+    summary: 查看当前存储方式、上传限制和对象库存
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-operations
+    x-permission: operations.monitor.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 只返回非秘密运行配置、对象统计和迁移健康度，不返回主机路径、桶名或凭据。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/StorageOperationsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+VIPProfileSettingsPath:
+  get:
+    operationId: getVIPProfileSettings
+    summary: 查看 VIP 生效状态、已接入权益和用户资料规则
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-operations
+    x-permission: operations.monitor.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 返回真实用户统计、当前做种奖励权益和账户资料上传规则；未接入权益明确为 false。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/VIPProfileSettingsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+EmailSettingsPath:
+  get:
+    operationId: getEmailSettings
+    summary: 查看 Privacy Vault 邮件投递方式与聚合状态
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-operations
+    x-permission: operations.monitor.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 返回非秘密投递模式、公开链接来源、模板及聚合投递状态，不返回收件人、令牌、文件路径、Relay 地址或凭据。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/EmailSettingsOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: testEmailDelivery
+    summary: 发送一封邮件投递测试
+    tags: [operations]
+    x-audience: [staff]
+    x-owner: core-operations
+    x-permission: operations.email.test
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/operations.yaml#/TestEmailDeliveryRequest"
+    responses:
+      "202":
+        description: Relay 已接受测试邮件；响应不回显收件地址。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/operations.yaml#/EmailDeliveryTestReceipt"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "503":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"

@@ -1,0 +1,296 @@
+PromotionCampaignsPath:
+  get:
+    operationId: listPromotionCampaigns
+    summary: 查询不可变优惠政策时间线及 Settlement 投递状态
+    tags: [promotions]
+    x-audience: [staff]
+    x-owner: core-promotions
+    x-permission: promotion.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: Core 控制面时间线；不包含 Settlement 明细或 Tracker 会话证据。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/promotions.yaml#/PromotionCampaignPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: schedulePromotionCampaign
+    summary: 签发全站或单种子优惠时间段
+    tags: [promotions]
+    x-audience: [staff]
+    x-owner: core-promotions
+    x-permission: promotion.schedule
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/promotions.yaml#/SchedulePromotionCampaignRequest"
+    responses:
+      "201":
+        description: 活动、审计事件和 Settlement 投递命令已在 Core 原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/promotions.yaml#/PromotionCampaign"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentPromotionProductsPath:
+  get:
+    operationId: getMyPromotionProductOffer
+    summary: 查看指定种子的付费优惠、置顶价格及自己的魔力值余额
+    tags: [promotions, economy]
+    x-audience: [web]
+    x-owner: core-promotions
+    x-permission: torrent.promotion.purchase.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/torrents.yaml#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: 当前不可变价格版本及已排期的付费时间段。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/promotions.yaml#/PromotionProductOffer"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: purchasePromotionProducts
+    summary: 使用整数魔力值原子购买种子优惠、置顶或二者组合
+    tags: [promotions, economy]
+    x-audience: [web]
+    x-owner: core-promotions
+    x-permission: torrent.promotion.purchase.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/torrents.yaml#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/promotions.yaml#/PurchasePromotionProductsRequest"
+    responses:
+      "201":
+        description: 价格凭证、账本、优惠命令、置顶时间段和订单已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/promotions.yaml#/PromotionProductOrder"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyPromotionProductOrdersPath:
+  get:
+    operationId: listMyPromotionProductOrders
+    summary: 分页查看自己的种子优惠与置顶购买记录
+    tags: [promotions, economy]
+    x-audience: [web]
+    x-owner: core-promotions
+    x-permission: torrent.promotion.purchase.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 每笔记录保留购买时的价格版本和实际时间段。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/promotions.yaml#/PromotionProductOrderPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedPromotionProductOrdersPath:
+  get:
+    operationId: listManagedPromotionProductOrders
+    summary: 分页查询全站种子优惠与置顶付费记录
+    tags: [promotions, economy]
+    x-audience: [staff]
+    x-owner: core-promotions
+    x-permission: promotion.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: query
+        in: query
+        required: false
+        description: 匹配用户数字 ID、用户名、种子数字 ID 或标题。
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 使用公开数字用户和种子 ID 的付费记录投影。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/promotions.yaml#/PromotionProductOrderPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+PromotionProductPolicyPath:
+  get:
+    operationId: getPromotionProductPolicy
+    summary: 读取用户付费优惠与置顶规则
+    tags: [promotions, settings]
+    x-audience: [staff]
+    x-owner: core-promotions
+    x-permission: promotion.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 当前生效的不可变整数魔力值价格版本。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/promotions.yaml#/PromotionProductPolicy"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  put:
+    operationId: updatePromotionProductPolicy
+    summary: 追加新的用户付费优惠与置顶规则版本
+    tags: [promotions, settings]
+    x-audience: [staff]
+    x-owner: core-promotions
+    x-permission: promotion.schedule
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/promotions.yaml#/UpdatePromotionProductPolicyRequest"
+    responses:
+      "200":
+        description: 新规则已追加；历史订单的单价与结算保持不变。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/promotions.yaml#/PromotionProductPolicy"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"

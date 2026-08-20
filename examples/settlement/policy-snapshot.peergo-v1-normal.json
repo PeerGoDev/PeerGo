@@ -1,0 +1,1 @@
+{"revision":{"source":"policy_revision","id":"development-normal-policy","version":1},"profile":"peergo-v1","promotion":{"profile":"peergo-v1","factors":{"upload":10000,"download":10000}},"benefits":{}}

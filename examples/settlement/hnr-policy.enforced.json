@@ -1,0 +1,1 @@
+{"rule_id":"global-hnr","rule_version":1,"mode":"enforced","required_seed_seconds":604800,"required_ratio_basis_points":10000,"assessment_window_seconds":604800,"grace_period_seconds":86400,"max_interval_credit_seconds":5400}

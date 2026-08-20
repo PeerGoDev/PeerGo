@@ -1,0 +1,262 @@
+RSSSubscriptionIDPathParameter:
+  name: subscription_id
+  in: path
+  required: true
+  schema: { type: string, format: uuid }
+
+RSSTokenPathParameter:
+  name: rss_token
+  in: path
+  required: true
+  description: 256 位随机 RSS 令牌；服务端只保存 SHA-256 摘要。
+  schema:
+    type: string
+    minLength: 43
+    maxLength: 43
+    pattern: "^[A-Za-z0-9_-]{43}$"
+
+RSSTorrentIDPathParameter:
+  name: torrent_id
+  in: path
+  required: true
+  schema: { type: integer, format: int64, minimum: 1 }
+
+MyRSSSubscriptionsPath:
+  get:
+    operationId: listMyRSSSubscriptions
+    summary: 查看自己的 RSS 订阅配置
+    tags: [rss]
+    x-audience: [web]
+    x-owner: core-rss
+    x-permission: rss.subscription.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 订阅配置列表；永不返回现有原始令牌或可恢复的令牌材料。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/rss.yaml#/RSSSubscriptionList" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: createMyRSSSubscription
+    summary: 创建 RSS 订阅并仅本次返回原始令牌
+    tags: [rss]
+    x-audience: [web]
+    x-owner: core-rss
+    x-permission: rss.subscription.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/rss.yaml#/RSSSubscriptionInput" }
+    responses:
+      "201":
+        description: 原始令牌和私密 URL 仅在本响应出现；响应丢失时应轮换而非恢复。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/rss.yaml#/IssuedRSSSubscription" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyRSSSubscriptionPath:
+  parameters:
+    - $ref: "#/RSSSubscriptionIDPathParameter"
+  put:
+    operationId: updateMyRSSSubscription
+    summary: 修改自己的 RSS 固定过滤条件
+    tags: [rss]
+    x-audience: [web]
+    x-owner: core-rss
+    x-permission: rss.subscription.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/rss.yaml#/UpdateRSSSubscriptionRequest" }
+    responses:
+      "200":
+        description: 新配置已经生效，旧令牌保持不变且不在响应中返回。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/rss.yaml#/RSSSubscription" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  delete:
+    operationId: deleteMyRSSSubscription
+    summary: 永久撤销自己的 RSS 订阅令牌
+    tags: [rss]
+    x-audience: [web]
+    x-owner: core-rss
+    x-permission: rss.subscription.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - name: expected_version
+        in: query
+        required: true
+        schema: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    responses:
+      "204": { description: 订阅及其令牌已撤销。 }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyRSSSubscriptionTokenRotationsPath:
+  parameters:
+    - $ref: "#/RSSSubscriptionIDPathParameter"
+  post:
+    operationId: rotateMyRSSSubscriptionToken
+    summary: 轮换私密 RSS 令牌并立即废止旧 URL
+    tags: [rss]
+    x-audience: [web]
+    x-owner: core-rss
+    x-permission: rss.subscription.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/rss.yaml#/RSSSubscriptionVersionRequest" }
+    responses:
+      "201":
+        description: 新令牌仅本次返回；旧令牌已不可用。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/rss.yaml#/IssuedRSSSubscription" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+RSSFeedPath:
+  get:
+    operationId: getRSSFeed
+    summary: 读取一个固定过滤条件的私密 RSS 2.0 Feed
+    tags: [rss]
+    x-audience: [rss]
+    x-owner: core-rss
+    x-permission: rss.subscription.token
+    x-credential-audience: rss-token
+    parameters:
+      - $ref: "#/RSSTokenPathParameter"
+      - name: If-None-Match
+        in: header
+        required: false
+        schema: { type: string, maxLength: 80 }
+    responses:
+      "200":
+        description: 优惠状态冻结在缓存观察时刻，并在最近的优惠或置顶边界前失效。
+        headers:
+          ETag: { required: true, schema: { type: string } }
+          Last-Modified: { required: true, schema: { type: string } }
+          Cache-Control: { required: true, schema: { type: string, enum: [private, no-cache] } }
+          Referrer-Policy: { required: true, schema: { type: string, enum: [no-referrer] } }
+        content:
+          application/rss+xml:
+            schema: { type: string }
+      "304":
+        description: 内容未变化；令牌仍已校验且请求仍计入限流。
+        headers:
+          ETag: { required: true, schema: { type: string } }
+          Cache-Control: { required: true, schema: { type: string, enum: [private, no-cache] } }
+          Referrer-Policy: { required: true, schema: { type: string, enum: [no-referrer] } }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+RSSTorrentDownloadPath:
+  get:
+    operationId: downloadTorrentFromRSS
+    summary: 使用 RSS 令牌下载其当前条目中的种子
+    tags: [rss, torrents]
+    x-audience: [rss]
+    x-owner: core-rss
+    x-permission: rss.subscription.token
+    x-credential-audience: rss-token
+    parameters:
+      - $ref: "#/RSSTokenPathParameter"
+      - $ref: "#/RSSTorrentIDPathParameter"
+    responses:
+      "200":
+        description: 复用普通下载的购买、限制、对象校验与 Tracker announce 改写流程。
+        headers:
+          Content-Disposition: { required: true, schema: { type: string } }
+          Cache-Control: { required: true, schema: { type: string, enum: [no-store] } }
+          Referrer-Policy: { required: true, schema: { type: string, enum: [no-referrer] } }
+        content:
+          application/x-bittorrent:
+            schema: { type: string, format: binary }
+      "402": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+StaffRSSSettingsPath:
+  get:
+    operationId: getRSSSettings
+    summary: 读取 RSS 缓存、条数、订阅数与限流设置
+    tags: [rss]
+    x-audience: [staff]
+    x-owner: core-rss
+    x-permission: rss.settings.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 当前 RSS 设置；内部 revision、边界与锁不暴露为可编辑项。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/rss.yaml#/RSSSettings" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  put:
+    operationId: updateRSSSettings
+    summary: 以乐观并发修改 RSS 服务设置
+    tags: [rss]
+    x-audience: [staff]
+    x-owner: core-rss
+    x-permission: rss.settings.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/rss.yaml#/UpdateRSSSettingsRequest" }
+    responses:
+      "200":
+        description: 设置与不可变变更证据已经原子提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/rss.yaml#/RSSSettings" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

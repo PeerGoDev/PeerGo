@@ -1,0 +1,452 @@
+PromotionType:
+  type: string
+  enum:
+    - free
+    - double_upload
+    - double_upload_free
+    - half_download
+    - double_upload_half_download
+    - thirty_percent_download
+
+PromotionScope:
+  type: string
+  enum: [global, torrent]
+
+PromotionCampaignSource:
+  type: string
+  enum: [staff_schedule, member_purchase]
+
+PromotionCampaign:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - source
+    - scope
+    - torrent_id
+    - torrent_title
+    - promotion
+    - starts_at
+    - ends_at
+    - override_lower_scopes
+    - reason
+    - created_at
+    - delivery_state
+    - delivery_attempts
+    - last_delivery_error
+    - delivered_at
+    - timeline_state
+  properties:
+    id:
+      type: string
+      format: uuid
+    source:
+      $ref: "#/PromotionCampaignSource"
+    scope:
+      $ref: "#/PromotionScope"
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+      nullable: true
+    torrent_title:
+      type: string
+      maxLength: 240
+    promotion:
+      $ref: "#/PromotionType"
+    starts_at:
+      type: string
+      format: date-time
+    ends_at:
+      type: string
+      format: date-time
+    override_lower_scopes:
+      type: boolean
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    created_at:
+      type: string
+      format: date-time
+    delivery_state:
+      type: string
+      enum: [pending, retrying, delivered]
+    delivery_attempts:
+      type: integer
+      minimum: 0
+    last_delivery_error:
+      type: string
+      maxLength: 64
+    delivered_at:
+      type: string
+      format: date-time
+      nullable: true
+    timeline_state:
+      type: string
+      enum: [scheduled, active, expired]
+
+PromotionCampaignPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/PromotionCampaign"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+
+SchedulePromotionCampaignRequest:
+  type: object
+  additionalProperties: false
+  required: [scope, promotion, starts_at, ends_at, reason]
+  properties:
+    scope:
+      $ref: "#/PromotionScope"
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    promotion:
+      $ref: "#/PromotionType"
+    starts_at:
+      type: string
+      format: date-time
+    ends_at:
+      type: string
+      format: date-time
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+PromotionProductPolicy:
+  type: object
+  additionalProperties: false
+  required:
+    - revision
+    - effective_from
+    - promotion_enabled
+    - sticky_enabled
+    - free_price_per_day
+    - double_upload_price_per_day
+    - double_upload_free_price_per_day
+    - half_download_price_per_day
+    - double_upload_half_download_price_per_day
+    - thirty_percent_download_price_per_day
+    - sticky_price_per_day
+    - max_promotion_days
+    - max_sticky_days
+  properties:
+    revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    effective_from:
+      type: string
+      format: date-time
+    promotion_enabled:
+      type: boolean
+    sticky_enabled:
+      type: boolean
+    free_price_per_day:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    double_upload_price_per_day:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    double_upload_free_price_per_day:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    half_download_price_per_day:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    double_upload_half_download_price_per_day:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    thirty_percent_download_price_per_day:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    sticky_price_per_day:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    max_promotion_days:
+      type: integer
+      minimum: 1
+      maximum: 30
+    max_sticky_days:
+      type: integer
+      minimum: 1
+      maximum: 30
+
+PromotionProductOffer:
+  type: object
+  additionalProperties: false
+  required:
+    - torrent_id
+    - torrent_title
+    - magic_balance
+    - policy
+    - current_promotion
+    - promotion_starts_at
+    - promotion_ends_at
+    - sticky_starts_at
+    - sticky_ends_at
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    torrent_title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    magic_balance:
+      type: string
+      pattern: "^-?(0|[1-9][0-9]{0,17})$"
+    policy:
+      $ref: "#/PromotionProductPolicy"
+    current_promotion:
+      type: string
+      enum: [free, double_upload, double_upload_free, half_download, double_upload_half_download, thirty_percent_download]
+      nullable: true
+    promotion_starts_at:
+      type: string
+      format: date-time
+      nullable: true
+    promotion_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+    sticky_starts_at:
+      type: string
+      format: date-time
+      nullable: true
+    sticky_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+
+PurchasePromotionProductsRequest:
+  type: object
+  additionalProperties: false
+  properties:
+    promotion:
+      $ref: "#/PromotionType"
+    promotion_days:
+      type: integer
+      minimum: 1
+      maximum: 30
+    sticky_days:
+      type: integer
+      minimum: 1
+      maximum: 30
+
+PromotionProductOrder:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - buyer_numeric_id
+    - buyer_username
+    - torrent_id
+    - torrent_title
+    - campaign_id
+    - promotion
+    - promotion_days
+    - promotion_unit_price
+    - promotion_starts_at
+    - promotion_ends_at
+    - sticky_days
+    - sticky_unit_price
+    - sticky_starts_at
+    - sticky_ends_at
+    - total_price
+    - policy_revision
+    - balance_after
+    - purchased_at
+    - replayed
+  properties:
+    id:
+      type: string
+      format: uuid
+    buyer_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+    buyer_username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    torrent_title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    campaign_id:
+      type: string
+      format: uuid
+      nullable: true
+    promotion:
+      type: string
+      enum: [free, double_upload, double_upload_free, half_download, double_upload_half_download, thirty_percent_download]
+      nullable: true
+    promotion_days:
+      type: integer
+      minimum: 1
+      maximum: 30
+      nullable: true
+    promotion_unit_price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+      nullable: true
+    promotion_starts_at:
+      type: string
+      format: date-time
+      nullable: true
+    promotion_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+    sticky_days:
+      type: integer
+      minimum: 1
+      maximum: 30
+      nullable: true
+    sticky_unit_price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+      nullable: true
+    sticky_starts_at:
+      type: string
+      format: date-time
+      nullable: true
+    sticky_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+    total_price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,17})$"
+    policy_revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    balance_after:
+      type: string
+      pattern: "^-?(0|[1-9][0-9]{0,17})$"
+    purchased_at:
+      type: string
+      format: date-time
+    replayed:
+      type: boolean
+
+PromotionProductOrderPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/PromotionProductOrder"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+
+UpdatePromotionProductPolicyRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - expected_revision
+    - promotion_enabled
+    - sticky_enabled
+    - free_price_per_day
+    - double_upload_price_per_day
+    - double_upload_free_price_per_day
+    - half_download_price_per_day
+    - double_upload_half_download_price_per_day
+    - thirty_percent_download_price_per_day
+    - sticky_price_per_day
+    - max_promotion_days
+    - max_sticky_days
+    - reason
+  properties:
+    expected_revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    promotion_enabled:
+      type: boolean
+    sticky_enabled:
+      type: boolean
+    free_price_per_day:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    double_upload_price_per_day:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    double_upload_free_price_per_day:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    half_download_price_per_day:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    double_upload_half_download_price_per_day:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    thirty_percent_download_price_per_day:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    sticky_price_per_day:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    max_promotion_days:
+      type: integer
+      minimum: 1
+      maximum: 30
+    max_sticky_days:
+      type: integer
+      minimum: 1
+      maximum: 30
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000

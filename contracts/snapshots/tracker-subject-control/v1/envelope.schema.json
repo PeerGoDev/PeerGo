@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peergo.dev/contracts/snapshots/tracker-subject-control/v1/envelope.schema.json",
+  "title": "PeerGo Tracker subject control signed snapshot envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "algorithm",
+    "key_id",
+    "payload_sha256",
+    "payload",
+    "signature"
+  ],
+  "properties": {
+    "format_version": { "const": "1.0.0" },
+    "algorithm": { "const": "Ed25519" },
+    "key_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
+    "payload_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "payload": {
+      "type": "string",
+      "contentEncoding": "base64"
+    },
+    "signature": {
+      "type": "string",
+      "contentEncoding": "base64"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "peergo",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @peergo/web dev",
+    "build:web": "pnpm --filter @peergo/web build",
+    "typecheck:web": "pnpm --filter @peergo/web typecheck",
+    "test:web": "pnpm --filter @peergo/web test",
+    "test:e2e:web": "pnpm --filter @peergo/web test:e2e",
+    "contract:lint": "redocly lint contracts/openapi/v1/root.yaml",
+    "contract:bundle": "redocly bundle contracts/openapi/v1/root.yaml --output contracts/openapi/v1/bundled/internal.yaml",
+    "generate:web": "pnpm contract:bundle && pnpm --filter @peergo/web generate:api",
+    "format:web": "pnpm --filter @peergo/web format",
+    "check:web": "pnpm --filter @peergo/web format:check && pnpm typecheck:web && pnpm test:web && pnpm build:web"
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.44.1"
+  }
+}

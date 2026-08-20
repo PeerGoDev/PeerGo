@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v1/site-display-settings-change-recorded.schema.json",
+  "title": "Site display settings change recorded v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "settings_section",
+    "actor_pseudonym",
+    "pseudonym_key_epoch",
+    "reason_sha256",
+    "expected_version",
+    "resulting_version",
+    "before_sha256",
+    "after_sha256",
+    "decision_id",
+    "policy_version",
+    "authority"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_type": { "const": "catalog.site-display-settings-change.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "settings_section": { "const": "site-display" },
+    "actor_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pseudonym_key_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "reason_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "expected_version": { "type": "integer", "minimum": 1 },
+    "resulting_version": { "type": "integer", "minimum": 2 },
+    "before_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "after_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "decision_id": { "type": "string", "format": "uuid" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "grant_id", "grant_version", "mandate_id", "effective_until"],
+      "properties": {
+        "role_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "grant_id": { "type": "string", "format": "uuid" },
+        "grant_version": { "type": "integer", "minimum": 1 },
+        "mandate_id": { "type": "string", "format": "uuid" },
+        "effective_until": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

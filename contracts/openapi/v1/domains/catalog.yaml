@@ -1,0 +1,358 @@
+CategoriesPath:
+  get:
+    operationId: listCategories
+    summary: 获取启用的种子分类
+    tags: [catalog]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: category.read
+    x-credential-audience: anonymous
+    responses:
+      "200":
+        description: 按展示顺序排列的分类。
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../schemas/catalog.yaml#/CategoryWithCount"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+CategoryFacetsPath:
+  get:
+    operationId: listCategoryFacets
+    summary: 获取一个启用分类的上传属性定义
+    tags: [catalog]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: category.read
+    x-credential-audience: anonymous
+    parameters:
+      - name: category_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    responses:
+      "200":
+        description: 按展示顺序排列的受控属性及当前可选项。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/CategoryFacetList"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedCategoriesPath:
+  get:
+    operationId: listManagedCategories
+    summary: 获取包含停用项和引用计数的分类管理视图
+    tags: [catalog]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: category.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 按显示权重和稳定标识排序的完整分类列表。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedCategoryList"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: createManagedCategory
+    summary: 创建一个稳定的分类业务对象
+    tags: [catalog]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: category.create
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/catalog.yaml#/CreateManagedCategoryRequest"
+    responses:
+      "201":
+        description: 分类与对应审计事件已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedCategory"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedCategoryPath:
+  put:
+    operationId: updateManagedCategory
+    summary: 以乐观并发更新或停用一个分类
+    tags: [catalog]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: category.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/CategoryIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/catalog.yaml#/UpdateManagedCategoryRequest"
+    responses:
+      "200":
+        description: 新版本分类与对应审计事件已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedCategory"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedAnnouncementsPath:
+  get:
+    operationId: listManagedAnnouncements
+    summary: 分页读取公告草稿、排期和公开状态
+    tags: [announcement]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: announcement.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/site.yaml#/AnnouncementLimitQueryParameter"
+      - $ref: "../domains/site.yaml#/AnnouncementOffsetQueryParameter"
+    responses:
+      "200":
+        description: 按最近更新时间倒序的公告管理投影。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedAnnouncementPage"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: createManagedAnnouncement
+    summary: 创建公告与首个不可变草稿修订
+    tags: [announcement]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: announcement.create
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/catalog.yaml#/CreateManagedAnnouncementRequest"
+    responses:
+      "201":
+        description: 草稿修订、聚合和审计事件已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedAnnouncement"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedAnnouncementPath:
+  get:
+    operationId: getManagedAnnouncement
+    summary: 读取一篇公告当前可编辑或可预览版本
+    tags: [announcement]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: announcement.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/site.yaml#/AnnouncementIDPathParameter"
+    responses:
+      "200":
+        description: 公告编辑投影；草稿不会进入公开详情接口。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedAnnouncement"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  put:
+    operationId: updateManagedAnnouncementDraft
+    summary: 追加一个新的不可变公告草稿修订
+    tags: [announcement]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: announcement.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/site.yaml#/AnnouncementIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/catalog.yaml#/UpdateManagedAnnouncementDraftRequest"
+    responses:
+      "200":
+        description: 新草稿修订和审计事件已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedAnnouncement"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedAnnouncementPublicationPath:
+  put:
+    operationId: changeManagedAnnouncementPublication
+    summary: 发布、排期、取消排期或撤回公告
+    tags: [announcement]
+    x-audience: [staff]
+    x-owner: core-catalog
+    # x-permission remains the operation's default typed capability so generic
+    # tooling can classify the endpoint. Core selects the exact capability from
+    # the closed action body and enforces the mapping below on every command.
+    x-permission: announcement.publish
+    x-action-permissions:
+      publish_now: announcement.publish
+      schedule: announcement.publish
+      cancel_schedule: announcement.publish
+      withdraw: announcement.withdraw
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/site.yaml#/AnnouncementIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/catalog.yaml#/ChangeAnnouncementPublicationRequest"
+    responses:
+      "200":
+        description: 发布指针、聚合版本和审计事件已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedAnnouncement"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedAnnouncementRevisionsPath:
+  get:
+    operationId: listManagedAnnouncementRevisions
+    summary: 分页读取公告不可变修订历史
+    tags: [announcement]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: announcement.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/site.yaml#/AnnouncementIDPathParameter"
+      - $ref: "../domains/site.yaml#/AnnouncementLimitQueryParameter"
+      - $ref: "../domains/site.yaml#/AnnouncementOffsetQueryParameter"
+    responses:
+      "200":
+        description: 修订号倒序的有界历史，不包含审计授权证据。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/AnnouncementRevisionPage"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+CategoryIDPathParameter:
+  name: category_id
+  in: path
+  required: true
+  description: 创建后不可变的分类稳定标识。
+  schema:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9-]{0,63}$"

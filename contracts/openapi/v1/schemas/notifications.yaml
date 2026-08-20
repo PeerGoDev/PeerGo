@@ -1,0 +1,284 @@
+MyNotificationKind:
+  type: string
+  enum: [torrent_review, ratio_watch, ratio_appeal, hnr, hnr_appeal, workgroup_contribution, member_gift, content_tip]
+
+MyRatioWatchNotificationStatus:
+  type: string
+  enum: [watching, warning, download_restricted, satisfied, manually_cleared]
+
+MyRatioWatchAppealNotificationStatus:
+  type: string
+  enum: [rejected]
+
+MyHNRNotificationStatus:
+  type: string
+  enum:
+    [
+      grace_started,
+      download_restricted,
+      satisfied,
+      appeal_approved,
+      appeal_rejected,
+    ]
+
+MyNotification:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - kind
+    - created_at
+    - read_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    kind:
+      $ref: "#/MyNotificationKind"
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    torrent_title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    outcome:
+      type: string
+      enum: [published, rejected]
+    reason_code:
+      $ref: "../schemas/torrents.yaml#/TorrentReviewReasonCode"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    ratio_watch_status:
+      $ref: "#/MyRatioWatchNotificationStatus"
+    ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    minimum_ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 1000000
+    restriction_ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 1000000
+    deadline_at:
+      type: string
+      format: date-time
+    ratio_appeal_status:
+      $ref: "#/MyRatioWatchAppealNotificationStatus"
+    ratio_appeal_response:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    hnr_status:
+      $ref: "#/MyHNRNotificationStatus"
+    hnr_grace_ends_at:
+      type: string
+      format: date-time
+    hnr_appeal_response:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    workgroup_kind:
+      $ref: "#/WorkgroupNotificationKind"
+    workgroup_metric:
+      $ref: "#/WorkgroupNotificationMetric"
+    workgroup_policy_revision:
+      type: integer
+      format: int64
+      minimum: 1
+    workgroup_period_starts_at:
+      type: string
+      format: date-time
+    workgroup_period_ends_at:
+      type: string
+      format: date-time
+    workgroup_observed_at:
+      type: string
+      format: date-time
+    workgroup_evidence_state:
+      type: string
+      enum: [collecting, complete]
+    workgroup_current_value:
+      type: integer
+      format: int64
+      minimum: 0
+    workgroup_target_value:
+      type: integer
+      format: int64
+      minimum: 1
+    workgroup_assessment_state:
+      type: string
+      enum: [in_progress, not_met]
+    workgroup_explanation_code:
+      type: string
+      enum: [period_in_progress, below_target, no_contribution]
+    workgroup_reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    member_gift_sender_numeric_id:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+    member_gift_sender_username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    member_gift_sender_display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    member_gift_net_amount:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+    member_gift_message:
+      type: string
+      maxLength: 200
+    content_tip_sender_numeric_id:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+    content_tip_sender_username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    content_tip_sender_display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    content_tip_net_amount:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+    content_tip_target_kind:
+      type: string
+      enum: [torrent, post, comment]
+    content_tip_torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    content_tip_post_id:
+      type: string
+      format: uuid
+    content_tip_comment_id:
+      type: string
+      format: uuid
+    content_tip_target_title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    created_at:
+      type: string
+      format: date-time
+    read_at:
+      type: string
+      format: date-time
+      nullable: true
+
+WorkgroupNotificationKind:
+  type: string
+  enum: [reseed, review, retention]
+
+WorkgroupNotificationMetric:
+  type: string
+  enum: [trusted_torrents_published, torrent_review_votes, seeding_active_seconds]
+
+MyNotificationPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, unread_count, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/MyNotification"
+    total:
+      type: integer
+      minimum: 0
+    unread_count:
+      type: integer
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999
+
+MyNotificationSummary:
+  type: object
+  additionalProperties: false
+  required: [unread_count]
+  properties:
+    unread_count:
+      type: integer
+      minimum: 0
+
+MyNotificationReadReceipt:
+  type: object
+  additionalProperties: false
+  required: [notification_id, read_at, already_read]
+  properties:
+    notification_id:
+      type: string
+      format: uuid
+    read_at:
+      type: string
+      format: date-time
+    already_read:
+      type: boolean
+
+MyNotificationReadAllReceipt:
+  type: object
+  additionalProperties: false
+  required: [updated_count, read_at]
+  properties:
+    updated_count:
+      type: integer
+      minimum: 0
+    read_at:
+      type: string
+      format: date-time
+
+MyNotificationArchiveAllReceipt:
+  type: object
+  additionalProperties: false
+  required: [updated_count, archived_at]
+  properties:
+    updated_count:
+      type: integer
+      minimum: 0
+    archived_at:
+      type: string
+      format: date-time
+
+MyNotificationFeedbackRequest:
+  type: object
+  additionalProperties: false
+  required: [title, content]
+  properties:
+    title:
+      type: string
+      minLength: 1
+      maxLength: 100
+    content:
+      type: string
+      minLength: 1
+      maxLength: 2000
+
+MyNotificationFeedbackReceipt:
+  type: object
+  additionalProperties: false
+  required: [feedback_id, created_at]
+  properties:
+    feedback_id:
+      type: string
+      format: uuid
+    created_at:
+      type: string
+      format: date-time

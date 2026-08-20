@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v4/comment-moderation-decision-recorded.schema.json",
+  "title": "Comment moderation decision recorded v4",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "event_type", "event_id", "occurred_at", "moderation_decision_id",
+    "case_id", "comment_id", "target_kind", "decision", "reason_code", "note_sha256",
+    "moderator_pseudonym", "comment_author_pseudonym", "pseudonym_key_epoch", "report_count",
+    "expected_case_version", "resulting_case_version", "expected_comment_version",
+    "resulting_comment_version", "before_sha256", "after_sha256",
+    "authorization_decision_id", "policy_version", "authority"
+  ],
+  "properties": {
+    "schema_version": { "const": "4.0.0" },
+    "event_type": { "const": "social.comment-moderation-decision.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "moderation_decision_id": { "type": "string", "format": "uuid" },
+    "case_id": { "type": "string", "format": "uuid" },
+    "comment_id": { "type": "string", "format": "uuid" },
+    "target_kind": { "enum": ["torrent", "announcement", "post"] },
+    "torrent_id": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+    "announcement_id": {
+      "type": "string", "minLength": 1, "maxLength": 120,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    },
+    "post_id": { "type": "string", "format": "uuid" },
+    "decision": { "enum": ["dismiss", "hide_comment"] },
+    "reason_code": { "enum": ["no_violation", "spam", "harassment", "personal_information", "off_topic", "other"] },
+    "note_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "moderator_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "comment_author_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pseudonym_key_epoch": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "report_count": { "type": "integer", "minimum": 1 },
+    "expected_case_version": { "type": "integer", "minimum": 1 },
+    "resulting_case_version": { "type": "integer", "minimum": 2 },
+    "expected_comment_version": { "type": "integer", "minimum": 1 },
+    "resulting_comment_version": { "type": "integer", "minimum": 1 },
+    "before_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "after_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "authorization_decision_id": { "type": "string", "format": "uuid" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role_id", "grant_id", "grant_version", "mandate_id", "effective_until"],
+      "properties": {
+        "role_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "grant_id": { "type": "string", "format": "uuid" },
+        "grant_version": { "type": "integer", "minimum": 1 },
+        "mandate_id": { "type": "string", "format": "uuid" },
+        "effective_until": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "required": ["torrent_id"],
+      "properties": { "target_kind": { "const": "torrent" } },
+      "not": { "anyOf": [{ "required": ["announcement_id"] }, { "required": ["post_id"] }] }
+    },
+    {
+      "required": ["announcement_id"],
+      "properties": { "target_kind": { "const": "announcement" } },
+      "not": { "anyOf": [{ "required": ["torrent_id"] }, { "required": ["post_id"] }] }
+    },
+    {
+      "required": ["post_id"],
+      "properties": { "target_kind": { "const": "post" } },
+      "not": { "anyOf": [{ "required": ["torrent_id"] }, { "required": ["announcement_id"] }] }
+    }
+  ]
+}

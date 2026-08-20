@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v1/email-verified.schema.json",
+  "title": "Email verified v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "verification_id",
+    "user_pseudonym",
+    "pseudonym_key_epoch"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_type": { "const": "identity.email.verified" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "verification_id": { "type": "string", "format": "uuid" },
+    "user_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pseudonym_key_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    }
+  }
+}

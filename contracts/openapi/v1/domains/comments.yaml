@@ -1,0 +1,383 @@
+TorrentCommentsPath:
+  get:
+    operationId: listTorrentComments
+    summary: 分页读取已发布种子的公开评论
+    tags: [comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "../domains/torrents.yaml#/TorrentIDPathParameter"
+      - name: limit
+        in: query
+        required: false
+        description: 单页评论数量上限。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        description: 从零开始的评论偏移量。
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+    responses:
+      "200":
+        description: 按发表时间从早到晚排列的评论与回复；删除项保留墓碑。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/TorrentCommentPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: createTorrentComment
+    summary: 在已发布种子下发表评论或回复同线程可见评论
+    tags: [comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: torrent.comment.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/torrents.yaml#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/comments.yaml#/CreateCommentRequest"
+    responses:
+      "201":
+        description: 评论已创建；相同幂等键和相同内容重试时返回原评论。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/Comment"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+AnnouncementCommentsPath:
+  get:
+    operationId: listAnnouncementComments
+    summary: 分页读取已发布公告的公开评论
+    tags: [comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: announcement.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "../domains/site.yaml#/AnnouncementIDPathParameter"
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+    responses:
+      "200":
+        description: 按发表时间从早到晚排列的公告评论与回复；删除项保留墓碑。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/AnnouncementCommentPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: createAnnouncementComment
+    summary: 在已发布公告下发表评论或回复同线程可见评论
+    tags: [comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: announcement.comment.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/site.yaml#/AnnouncementIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/comments.yaml#/CreateCommentRequest"
+    responses:
+      "201":
+        description: 评论已创建；相同幂等键和相同内容重试时返回原评论。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/Comment"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+CommentPath:
+  parameters:
+    - $ref: "#/CommentIDPathParameter"
+  patch:
+    operationId: updateMyComment
+    summary: 使用期望版本编辑自己的可见评论
+    tags: [comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: comment.update.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/comments.yaml#/UpdateCommentRequest"
+    responses:
+      "200":
+        description: 评论已编辑；相同版本和相同正文的响应丢失重试返回当前评论。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/Comment"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  delete:
+    operationId: deleteMyComment
+    summary: 使用期望版本删除自己的评论并保留楼层墓碑
+    tags: [comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: comment.delete.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - name: expected_version
+        in: query
+        required: true
+        description: 客户端最后读取到的评论版本。
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    responses:
+      "204":
+        description: 评论已成为作者删除墓碑；相同请求重试同样成功。
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+CommentIDPathParameter:
+  name: comment_id
+  in: path
+  required: true
+  description: 评论的稳定公开 UUID。
+  schema:
+    type: string
+    format: uuid
+
+CommentReportsPath:
+  parameters:
+    - $ref: "#/CommentIDPathParameter"
+  post:
+    operationId: createCommentReport
+    summary: 举报一条他人可见评论并归入评论专属审核案件
+    tags: [comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: comment.report.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/comments.yaml#/CreateCommentReportRequest"
+    responses:
+      "201":
+        description: 举报已保存；相同幂等键和相同内容重试时返回原回执。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/CommentReportReceipt"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+CommentModerationCasesPath:
+  get:
+    operationId: listOpenCommentModerationCases
+    summary: 分页读取脱敏的待处理评论举报案件
+    tags: [comments, administration]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.report.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+    responses:
+      "200":
+        description: 按案件创建时间从早到晚排列的待处理案件；不返回举报人身份。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/CommentModerationCasePage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+CommentModerationDecisionPath:
+  parameters:
+    - $ref: "#/CommentModerationCaseIDPathParameter"
+  post:
+    operationId: decideCommentModerationCase
+    summary: 关闭评论举报案件或隐藏当前已复核评论
+    tags: [comments, administration]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.report.resolve
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/comments.yaml#/CreateCommentModerationDecisionRequest"
+    responses:
+      "201":
+        description: 处置、评论墓碑（如有）和审计事件已在同一事务提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/CommentModerationDecisionResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+CommentModerationCaseIDPathParameter:
+  name: case_id
+  in: path
+  required: true
+  description: 评论举报案件的稳定公开 UUID。
+  schema:
+    type: string
+    format: uuid

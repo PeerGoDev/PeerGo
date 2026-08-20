@@ -1,0 +1,275 @@
+MyRatioWatchPath:
+  get:
+    operationId: getMyRatioWatch
+    summary: 获取当前用户的长期分享率考核与恢复进度
+    tags: [ratio]
+    x-audience: [web]
+    x-owner: core-ratio-watch
+    x-permission: ratio.assessment.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: >-
+          只读 Core 用户安全投影；使用已结算有效流量，不查询 Tracker 热路径，
+          不返回规则 UUID、操作员、内部原因或状态迁移证据。
+        headers:
+          Cache-Control:
+            description: 本人考核响应不得由浏览器或中间缓存持久保存。
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/MyRatioWatch" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyRatioWatchAppealsPath:
+  post:
+    operationId: submitMyRatioWatchAppeal
+    summary: 为当前这期长期分享率考核提交一次申诉
+    tags: [ratio]
+    x-audience: [web]
+    x-owner: core-ratio-watch
+    x-permission: ratio.appeal.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/ratio.yaml#/SubmitRatioWatchAppealRequest" }
+    responses:
+      "201":
+        description: 申诉已绑定当前这期考核；重试同一幂等键不会重复创建。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/MyRatioWatchAppeal" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+RatioWatchPolicyPath:
+  get:
+    operationId: listRatioWatchPolicyRevisions
+    summary: 查询长期总分享率规则、当前考核汇总和 Worker 状态
+    tags: [ratio]
+    x-audience: [staff]
+    x-owner: core-ratio-watch
+    x-permission: ratio.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 只返回 Core 结构化规则与考核汇总，不包含 Tracker 凭据或账本明细。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/RatioWatchPolicyPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: issueRatioWatchPolicyRevision
+    summary: 签发未来生效的全站长期总分享率规则
+    tags: [ratio]
+    x-audience: [staff]
+    x-owner: core-ratio-watch
+    x-permission: ratio.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/ratio.yaml#/IssueRatioWatchPolicyRequest" }
+    responses:
+      "201":
+        description: 不可变规则已写入；只影响生效后新进入的考核。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/RatioWatchPolicyRevision" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+RatioWatchPolicyPreviewPath:
+  post:
+    operationId: previewRatioWatchPolicy
+    summary: 用当前用户投影预览规则影响人数，不写入状态
+    tags: [ratio]
+    x-audience: [staff]
+    x-owner: core-ratio-watch
+    x-permission: ratio.policy.read
+    x-credential-audience: staff-session
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/ratio.yaml#/RatioWatchPolicyInput" }
+    responses:
+      "200":
+        description: 当前时刻的只读影响预览；不是对未来结果的保证。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/RatioWatchPolicyImpactPreview" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+RatioWatchAssessmentsPath:
+  get:
+    operationId: listRatioWatchAssessments
+    summary: 查询长期分享率考核与当前结构化指标
+    tags: [ratio]
+    x-audience: [staff]
+    x-owner: core-ratio-watch
+    x-permission: ratio.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: q
+        in: query
+        schema: { type: string, maxLength: 120, default: "" }
+      - name: filter
+        in: query
+        schema:
+          allOf: [{ $ref: "../schemas/ratio.yaml#/RatioWatchAssessmentFilter" }]
+          default: active
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 邮箱、passkey、IP 与 Settlement 条目不进入此列表。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/RatioWatchAssessmentPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+RatioWatchAssessmentClearPath:
+  post:
+    operationId: clearRatioWatchAssessment
+    summary: 人工解除一条当前生效的长期分享率考核
+    tags: [ratio]
+    x-audience: [staff]
+    x-owner: core-ratio-watch
+    x-permission: ratio.assessment.manage
+    x-credential-audience: staff-session
+    parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/ratio.yaml#/ClearRatioWatchAssessmentRequest" }
+    responses:
+      "200":
+        description: 仅解除该规则考核；旧站迁移或其他来源的下载限制保持不变。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/RatioWatchAssessment" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+RatioWatchAppealsPath:
+  get:
+    operationId: listRatioWatchAppeals
+    summary: 集中查询长期分享率申诉与处理结果
+    tags: [ratio]
+    x-audience: [staff]
+    x-owner: core-ratio-watch
+    x-permission: ratio.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: q
+        in: query
+        schema: { type: string, maxLength: 120, default: "" }
+      - name: filter
+        in: query
+        schema:
+          allOf: [{ $ref: "../schemas/ratio.yaml#/RatioWatchAppealFilter" }]
+          default: pending
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 只包含用户、申诉文本、当前考核指标和处理结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/RatioWatchAppealPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+RatioWatchAppealDecisionPath:
+  post:
+    operationId: decideRatioWatchAppeal
+    summary: 批准并解除考核，或驳回但保持考核不变
+    tags: [ratio]
+    x-audience: [staff]
+    x-owner: core-ratio-watch
+    x-permission: ratio.assessment.manage
+    x-credential-audience: staff-session
+    parameters:
+      - name: appeal_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/ratio.yaml#/DecideRatioWatchAppealRequest" }
+    responses:
+      "200":
+        description: 处理意见已固化；批准时同一事务内解除这期考核。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/ratio.yaml#/RatioWatchAppeal" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

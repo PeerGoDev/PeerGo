@@ -1,0 +1,413 @@
+TrafficByteCount:
+  type: string
+  pattern: "^(0|[1-9][0-9]{0,18})$"
+  description: >-
+    非负 int64 字节数的十进制文本。账本数值不得转换为 JavaScript Number，
+    避免超过 2^53 后丢失精度。
+  example: "18742348800"
+
+TrafficEntryCount:
+  type: string
+  pattern: "^(0|[1-9][0-9]{0,18})$"
+  description: 非负 int64 结算条目数的十进制文本。
+  example: "42"
+
+TrafficTotals:
+  type: object
+  additionalProperties: false
+  required:
+    - raw_uploaded_bytes
+    - raw_downloaded_bytes
+    - credited_uploaded_bytes
+    - charged_downloaded_bytes
+    - entry_count
+    - last_settled_at
+    - projection_updated_at
+  properties:
+    raw_uploaded_bytes:
+      $ref: "#/TrafficByteCount"
+    raw_downloaded_bytes:
+      $ref: "#/TrafficByteCount"
+    credited_uploaded_bytes:
+      $ref: "#/TrafficByteCount"
+    charged_downloaded_bytes:
+      $ref: "#/TrafficByteCount"
+    entry_count:
+      $ref: "#/TrafficEntryCount"
+    last_settled_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: 最新一条最终结算事件的发生时刻；尚无结算时为 null。
+    projection_updated_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Core 最近一次成功应用最终结算投影的时刻；尚无结算时为 null。
+
+TrafficTorrentReference:
+  type: object
+  additionalProperties: false
+  required: [id, title]
+  properties:
+    id:
+      type: integer
+      format: int64
+      minimum: 1
+      description: 种子的唯一正整数 ID。
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+
+TrafficExplanationStatus:
+  type: string
+  enum: [complete, not_available, too_many_segments]
+  description: >-
+    complete 表示公开分段完整可读；not_available 表示该保留事件早于解释投影；
+    too_many_segments 表示完整证据仍在 Tracker Ledger，但超过本人页面的有界投影上限。
+
+TrafficExplanationSegment:
+  type: object
+  additionalProperties: false
+  required:
+    - started_at
+    - ended_at
+    - raw_uploaded_bytes
+    - raw_downloaded_bytes
+    - credited_uploaded_bytes
+    - charged_downloaded_bytes
+  properties:
+    started_at:
+      type: string
+      format: date-time
+      description: 本分段的服务端起始时刻。
+    ended_at:
+      type: string
+      format: date-time
+      description: 本分段的服务端结束时刻。
+    raw_uploaded_bytes:
+      $ref: "#/TrafficByteCount"
+    raw_downloaded_bytes:
+      $ref: "#/TrafficByteCount"
+    credited_uploaded_bytes:
+      $ref: "#/TrafficByteCount"
+    charged_downloaded_bytes:
+      $ref: "#/TrafficByteCount"
+
+TrafficSettlementExplanation:
+  type: object
+  additionalProperties: false
+  required: [status, segment_count, segments]
+  properties:
+    status:
+      $ref: "#/TrafficExplanationStatus"
+    segment_count:
+      $ref: "#/TrafficEntryCount"
+    segments:
+      type: array
+      maxItems: 24
+      description: >-
+        按时间连续排列的公开安全分段。仅包含最终字节值；不包含政策标识、
+        rule application、digest、passkey、IP、peer ID 或 Tracker session 证据。
+      items:
+        $ref: "#/TrafficExplanationSegment"
+
+TrafficEntry:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - torrent
+    - interval_started_at
+    - interval_ended_at
+    - raw_uploaded_bytes
+    - raw_downloaded_bytes
+    - credited_uploaded_bytes
+    - charged_downloaded_bytes
+    - explanation
+    - settled_at
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Core 中不可变结算条目的公开稳定标识。
+    torrent:
+      $ref: "#/TrafficTorrentReference"
+    interval_started_at:
+      type: string
+      format: date-time
+      description: 本条原始流量区间的服务端起始时刻。
+    interval_ended_at:
+      type: string
+      format: date-time
+      description: 本条原始流量区间的服务端结束时刻。
+    raw_uploaded_bytes:
+      $ref: "#/TrafficByteCount"
+    raw_downloaded_bytes:
+      $ref: "#/TrafficByteCount"
+    credited_uploaded_bytes:
+      $ref: "#/TrafficByteCount"
+    charged_downloaded_bytes:
+      $ref: "#/TrafficByteCount"
+    explanation:
+      $ref: "#/TrafficSettlementExplanation"
+    settled_at:
+      type: string
+      format: date-time
+      description: Settlement 按事件时刻优惠政策完成最终结算的时刻。
+
+TrafficOverview:
+  type: object
+  additionalProperties: false
+  required: [totals, entries]
+  properties:
+    totals:
+      $ref: "#/TrafficTotals"
+    entries:
+      type: array
+      maxItems: 50
+      description: 按流量区间结束时刻倒序排列的最近最终结算。
+      items:
+        $ref: "#/TrafficEntry"
+
+HNRDurationSeconds:
+  type: string
+  pattern: "^(0|[1-9][0-9]{0,18})$"
+  description: 非负 int64 秒数的十进制文本，避免 JavaScript Number 精度损失。
+  example: "259200"
+
+HNRRatioBasisPoints:
+  type: string
+  pattern: "^(0|[1-9][0-9]{0,18})$"
+  description: 原始分享率的整数基点文本；10000 表示 1.0。
+  example: "12500"
+
+HNRStatus:
+  type: string
+  enum: [tracking, grace, overdue, satisfied, exempt]
+  description: >-
+    tracking 为考察中，grace 为宽限期，overdue 为待补做，
+    satisfied 为已经达标，exempt 为完成时策略豁免或已批准的单条申诉豁免。
+
+HNRSatisfiedBy:
+  type: string
+  enum: [seed_time, raw_ratio, exempt]
+
+HNRAppealStatus:
+  type: string
+  enum: [pending, approved, rejected, obligation_resolved]
+
+MyHNRAppeal:
+  type: object
+  additionalProperties: false
+  required: [status, statement, submitted_at, resolved_at, response]
+  properties:
+    status: { $ref: "#/HNRAppealStatus" }
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+    submitted_at: { type: string, format: date-time }
+    resolved_at:
+      type: string
+      format: date-time
+      nullable: true
+    response: { type: string, maxLength: 1000 }
+
+SubmitHNRAppealRequest:
+  type: object
+  additionalProperties: false
+  required: [statement]
+  properties:
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+
+HNRSummary:
+  type: object
+  additionalProperties: false
+  required: [total, tracking, grace, overdue, satisfied, exempt]
+  properties:
+    total:
+      $ref: "#/TrafficEntryCount"
+    tracking:
+      $ref: "#/TrafficEntryCount"
+    grace:
+      $ref: "#/TrafficEntryCount"
+    overdue:
+      $ref: "#/TrafficEntryCount"
+    satisfied:
+      $ref: "#/TrafficEntryCount"
+    exempt:
+      $ref: "#/TrafficEntryCount"
+
+HNREntry:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - torrent
+    - completed_at
+    - status
+    - seeded_seconds
+    - required_seed_seconds
+    - raw_uploaded_bytes
+    - raw_downloaded_bytes
+    - raw_ratio_basis_points
+    - required_ratio_basis_points
+    - assessment_due_at
+    - grace_ends_at
+    - satisfied_by
+    - satisfied_at
+    - updated_at
+    - appeal
+    - can_appeal
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: 本次 H&R 义务的稳定公开标识，仅用于列表身份与支持定位。
+    torrent:
+      $ref: "#/TrafficTorrentReference"
+    completed_at:
+      type: string
+      format: date-time
+      description: PeerGo 在切换后观测到可信完成跃迁的服务端时刻。
+    status:
+      $ref: "#/HNRStatus"
+    seeded_seconds:
+      $ref: "#/HNRDurationSeconds"
+    required_seed_seconds:
+      $ref: "#/HNRDurationSeconds"
+    raw_uploaded_bytes:
+      $ref: "#/TrafficByteCount"
+    raw_downloaded_bytes:
+      $ref: "#/TrafficByteCount"
+    raw_ratio_basis_points:
+      $ref: "#/HNRRatioBasisPoints"
+    required_ratio_basis_points:
+      $ref: "#/HNRRatioBasisPoints"
+    assessment_due_at:
+      type: string
+      format: date-time
+      description: 正常考察窗口结束时刻。
+    grace_ends_at:
+      type: string
+      format: date-time
+      description: 宽限窗口结束时刻；之后仍未达标则显示为待补做。
+    satisfied_by:
+      type: string
+      nullable: true
+      allOf:
+        - $ref: "#/HNRSatisfiedBy"
+    satisfied_at:
+      type: string
+      format: date-time
+      nullable: true
+    updated_at:
+      type: string
+      format: date-time
+      description: Core 最近应用该义务公开投影的事件时刻。
+    appeal:
+      type: object
+      allOf: [{ $ref: "#/MyHNRAppeal" }]
+      nullable: true
+    can_appeal:
+      type: boolean
+      description: true 表示该义务已过宽限期且尚未提交过申诉。
+
+HNRPage:
+  type: object
+  additionalProperties: false
+  required: [as_of, summary, items, next_cursor]
+  properties:
+    as_of:
+      type: string
+      format: date-time
+      description: 本页汇总和状态共同使用的 PostgreSQL 事务时刻。
+    summary:
+      $ref: "#/HNRSummary"
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/HNREntry"
+    next_cursor:
+      type: string
+      minLength: 34
+      maxLength: 34
+      pattern: "^[A-Za-z0-9_-]{34}$"
+      nullable: true
+
+HNRAppealFilter:
+  type: string
+  enum: [all, pending, resolved]
+
+HNRAppeal:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      id,
+      obligation_id,
+      user_id,
+      user_numeric_id,
+      username,
+      torrent,
+      statement,
+      created_at,
+      status,
+      response,
+      resolved_at,
+      obligation_status,
+      obligation_version,
+      seeded_seconds,
+      required_seed_seconds,
+      raw_ratio_basis_points,
+      required_ratio_basis_points,
+      grace_ends_at,
+      replayed,
+    ]
+  properties:
+    id: { type: string, format: uuid }
+    obligation_id: { type: string, format: uuid }
+    user_id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    torrent: { $ref: "#/TrafficTorrentReference" }
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+    created_at: { type: string, format: date-time }
+    status: { $ref: "#/HNRAppealStatus" }
+    response: { type: string, maxLength: 1000 }
+    resolved_at:
+      type: string
+      format: date-time
+      nullable: true
+    obligation_status: { $ref: "#/HNRStatus" }
+    obligation_version: { type: integer, format: int64, minimum: 1 }
+    seeded_seconds: { $ref: "#/HNRDurationSeconds" }
+    required_seed_seconds: { $ref: "#/HNRDurationSeconds" }
+    raw_ratio_basis_points: { $ref: "#/HNRRatioBasisPoints" }
+    required_ratio_basis_points: { $ref: "#/HNRRatioBasisPoints" }
+    grace_ends_at: { type: string, format: date-time }
+    replayed: { type: boolean }
+
+HNRAppealPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/HNRAppeal" }
+    total: { $ref: "operations.yaml#/OperationsCount" }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+DecideHNRAppealRequest:
+  type: object
+  additionalProperties: false
+  required: [decision, expected_obligation_version, response]
+  properties:
+    decision:
+      type: string
+      enum: [approved, rejected]
+    expected_obligation_version: { type: integer, format: int64, minimum: 1 }
+    response: { type: string, minLength: 10, maxLength: 1000 }

@@ -1,0 +1,625 @@
+WorkgroupKind:
+  type: string
+  enum: [reseed, review, retention]
+
+WorkgroupJoinMode:
+  type: string
+  enum: [staff_only, application]
+
+WorkgroupEntitlement:
+  type: string
+  enum:
+    - torrent.publish.trusted
+    - torrent.review.vote
+    - traffic.download.charge_exempt
+
+WorkgroupDefinition:
+  type: object
+  additionalProperties: false
+  required: [kind, display_name, description, join_mode, entitlement, enabled, sort_order, version]
+  properties:
+    kind: { $ref: "#/WorkgroupKind" }
+    display_name: { type: string, minLength: 1, maxLength: 32 }
+    description: { type: string, minLength: 1, maxLength: 500 }
+    join_mode: { $ref: "#/WorkgroupJoinMode" }
+    entitlement: { $ref: "#/WorkgroupEntitlement" }
+    enabled: { type: boolean }
+    sort_order: { type: integer, format: int32, minimum: 1, maximum: 99 }
+    version: { type: integer, format: int64, minimum: 1 }
+
+ReviewerEligibility:
+  type: object
+  additionalProperties: false
+  required:
+    - policy_revision
+    - eligible
+    - level
+    - minimum_level
+    - credited_uploaded_bytes
+    - minimum_credited_uploaded_bytes
+    - account_age_days
+    - minimum_account_age_days
+    - email_verified
+    - require_verified_email
+    - download_restricted
+    - require_unrestricted_download
+    - account_active
+  properties:
+    policy_revision: { type: integer, format: int64, minimum: 1 }
+    eligible: { type: boolean }
+    level: { type: integer, format: int32, minimum: 1, maximum: 99 }
+    minimum_level: { type: integer, format: int32, minimum: 1, maximum: 99 }
+    credited_uploaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    minimum_credited_uploaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    account_age_days: { type: integer, format: int32, minimum: 0 }
+    minimum_account_age_days: { type: integer, format: int32, minimum: 0 }
+    email_verified: { type: boolean }
+    require_verified_email: { type: boolean }
+    download_restricted: { type: boolean }
+    require_unrestricted_download: { type: boolean }
+    account_active: { type: boolean }
+
+WorkgroupApplicationStatus:
+  type: string
+  enum: [pending, approved, rejected]
+
+WorkgroupApplication:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - group_kind
+    - applicant_id
+    - applicant_numeric_id
+    - applicant_username
+    - applicant_display_name
+    - statement
+    - status
+    - eligibility
+    - version
+    - submitted_at
+  properties:
+    id: { type: string, format: uuid }
+    group_kind: { $ref: "#/WorkgroupKind" }
+    applicant_id: { type: string, format: uuid }
+    applicant_numeric_id: { type: integer, format: int64, minimum: 1 }
+    applicant_username: { type: string, minLength: 1, maxLength: 64 }
+    applicant_display_name: { type: string, minLength: 1, maxLength: 80 }
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+    status: { $ref: "#/WorkgroupApplicationStatus" }
+    policy_revision: { type: integer, format: int64, minimum: 1 }
+    eligibility: { $ref: "#/ReviewerEligibility" }
+    version: { type: integer, format: int64, minimum: 1 }
+    submitted_at: { type: string, format: date-time }
+    decided_at: { type: string, format: date-time }
+
+WorkgroupMembershipStatus:
+  type: string
+  enum: [active, suspended, ended]
+
+WorkgroupContributionMetric:
+  type: string
+  enum:
+    - trusted_torrents_published
+    - torrent_review_votes
+    - seeding_active_seconds
+
+WorkgroupContributionProgress:
+  type: object
+  additionalProperties: false
+  required:
+    - group_kind
+    - metric
+    - policy_revision
+    - period_kind
+    - period_starts_at
+    - period_ends_at
+    - observed_at
+    - current_value
+    - target_value
+    - met
+    - enforcement_mode
+  properties:
+    group_kind: { $ref: "#/WorkgroupKind" }
+    metric: { $ref: "#/WorkgroupContributionMetric" }
+    policy_revision: { type: integer, format: int64, minimum: 1 }
+    period_kind: { type: string, enum: [calendar_month] }
+    period_starts_at: { type: string, format: date-time }
+    period_ends_at: { type: string, format: date-time }
+    observed_at: { type: string, format: date-time }
+    evidence_through: { type: string, format: date-time }
+    current_value: { type: integer, format: int64, minimum: 0 }
+    target_value: { type: integer, format: int64, minimum: 1 }
+    met: { type: boolean }
+    enforcement_mode: { type: string, enum: [observe] }
+
+WorkgroupContributionPolicyRevision:
+  type: object
+  additionalProperties: false
+  required:
+    - group_kind
+    - revision
+    - metric
+    - period_kind
+    - target_value
+    - enforcement_mode
+    - effective_from
+    - opening
+    - reason
+    - created_at
+    - timeline_state
+    - replayed
+  properties:
+    group_kind: { $ref: "#/WorkgroupKind" }
+    revision: { type: integer, format: int64, minimum: 1 }
+    metric: { $ref: "#/WorkgroupContributionMetric" }
+    period_kind: { type: string, enum: [calendar_month] }
+    target_value: { type: integer, format: int64, minimum: 1, maximum: 3153600000 }
+    enforcement_mode: { type: string, enum: [observe] }
+    effective_from:
+      type: string
+      format: date-time
+      nullable: true
+    opening: { type: boolean }
+    reason: { type: string, minLength: 6, maxLength: 1000 }
+    created_at: { type: string, format: date-time }
+    timeline_state: { type: string, enum: [active, scheduled] }
+    replayed: { type: boolean }
+
+WorkgroupContributionPolicyPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset, minimum_effective_from, current]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/WorkgroupContributionPolicyRevision" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+    minimum_effective_from: { type: string, format: date-time }
+    current:
+      type: object
+      allOf:
+        - $ref: "#/WorkgroupContributionPolicyRevision"
+      nullable: true
+
+WorkgroupContributionSummary:
+  type: object
+  additionalProperties: false
+  required:
+    - group_kind
+    - metric
+    - policy_revision
+    - period_starts_at
+    - period_ends_at
+    - observed_at
+    - active_members
+    - contributing_members
+    - met_members
+    - total_value
+    - target_value
+  properties:
+    group_kind: { $ref: "#/WorkgroupKind" }
+    metric: { $ref: "#/WorkgroupContributionMetric" }
+    policy_revision: { type: integer, format: int64, minimum: 1 }
+    period_starts_at: { type: string, format: date-time }
+    period_ends_at: { type: string, format: date-time }
+    observed_at: { type: string, format: date-time }
+    evidence_through: { type: string, format: date-time }
+    active_members: { type: integer, format: int64, minimum: 0 }
+    contributing_members: { type: integer, format: int64, minimum: 0 }
+    met_members: { type: integer, format: int64, minimum: 0 }
+    total_value: { type: integer, format: int64, minimum: 0 }
+    target_value: { type: integer, format: int64, minimum: 1 }
+
+WorkgroupContributionEvidenceState:
+  type: string
+  enum: [complete, collecting, incomplete, unavailable]
+
+WorkgroupContributionAssessmentState:
+  type: string
+  enum: [met, in_progress, not_met, not_assessable, indeterminate]
+
+WorkgroupContributionExplanationCode:
+  type: string
+  enum:
+    - target_met
+    - period_in_progress
+    - below_target
+    - no_contribution
+    - partial_membership
+    - membership_inactive
+    - evidence_incomplete
+    - evidence_unavailable
+
+WorkgroupContributionCycle:
+  type: object
+  additionalProperties: false
+  required:
+    - group_kind
+    - metric
+    - policy_revision
+    - period_starts_at
+    - period_ends_at
+    - observed_at
+    - evidence_state
+    - active_seconds
+    - full_period_active
+    - current_value
+    - target_value
+    - assessment_state
+    - explanation_code
+    - enforcement_mode
+    - reminder
+  properties:
+    group_kind: { $ref: "#/WorkgroupKind" }
+    metric: { $ref: "#/WorkgroupContributionMetric" }
+    policy_revision: { type: integer, format: int64, minimum: 1 }
+    period_starts_at: { type: string, format: date-time }
+    period_ends_at: { type: string, format: date-time }
+    observed_at: { type: string, format: date-time }
+    evidence_through: { type: string, format: date-time }
+    evidence_state: { $ref: "#/WorkgroupContributionEvidenceState" }
+    active_seconds: { type: integer, format: int64, minimum: 0 }
+    full_period_active: { type: boolean }
+    current_value: { type: integer, format: int64, minimum: 0 }
+    target_value: { type: integer, format: int64, minimum: 1 }
+    assessment_state: { $ref: "#/WorkgroupContributionAssessmentState" }
+    explanation_code: { $ref: "#/WorkgroupContributionExplanationCode" }
+    enforcement_mode: { type: string, enum: [observe] }
+    reminder:
+      type: object
+      nullable: true
+      allOf:
+        - $ref: "#/WorkgroupContributionReminder"
+
+WorkgroupContributionReminder:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - group_kind
+    - metric
+    - policy_revision
+    - period_starts_at
+    - period_ends_at
+    - observed_at
+    - evidence_state
+    - current_value
+    - target_value
+    - assessment_state
+    - explanation_code
+    - reason
+    - created_at
+    - read_at
+    - replayed
+  properties:
+    id: { type: string, format: uuid }
+    group_kind: { $ref: "#/WorkgroupKind" }
+    metric: { $ref: "#/WorkgroupContributionMetric" }
+    policy_revision: { type: integer, format: int64, minimum: 1 }
+    period_starts_at: { type: string, format: date-time }
+    period_ends_at: { type: string, format: date-time }
+    observed_at: { type: string, format: date-time }
+    evidence_through: { type: string, format: date-time, nullable: true }
+    evidence_state: { $ref: "#/WorkgroupContributionEvidenceState" }
+    current_value: { type: integer, format: int64, minimum: 0 }
+    target_value: { type: integer, format: int64, minimum: 1 }
+    assessment_state: { $ref: "#/WorkgroupContributionAssessmentState" }
+    explanation_code: { $ref: "#/WorkgroupContributionExplanationCode" }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+    created_at: { type: string, format: date-time }
+    read_at: { type: string, format: date-time, nullable: true }
+    replayed: { type: boolean }
+
+WorkgroupContributionCyclePage:
+  type: object
+  additionalProperties: false
+  required: [items, limit]
+  properties:
+    items:
+      type: array
+      maxItems: 24
+      items: { $ref: "#/WorkgroupContributionCycle" }
+    limit: { type: integer, minimum: 1, maximum: 24 }
+
+WorkgroupMembership:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - group_kind
+    - user_id
+    - user_numeric_id
+    - username
+    - display_name
+    - status
+    - source
+    - version
+    - started_at
+    - updated_at
+  properties:
+    id: { type: string, format: uuid }
+    group_kind: { $ref: "#/WorkgroupKind" }
+    user_id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    display_name: { type: string, minLength: 1, maxLength: 80 }
+    status: { $ref: "#/WorkgroupMembershipStatus" }
+    source: { type: string, enum: [application, staff, legacy_migration] }
+    version: { type: integer, format: int64, minimum: 1 }
+    started_at: { type: string, format: date-time }
+    ended_at: { type: string, format: date-time }
+    updated_at: { type: string, format: date-time }
+    contribution: { $ref: "#/WorkgroupContributionProgress" }
+
+MyWorkgroup:
+  type: object
+  additionalProperties: false
+  required: [definition]
+  properties:
+    definition: { $ref: "#/WorkgroupDefinition" }
+    membership: { $ref: "#/WorkgroupMembership" }
+    application: { $ref: "#/WorkgroupApplication" }
+    eligibility: { $ref: "#/ReviewerEligibility" }
+
+MyWorkgroupOverview:
+  type: object
+  additionalProperties: false
+  required: [items]
+  properties:
+    items:
+      type: array
+      minItems: 3
+      maxItems: 3
+      items: { $ref: "#/MyWorkgroup" }
+
+AdminWorkgroupOverview:
+  type: object
+  additionalProperties: false
+  required: [definitions, pending_applications, active_reseed_members, active_review_members, active_retention_members, contribution_summaries]
+  properties:
+    definitions:
+      type: array
+      minItems: 3
+      maxItems: 3
+      items: { $ref: "#/WorkgroupDefinition" }
+    pending_applications: { type: integer, format: int64, minimum: 0 }
+    active_reseed_members: { type: integer, format: int64, minimum: 0 }
+    active_review_members: { type: integer, format: int64, minimum: 0 }
+    active_retention_members: { type: integer, format: int64, minimum: 0 }
+    contribution_summaries:
+      type: array
+      minItems: 3
+      maxItems: 3
+      items: { $ref: "#/WorkgroupContributionSummary" }
+
+WorkgroupApplicationPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/WorkgroupApplication" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+WorkgroupMembershipPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/WorkgroupMembership" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+WorkgroupTaskType:
+  type: string
+  enum: [task, activity]
+
+WorkgroupTaskTimelineState:
+  type: string
+  enum: [scheduled, open, closed]
+
+WorkgroupTaskAssignmentState:
+  type: string
+  enum: [not_submitted, pending_review, changes_requested, accepted]
+
+WorkgroupTaskReviewDecision:
+  type: string
+  enum: [accepted, rejected]
+
+WorkgroupTask:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - group_kind
+    - task_type
+    - title
+    - description
+    - starts_at
+    - due_at
+    - timeline_state
+    - assignment_count
+    - submitted_count
+    - pending_review_count
+    - accepted_count
+    - created_at
+    - replayed
+  properties:
+    id: { type: string, format: uuid }
+    group_kind: { $ref: "#/WorkgroupKind" }
+    task_type: { $ref: "#/WorkgroupTaskType" }
+    title: { type: string, minLength: 2, maxLength: 100 }
+    description: { type: string, minLength: 10, maxLength: 2000 }
+    starts_at: { type: string, format: date-time }
+    due_at: { type: string, format: date-time }
+    timeline_state: { $ref: "#/WorkgroupTaskTimelineState" }
+    assignment_count: { type: integer, format: int64, minimum: 1 }
+    submitted_count: { type: integer, format: int64, minimum: 0 }
+    pending_review_count: { type: integer, format: int64, minimum: 0 }
+    accepted_count: { type: integer, format: int64, minimum: 0 }
+    created_at: { type: string, format: date-time }
+    replayed: { type: boolean }
+
+WorkgroupTaskSubmission:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - sequence
+    - statement
+    - submitted_at
+    - decision
+    - review_reason
+    - decided_at
+  properties:
+    id: { type: string, format: uuid }
+    sequence: { type: integer, format: int64, minimum: 1 }
+    statement: { type: string, minLength: 10, maxLength: 2000 }
+    submitted_at: { type: string, format: date-time }
+    decision:
+      type: string
+      nullable: true
+      allOf:
+        - $ref: "#/WorkgroupTaskReviewDecision"
+    review_reason: { type: string, minLength: 10, maxLength: 1000, nullable: true }
+    decided_at: { type: string, format: date-time, nullable: true }
+
+WorkgroupTaskAssignment:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - user_numeric_id
+    - username
+    - display_name
+    - task
+    - state
+    - can_submit
+    - latest_submission
+  properties:
+    id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    display_name: { type: string, minLength: 1, maxLength: 80 }
+    task: { $ref: "#/WorkgroupTask" }
+    state: { $ref: "#/WorkgroupTaskAssignmentState" }
+    can_submit: { type: boolean }
+    latest_submission:
+      type: object
+      nullable: true
+      allOf:
+        - $ref: "#/WorkgroupTaskSubmission"
+
+WorkgroupTaskPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/WorkgroupTask" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+WorkgroupTaskAssignmentPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/WorkgroupTaskAssignment" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+CreateWorkgroupApplicationRequest:
+  type: object
+  additionalProperties: false
+  required: [statement]
+  properties:
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+
+DecideWorkgroupApplicationRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, decision, reason]
+  properties:
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    decision: { type: string, enum: [approve, reject] }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+GrantWorkgroupMembershipRequest:
+  type: object
+  additionalProperties: false
+  required: [user_numeric_id, reason]
+  properties:
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+ChangeWorkgroupMembershipRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, transition, reason]
+  properties:
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    transition: { type: string, enum: [suspended, reactivated, ended] }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+IssueWorkgroupContributionPolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [target_value, effective_from, reason]
+  properties:
+    target_value: { type: integer, format: int64, minimum: 1, maximum: 3153600000 }
+    effective_from: { type: string, format: date-time }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+IssueWorkgroupContributionReminderRequest:
+  type: object
+  additionalProperties: false
+  required: [period_starts_at, reason]
+  properties:
+    period_starts_at: { type: string, format: date-time }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+PublishWorkgroupTaskRequest:
+  type: object
+  additionalProperties: false
+  required: [task_type, title, description, starts_at, due_at]
+  properties:
+    task_type: { $ref: "#/WorkgroupTaskType" }
+    title: { type: string, minLength: 2, maxLength: 100 }
+    description: { type: string, minLength: 10, maxLength: 2000 }
+    starts_at: { type: string, format: date-time }
+    due_at: { type: string, format: date-time }
+
+SubmitWorkgroupTaskRequest:
+  type: object
+  additionalProperties: false
+  required: [statement]
+  properties:
+    statement: { type: string, minLength: 10, maxLength: 2000 }
+
+ReviewWorkgroupTaskSubmissionRequest:
+  type: object
+  additionalProperties: false
+  required: [decision, reason]
+  properties:
+    decision: { $ref: "#/WorkgroupTaskReviewDecision" }
+    reason: { type: string, minLength: 10, maxLength: 1000 }

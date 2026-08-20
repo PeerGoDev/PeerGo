@@ -1,0 +1,789 @@
+SiteInfo:
+  type: object
+  additionalProperties: false
+  required:
+    - name
+    - description
+    - registration_mode
+    - registration_username_min_characters
+    - registration_username_max_characters
+    - registration_email_domain_mode
+    - human_verification
+    - online_users
+    - default_torrent_view
+    - show_latest_announcement
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 80
+      example: PeerGo
+    description:
+      type: string
+      maxLength: 500
+    registration_mode:
+      $ref: "../schemas/identity.yaml#/RegistrationMode"
+    registration_username_min_characters:
+      type: integer
+      minimum: 3
+      maximum: 32
+    registration_username_max_characters:
+      type: integer
+      minimum: 3
+      maximum: 32
+    registration_email_domain_mode:
+      $ref: "../schemas/identity.yaml#/EmailDomainMode"
+    human_verification:
+      $ref: "#/HumanVerificationPublicConfig"
+    online_users:
+      type: integer
+      minimum: 0
+    default_torrent_view:
+      type: string
+      enum: [list, poster]
+    show_latest_announcement:
+      type: boolean
+
+HumanVerificationPublicConfig:
+  type: object
+  additionalProperties: false
+  required: [provider, site_key, registration_enabled, login_enabled, password_recovery_enabled]
+  properties:
+    provider:
+      $ref: "../schemas/identity.yaml#/HumanVerificationProvider"
+    site_key:
+      type: string
+      maxLength: 128
+    registration_enabled:
+      type: boolean
+    login_enabled:
+      type: boolean
+    password_recovery_enabled:
+      type: boolean
+
+SiteDisplaySettings:
+  type: object
+  additionalProperties: false
+  required:
+    - name
+    - description
+    - default_torrent_view
+    - show_latest_announcement
+    - version
+    - effective_at
+    - updated_at
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    description:
+      type: string
+      maxLength: 500
+    default_torrent_view:
+      type: string
+      enum: [list, poster]
+    show_latest_announcement:
+      type: boolean
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    effective_at:
+      type: string
+      format: date-time
+      description: 低风险设置直接生效，因此与成功更新时刻一致。
+    updated_at:
+      type: string
+      format: date-time
+
+UpdateSiteDisplaySettingsRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - name
+    - description
+    - default_torrent_view
+    - show_latest_announcement
+    - expected_version
+    - reason
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    description:
+      type: string
+      maxLength: 500
+    default_torrent_view:
+      type: string
+      enum: [list, poster]
+    show_latest_announcement:
+      type: boolean
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+
+AnnouncementSummary:
+  type: object
+  additionalProperties: false
+  required: [id, title, summary, published_at]
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 120
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 500
+    published_at:
+      type: string
+      format: date-time
+
+AnnouncementPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/AnnouncementSummary"
+    total:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+
+AnnouncementBodyFormat:
+  type: string
+  enum: [plain_text, legacy_bbcode]
+
+AnnouncementDetail:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - title
+    - summary
+    - body
+    - body_format
+    - version
+    - published_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 120
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 500
+    body:
+      type: string
+      minLength: 1
+      maxLength: 20000
+      description: 公告正文；legacy_bbcode 首版按转义纯文本展示，不执行旧站标记。
+    body_format:
+      $ref: "#/AnnouncementBodyFormat"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+    published_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+ManagedAnnouncementStatus:
+  type: string
+  enum: [draft, scheduled, published, withdrawn]
+
+ManagedAnnouncementSummary:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - title
+    - summary
+    - status
+    - version
+    - revision_number
+    - has_unpublished_changes
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 120
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+      description: 创建后不可修改的公开路由键。
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 500
+    status:
+      $ref: "#/ManagedAnnouncementStatus"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+      description: 公告聚合版本；所有草稿或发布命令成功后递增。
+    revision_number:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+      description: 当前编辑视图对应的不可变正文修订号。
+    has_unpublished_changes:
+      type: boolean
+    published_at:
+      type: string
+      format: date-time
+      nullable: true
+    scheduled_for:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+ManagedAnnouncement:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - title
+    - summary
+    - body
+    - body_format
+    - status
+    - version
+    - revision_number
+    - has_unpublished_changes
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 120
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 500
+    body:
+      type: string
+      minLength: 1
+      maxLength: 20000
+    body_format:
+      $ref: "#/AnnouncementBodyFormat"
+    status:
+      $ref: "#/ManagedAnnouncementStatus"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    revision_number:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    has_unpublished_changes:
+      type: boolean
+    published_at:
+      type: string
+      format: date-time
+      nullable: true
+    scheduled_for:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+ManagedAnnouncementPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/ManagedAnnouncementSummary"
+    total:
+      type: integer
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+
+AnnouncementRevisionSummary:
+  type: object
+  additionalProperties: false
+  required:
+    - revision_number
+    - title
+    - summary
+    - body_format
+    - origin
+    - is_draft
+    - is_published
+    - is_scheduled
+    - created_at
+  properties:
+    revision_number:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 500
+    body_format:
+      $ref: "#/AnnouncementBodyFormat"
+    origin:
+      type: string
+      enum: [migration, development_seed, staff]
+    editor_display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+      nullable: true
+    is_draft:
+      type: boolean
+    is_published:
+      type: boolean
+    is_scheduled:
+      type: boolean
+    created_at:
+      type: string
+      format: date-time
+
+AnnouncementRevisionPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/AnnouncementRevisionSummary"
+    total:
+      type: integer
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+
+CreateManagedAnnouncementRequest:
+  type: object
+  additionalProperties: false
+  required: [id, title, summary, body, body_format, reason]
+  properties:
+    id:
+      type: string
+      minLength: 1
+      maxLength: 120
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 500
+    body:
+      type: string
+      minLength: 1
+      maxLength: 20000
+    body_format:
+      $ref: "#/AnnouncementBodyFormat"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+
+UpdateManagedAnnouncementDraftRequest:
+  type: object
+  additionalProperties: false
+  required: [title, summary, body, body_format, expected_version, reason]
+  properties:
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      minLength: 1
+      maxLength: 500
+    body:
+      type: string
+      minLength: 1
+      maxLength: 20000
+    body_format:
+      $ref: "#/AnnouncementBodyFormat"
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+
+AnnouncementPublicationAction:
+  type: string
+  enum: [publish_now, schedule, cancel_schedule, withdraw]
+
+ChangeAnnouncementPublicationRequest:
+  type: object
+  additionalProperties: false
+  required: [action, expected_version, reason]
+  properties:
+    action:
+      $ref: "#/AnnouncementPublicationAction"
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    scheduled_for:
+      type: string
+      format: date-time
+      nullable: true
+      description: action=schedule 时必填，必须处于允许的未来窗口。
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+
+Category:
+  type: object
+  required: [id, name]
+  properties:
+    id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+
+CategoryWithCount:
+  type: object
+  additionalProperties: false
+  required: [id, name, torrent_count]
+  properties:
+    id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    torrent_count:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+
+CategoryFacetOption:
+  type: object
+  additionalProperties: false
+  required: [key, label]
+  properties:
+    key:
+      type: string
+      minLength: 1
+      maxLength: 80
+    label:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+CategoryFacet:
+  type: object
+  additionalProperties: false
+  required: [id, name, selection_mode, required, options]
+  properties:
+    id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    selection_mode:
+      type: string
+      enum: [single_option, multi_option]
+    required:
+      type: boolean
+    requirement_group:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+      description: Facets sharing this value form an at-least-one upload requirement.
+    options:
+      type: array
+      minItems: 1
+      maxItems: 200
+      items:
+        $ref: "#/CategoryFacetOption"
+
+CategoryFacetList:
+  type: array
+  maxItems: 20
+  items:
+    $ref: "#/CategoryFacet"
+
+ManagedCategory:
+  type: object
+  required:
+    - id
+    - name
+    - display_order
+    - enabled
+    - version
+    - torrent_count
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+      description: 创建后不可修改的公开稳定标识。
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    display_order:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+      description: 较小的权重优先展示；相同权重按稳定标识排序。
+    enabled:
+      type: boolean
+      description: 停用后不再进入公开分类和种子列表，但不会删除已有引用。
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    torrent_count:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+ManagedCategoryList:
+  type: array
+  items:
+    $ref: "#/ManagedCategory"
+
+CreateManagedCategoryRequest:
+  type: object
+  additionalProperties: false
+  required: [id, name, display_order, enabled, reason]
+  properties:
+    id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    display_order:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+    enabled:
+      type: boolean
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+
+UpdateManagedCategoryRequest:
+  type: object
+  additionalProperties: false
+  required: [name, display_order, enabled, expected_version, reason]
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    display_order:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+    enabled:
+      type: boolean
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+
+TorrentSummary:
+  type: object
+  required:
+    - id
+    - name
+    - subtitle
+    - category
+    - size_bytes
+    - seeders
+    - leechers
+    - completed
+    - promotion
+    - sticky_until
+    - uploaded_at
+    - swarm_observed_at
+    - swarm_stale
+  properties:
+    id:
+      type: integer
+      format: int64
+      minimum: 1
+    name:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    category:
+      $ref: "#/Category"
+    size_bytes:
+      type: integer
+      format: int64
+      minimum: 0
+      description: 未压缩内容总大小，单位为 byte。
+    seeders:
+      type: integer
+      minimum: 0
+    leechers:
+      type: integer
+      minimum: 0
+    completed:
+      type: integer
+      minimum: 0
+    promotion:
+      type: string
+      enum:
+        - none
+        - free
+        - double_upload
+        - double_upload_free
+        - half_download
+        - double_upload_half_download
+        - thirty_percent_download
+    sticky_until:
+      type: string
+      format: date-time
+      nullable: true
+      description: 当前用户付费列表置顶的结束时间；未置顶时为 null。
+    uploaded_at:
+      type: string
+      format: date-time
+    swarm_observed_at:
+      type: string
+      format: date-time
+    swarm_stale:
+      type: boolean
+      description: true 表示统计快照超过服务端的新鲜度阈值，但内容本身仍可展示。
+
+TorrentList:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/TorrentSummary"
+    total:
+      type: integer
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000

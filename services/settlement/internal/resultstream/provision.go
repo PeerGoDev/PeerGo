@@ -1,0 +1,119 @@
+// Package resultstream provisions immutable Settlement result streams. Stream
+// retention is shared infrastructure behavior; traffic and H&R keep separate
+// identities and codecs but must enforce the same fail-closed drift rules.
+package resultstream
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"reflect"
+	"strings"
+
+	"github.com/nats-io/nats.go/jetstream"
+	contract "github.com/peergo/peergo/contracts/go/jetstreamv1"
+)
+
+var (
+	ErrInput = errors.New("Settlement result stream configuration is invalid")
+	ErrDrift = errors.New("existing Settlement result stream configuration differs")
+)
+
+type Manager interface {
+	Get(context.Context, string) (jetstream.StreamConfig, error)
+	Create(context.Context, jetstream.StreamConfig) error
+}
+
+type NATSManager struct{ js jetstream.JetStream }
+
+func NewNATSManager(js jetstream.JetStream) (*NATSManager, error) {
+	if js == nil {
+		return nil, ErrInput
+	}
+	return &NATSManager{js: js}, nil
+}
+
+func (manager *NATSManager) Get(ctx context.Context, name string) (jetstream.StreamConfig, error) {
+	stream, err := manager.js.Stream(ctx, name)
+	if err != nil {
+		return jetstream.StreamConfig{}, err
+	}
+	info, err := stream.Info(ctx)
+	if err != nil {
+		return jetstream.StreamConfig{}, err
+	}
+	return info.Config, nil
+}
+
+func (manager *NATSManager) Create(ctx context.Context, config jetstream.StreamConfig) error {
+	_, err := manager.js.CreateStream(ctx, config)
+	return err
+}
+
+// Ensure creates a missing stream but never mutates an existing one. An
+// operator must review retention or discard changes because drift can erase
+// replayable accounting projections.
+func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig) (bool, error) {
+	if manager == nil || validate(desired) != nil {
+		return false, ErrInput
+	}
+	current, err := manager.Get(ctx, desired.Name)
+	if err == nil {
+		if !equivalent(current, desired) {
+			return false, ErrDrift
+		}
+		return false, nil
+	}
+	if !errors.Is(err, jetstream.ErrStreamNotFound) {
+		return false, fmt.Errorf("inspect Settlement result stream: %w", err)
+	}
+	if err := manager.Create(ctx, desired); err != nil {
+		return false, fmt.Errorf("create Settlement result stream: %w", err)
+	}
+	return true, nil
+}
+
+func validate(config jetstream.StreamConfig) error {
+	if !contract.ValidStreamName(config.Name) || len(config.Subjects) != 1 ||
+		!contract.ValidLiteralSubject(config.Subjects[0]) || config.Retention != jetstream.LimitsPolicy ||
+		config.Discard != jetstream.DiscardNew || config.Storage != jetstream.FileStorage || config.MaxBytes < 1 ||
+		config.MaxAge <= 0 || config.MaxMsgSize < 1 || config.Replicas < 1 || config.Replicas > 5 || config.NoAck ||
+		config.Duplicates <= 0 || config.MaxConsumers < 1 || config.PersistMode != jetstream.DefaultPersistMode ||
+		config.Mirror != nil || len(config.Sources) != 0 || config.SubjectTransform != nil || config.RePublish != nil ||
+		config.AllowRollup || config.AllowMsgTTL || config.AllowMsgCounter || config.AllowMsgSchedules {
+		return ErrInput
+	}
+	for key := range config.Metadata {
+		if strings.HasPrefix(key, "_nats.") {
+			return ErrInput
+		}
+	}
+	return nil
+}
+
+func equivalent(current, desired jetstream.StreamConfig) bool {
+	return current.Name == desired.Name && current.Description == desired.Description && reflect.DeepEqual(current.Subjects, desired.Subjects) &&
+		current.Retention == desired.Retention && current.MaxConsumers == desired.MaxConsumers && current.MaxMsgs == desired.MaxMsgs &&
+		current.MaxBytes == desired.MaxBytes && current.Discard == desired.Discard && current.DiscardNewPerSubject == desired.DiscardNewPerSubject &&
+		current.MaxAge == desired.MaxAge && current.MaxMsgsPerSubject == desired.MaxMsgsPerSubject && current.MaxMsgSize == desired.MaxMsgSize &&
+		current.Storage == desired.Storage && current.Replicas == desired.Replicas && current.NoAck == desired.NoAck &&
+		current.Duplicates == desired.Duplicates && reflect.DeepEqual(current.Placement, desired.Placement) &&
+		reflect.DeepEqual(current.Mirror, desired.Mirror) && reflect.DeepEqual(current.Sources, desired.Sources) && current.Sealed == desired.Sealed &&
+		current.DenyDelete == desired.DenyDelete && current.DenyPurge == desired.DenyPurge && current.AllowRollup == desired.AllowRollup &&
+		current.Compression == desired.Compression && current.FirstSeq == desired.FirstSeq && reflect.DeepEqual(current.SubjectTransform, desired.SubjectTransform) &&
+		reflect.DeepEqual(current.RePublish, desired.RePublish) && current.AllowDirect == desired.AllowDirect && current.MirrorDirect == desired.MirrorDirect &&
+		reflect.DeepEqual(current.ConsumerLimits, desired.ConsumerLimits) && equivalentMetadata(current.Metadata, desired.Metadata) &&
+		current.Template == desired.Template && current.AllowMsgTTL == desired.AllowMsgTTL && current.SubjectDeleteMarkerTTL == desired.SubjectDeleteMarkerTTL &&
+		current.AllowMsgCounter == desired.AllowMsgCounter && current.AllowAtomicPublish == desired.AllowAtomicPublish &&
+		current.AllowMsgSchedules == desired.AllowMsgSchedules && current.PersistMode == desired.PersistMode && current.AllowBatchPublish == desired.AllowBatchPublish
+}
+
+func equivalentMetadata(current, desired map[string]string) bool {
+	applicationMetadata := make(map[string]string, len(current))
+	for key, value := range current {
+		if !strings.HasPrefix(key, "_nats.") {
+			applicationMetadata[key] = value
+		}
+	}
+	return reflect.DeepEqual(applicationMetadata, desired)
+}

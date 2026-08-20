@@ -1,0 +1,17 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: ../../db/vault/migrations
+    queries: internal/credentials/repository_postgres.sql
+    gen:
+      go:
+        package: vaultdb
+        out: internal/generated/vaultdb
+        sql_package: pgx/v5
+        emit_interface: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID

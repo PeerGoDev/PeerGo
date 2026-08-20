@@ -1,0 +1,25 @@
+/.DS_Store
+/references/*
+!/references/README.md
+/docs/personal/
+
+# JavaScript / React Router
+node_modules/
+.pnpm-store/
+build/
+dist/
+.react-router/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Go
+bin/
+*.test
+
+# Local configuration
+.env
+.env.*
+!.env.example
+/.local/

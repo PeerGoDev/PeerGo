@@ -1,0 +1,1550 @@
+SignedIntegerText:
+  type: string
+  pattern: "^-?(0|[1-9][0-9]{0,18})$"
+  description: int64 整数十进制文本，防止 JavaScript Number 丢失精度。
+
+UnsignedIntegerText:
+  type: string
+  pattern: "^(0|[1-9][0-9]{0,18})$"
+
+ExactExperienceText:
+  type: string
+  pattern: "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,20})?$"
+  description: PostgreSQL numeric(38,20) 的规范非负十进制文本。
+
+MagicStatementEntry:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      sequence,
+      transaction_type,
+      entry_type,
+      amount,
+      balance_after,
+      source_reference,
+      policy_revision,
+      occurred_at,
+    ]
+  properties:
+    sequence:
+      $ref: "#/UnsignedIntegerText"
+    transaction_type:
+      type: string
+      enum:
+        [
+          legacy_opening,
+          seeding_reward,
+          activity_reward,
+          torrent_purchase,
+          member_gift,
+          tip,
+          refund,
+          adjustment,
+        ]
+    entry_type:
+      type: string
+      enum: [legacy_opening, earn, spend, adjustment]
+    amount:
+      $ref: "#/SignedIntegerText"
+    balance_after:
+      $ref: "#/SignedIntegerText"
+    source_reference:
+      type: string
+      maxLength: 128
+    policy_revision:
+      type: string
+      maxLength: 64
+    occurred_at:
+      type: string
+      format: date-time
+
+ExperienceStatementEntry:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      sequence,
+      entry_type,
+      amount,
+      balance_after,
+      source_kind,
+      policy_revision,
+      level_after,
+      occurred_at,
+    ]
+  properties:
+    sequence:
+      $ref: "#/UnsignedIntegerText"
+    entry_type:
+      type: string
+      enum: [legacy_opening, earn, reversal, adjustment]
+    amount:
+      type: string
+      pattern: "^-?(0|[1-9][0-9]{0,17})(\\.[0-9]{1,20})?$"
+    balance_after:
+      $ref: "#/ExactExperienceText"
+    source_kind:
+      type: string
+      enum:
+        [
+          legacy_opening,
+          seeding_reward,
+          torrent_publish,
+          activity,
+          assessment,
+          administrator_adjustment,
+        ]
+    policy_revision:
+      type: string
+      maxLength: 64
+    level_after:
+      type: integer
+      minimum: 1
+      maximum: 99
+    occurred_at:
+      type: string
+      format: date-time
+
+LevelTarget:
+  type: object
+  additionalProperties: false
+  required: [level, minimum_experience]
+  properties:
+    level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    minimum_experience:
+      $ref: "#/ExactExperienceText"
+
+ProgressOverview:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      experience,
+      level,
+      policy_version,
+      current_minimum_experience,
+      next,
+      updated_at,
+    ]
+  properties:
+    experience:
+      $ref: "#/ExactExperienceText"
+    level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    policy_version:
+      type: string
+      maxLength: 64
+    current_minimum_experience:
+      $ref: "#/ExactExperienceText"
+    next:
+      type: object
+      allOf:
+        - $ref: "#/LevelTarget"
+      nullable: true
+    updated_at:
+      type: string
+      format: date-time
+      nullable: true
+
+EconomyOverview:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      magic_balance,
+      magic_updated_at,
+      magic_entries,
+      progress,
+      experience_entries,
+      rules,
+    ]
+  properties:
+    magic_balance:
+      $ref: "#/SignedIntegerText"
+    magic_updated_at:
+      type: string
+      format: date-time
+      nullable: true
+    magic_entries:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/MagicStatementEntry"
+    progress:
+      $ref: "#/ProgressOverview"
+    experience_entries:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/ExperienceStatementEntry"
+    rules:
+      $ref: "#/EconomyRuleOverview"
+    latest_seeding_reward:
+      $ref: "#/LatestSeedingRewardCalculation"
+
+EconomyRuleOverview:
+  type: object
+  additionalProperties: false
+  required:
+    [seeding_reward, contribution_experience, level_policy_version, levels]
+  properties:
+    seeding_reward:
+      type: object
+      nullable: true
+      allOf:
+        - $ref: "#/SeedingRewardPolicyInput"
+    contribution_experience:
+      $ref: "#/ContributionExperiencePolicyInput"
+    level_policy_version:
+      type: string
+      maxLength: 64
+    levels:
+      type: array
+      minItems: 1
+      maxItems: 99
+      items:
+        $ref: "#/LevelPolicyRuleInput"
+
+LatestSeedingRewardCalculation:
+  type: object
+  additionalProperties: false
+  required:
+    - window_start
+    - window_end
+    - policy_revision
+    - eligible_torrent_count
+    - curve_reward_milli
+    - linear_reward_milli
+    - base_reward_milli
+    - vip_bonus_milli
+    - medal_bonus_milli
+    - level_bonus_milli
+    - uncapped_reward
+    - reward
+    - experience_amount
+    - capped
+    - calculated_at
+  properties:
+    window_start:
+      type: string
+      format: date-time
+    window_end:
+      type: string
+      format: date-time
+    policy_revision:
+      type: string
+      maxLength: 64
+    eligible_torrent_count:
+      type: integer
+      minimum: 0
+    curve_reward_milli:
+      $ref: "#/UnsignedIntegerText"
+    linear_reward_milli:
+      $ref: "#/UnsignedIntegerText"
+    base_reward_milli:
+      $ref: "#/UnsignedIntegerText"
+    vip_bonus_milli:
+      $ref: "#/UnsignedIntegerText"
+    medal_bonus_milli:
+      $ref: "#/UnsignedIntegerText"
+    level_bonus_milli:
+      $ref: "#/UnsignedIntegerText"
+    uncapped_reward:
+      $ref: "#/UnsignedIntegerText"
+    reward:
+      $ref: "#/UnsignedIntegerText"
+    experience_amount:
+      $ref: "#/ExactExperienceText"
+    capped:
+      type: boolean
+    calculated_at:
+      type: string
+      format: date-time
+
+MemberGiftPolicySettings:
+  type: object
+  additionalProperties: false
+  required:
+    [enabled, minimum_amount, maximum_amount, daily_gross_limit, fee_bps]
+  properties:
+    enabled:
+      type: boolean
+    minimum_amount:
+      $ref: "#/UnsignedIntegerText"
+    maximum_amount:
+      $ref: "#/UnsignedIntegerText"
+    daily_gross_limit:
+      $ref: "#/UnsignedIntegerText"
+    fee_bps:
+      type: integer
+      minimum: 0
+      maximum: 5000
+      description: 手续费基点，100 表示 1%。
+
+MemberGiftPolicy:
+  type: object
+  additionalProperties: false
+  required: [revision, settings, snapshot_sha256, reason, created_at]
+  properties:
+    revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    settings:
+      $ref: "#/MemberGiftPolicySettings"
+    snapshot_sha256:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+    issued_by:
+      type: string
+      format: uuid
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    created_at:
+      type: string
+      format: date-time
+
+MemberGiftPolicyPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/MemberGiftPolicy"
+    total:
+      $ref: "#/UnsignedIntegerText"
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+
+MemberGiftCounterparty:
+  type: object
+  additionalProperties: false
+  required: [numeric_id, username, display_name]
+  properties:
+    numeric_id:
+      $ref: "#/UnsignedIntegerText"
+    username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+MemberGiftRecord:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      id,
+      direction,
+      counterparty,
+      gross_amount,
+      fee_amount,
+      net_amount,
+      message,
+      policy_revision,
+      occurred_at,
+    ]
+  properties:
+    id:
+      type: string
+      format: uuid
+    direction:
+      type: string
+      enum: [sent, received]
+    counterparty:
+      $ref: "#/MemberGiftCounterparty"
+    gross_amount:
+      $ref: "#/UnsignedIntegerText"
+    fee_amount:
+      $ref: "#/UnsignedIntegerText"
+    net_amount:
+      $ref: "#/UnsignedIntegerText"
+    message:
+      type: string
+      maxLength: 200
+    policy_revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    occurred_at:
+      type: string
+      format: date-time
+
+MemberGiftOverview:
+  type: object
+  additionalProperties: false
+  required: [policy, my_numeric_id, outgoing_today, remaining_today, history]
+  properties:
+    policy:
+      $ref: "#/MemberGiftPolicy"
+    my_numeric_id:
+      $ref: "#/UnsignedIntegerText"
+    outgoing_today:
+      $ref: "#/UnsignedIntegerText"
+    remaining_today:
+      $ref: "#/UnsignedIntegerText"
+    history:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/MemberGiftRecord"
+
+CreateMemberGiftRequest:
+  type: object
+  additionalProperties: false
+  required: [recipient_numeric_id, amount, message]
+  properties:
+    recipient_numeric_id:
+      $ref: "#/UnsignedIntegerText"
+    amount:
+      $ref: "#/UnsignedIntegerText"
+    message:
+      type: string
+      maxLength: 200
+
+IssueMemberGiftPolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [settings, reason]
+  properties:
+    settings:
+      $ref: "#/MemberGiftPolicySettings"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+ContentTipPolicySettings:
+  type: object
+  additionalProperties: false
+  required:
+    [enabled, minimum_amount, maximum_amount, daily_gross_limit, fee_bps]
+  properties:
+    enabled: { type: boolean }
+    minimum_amount: { $ref: "#/UnsignedIntegerText" }
+    maximum_amount: { $ref: "#/UnsignedIntegerText" }
+    daily_gross_limit: { $ref: "#/UnsignedIntegerText" }
+    fee_bps:
+      type: integer
+      minimum: 0
+      maximum: 5000
+      description: 手续费基点，100 表示 1%。
+
+ContentTipPolicy:
+  type: object
+  additionalProperties: false
+  required: [revision, settings, snapshot_sha256, reason, created_at]
+  properties:
+    revision: { type: string, pattern: "^[a-z0-9][a-z0-9._-]{0,63}$" }
+    settings: { $ref: "#/ContentTipPolicySettings" }
+    snapshot_sha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+    issued_by: { type: string, format: uuid }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+    created_at: { type: string, format: date-time }
+
+ContentTipPolicyPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/ContentTipPolicy" }
+    total: { $ref: "#/UnsignedIntegerText" }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+ContentTipTarget:
+  type: object
+  additionalProperties: false
+  required: [kind, title]
+  properties:
+    kind: { type: string, enum: [torrent, post, comment] }
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    post_id: { type: string, format: uuid }
+    comment_id: { type: string, format: uuid }
+    title: { type: string, minLength: 1, maxLength: 240 }
+
+ContentTipRecord:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      id,
+      direction,
+      counterparty,
+      target,
+      gross_amount,
+      fee_amount,
+      net_amount,
+      policy_revision,
+      occurred_at,
+    ]
+  properties:
+    id: { type: string, format: uuid }
+    direction: { type: string, enum: [sent, received] }
+    counterparty: { $ref: "#/MemberGiftCounterparty" }
+    target: { $ref: "#/ContentTipTarget" }
+    gross_amount: { $ref: "#/UnsignedIntegerText" }
+    fee_amount: { $ref: "#/UnsignedIntegerText" }
+    net_amount: { $ref: "#/UnsignedIntegerText" }
+    policy_revision: { type: string, pattern: "^[a-z0-9][a-z0-9._-]{0,63}$" }
+    occurred_at: { type: string, format: date-time }
+
+ContentTipOverview:
+  type: object
+  additionalProperties: false
+  required: [policy, outgoing_today, remaining_today, history]
+  properties:
+    policy: { $ref: "#/ContentTipPolicy" }
+    outgoing_today: { $ref: "#/UnsignedIntegerText" }
+    remaining_today: { $ref: "#/UnsignedIntegerText" }
+    history:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/ContentTipRecord" }
+
+CreateContentTipRequest:
+  type: object
+  additionalProperties: false
+  required: [amount]
+  properties:
+    amount: { $ref: "#/UnsignedIntegerText" }
+
+IssueContentTipPolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [settings, reason]
+  properties:
+    settings: { $ref: "#/ContentTipPolicySettings" }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+AttendanceMode:
+  type: string
+  enum: [fixed, random]
+
+AttendanceStreakMilestone:
+  type: object
+  additionalProperties: false
+  required: [days, reward]
+  properties:
+    days:
+      type: integer
+      minimum: 2
+      maximum: 365
+    reward:
+      $ref: "#/UnsignedIntegerText"
+
+AttendancePolicySettings:
+  type: object
+  additionalProperties: false
+  required:
+    - enabled
+    - day_boundary_timezone
+    - fixed_enabled
+    - fixed_reward
+    - random_enabled
+    - random_min
+    - random_max
+    - streak_enabled
+    - streak_milestones
+    - experience_reward
+  properties:
+    enabled:
+      type: boolean
+    day_boundary_timezone:
+      type: string
+      minLength: 1
+      maxLength: 64
+      example: Asia/Shanghai
+    fixed_enabled:
+      type: boolean
+    fixed_reward:
+      $ref: "#/UnsignedIntegerText"
+    random_enabled:
+      type: boolean
+    random_min:
+      $ref: "#/UnsignedIntegerText"
+    random_max:
+      $ref: "#/UnsignedIntegerText"
+    streak_enabled:
+      type: boolean
+    streak_milestones:
+      type: array
+      maxItems: 32
+      items:
+        $ref: "#/AttendanceStreakMilestone"
+    experience_reward:
+      $ref: "#/UnsignedIntegerText"
+
+AttendancePolicy:
+  type: object
+  additionalProperties: false
+  required:
+    - revision
+    - effective_from
+    - created_at
+    - settings
+    - snapshot_sha256
+    - reason
+  properties:
+    revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    effective_from:
+      type: string
+      format: date-time
+    created_at:
+      type: string
+      format: date-time
+    settings:
+      $ref: "#/AttendancePolicySettings"
+    snapshot_sha256:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+    issued_by:
+      type: string
+      format: uuid
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+AttendancePolicyPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset, minimum_effective_from]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/AttendancePolicy"
+    total:
+      $ref: "#/UnsignedIntegerText"
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+    minimum_effective_from:
+      type: string
+      format: date-time
+
+IssueAttendancePolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [settings, reason]
+  properties:
+    settings:
+      $ref: "#/AttendancePolicySettings"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+ClaimAttendanceRequest:
+  type: object
+  additionalProperties: false
+  required: [mode]
+  properties:
+    mode:
+      $ref: "#/AttendanceMode"
+
+AttendanceRecord:
+  type: object
+  additionalProperties: false
+  required:
+    - attendance_date
+    - day_boundary_timezone
+    - mode
+    - base_reward
+    - streak_reward
+    - total_reward
+    - experience_reward
+    - current_streak
+    - total_days
+    - longest_streak
+    - policy_revision
+    - occurred_at
+  properties:
+    attendance_date:
+      type: string
+      format: date
+    day_boundary_timezone:
+      type: string
+      maxLength: 64
+    mode:
+      $ref: "#/AttendanceMode"
+    base_reward:
+      $ref: "#/UnsignedIntegerText"
+    streak_reward:
+      $ref: "#/UnsignedIntegerText"
+    total_reward:
+      $ref: "#/UnsignedIntegerText"
+    experience_reward:
+      $ref: "#/UnsignedIntegerText"
+    current_streak:
+      type: integer
+      minimum: 1
+    total_days:
+      type: integer
+      minimum: 1
+    longest_streak:
+      type: integer
+      minimum: 1
+    policy_revision:
+      type: string
+      maxLength: 64
+    occurred_at:
+      type: string
+      format: date-time
+
+AttendanceOverview:
+  type: object
+  additionalProperties: false
+  required:
+    - claimed_today
+    - today
+    - current_streak
+    - total_days
+    - longest_streak
+    - history
+  properties:
+    policy:
+      $ref: "#/AttendancePolicy"
+    claimed_today:
+      type: boolean
+    today:
+      type: string
+      format: date
+      nullable: true
+    current_streak:
+      type: integer
+      minimum: 0
+    total_days:
+      type: integer
+      minimum: 0
+    longest_streak:
+      type: integer
+      minimum: 0
+    today_record:
+      $ref: "#/AttendanceRecord"
+    history:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/AttendanceRecord"
+
+SeedingRewardPolicyInput:
+  type: object
+  additionalProperties: false
+  required:
+    - revision
+    - formula_version
+    - effective_from
+    - curve_hourly_cap_milli
+    - age_saturation_seconds
+    - seeder_decay
+    - curve_scale_milli
+    - size_multiplier_bps
+    - official_bonus_bps
+    - upload_contribution_bonus_bps
+    - per_torrent_hourly_milli
+    - base_linear_torrent_limit
+    - maximum_level_torrent_bonus
+    - minimum_torrent_bytes
+    - minimum_active_seconds
+    - maximum_snapshot_age_seconds
+    - vip_bonus_bps
+    - maximum_medal_bonus_bps
+    - maximum_level_bonus_bps
+    - maximum_hourly_reward
+    - experience_per_magic_bps
+  properties:
+    revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    formula_version:
+      type: string
+      enum: [nexus-atan-active-v1]
+    effective_from:
+      type: string
+      format: date-time
+    curve_hourly_cap_milli:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 10000000000
+    age_saturation_seconds:
+      type: integer
+      format: int64
+      minimum: 3600
+      maximum: 315360000
+    seeder_decay:
+      type: integer
+      minimum: 2
+      maximum: 1000
+    curve_scale_milli:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 10000000000000
+    size_multiplier_bps:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 100000
+    official_bonus_bps:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 100000
+    upload_contribution_bonus_bps:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 100000
+    per_torrent_hourly_milli:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 10000000000
+    base_linear_torrent_limit:
+      type: integer
+      minimum: 0
+      maximum: 100000
+    maximum_level_torrent_bonus:
+      type: integer
+      minimum: 0
+      maximum: 100000
+    minimum_torrent_bytes:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1152921504606846976
+    minimum_active_seconds:
+      type: integer
+      minimum: 1
+      maximum: 3600
+    maximum_snapshot_age_seconds:
+      type: integer
+      minimum: 1
+      maximum: 86400
+    vip_bonus_bps:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 100000
+    maximum_medal_bonus_bps:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 100000
+    maximum_level_bonus_bps:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 100000
+    maximum_hourly_reward:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 1000000000
+    experience_per_magic_bps:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 100000
+
+SeedingRewardPolicy:
+  allOf:
+    - $ref: "#/SeedingRewardPolicyInput"
+    - type: object
+      additionalProperties: false
+      required: [snapshot_sha256, reason, created_at]
+      properties:
+        snapshot_sha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        issued_by:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        created_at:
+          type: string
+          format: date-time
+
+ContributionExperiencePolicyInput:
+  type: object
+  additionalProperties: false
+  required:
+    - revision
+    - effective_from
+    - experience_per_upload_gib_milli
+    - experience_per_torrent_milli
+    - experience_per_account_day_milli
+  properties:
+    revision:
+      type: string
+      maxLength: 55
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    effective_from:
+      type: string
+      format: date-time
+    experience_per_upload_gib_milli:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000000
+      description: 实际上传每 1 GiB 获取的经验值，按千分之一经验存储。
+    experience_per_torrent_milli:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000000
+      description: 每发布一个种子获取的经验值，按千分之一经验存储。
+    experience_per_account_day_milli:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000000
+      description: 账号每注册满一天获取的经验值，按千分之一经验存储。
+
+ContributionExperiencePolicy:
+  allOf:
+    - $ref: "#/ContributionExperiencePolicyInput"
+    - type: object
+      additionalProperties: false
+      required: [snapshot_sha256, reason, created_at]
+      properties:
+        snapshot_sha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        issued_by:
+          type: string
+          format: uuid
+          description: 为空表示由数据库迁移签发的系统首版基线。
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        created_at:
+          type: string
+          format: date-time
+
+ContributionExperiencePolicyPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset, minimum_effective_from]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/ContributionExperiencePolicy"
+    total:
+      $ref: "#/UnsignedIntegerText"
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+    minimum_effective_from:
+      type: string
+      format: date-time
+
+IssueContributionExperiencePolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [policy, reason]
+  properties:
+    policy:
+      $ref: "#/ContributionExperiencePolicyInput"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+SeedingRewardPolicyPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset, minimum_effective_from]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/SeedingRewardPolicy"
+    total:
+      $ref: "#/UnsignedIntegerText"
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+    minimum_effective_from:
+      type: string
+      format: date-time
+
+IssueSeedingRewardPolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [policy, reason]
+  properties:
+    policy:
+      $ref: "#/SeedingRewardPolicyInput"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+SeedingRewardPolicyPreviewResult:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      name,
+      description,
+      eligible_torrent_count,
+      reward,
+      experience_amount,
+      capped,
+    ]
+  properties:
+    name:
+      type: string
+      maxLength: 32
+    description:
+      type: string
+      maxLength: 160
+    eligible_torrent_count:
+      type: integer
+      minimum: 0
+    reward:
+      $ref: "#/UnsignedIntegerText"
+    experience_amount:
+      $ref: "#/ExactExperienceText"
+    capped:
+      type: boolean
+
+SeedingRewardPolicyPreview:
+  type: object
+  additionalProperties: false
+  required: [policy_sha256, results]
+  properties:
+    policy_sha256:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+    results:
+      type: array
+      minItems: 4
+      maxItems: 4
+      items:
+        $ref: "#/SeedingRewardPolicyPreviewResult"
+
+LevelDefinition:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      level,
+      minimum_experience,
+      karma_bonus_bps,
+      seeding_count_bonus,
+      current_user_count,
+    ]
+  properties:
+    level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    minimum_experience:
+      $ref: "#/ExactExperienceText"
+    karma_bonus_bps:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 10000
+    seeding_count_bonus:
+      type: integer
+      minimum: 0
+      maximum: 1000
+    current_user_count:
+      $ref: "#/UnsignedIntegerText"
+
+LevelPolicy:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      policy_version,
+      sequence,
+      effective_at,
+      activation_status,
+      user_count,
+      affected_user_count,
+      changed_level_count,
+      reason,
+      created_at,
+      levels,
+    ]
+  properties:
+    policy_version:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    sequence:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    effective_at:
+      type: string
+      format: date-time
+    activation_status:
+      type: string
+      enum: [scheduled, applied]
+    applied_at:
+      type: string
+      format: date-time
+      nullable: true
+    user_count:
+      $ref: "#/UnsignedIntegerText"
+    affected_user_count:
+      $ref: "#/UnsignedIntegerText"
+    changed_level_count:
+      $ref: "#/UnsignedIntegerText"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    created_at:
+      type: string
+      format: date-time
+    levels:
+      type: array
+      minItems: 2
+      maxItems: 99
+      items:
+        $ref: "#/LevelDefinition"
+
+LevelPolicyList:
+  type: object
+  additionalProperties: false
+  required: [items, minimum_effective_at]
+  properties:
+    items:
+      type: array
+      maxItems: 32
+      items:
+        $ref: "#/LevelPolicy"
+    minimum_effective_at:
+      type: string
+      format: date-time
+
+LevelPolicyRuleInput:
+  type: object
+  additionalProperties: false
+  required: [level, minimum_experience, karma_bonus_bps, seeding_count_bonus]
+  properties:
+    level:
+      type: integer
+      minimum: 1
+      maximum: 99
+    minimum_experience:
+      $ref: "#/UnsignedIntegerText"
+    karma_bonus_bps:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 10000
+    seeding_count_bonus:
+      type: integer
+      minimum: 0
+      maximum: 1000
+
+IssueLevelPolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_sequence, effective_at, levels, reason]
+  properties:
+    expected_sequence:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    effective_at:
+      type: string
+      format: date-time
+    levels:
+      type: array
+      minItems: 2
+      maxItems: 99
+      items:
+        $ref: "#/LevelPolicyRuleInput"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+MedalAcquisitionMethod:
+  type: string
+  enum: [purchase, grant, sponsor, workgroup, developer]
+
+MemberMedalHolding:
+  type: object
+  additionalProperties: false
+  required: [id, state, priority, acquired_at, version]
+  properties:
+    id: { $ref: "#/UnsignedIntegerText" }
+    state: { type: string, enum: [owned, wearing] }
+    priority: { type: integer, format: int64 }
+    expires_at: { type: string, format: date-time, nullable: true }
+    acquired_at: { type: string, format: date-time }
+    version: { type: integer, format: int64, minimum: 1 }
+
+MemberMedal:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      id,
+      name,
+      acquisition_method,
+      price,
+      duration_days,
+      upload_bonus_bps,
+      download_discount_bps,
+      magic_bonus_bps,
+      invite_bonus,
+      is_workgroup,
+      purchasable,
+    ]
+  properties:
+    id: { $ref: "#/UnsignedIntegerText" }
+    name: { type: string, minLength: 1, maxLength: 100 }
+    description: { type: string, nullable: true, maxLength: 500 }
+    image_large_path: { type: string, nullable: true, maxLength: 2048 }
+    image_small_path: { type: string, nullable: true, maxLength: 2048 }
+    acquisition_method: { $ref: "#/MedalAcquisitionMethod" }
+    price: { $ref: "#/UnsignedIntegerText" }
+    duration_days: { type: integer, format: int64, minimum: 0, maximum: 36500 }
+    upload_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    download_discount_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    magic_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    invite_bonus: { $ref: "#/UnsignedIntegerText" }
+    is_workgroup: { type: boolean }
+    sale_begin_at: { type: string, format: date-time, nullable: true }
+    sale_end_at: { type: string, format: date-time, nullable: true }
+    inventory:
+      type: string
+      nullable: true
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+    holding:
+      type: object
+      allOf: [{ $ref: "#/MemberMedalHolding" }]
+      nullable: true
+    purchasable: { type: boolean }
+    purchase_unavailable_reason:
+      { type: string, nullable: true, maxLength: 100 }
+
+MemberMedalBenefitSummary:
+  type: object
+  additionalProperties: false
+  required:
+    [upload_bonus_bps, download_discount_bps, magic_bonus_bps, invite_bonus]
+  properties:
+    upload_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    download_discount_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    magic_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    invite_bonus: { $ref: "#/UnsignedIntegerText" }
+
+MemberMedalOverview:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      settings,
+      magic_balance,
+      benefits,
+      owned_count,
+      wearing_count,
+      shop_count,
+      items,
+    ]
+  properties:
+    settings: { $ref: "#/MedalSettings" }
+    magic_balance: { $ref: "#/UnsignedIntegerText" }
+    benefits: { $ref: "#/MemberMedalBenefitSummary" }
+    owned_count: { $ref: "#/UnsignedIntegerText" }
+    wearing_count: { $ref: "#/UnsignedIntegerText" }
+    shop_count: { $ref: "#/UnsignedIntegerText" }
+    items:
+      type: array
+      maxItems: 1000
+      items: { $ref: "#/MemberMedal" }
+
+MemberMedalPurchaseReceipt:
+  type: object
+  additionalProperties: false
+  required:
+    [id, medal_id, user_medal_id, price, balance_after, purchased_at, replayed]
+  properties:
+    id: { type: string, format: uuid }
+    medal_id: { $ref: "#/UnsignedIntegerText" }
+    user_medal_id: { $ref: "#/UnsignedIntegerText" }
+    price: { $ref: "#/UnsignedIntegerText" }
+    balance_after: { $ref: "#/UnsignedIntegerText" }
+    magic_transaction_id: { type: string, format: uuid, nullable: true }
+    purchased_at: { type: string, format: date-time }
+    replayed: { type: boolean }
+
+MemberMedalWearingRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, wearing]
+  properties:
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    wearing: { type: boolean }
+
+MemberMedalPriorityRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, direction]
+  properties:
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    direction: { type: string, enum: [up, down] }
+
+MedalDefinition:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      id,
+      name,
+      acquisition_method,
+      price,
+      duration_days,
+      display_on_page,
+      priority,
+      upload_bonus_bps,
+      download_discount_bps,
+      magic_bonus_bps,
+      invite_bonus,
+      is_workgroup,
+      pool_eligible,
+      periodic_reward_magic,
+      conditions_count,
+      privileges_count,
+      version,
+      holder_count,
+      active_holder_count,
+      wearing_count,
+      created_at,
+      updated_at,
+    ]
+  properties:
+    id: { $ref: "#/UnsignedIntegerText" }
+    name: { type: string, minLength: 1, maxLength: 100 }
+    description: { type: string, nullable: true, maxLength: 500 }
+    image_large_path: { type: string, nullable: true, maxLength: 2048 }
+    image_small_path: { type: string, nullable: true, maxLength: 2048 }
+    acquisition_method: { $ref: "#/MedalAcquisitionMethod" }
+    price: { $ref: "#/UnsignedIntegerText" }
+    duration_days: { type: integer, format: int64, minimum: 0, maximum: 36500 }
+    display_on_page: { type: boolean }
+    priority: { type: integer, format: int64, minimum: 0, maximum: 1000000 }
+    upload_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    download_discount_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    magic_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    invite_bonus: { $ref: "#/UnsignedIntegerText" }
+    is_workgroup: { type: boolean }
+    pool_eligible: { type: boolean }
+    periodic_reward_magic: { $ref: "#/UnsignedIntegerText" }
+    reward_cycle:
+      type: string
+      nullable: true
+      enum: [daily, weekly, monthly]
+    sale_begin_at: { type: string, format: date-time, nullable: true }
+    sale_end_at: { type: string, format: date-time, nullable: true }
+    inventory:
+      type: string
+      nullable: true
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+    conditions_count: { $ref: "#/UnsignedIntegerText" }
+    privileges_count: { $ref: "#/UnsignedIntegerText" }
+    version: { type: integer, format: int64, minimum: 1 }
+    holder_count: { $ref: "#/UnsignedIntegerText" }
+    active_holder_count: { $ref: "#/UnsignedIntegerText" }
+    wearing_count: { $ref: "#/UnsignedIntegerText" }
+    created_at: { type: string, format: date-time }
+    updated_at: { type: string, format: date-time }
+
+MedalSettings:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      enabled,
+      maximum_wear_count,
+      maximum_upload_bonus_bps,
+      maximum_download_discount_bps,
+      maximum_magic_bonus_bps,
+      maximum_invite_bonus,
+      condition_check_day,
+      condition_warning_days,
+      version,
+      updated_at,
+    ]
+  properties:
+    enabled: { type: boolean }
+    maximum_wear_count:
+      { type: integer, format: int64, minimum: 0, maximum: 100 }
+    maximum_upload_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    maximum_download_discount_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    maximum_magic_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    maximum_invite_bonus: { $ref: "#/UnsignedIntegerText" }
+    condition_check_day:
+      { type: integer, format: int64, minimum: 1, maximum: 28 }
+    condition_warning_days:
+      { type: integer, format: int64, minimum: 0, maximum: 365 }
+    version: { type: integer, format: int64, minimum: 1 }
+    updated_at: { type: string, format: date-time }
+
+MedalSettingsWriteRequest:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      enabled,
+      maximum_wear_count,
+      maximum_upload_bonus_bps,
+      maximum_download_discount_bps,
+      maximum_magic_bonus_bps,
+      maximum_invite_bonus,
+      expected_version,
+      reason,
+    ]
+  properties:
+    enabled: { type: boolean }
+    maximum_wear_count:
+      { type: integer, format: int64, minimum: 0, maximum: 100 }
+    maximum_upload_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    maximum_download_discount_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    maximum_magic_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    maximum_invite_bonus: { $ref: "#/UnsignedIntegerText" }
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    reason: { type: string, minLength: 10, maxLength: 500 }
+
+MedalDefinitionOverview:
+  type: object
+  additionalProperties: false
+  required: [settings, items, total]
+  properties:
+    settings: { $ref: "#/MedalSettings" }
+    items:
+      type: array
+      maxItems: 1000
+      items: { $ref: "#/MedalDefinition" }
+    total: { $ref: "#/UnsignedIntegerText" }
+
+MedalDefinitionWriteRequest:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      name,
+      acquisition_method,
+      price,
+      duration_days,
+      display_on_page,
+      priority,
+      upload_bonus_bps,
+      download_discount_bps,
+      magic_bonus_bps,
+      invite_bonus,
+      pool_eligible,
+      periodic_reward_magic,
+      reason,
+    ]
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      description: 更新时必填；创建时省略。
+    name: { type: string, minLength: 1, maxLength: 100 }
+    description: { type: string, nullable: true, maxLength: 500 }
+    image_large_path: { type: string, nullable: true, maxLength: 2048 }
+    image_small_path: { type: string, nullable: true, maxLength: 2048 }
+    acquisition_method: { $ref: "#/MedalAcquisitionMethod" }
+    price: { $ref: "#/UnsignedIntegerText" }
+    duration_days: { type: integer, format: int64, minimum: 0, maximum: 36500 }
+    display_on_page: { type: boolean }
+    priority: { type: integer, format: int64, minimum: 0, maximum: 1000000 }
+    upload_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    download_discount_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    magic_bonus_bps:
+      { type: integer, format: int64, minimum: 0, maximum: 100000 }
+    invite_bonus: { $ref: "#/UnsignedIntegerText" }
+    pool_eligible: { type: boolean }
+    periodic_reward_magic: { $ref: "#/UnsignedIntegerText" }
+    reward_cycle:
+      type: string
+      nullable: true
+      enum: [daily, weekly, monthly]
+    sale_begin_at: { type: string, format: date-time, nullable: true }
+    sale_end_at: { type: string, format: date-time, nullable: true }
+    inventory:
+      type: string
+      nullable: true
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+    reason: { type: string, minLength: 10, maxLength: 500 }

@@ -1,0 +1,570 @@
+GroupKindPathParameter:
+  name: group_kind
+  in: path
+  required: true
+  schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupKind" }
+
+ApplicationIDPathParameter:
+  name: application_id
+  in: path
+  required: true
+  schema: { type: string, format: uuid }
+
+MembershipIDPathParameter:
+  name: membership_id
+  in: path
+  required: true
+  schema: { type: string, format: uuid }
+
+TaskIDPathParameter:
+  name: task_id
+  in: path
+  required: true
+  schema: { type: string, format: uuid }
+
+AssignmentIDPathParameter:
+  name: assignment_id
+  in: path
+  required: true
+  schema: { type: string, format: uuid }
+
+SubmissionIDPathParameter:
+  name: submission_id
+  in: path
+  required: true
+  schema: { type: string, format: uuid }
+
+MyWorkgroupsPath:
+  get:
+    operationId: getMyWorkgroups
+    summary: 查看自己的工作组成员资格、申请状态与种审申请条件
+    tags: [workgroups]
+    x-audience: [web]
+    x-owner: core-workgroups
+    x-permission: workgroup.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 三类固定工作组的当前个人视图。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/MyWorkgroupOverview" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyWorkgroupApplicationsPath:
+  post:
+    operationId: createMyWorkgroupApplication
+    summary: 申请加入允许成员自助申请的工作组
+    tags: [workgroups]
+    x-audience: [web]
+    x-owner: core-workgroups
+    x-permission: workgroup.application.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/CreateWorkgroupApplicationRequest" }
+    responses:
+      "201":
+        description: 申请与当时的准入资格快照已经原子记录。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupApplication" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyWorkgroupContributionCyclesPath:
+  get:
+    operationId: listMyWorkgroupContributionCycles
+    summary: 查看自己的工作组月度贡献历史与证据状态
+    tags: [workgroups]
+    x-audience: [web]
+    x-owner: core-workgroups
+    x-permission: workgroup.read.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 24, default: 6 }
+    responses:
+      "200":
+        description: 返回按不可变成员时间线和业务证据重建的月度历史。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupContributionCyclePage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyWorkgroupTasksPath:
+  get:
+    operationId: listMyWorkgroupTasks
+    summary: 查看发布时分配给自己的工作组任务与活动
+    tags: [workgroups]
+    x-audience: [web]
+    x-owner: core-workgroups
+    x-permission: workgroup.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 返回冻结成员快照中的本人任务及最新提交状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupTaskAssignmentPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyWorkgroupTaskSubmissionsPath:
+  post:
+    operationId: submitMyWorkgroupTask
+    summary: 提交或在被要求修改后重新提交自己的工作组任务成果
+    tags: [workgroups]
+    x-audience: [web]
+    x-owner: core-workgroups
+    x-permission: workgroup.task.submit.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/AssignmentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/SubmitWorkgroupTaskRequest" }
+    responses:
+      "201":
+        description: 新的不可变成果提交已追加并等待人工验收。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupTaskAssignment" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupsPath:
+  get:
+    operationId: getAdminWorkgroups
+    summary: 查看工作组定义与待处理数量
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 工作组管理概览。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/AdminWorkgroupOverview" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupTasksPath:
+  get:
+    operationId: listAdminWorkgroupTasks
+    summary: 查看指定工作组已经发布的任务与活动
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 返回发布记录和冻结成员完成汇总。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupTaskPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: publishAdminWorkgroupTask
+    summary: 向指定工作组发布任务或活动并冻结当前有效成员名单
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.task.publish
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/PublishWorkgroupTaskRequest" }
+    responses:
+      "201":
+        description: 发布记录与全部成员分配快照已经原子提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupTask" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupTaskAssignmentsPath:
+  get:
+    operationId: listAdminWorkgroupTaskAssignments
+    summary: 查看任务发布时冻结的成员名单与最新提交状态
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "#/TaskIDPathParameter"
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 成员分配按待验收优先排序。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupTaskAssignmentPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupTaskSubmissionDecisionPath:
+  post:
+    operationId: reviewAdminWorkgroupTaskSubmission
+    summary: 人工通过或要求修改一份工作组任务成果
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.task.review
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/SubmissionIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/ReviewWorkgroupTaskSubmissionRequest" }
+    responses:
+      "200":
+        description: 不可变人工验收决定已经记录。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupTaskAssignment" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupApplicationsPath:
+  get:
+    operationId: listAdminWorkgroupApplications
+    summary: 分页查看工作组申请
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: status
+        in: query
+        schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupApplicationStatus" }
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 工作组申请分页。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupApplicationPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupApplicationDecisionPath:
+  post:
+    operationId: decideAdminWorkgroupApplication
+    summary: 批准或驳回一个工作组申请
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.application.decide
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/ApplicationIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/DecideWorkgroupApplicationRequest" }
+    responses:
+      "200":
+        description: 申请决定已记录；批准时成员资格在同一事务生效。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupApplication" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupContributionPoliciesPath:
+  get:
+    operationId: listAdminWorkgroupContributionPolicies
+    summary: 查询指定工作组的贡献目标时间线
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 返回当前、已排期和历史不可变贡献目标，不返回管理员身份。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupContributionPolicyPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: issueAdminWorkgroupContributionPolicy
+    summary: 签发未来自然月生效的工作组贡献目标
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.contribution.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/IssueWorkgroupContributionPolicyRequest" }
+    responses:
+      "201":
+        description: 新目标已追加到不可变时间线；现有月份和既有贡献证据不会被改写。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupContributionPolicyRevision" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupMembershipsPath:
+  get:
+    operationId: listAdminWorkgroupMemberships
+    summary: 分页查看指定工作组成员
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - name: status
+        in: query
+        schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupMembershipStatus" }
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 指定工作组的成员分页。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupMembershipPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: grantAdminWorkgroupMembership
+    summary: 按后台数字用户 ID 授予或恢复工作组成员资格
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.membership.manage
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/GrantWorkgroupMembershipRequest" }
+    responses:
+      "201":
+        description: 成员资格和不可变加入或恢复记录已经提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupMembership" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupMembershipTransitionPath:
+  post:
+    operationId: changeAdminWorkgroupMembership
+    summary: 暂停、恢复或结束一个工作组成员资格
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.membership.manage
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "#/MembershipIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/ChangeWorkgroupMembershipRequest" }
+    responses:
+      "200":
+        description: 成员资格投影与不可变状态转换已经提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupMembership" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AdminWorkgroupMembershipContributionCyclesPath:
+  get:
+    operationId: listAdminWorkgroupMembershipContributionCycles
+    summary: 查看指定工作组成员的月度贡献历史与证据状态
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "#/MembershipIDPathParameter"
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 24, default: 12 }
+    responses:
+      "200":
+        description: 返回用于解释而非自动处分的成员月度贡献历史。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupContributionCyclePage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: issueAdminWorkgroupContributionReminder
+    summary: 依据指定贡献周期快照向工作组成员发送人工提醒
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.contribution.reminder.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "#/MembershipIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/IssueWorkgroupContributionReminderRequest" }
+    responses:
+      "201":
+        description: 不可变提醒快照和成员站内消息已在同一事务中写入。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupContributionReminder" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

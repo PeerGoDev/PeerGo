@@ -1,0 +1,106 @@
+HNRPolicyRevisionsPath:
+  get:
+    operationId: listHNRPolicyRevisions
+    summary: 查询 Core 签发的不可变 H&R 政策及 Settlement 投递状态
+    tags: [hnr]
+    x-audience: [staff]
+    x-owner: core-hnr-control
+    x-permission: hnr.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 仅返回后台控制面时间线，不包含用户义务或 Tracker 证据。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/hnr.yaml#/HNRPolicyRevisionPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: issueHNRPolicyRevision
+    summary: 签发未来生效的全站 H&R 政策
+    tags: [hnr]
+    x-audience: [staff]
+    x-owner: core-hnr-control
+    x-permission: hnr.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/hnr.yaml#/IssueHNRPolicyRequest"
+    responses:
+      "201":
+        description: 政策、审计事件和 Settlement 投递命令已在 Core 原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/hnr.yaml#/HNRPolicyRevision"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+HNRPolicyPreviewPath:
+  post:
+    operationId: previewHNRPolicy
+    summary: 用一个完成下载时刻预览 H&R 截止时间
+    tags: [hnr]
+    x-audience: [staff]
+    x-owner: core-hnr-control
+    x-permission: hnr.policy.read
+    x-credential-audience: staff-session
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/hnr.yaml#/HNRPolicyInput"
+    responses:
+      "200":
+        description: 只执行纯计算，不写入政策、义务或账本。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/hnr.yaml#/HNRPolicyPreview"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"

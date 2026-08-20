@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peergo.dev/contracts/events/tracker-announce/v1/announce.schema.json",
+  "title": "PeerGo Tracker announce event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "received_at",
+    "user_id",
+    "torrent_id",
+    "info_hash_v1",
+    "session_token",
+    "address_family",
+    "event",
+    "uploaded",
+    "downloaded",
+    "left",
+    "credential_version",
+    "torrent_control_sequence",
+    "subject_control_sequence"
+  ],
+  "properties": {
+    "schema_version": { "const": "tracker.announce.v1" },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "received_at": { "type": "string", "format": "date-time" },
+    "user_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "torrent_id": { "type": "integer", "minimum": 1 },
+    "info_hash_v1": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "session_token": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "address_family": { "enum": [4, 6] },
+    "event": { "enum": ["", "started", "stopped", "completed"] },
+    "uploaded": { "type": "integer", "minimum": 0 },
+    "downloaded": { "type": "integer", "minimum": 0 },
+    "left": { "type": "integer", "minimum": 0 },
+    "credential_version": { "type": "integer", "minimum": 1 },
+    "torrent_control_sequence": { "type": "integer", "minimum": 1 },
+    "subject_control_sequence": { "type": "integer", "minimum": 1 }
+  }
+}

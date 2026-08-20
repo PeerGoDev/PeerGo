@@ -1,0 +1,207 @@
+RSSPriceFilter:
+  type: string
+  enum: [all, free, paid]
+
+RSSPromotionFilter:
+  type: string
+  enum:
+    - free
+    - double_upload
+    - double_upload_free
+    - half_download
+    - double_upload_half_download
+    - thirty_percent_download
+
+RSSSubscription:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - name
+    - enabled
+    - token_version
+    - category_ids
+    - promotion_filters
+    - price_filter
+    - bookmarked_only
+    - item_limit
+    - include_category
+    - include_subtitle
+    - include_size
+    - include_promotion
+    - version
+    - created_at
+    - updated_at
+  properties:
+    id: { type: string, format: uuid }
+    name: { type: string, minLength: 1, maxLength: 80 }
+    enabled: { type: boolean }
+    token_version: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    category_ids:
+      type: array
+      maxItems: 20
+      uniqueItems: true
+      items: { type: string, minLength: 1, maxLength: 64 }
+    promotion_filters:
+      type: array
+      maxItems: 6
+      uniqueItems: true
+      items: { $ref: "#/RSSPromotionFilter" }
+    price_filter: { $ref: "#/RSSPriceFilter" }
+    bookmarked_only: { type: boolean }
+    item_limit: { type: integer, minimum: 1, maximum: 50 }
+    include_category: { type: boolean }
+    include_subtitle: { type: boolean }
+    include_size: { type: boolean }
+    include_promotion: { type: boolean }
+    version: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    created_at: { type: string, format: date-time }
+    updated_at: { type: string, format: date-time }
+
+RSSSubscriptionList:
+  type: object
+  additionalProperties: false
+  required: [items]
+  properties:
+    items:
+      type: array
+      items: { $ref: "#/RSSSubscription" }
+
+RSSSubscriptionInput:
+  type: object
+  additionalProperties: false
+  required:
+    - name
+    - enabled
+    - category_ids
+    - promotion_filters
+    - price_filter
+    - bookmarked_only
+    - item_limit
+    - include_category
+    - include_subtitle
+    - include_size
+    - include_promotion
+  properties:
+    name: { type: string, minLength: 1, maxLength: 80 }
+    enabled: { type: boolean }
+    category_ids:
+      type: array
+      maxItems: 20
+      uniqueItems: true
+      items: { type: string, minLength: 1, maxLength: 64 }
+    promotion_filters:
+      type: array
+      maxItems: 6
+      uniqueItems: true
+      items: { $ref: "#/RSSPromotionFilter" }
+    price_filter: { $ref: "#/RSSPriceFilter" }
+    bookmarked_only: { type: boolean }
+    item_limit: { type: integer, minimum: 1, maximum: 50 }
+    include_category: { type: boolean }
+    include_subtitle: { type: boolean }
+    include_size: { type: boolean }
+    include_promotion: { type: boolean }
+
+UpdateRSSSubscriptionRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - name
+    - enabled
+    - category_ids
+    - promotion_filters
+    - price_filter
+    - bookmarked_only
+    - item_limit
+    - include_category
+    - include_subtitle
+    - include_size
+    - include_promotion
+    - expected_version
+  properties:
+    name: { type: string, minLength: 1, maxLength: 80 }
+    enabled: { type: boolean }
+    category_ids:
+      type: array
+      maxItems: 20
+      uniqueItems: true
+      items: { type: string, minLength: 1, maxLength: 64 }
+    promotion_filters:
+      type: array
+      maxItems: 6
+      uniqueItems: true
+      items: { $ref: "#/RSSPromotionFilter" }
+    price_filter: { $ref: "#/RSSPriceFilter" }
+    bookmarked_only: { type: boolean }
+    item_limit: { type: integer, minimum: 1, maximum: 50 }
+    include_category: { type: boolean }
+    include_subtitle: { type: boolean }
+    include_size: { type: boolean }
+    include_promotion: { type: boolean }
+    expected_version: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+
+RSSSubscriptionVersionRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version]
+  properties:
+    expected_version: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+
+IssuedRSSSubscription:
+  type: object
+  additionalProperties: false
+  required: [subscription, token, feed_url]
+  properties:
+    subscription: { $ref: "#/RSSSubscription" }
+    token:
+      type: string
+      minLength: 43
+      maxLength: 43
+      description: 仅在创建或轮换成功响应中出现一次的高熵令牌。
+    feed_url:
+      type: string
+      format: uri
+      description: 含令牌的私密地址；不得进入日志、分析或引用来源。
+
+RSSSettings:
+  type: object
+  additionalProperties: false
+  required:
+    - enabled
+    - cache_ttl_seconds
+    - max_items_per_feed
+    - max_subscriptions_per_user
+    - requests_per_minute
+    - version
+    - effective_at
+    - updated_at
+  properties:
+    enabled: { type: boolean }
+    cache_ttl_seconds: { type: integer, minimum: 60, maximum: 900 }
+    max_items_per_feed: { type: integer, minimum: 1, maximum: 50 }
+    max_subscriptions_per_user: { type: integer, minimum: 1, maximum: 20 }
+    requests_per_minute: { type: integer, minimum: 1, maximum: 120 }
+    version: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    effective_at: { type: string, format: date-time }
+    updated_at: { type: string, format: date-time }
+
+UpdateRSSSettingsRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - enabled
+    - cache_ttl_seconds
+    - max_items_per_feed
+    - max_subscriptions_per_user
+    - requests_per_minute
+    - expected_version
+    - reason
+  properties:
+    enabled: { type: boolean }
+    cache_ttl_seconds: { type: integer, minimum: 60, maximum: 900 }
+    max_items_per_feed: { type: integer, minimum: 1, maximum: 50 }
+    max_subscriptions_per_user: { type: integer, minimum: 1, maximum: 20 }
+    requests_per_minute: { type: integer, minimum: 1, maximum: 120 }
+    expected_version: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    reason: { type: string, minLength: 10, maxLength: 500 }

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v1/account-restriction-recorded.schema.json",
+  "title": "Account restriction recorded v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "restriction_id",
+    "transition",
+    "actor_pseudonym",
+    "target_pseudonym",
+    "pseudonym_key_epoch",
+    "command_reason_code",
+    "reason_sha256",
+    "expected_user_version",
+    "resulting_user_version",
+    "resulting_restriction_version",
+    "after_sha256",
+    "decision_id",
+    "policy_version",
+    "authority"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_type": { "const": "identity.account-restriction.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "restriction_id": { "type": "string", "format": "uuid" },
+    "transition": { "enum": ["created", "revoked"] },
+    "actor_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "target_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pseudonym_key_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "command_reason_code": {
+      "enum": ["manual_review", "security_incident", "review_completed", "restriction_no_longer_needed"]
+    },
+    "reason_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "expected_user_version": { "type": "integer", "minimum": 1 },
+    "resulting_user_version": { "type": "integer", "minimum": 2 },
+    "expected_restriction_version": { "type": "integer", "minimum": 1 },
+    "resulting_restriction_version": { "type": "integer", "minimum": 1 },
+    "before_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "after_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "decision_id": { "type": "string", "format": "uuid" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "grant_id", "grant_version", "mandate_id", "effective_until"],
+      "properties": {
+        "role_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "grant_id": { "type": "string", "format": "uuid" },
+        "grant_version": { "type": "integer", "minimum": 1 },
+        "mandate_id": { "type": "string", "format": "uuid" },
+        "effective_until": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "transition": { "const": "revoked" } }, "required": ["transition"] },
+      "then": { "required": ["expected_restriction_version", "before_sha256"] },
+      "else": {
+        "allOf": [
+          { "not": { "required": ["expected_restriction_version"] } },
+          { "not": { "required": ["before_sha256"] } }
+        ]
+      }
+    }
+  ]
+}

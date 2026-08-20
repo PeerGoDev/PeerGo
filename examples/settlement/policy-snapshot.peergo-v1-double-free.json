@@ -1,0 +1,1 @@
+{"revision":{"source":"policy_revision","id":"development-double-free-policy","version":1},"profile":"peergo-v1","promotion":{"profile":"peergo-v1","factors":{"upload":20000,"download":0},"matches":[{"rule":{"source":"torrent_promotion","id":"development-double-free-corpus","version":1},"promotion":"double_upload_free","factors":{"upload":20000,"download":0}}]},"benefits":{}}

@@ -1,0 +1,11 @@
+node_modules/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.pnpm-store/
+.react-router/
+app/generated/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock

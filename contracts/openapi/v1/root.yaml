@@ -1,0 +1,900 @@
+openapi: 3.0.3
+info:
+  title: PeerGo Core API
+  version: 0.1.0
+  description: >-
+    PeerGo 的同源 JSON API。该契约是 Go transport 与第一方 Web client
+    的唯一 HTTP 类型来源；生成文件不得手工修改。
+servers:
+  - url: /
+paths:
+  /api/v1/registrations:
+    $ref: "./domains/identity.yaml#/RegistrationsPath"
+  /api/v1/email-verifications:
+    $ref: "./domains/identity.yaml#/EmailVerificationsPath"
+  /api/v1/email-verifications/confirm:
+    $ref: "./domains/identity.yaml#/EmailVerificationConfirmationPath"
+  /api/v1/password-recovery-requests:
+    $ref: "./domains/identity.yaml#/PasswordRecoveryRequestsPath"
+  /api/v1/password-recoveries/confirm:
+    $ref: "./domains/identity.yaml#/PasswordRecoveryConfirmationPath"
+  /api/v1/session:
+    $ref: "./domains/identity.yaml#/SessionPath"
+  /api/v1/me/profile:
+    $ref: "./domains/identity.yaml#/AccountProfilePath"
+  /api/v1/me/invitations:
+    $ref: "./domains/identity.yaml#/MyInvitationsPath"
+  /api/v1/me/invitations/{invitation_id}/revocation:
+    $ref: "./domains/identity.yaml#/MyInvitationRevocationPath"
+  /api/v1/me/avatar:
+    $ref: "./domains/identity.yaml#/MyAvatarPath"
+  /api/v1/users/{username}:
+    $ref: "./domains/identity.yaml#/PublicUserProfilePath"
+  /api/v1/users/{username}/avatar:
+    $ref: "./domains/identity.yaml#/PublicUserAvatarPath"
+  /api/v1/me/security:
+    $ref: "./domains/identity.yaml#/AccountSecurityPath"
+  /api/v1/me/download-restriction:
+    $ref: "./domains/identity.yaml#/MyDownloadRestrictionPath"
+  /api/v1/me/download-restriction/appeals:
+    $ref: "./domains/identity.yaml#/MyDownloadRestrictionAppealsPath"
+  /api/v1/me/totp:
+    $ref: "./domains/identity.yaml#/MyTOTPPath"
+  /api/v1/me/totp/enrollments:
+    $ref: "./domains/identity.yaml#/MyTOTPEnrollmentsPath"
+  /api/v1/me/totp/enrollments/{enrollment_id}/confirm:
+    $ref: "./domains/identity.yaml#/MyTOTPEnrollmentConfirmationPath"
+  /api/v1/me/totp/recovery-code-rotations:
+    $ref: "./domains/identity.yaml#/MyTOTPRecoveryCodeRotationsPath"
+  /api/v1/me/sessions:
+    $ref: "./domains/identity.yaml#/MySessionsPath"
+  /api/v1/me/sessions/{session_id}:
+    $ref: "./domains/identity.yaml#/MySessionPath"
+  /api/v1/staff/elevation/options:
+    $ref: "./domains/identity.yaml#/StaffElevationOptionsPath"
+  /api/v1/staff/elevation:
+    $ref: "./domains/identity.yaml#/StaffElevationPath"
+  /api/v1/staff/enrollment/options:
+    $ref: "./domains/identity.yaml#/StaffEnrollmentOptionsPath"
+  /api/v1/staff/enrollment:
+    $ref: "./domains/identity.yaml#/StaffEnrollmentPath"
+  /api/v1/admin/session:
+    $ref: "./domains/identity.yaml#/StaffSessionPath"
+  /api/v1/admin/users:
+    $ref: "./domains/identity.yaml#/ManagedUsersPath"
+  /api/v1/admin/users/{user_id}:
+    $ref: "./domains/identity.yaml#/ManagedUserPath"
+  /api/v1/admin/users/{user_id}/account-restrictions:
+    $ref: "./domains/identity.yaml#/ManagedUserAccountRestrictionsPath"
+  /api/v1/admin/users/{user_id}/account-restrictions/{restriction_id}/revocations:
+    $ref: "./domains/identity.yaml#/ManagedUserAccountRestrictionRevocationsPath"
+  /api/v1/admin/users/{user_id}/manual-download-restriction:
+    $ref: "./domains/identity.yaml#/ManagedUserManualDownloadRestrictionPath"
+  /api/v1/admin/users/{user_id}/manual-download-restriction/revocations:
+    $ref: "./domains/identity.yaml#/ManagedUserManualDownloadRestrictionRevocationsPath"
+  /api/v1/admin/users/{user_id}/vip:
+    $ref: "./domains/identity.yaml#/ManagedUserVIPPath"
+  /api/v1/admin/seedboxes:
+    $ref: "./domains/seedbox.yaml#/AdminSeedboxReportsPath"
+  /api/v1/admin/seedboxes/{report_id}/decision:
+    $ref: "./domains/seedbox.yaml#/AdminSeedboxReportDecisionPath"
+  /api/v1/account-access/status:
+    $ref: "./domains/identity.yaml#/AccountAccessStatusPath"
+  /api/v1/account-access/appeals:
+    $ref: "./domains/identity.yaml#/AccountAccessAppealsPath"
+  /api/v1/admin/account-access-appeals:
+    $ref: "./domains/identity.yaml#/ManagedAccountAccessAppealsPath"
+  /api/v1/admin/account-access-appeals/{appeal_id}/decision:
+    $ref: "./domains/identity.yaml#/ManagedAccountAccessAppealDecisionPath"
+  /api/v1/me/capabilities:
+    $ref: "./domains/authz.yaml#/MyCapabilitiesPath"
+  /api/v1/me/seedboxes:
+    $ref: "./domains/seedbox.yaml#/MySeedboxReportsPath"
+  /api/v1/me/traffic:
+    $ref: "./domains/traffic.yaml#/MyTrafficPath"
+  /api/v1/me/ratio-watch:
+    $ref: "./domains/ratio.yaml#/MyRatioWatchPath"
+  /api/v1/me/newcomer-assessment:
+    $ref: "./domains/newcomer.yaml#/MyNewcomerAssessmentPath"
+  /api/v1/me/ratio-watch/appeals:
+    $ref: "./domains/ratio.yaml#/MyRatioWatchAppealsPath"
+  /api/v1/me/economy:
+    $ref: "./domains/economy.yaml#/MyEconomyPath"
+  /api/v1/me/medals:
+    $ref: "./domains/economy.yaml#/MyMedalsPath"
+  /api/v1/me/medals/{medal_id}/purchase:
+    $ref: "./domains/economy.yaml#/MyMedalPurchasePath"
+  /api/v1/me/medals/{medal_id}/wearing:
+    $ref: "./domains/economy.yaml#/MyMedalWearingPath"
+  /api/v1/me/medals/{medal_id}/priority:
+    $ref: "./domains/economy.yaml#/MyMedalPriorityPath"
+  /api/v1/me/member-gifts:
+    $ref: "./domains/economy.yaml#/MyMemberGiftsPath"
+  /api/v1/me/content-tips:
+    $ref: "./domains/economy.yaml#/MyContentTipsPath"
+  /api/v1/torrents/{torrent_id}/tips:
+    $ref: "./domains/economy.yaml#/TorrentContentTipsPath"
+  /api/v1/social/posts/{post_id}/tips:
+    $ref: "./domains/economy.yaml#/PostContentTipsPath"
+  /api/v1/comments/{comment_id}/tips:
+    $ref: "./domains/economy.yaml#/CommentContentTipsPath"
+  /api/v1/me/attendance:
+    $ref: "./domains/economy.yaml#/MyAttendancePath"
+  /api/v1/me/workgroups:
+    $ref: "./domains/workgroups.yaml#/MyWorkgroupsPath"
+  /api/v1/me/workgroups/{group_kind}/applications:
+    $ref: "./domains/workgroups.yaml#/MyWorkgroupApplicationsPath"
+  /api/v1/me/workgroups/{group_kind}/contributions:
+    $ref: "./domains/workgroups.yaml#/MyWorkgroupContributionCyclesPath"
+  /api/v1/me/workgroups/tasks:
+    $ref: "./domains/workgroups.yaml#/MyWorkgroupTasksPath"
+  /api/v1/me/workgroups/tasks/{assignment_id}/submissions:
+    $ref: "./domains/workgroups.yaml#/MyWorkgroupTaskSubmissionsPath"
+  /api/v1/me/hit-and-runs:
+    $ref: "./domains/traffic.yaml#/MyHitAndRunsPath"
+  /api/v1/me/hit-and-runs/{obligation_id}/appeals:
+    $ref: "./domains/traffic.yaml#/MyHitAndRunAppealsPath"
+  /api/v1/me/torrent-submissions:
+    $ref: "./domains/torrents.yaml#/MyTorrentSubmissionsPath"
+  /api/v1/me/torrent-submissions/{torrent_id}/resubmit:
+    $ref: "./domains/torrents.yaml#/MyTorrentResubmissionPath"
+  /api/v1/me/torrent-submissions/{torrent_id}/metadata:
+    $ref: "./domains/torrents.yaml#/MyPublishedTorrentMetadataPath"
+  /api/v1/me/torrent-submissions/{torrent_id}/content-change:
+    $ref: "./domains/torrents.yaml#/MyPublishedTorrentContentChangePath"
+  /api/v1/me/torrent-submissions/{torrent_id}/screenshot-change:
+    $ref: "./domains/torrents.yaml#/MyPublishedTorrentScreenshotChangePath"
+  /api/v1/me/torrent-submissions/{torrent_id}/withdrawal:
+    $ref: "./domains/torrents.yaml#/MyPublishedTorrentWithdrawalPath"
+  /api/v1/me/rss-subscriptions:
+    $ref: "./domains/rss.yaml#/MyRSSSubscriptionsPath"
+  /api/v1/me/rss-subscriptions/{subscription_id}:
+    $ref: "./domains/rss.yaml#/MyRSSSubscriptionPath"
+  /api/v1/me/rss-subscriptions/{subscription_id}/token-rotations:
+    $ref: "./domains/rss.yaml#/MyRSSSubscriptionTokenRotationsPath"
+  /api/v1/torrents/{torrent_id}/reports:
+    $ref: "./domains/torrents.yaml#/TorrentReportsPath"
+  /api/v1/me/torrent-bookmarks:
+    $ref: "./domains/torrents.yaml#/MyTorrentBookmarksPath"
+  /api/v1/me/torrent-bookmark-statuses:
+    $ref: "./domains/torrents.yaml#/MyTorrentBookmarkStatusesPath"
+  /api/v1/me/torrent-bookmarks/{torrent_id}:
+    $ref: "./domains/torrents.yaml#/MyTorrentBookmarkPath"
+  /api/v1/me/torrent-purchases:
+    $ref: "./domains/torrents.yaml#/MyTorrentPurchasesPath"
+  /api/v1/me/promotion-product-orders:
+    $ref: "./domains/promotions.yaml#/MyPromotionProductOrdersPath"
+  /api/v1/me/notifications:
+    $ref: "./domains/notifications.yaml#/MyNotificationsPath"
+  /api/v1/me/notifications/summary:
+    $ref: "./domains/notifications.yaml#/MyNotificationSummaryPath"
+  /api/v1/me/notifications/read-all:
+    $ref: "./domains/notifications.yaml#/MyNotificationReadAllPath"
+  /api/v1/me/notifications/archive-all:
+    $ref: "./domains/notifications.yaml#/MyNotificationArchiveAllPath"
+  /api/v1/me/notifications/feedback:
+    $ref: "./domains/notifications.yaml#/MyNotificationFeedbackPath"
+  /api/v1/me/notifications/{notification_id}/read:
+    $ref: "./domains/notifications.yaml#/MyNotificationPath"
+  /api/v1/admin/me/capabilities:
+    $ref: "./domains/authz.yaml#/MyStaffCapabilitiesPath"
+  /api/v1/admin/workgroups:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupsPath"
+  /api/v1/admin/newcomer/policies:
+    $ref: "./domains/newcomer.yaml#/NewcomerPolicyPath"
+  /api/v1/admin/economy/member-gift-policies:
+    $ref: "./domains/economy.yaml#/MemberGiftPoliciesPath"
+  /api/v1/admin/economy/content-tip-policies:
+    $ref: "./domains/economy.yaml#/ContentTipPoliciesPath"
+  /api/v1/admin/newcomer/assessments:
+    $ref: "./domains/newcomer.yaml#/NewcomerAssessmentsPath"
+  /api/v1/admin/newcomer/assessments/{assessment_id}/exemption:
+    $ref: "./domains/newcomer.yaml#/NewcomerAssessmentExemptionPath"
+  /api/v1/admin/workgroups/applications:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupApplicationsPath"
+  /api/v1/admin/workgroups/applications/{application_id}/decision:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupApplicationDecisionPath"
+  /api/v1/admin/workgroups/{group_kind}/contribution-policies:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupContributionPoliciesPath"
+  /api/v1/admin/workgroups/{group_kind}/tasks:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupTasksPath"
+  /api/v1/admin/workgroups/{group_kind}/tasks/{task_id}/assignments:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupTaskAssignmentsPath"
+  /api/v1/admin/workgroups/task-submissions/{submission_id}/decision:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupTaskSubmissionDecisionPath"
+  /api/v1/admin/workgroups/{group_kind}/memberships:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupMembershipsPath"
+  /api/v1/admin/workgroups/{group_kind}/memberships/{membership_id}/transition:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupMembershipTransitionPath"
+  /api/v1/admin/workgroups/{group_kind}/memberships/{membership_id}/contributions:
+    $ref: "./domains/workgroups.yaml#/AdminWorkgroupMembershipContributionCyclesPath"
+  /api/v1/admin/authz/grants:
+    $ref: "./domains/authz.yaml#/GrantAdministrationPath"
+  /api/v1/admin/authz/grant-revocations:
+    $ref: "./domains/authz.yaml#/GrantRevocationsPath"
+  /api/v1/admin/authz/grant-revocations/{request_id}/governance-review:
+    $ref: "./domains/authz.yaml#/GrantGovernanceReviewPath"
+  /api/v1/admin/authz/grant-revocations/{request_id}/security-review:
+    $ref: "./domains/authz.yaml#/GrantSecurityReviewPath"
+  /api/v1/site:
+    $ref: "./domains/site.yaml#/SiteInfoPath"
+  /api/v1/admin/settings/site:
+    $ref: "./domains/site.yaml#/StaffSiteDisplaySettingsPath"
+  /api/v1/admin/settings/registration:
+    $ref: "./domains/site.yaml#/StaffRegistrationPolicySettingsPath"
+  /api/v1/admin/settings/rss:
+    $ref: "./domains/rss.yaml#/StaffRSSSettingsPath"
+  /rss/{rss_token}:
+    $ref: "./domains/rss.yaml#/RSSFeedPath"
+  /rss/{rss_token}/torrents/{torrent_id}/download:
+    $ref: "./domains/rss.yaml#/RSSTorrentDownloadPath"
+  /api/v1/announcements:
+    $ref: "./domains/site.yaml#/AnnouncementsPath"
+  /api/v1/announcements/latest:
+    $ref: "./domains/site.yaml#/LatestAnnouncementPath"
+  /api/v1/announcements/{announcement_id}:
+    $ref: "./domains/site.yaml#/AnnouncementDetailPath"
+  /api/v1/announcements/{announcement_id}/comments:
+    $ref: "./domains/comments.yaml#/AnnouncementCommentsPath"
+  /api/v1/categories:
+    $ref: "./domains/catalog.yaml#/CategoriesPath"
+  /api/v1/categories/{category_id}/facets:
+    $ref: "./domains/catalog.yaml#/CategoryFacetsPath"
+  /api/v1/admin/catalog/categories:
+    $ref: "./domains/catalog.yaml#/ManagedCategoriesPath"
+  /api/v1/admin/catalog/categories/{category_id}:
+    $ref: "./domains/catalog.yaml#/ManagedCategoryPath"
+  /api/v1/admin/catalog/announcements:
+    $ref: "./domains/catalog.yaml#/ManagedAnnouncementsPath"
+  /api/v1/admin/catalog/announcements/{announcement_id}:
+    $ref: "./domains/catalog.yaml#/ManagedAnnouncementPath"
+  /api/v1/admin/catalog/announcements/{announcement_id}/publication:
+    $ref: "./domains/catalog.yaml#/ManagedAnnouncementPublicationPath"
+  /api/v1/admin/catalog/announcements/{announcement_id}/revisions:
+    $ref: "./domains/catalog.yaml#/ManagedAnnouncementRevisionsPath"
+  /api/v1/torrents:
+    $ref: "./domains/torrents.yaml#/TorrentsPath"
+  /api/v1/torrents/{torrent_id}:
+    $ref: "./domains/torrents.yaml#/TorrentDetailPath"
+  /api/v1/torrents/{torrent_id}/cover:
+    $ref: "./domains/torrents.yaml#/TorrentCoverPath"
+  /api/v1/torrents/{torrent_id}/screenshots/{position}:
+    $ref: "./domains/torrents.yaml#/TorrentScreenshotPath"
+  /api/v1/torrents/{torrent_id}/content:
+    $ref: "./domains/torrents.yaml#/TorrentContentPath"
+  /api/v1/torrents/{torrent_id}/related:
+    $ref: "./domains/torrents.yaml#/TorrentRelatedVersionsPath"
+  /api/v1/torrents/{torrent_id}/swarm:
+    $ref: "./domains/torrents.yaml#/TorrentSwarmPath"
+  /api/v1/torrents/{torrent_id}/files:
+    $ref: "./domains/torrents.yaml#/TorrentFilesPath"
+  /api/v1/torrents/{torrent_id}/comments:
+    $ref: "./domains/comments.yaml#/TorrentCommentsPath"
+  /api/v1/torrents/{torrent_id}/download:
+    $ref: "./domains/torrents.yaml#/TorrentDownloadPath"
+  /api/v1/torrents/{torrent_id}/purchase:
+    $ref: "./domains/torrents.yaml#/TorrentPurchasePath"
+  /api/v1/torrents/{torrent_id}/promotion-products:
+    $ref: "./domains/promotions.yaml#/TorrentPromotionProductsPath"
+  /api/v1/comments/{comment_id}:
+    $ref: "./domains/comments.yaml#/CommentPath"
+  /api/v1/comments/{comment_id}/reports:
+    $ref: "./domains/comments.yaml#/CommentReportsPath"
+  /api/v1/social/posts:
+    $ref: "./domains/social.yaml#/SocialPostsPath"
+  /api/v1/social/posts/{post_id}:
+    $ref: "./domains/social.yaml#/SocialPostPath"
+  /api/v1/social/posts/{post_id}/comments:
+    $ref: "./domains/social.yaml#/SocialPostCommentsPath"
+  /api/v1/admin/social/comment-moderation-cases:
+    $ref: "./domains/comments.yaml#/CommentModerationCasesPath"
+  /api/v1/admin/social/comment-moderation-cases/{case_id}/decisions:
+    $ref: "./domains/comments.yaml#/CommentModerationDecisionPath"
+  /api/v1/admin/torrent-reviews:
+    $ref: "./domains/torrents.yaml#/TorrentReviewsPath"
+  /api/v1/me/torrent-reviews:
+    $ref: "./domains/torrents.yaml#/MyTorrentReviewsPath"
+  /api/v1/me/torrent-reviews/{torrent_id}/votes:
+    $ref: "./domains/torrents.yaml#/MyTorrentReviewVotesPath"
+  /api/v1/admin/torrents:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentsPath"
+  /api/v1/admin/torrents/content-changes:
+    $ref: "./domains/torrents.yaml#/ManagedPublishedTorrentContentChangesPath"
+  /api/v1/admin/torrents/content-changes/{request_id}/decision:
+    $ref: "./domains/torrents.yaml#/ManagedPublishedTorrentContentChangeDecisionPath"
+  /api/v1/admin/torrents/screenshot-changes:
+    $ref: "./domains/torrents.yaml#/ManagedPublishedTorrentScreenshotChangesPath"
+  /api/v1/admin/torrents/screenshot-changes/{request_id}/decision:
+    $ref: "./domains/torrents.yaml#/ManagedPublishedTorrentScreenshotChangeDecisionPath"
+  /api/v1/admin/torrents/screenshot-changes/{request_id}/{side}/screenshots/{position}:
+    $ref: "./domains/torrents.yaml#/ManagedPublishedTorrentScreenshotChangeImagePath"
+  /api/v1/admin/torrents/withdrawals:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentWithdrawalsPath"
+  /api/v1/admin/torrents/withdrawals/{request_id}/decision:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentWithdrawalDecisionPath"
+  /api/v1/admin/torrents/report-cases:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentReportCasesPath"
+  /api/v1/admin/torrents/report-cases/{case_id}/decisions:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentReportCaseDecisionPath"
+  /api/v1/admin/torrents/{torrent_id}/availability:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentAvailabilityPath"
+  /api/v1/admin/torrents/{torrent_id}/purchase-price:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentPurchasePricePath"
+  /api/v1/admin/torrent-purchases:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentPurchasesPath"
+  /api/v1/admin/torrent-purchases/{user_numeric_id}/{torrent_id}/refund:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentPurchaseRefundPath"
+  /api/v1/admin/promotions:
+    $ref: "./domains/promotions.yaml#/PromotionCampaignsPath"
+  /api/v1/admin/promotion-product-orders:
+    $ref: "./domains/promotions.yaml#/ManagedPromotionProductOrdersPath"
+  /api/v1/admin/settings/promotion-products:
+    $ref: "./domains/promotions.yaml#/PromotionProductPolicyPath"
+  /api/v1/admin/settings/seeding-rewards:
+    $ref: "./domains/economy.yaml#/SeedingRewardPoliciesPath"
+  /api/v1/admin/settings/attendance:
+    $ref: "./domains/economy.yaml#/AttendancePoliciesPath"
+  /api/v1/admin/settings/seeding-rewards/preview:
+    $ref: "./domains/economy.yaml#/SeedingRewardPolicyPreviewPath"
+  /api/v1/admin/settings/hnr:
+    $ref: "./domains/hnr.yaml#/HNRPolicyRevisionsPath"
+  /api/v1/admin/settings/hnr/preview:
+    $ref: "./domains/hnr.yaml#/HNRPolicyPreviewPath"
+  /api/v1/admin/hnr/appeals:
+    $ref: "./domains/traffic.yaml#/HNRAppealsPath"
+  /api/v1/admin/hnr/appeals/{appeal_id}/decision:
+    $ref: "./domains/traffic.yaml#/HNRAppealDecisionPath"
+  /api/v1/admin/settings/ratio-watch:
+    $ref: "./domains/ratio.yaml#/RatioWatchPolicyPath"
+  /api/v1/admin/settings/ratio-watch/preview:
+    $ref: "./domains/ratio.yaml#/RatioWatchPolicyPreviewPath"
+  /api/v1/admin/ratio-watch/assessments:
+    $ref: "./domains/ratio.yaml#/RatioWatchAssessmentsPath"
+  /api/v1/admin/ratio-watch/assessments/{assessment_id}/clear:
+    $ref: "./domains/ratio.yaml#/RatioWatchAssessmentClearPath"
+  /api/v1/admin/ratio-watch/appeals:
+    $ref: "./domains/ratio.yaml#/RatioWatchAppealsPath"
+  /api/v1/admin/ratio-watch/appeals/{appeal_id}/decision:
+    $ref: "./domains/ratio.yaml#/RatioWatchAppealDecisionPath"
+  /api/v1/admin/settings/progression/levels:
+    $ref: "./domains/economy.yaml#/LevelPoliciesPath"
+  /api/v1/admin/settings/progression/contributions:
+    $ref: "./domains/economy.yaml#/ContributionExperiencePoliciesPath"
+  /api/v1/admin/settings/medals:
+    $ref: "./domains/economy.yaml#/MedalDefinitionsPath"
+  /api/v1/admin/settings/medals/{medal_id}:
+    $ref: "./domains/economy.yaml#/MedalDefinitionPath"
+  /api/v1/admin/operations/tracker:
+    $ref: "./domains/operations.yaml#/TrackerOperationsPath"
+  /api/v1/admin/settings/tracker:
+    $ref: "./domains/operations.yaml#/TrackerSettingsPath"
+  /api/v1/admin/settings/torrents:
+    $ref: "./domains/operations.yaml#/TorrentSettingsPath"
+  /api/v1/admin/settings/torrents/upload-policy-revisions:
+    $ref: "./domains/operations.yaml#/TorrentUploadPolicyRevisionsPath"
+  /api/v1/admin/settings/settlement:
+    $ref: "./domains/operations.yaml#/SettlementSettingsPath"
+  /api/v1/admin/settings/economy:
+    $ref: "./domains/operations.yaml#/EconomySettingsPath"
+  /api/v1/admin/operations/workers:
+    $ref: "./domains/operations.yaml#/WorkerOperationsPath"
+  /api/v1/admin/operations/storage:
+    $ref: "./domains/operations.yaml#/StorageOperationsPath"
+  /api/v1/admin/settings/vip-profile:
+    $ref: "./domains/operations.yaml#/VIPProfileSettingsPath"
+  /api/v1/admin/settings/email:
+    $ref: "./domains/operations.yaml#/EmailSettingsPath"
+  /api/v1/admin/torrents/{torrent_id}/review-decisions:
+    $ref: "./domains/torrents.yaml#/TorrentReviewDecisionsPath"
+components:
+  schemas:
+    RegistrationMode:
+      $ref: "./schemas/identity.yaml#/RegistrationMode"
+    CreateRegistrationRequest:
+      $ref: "./schemas/identity.yaml#/CreateRegistrationRequest"
+    RegistrationResult:
+      $ref: "./schemas/identity.yaml#/RegistrationResult"
+    RequestEmailVerificationRequest:
+      $ref: "./schemas/identity.yaml#/RequestEmailVerificationRequest"
+    EmailVerificationDispatch:
+      $ref: "./schemas/identity.yaml#/EmailVerificationDispatch"
+    ConfirmEmailVerificationRequest:
+      $ref: "./schemas/identity.yaml#/ConfirmEmailVerificationRequest"
+    EmailVerificationResult:
+      $ref: "./schemas/identity.yaml#/EmailVerificationResult"
+    RequestPasswordRecoveryRequest:
+      $ref: "./schemas/identity.yaml#/RequestPasswordRecoveryRequest"
+    PasswordRecoveryDispatch:
+      $ref: "./schemas/identity.yaml#/PasswordRecoveryDispatch"
+    ConfirmPasswordRecoveryRequest:
+      $ref: "./schemas/identity.yaml#/ConfirmPasswordRecoveryRequest"
+    PasswordRecoveryResult:
+      $ref: "./schemas/identity.yaml#/PasswordRecoveryResult"
+    CreateSessionRequest:
+      $ref: "./schemas/identity.yaml#/CreateSessionRequest"
+    SessionUser:
+      $ref: "./schemas/identity.yaml#/SessionUser"
+    WebSession:
+      $ref: "./schemas/identity.yaml#/WebSession"
+    PublicUserProfile:
+      $ref: "./schemas/identity.yaml#/PublicUserProfile"
+    AccountSecurityOverview:
+      $ref: "./schemas/identity.yaml#/AccountSecurityOverview"
+    UserWebSession:
+      $ref: "./schemas/identity.yaml#/UserWebSession"
+    UserWebSessionList:
+      $ref: "./schemas/identity.yaml#/UserWebSessionList"
+    StaffElevationOptions:
+      $ref: "./schemas/identity.yaml#/StaffElevationOptions"
+    CompleteStaffElevationRequest:
+      $ref: "./schemas/identity.yaml#/CompleteStaffElevationRequest"
+    StaffSession:
+      $ref: "./schemas/identity.yaml#/StaffSession"
+    BeginStaffEnrollmentRequest:
+      $ref: "./schemas/identity.yaml#/BeginStaffEnrollmentRequest"
+    StaffEnrollmentOptions:
+      $ref: "./schemas/identity.yaml#/StaffEnrollmentOptions"
+    CompleteStaffEnrollmentRequest:
+      $ref: "./schemas/identity.yaml#/CompleteStaffEnrollmentRequest"
+    StaffCredentialEnrollment:
+      $ref: "./schemas/identity.yaml#/StaffCredentialEnrollment"
+    ManagedUserStatus:
+      $ref: "./schemas/identity.yaml#/ManagedUserStatus"
+    ManagedUserSummary:
+      $ref: "./schemas/identity.yaml#/ManagedUserSummary"
+    ManagedUserPage:
+      $ref: "./schemas/identity.yaml#/ManagedUserPage"
+    CurrentAccountRestriction:
+      $ref: "./schemas/identity.yaml#/CurrentAccountRestriction"
+    ManagedUserDetail:
+      $ref: "./schemas/identity.yaml#/ManagedUserDetail"
+    AccountRestrictionReasonCode:
+      $ref: "./schemas/identity.yaml#/AccountRestrictionReasonCode"
+    AccountRestrictionRevocationReasonCode:
+      $ref: "./schemas/identity.yaml#/AccountRestrictionRevocationReasonCode"
+    CreateAccountRestrictionRequest:
+      $ref: "./schemas/identity.yaml#/CreateAccountRestrictionRequest"
+    RevokeAccountRestrictionRequest:
+      $ref: "./schemas/identity.yaml#/RevokeAccountRestrictionRequest"
+    ManualDownloadRestrictionState:
+      $ref: "./schemas/identity.yaml#/ManualDownloadRestrictionState"
+    ManualDownloadRestrictionTransition:
+      $ref: "./schemas/identity.yaml#/ManualDownloadRestrictionTransition"
+    ChangeManualDownloadRestrictionRequest:
+      $ref: "./schemas/identity.yaml#/ChangeManualDownloadRestrictionRequest"
+    RevokeManualDownloadRestrictionRequest:
+      $ref: "./schemas/identity.yaml#/RevokeManualDownloadRestrictionRequest"
+    CapabilityAction:
+      $ref: "./schemas/authz.yaml#/CapabilityAction"
+    CapabilityScope:
+      $ref: "./schemas/authz.yaml#/CapabilityScope"
+    Capability:
+      $ref: "./schemas/authz.yaml#/Capability"
+    CapabilityList:
+      $ref: "./schemas/authz.yaml#/CapabilityList"
+    GrantAdministrationGrant:
+      $ref: "./schemas/authz.yaml#/GrantAdministrationGrant"
+    GrantRevocationReview:
+      $ref: "./schemas/authz.yaml#/GrantRevocationReview"
+    GrantRevocationRequest:
+      $ref: "./schemas/authz.yaml#/GrantRevocationRequest"
+    GrantAdministrationOverview:
+      $ref: "./schemas/authz.yaml#/GrantAdministrationOverview"
+    CreateGrantRevocationRequest:
+      $ref: "./schemas/authz.yaml#/CreateGrantRevocationRequest"
+    ReviewGrantRevocationRequest:
+      $ref: "./schemas/authz.yaml#/ReviewGrantRevocationRequest"
+    WorkgroupKind:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupKind"
+    WorkgroupDefinition:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupDefinition"
+    ReviewerEligibility:
+      $ref: "./schemas/workgroups.yaml#/ReviewerEligibility"
+    WorkgroupApplication:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupApplication"
+    WorkgroupMembership:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupMembership"
+    WorkgroupContributionProgress:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionProgress"
+    WorkgroupContributionPolicyRevision:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionPolicyRevision"
+    WorkgroupContributionPolicyPage:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionPolicyPage"
+    WorkgroupContributionSummary:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionSummary"
+    WorkgroupContributionEvidenceState:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionEvidenceState"
+    WorkgroupContributionAssessmentState:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionAssessmentState"
+    WorkgroupContributionExplanationCode:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionExplanationCode"
+    WorkgroupContributionCycle:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionCycle"
+    WorkgroupContributionReminder:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionReminder"
+    WorkgroupContributionCyclePage:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupContributionCyclePage"
+    MyWorkgroupOverview:
+      $ref: "./schemas/workgroups.yaml#/MyWorkgroupOverview"
+    AdminWorkgroupOverview:
+      $ref: "./schemas/workgroups.yaml#/AdminWorkgroupOverview"
+    WorkgroupApplicationPage:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupApplicationPage"
+    WorkgroupMembershipPage:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupMembershipPage"
+    WorkgroupTaskType:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTaskType"
+    WorkgroupTaskTimelineState:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTaskTimelineState"
+    WorkgroupTaskAssignmentState:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTaskAssignmentState"
+    WorkgroupTaskReviewDecision:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTaskReviewDecision"
+    WorkgroupTask:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTask"
+    WorkgroupTaskSubmission:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTaskSubmission"
+    WorkgroupTaskAssignment:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTaskAssignment"
+    WorkgroupTaskPage:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTaskPage"
+    WorkgroupTaskAssignmentPage:
+      $ref: "./schemas/workgroups.yaml#/WorkgroupTaskAssignmentPage"
+    CreateWorkgroupApplicationRequest:
+      $ref: "./schemas/workgroups.yaml#/CreateWorkgroupApplicationRequest"
+    DecideWorkgroupApplicationRequest:
+      $ref: "./schemas/workgroups.yaml#/DecideWorkgroupApplicationRequest"
+    GrantWorkgroupMembershipRequest:
+      $ref: "./schemas/workgroups.yaml#/GrantWorkgroupMembershipRequest"
+    ChangeWorkgroupMembershipRequest:
+      $ref: "./schemas/workgroups.yaml#/ChangeWorkgroupMembershipRequest"
+    IssueWorkgroupContributionPolicyRequest:
+      $ref: "./schemas/workgroups.yaml#/IssueWorkgroupContributionPolicyRequest"
+    IssueWorkgroupContributionReminderRequest:
+      $ref: "./schemas/workgroups.yaml#/IssueWorkgroupContributionReminderRequest"
+    PublishWorkgroupTaskRequest:
+      $ref: "./schemas/workgroups.yaml#/PublishWorkgroupTaskRequest"
+    SubmitWorkgroupTaskRequest:
+      $ref: "./schemas/workgroups.yaml#/SubmitWorkgroupTaskRequest"
+    ReviewWorkgroupTaskSubmissionRequest:
+      $ref: "./schemas/workgroups.yaml#/ReviewWorkgroupTaskSubmissionRequest"
+    SiteInfo:
+      $ref: "./schemas/catalog.yaml#/SiteInfo"
+    SiteDisplaySettings:
+      $ref: "./schemas/catalog.yaml#/SiteDisplaySettings"
+    UpdateSiteDisplaySettingsRequest:
+      $ref: "./schemas/catalog.yaml#/UpdateSiteDisplaySettingsRequest"
+    RSSSubscription:
+      $ref: "./schemas/rss.yaml#/RSSSubscription"
+    RSSSubscriptionList:
+      $ref: "./schemas/rss.yaml#/RSSSubscriptionList"
+    RSSSubscriptionInput:
+      $ref: "./schemas/rss.yaml#/RSSSubscriptionInput"
+    UpdateRSSSubscriptionRequest:
+      $ref: "./schemas/rss.yaml#/UpdateRSSSubscriptionRequest"
+    RSSSubscriptionVersionRequest:
+      $ref: "./schemas/rss.yaml#/RSSSubscriptionVersionRequest"
+    IssuedRSSSubscription:
+      $ref: "./schemas/rss.yaml#/IssuedRSSSubscription"
+    RSSSettings:
+      $ref: "./schemas/rss.yaml#/RSSSettings"
+    UpdateRSSSettingsRequest:
+      $ref: "./schemas/rss.yaml#/UpdateRSSSettingsRequest"
+    RegistrationPolicySettings:
+      $ref: "./schemas/identity.yaml#/RegistrationPolicySettings"
+    UpdateRegistrationPolicySettingsRequest:
+      $ref: "./schemas/identity.yaml#/UpdateRegistrationPolicySettingsRequest"
+    AnnouncementSummary:
+      $ref: "./schemas/catalog.yaml#/AnnouncementSummary"
+    AnnouncementPage:
+      $ref: "./schemas/catalog.yaml#/AnnouncementPage"
+    AnnouncementBodyFormat:
+      $ref: "./schemas/catalog.yaml#/AnnouncementBodyFormat"
+    AnnouncementDetail:
+      $ref: "./schemas/catalog.yaml#/AnnouncementDetail"
+    ManagedAnnouncementStatus:
+      $ref: "./schemas/catalog.yaml#/ManagedAnnouncementStatus"
+    ManagedAnnouncementSummary:
+      $ref: "./schemas/catalog.yaml#/ManagedAnnouncementSummary"
+    ManagedAnnouncement:
+      $ref: "./schemas/catalog.yaml#/ManagedAnnouncement"
+    ManagedAnnouncementPage:
+      $ref: "./schemas/catalog.yaml#/ManagedAnnouncementPage"
+    AnnouncementRevisionSummary:
+      $ref: "./schemas/catalog.yaml#/AnnouncementRevisionSummary"
+    AnnouncementRevisionPage:
+      $ref: "./schemas/catalog.yaml#/AnnouncementRevisionPage"
+    CreateManagedAnnouncementRequest:
+      $ref: "./schemas/catalog.yaml#/CreateManagedAnnouncementRequest"
+    UpdateManagedAnnouncementDraftRequest:
+      $ref: "./schemas/catalog.yaml#/UpdateManagedAnnouncementDraftRequest"
+    AnnouncementPublicationAction:
+      $ref: "./schemas/catalog.yaml#/AnnouncementPublicationAction"
+    ChangeAnnouncementPublicationRequest:
+      $ref: "./schemas/catalog.yaml#/ChangeAnnouncementPublicationRequest"
+    Category:
+      $ref: "./schemas/catalog.yaml#/Category"
+    ManagedCategory:
+      $ref: "./schemas/catalog.yaml#/ManagedCategory"
+    ManagedCategoryList:
+      $ref: "./schemas/catalog.yaml#/ManagedCategoryList"
+    CreateManagedCategoryRequest:
+      $ref: "./schemas/catalog.yaml#/CreateManagedCategoryRequest"
+    UpdateManagedCategoryRequest:
+      $ref: "./schemas/catalog.yaml#/UpdateManagedCategoryRequest"
+    TorrentSummary:
+      $ref: "./schemas/catalog.yaml#/TorrentSummary"
+    TorrentList:
+      $ref: "./schemas/catalog.yaml#/TorrentList"
+    TorrentSubmissionRequest:
+      $ref: "./schemas/torrents.yaml#/TorrentSubmissionRequest"
+    TorrentSubmission:
+      $ref: "./schemas/torrents.yaml#/TorrentSubmission"
+    TorrentPublicDetail:
+      $ref: "./schemas/torrents.yaml#/TorrentPublicDetail"
+    TorrentSwarmOverview:
+      $ref: "./schemas/torrents.yaml#/TorrentSwarmOverview"
+    TorrentFile:
+      $ref: "./schemas/torrents.yaml#/TorrentFile"
+    TorrentFilePage:
+      $ref: "./schemas/torrents.yaml#/TorrentFilePage"
+    TorrentReviewFeedback:
+      $ref: "./schemas/torrents.yaml#/TorrentReviewFeedback"
+    MyTorrentSubmission:
+      $ref: "./schemas/torrents.yaml#/MyTorrentSubmission"
+    MyTorrentSubmissionPage:
+      $ref: "./schemas/torrents.yaml#/MyTorrentSubmissionPage"
+    TorrentBookmark:
+      $ref: "./schemas/torrents.yaml#/TorrentBookmark"
+    TorrentBookmarkPage:
+      $ref: "./schemas/torrents.yaml#/TorrentBookmarkPage"
+    TorrentBookmarkStatusList:
+      $ref: "./schemas/torrents.yaml#/TorrentBookmarkStatusList"
+    TorrentBookmarkState:
+      $ref: "./schemas/torrents.yaml#/TorrentBookmarkState"
+    MyNotificationKind:
+      $ref: "./schemas/notifications.yaml#/MyNotificationKind"
+    MyNotification:
+      $ref: "./schemas/notifications.yaml#/MyNotification"
+    MyNotificationPage:
+      $ref: "./schemas/notifications.yaml#/MyNotificationPage"
+    MyNotificationSummary:
+      $ref: "./schemas/notifications.yaml#/MyNotificationSummary"
+    MyNotificationReadReceipt:
+      $ref: "./schemas/notifications.yaml#/MyNotificationReadReceipt"
+    MyNotificationReadAllReceipt:
+      $ref: "./schemas/notifications.yaml#/MyNotificationReadAllReceipt"
+    MyNotificationArchiveAllReceipt:
+      $ref: "./schemas/notifications.yaml#/MyNotificationArchiveAllReceipt"
+    MyNotificationFeedbackRequest:
+      $ref: "./schemas/notifications.yaml#/MyNotificationFeedbackRequest"
+    MyNotificationFeedbackReceipt:
+      $ref: "./schemas/notifications.yaml#/MyNotificationFeedbackReceipt"
+    CommentState:
+      $ref: "./schemas/comments.yaml#/CommentState"
+    CommentBodyFormat:
+      $ref: "./schemas/comments.yaml#/CommentBodyFormat"
+    CommentAuthor:
+      $ref: "./schemas/comments.yaml#/CommentAuthor"
+    Comment:
+      $ref: "./schemas/comments.yaml#/Comment"
+    TorrentCommentPage:
+      $ref: "./schemas/comments.yaml#/TorrentCommentPage"
+    AnnouncementCommentPage:
+      $ref: "./schemas/comments.yaml#/AnnouncementCommentPage"
+    CreateCommentRequest:
+      $ref: "./schemas/comments.yaml#/CreateCommentRequest"
+    UpdateCommentRequest:
+      $ref: "./schemas/comments.yaml#/UpdateCommentRequest"
+    CommentReportReasonCode:
+      $ref: "./schemas/comments.yaml#/CommentReportReasonCode"
+    CreateCommentReportRequest:
+      $ref: "./schemas/comments.yaml#/CreateCommentReportRequest"
+    CommentReportReceipt:
+      $ref: "./schemas/comments.yaml#/CommentReportReceipt"
+    CommentModerationCaseState:
+      $ref: "./schemas/comments.yaml#/CommentModerationCaseState"
+    CommentModerationReport:
+      $ref: "./schemas/comments.yaml#/CommentModerationReport"
+    CommentModerationTargetKind:
+      $ref: "./schemas/comments.yaml#/CommentModerationTargetKind"
+    CommentModerationTarget:
+      $ref: "./schemas/comments.yaml#/CommentModerationTarget"
+    CommentModerationCase:
+      $ref: "./schemas/comments.yaml#/CommentModerationCase"
+    CommentModerationCasePage:
+      $ref: "./schemas/comments.yaml#/CommentModerationCasePage"
+    CommentModerationDecision:
+      $ref: "./schemas/comments.yaml#/CommentModerationDecision"
+    CommentModerationDecisionReasonCode:
+      $ref: "./schemas/comments.yaml#/CommentModerationDecisionReasonCode"
+    CreateCommentModerationDecisionRequest:
+      $ref: "./schemas/comments.yaml#/CreateCommentModerationDecisionRequest"
+    CommentModerationDecisionResult:
+      $ref: "./schemas/comments.yaml#/CommentModerationDecisionResult"
+    SocialPostAuthor:
+      $ref: "./schemas/social.yaml#/SocialPostAuthor"
+    SocialPost:
+      $ref: "./schemas/social.yaml#/SocialPost"
+    SocialPostSort:
+      $ref: "./schemas/social.yaml#/SocialPostSort"
+    SocialPostPage:
+      $ref: "./schemas/social.yaml#/SocialPostPage"
+    CreateSocialPostRequest:
+      $ref: "./schemas/social.yaml#/CreateSocialPostRequest"
+    UpdateSocialPostRequest:
+      $ref: "./schemas/social.yaml#/UpdateSocialPostRequest"
+    SocialPostCommentPage:
+      $ref: "./schemas/social.yaml#/SocialPostCommentPage"
+    PendingTorrentReview:
+      $ref: "./schemas/torrents.yaml#/PendingTorrentReview"
+    PendingTorrentReviewPage:
+      $ref: "./schemas/torrents.yaml#/PendingTorrentReviewPage"
+    TorrentReviewDecisionRequest:
+      $ref: "./schemas/torrents.yaml#/TorrentReviewDecisionRequest"
+    TorrentReviewDecisionResult:
+      $ref: "./schemas/torrents.yaml#/TorrentReviewDecisionResult"
+    ManagedTorrent:
+      $ref: "./schemas/torrents.yaml#/ManagedTorrent"
+    ManagedTorrentPage:
+      $ref: "./schemas/torrents.yaml#/ManagedTorrentPage"
+    ChangeTorrentAvailabilityRequest:
+      $ref: "./schemas/torrents.yaml#/ChangeTorrentAvailabilityRequest"
+    TorrentAvailabilityResult:
+      $ref: "./schemas/torrents.yaml#/TorrentAvailabilityResult"
+    TorrentReportReasonCode:
+      $ref: "./schemas/torrents.yaml#/TorrentReportReasonCode"
+    CreateTorrentReportRequest:
+      $ref: "./schemas/torrents.yaml#/CreateTorrentReportRequest"
+    TorrentReportReceipt:
+      $ref: "./schemas/torrents.yaml#/TorrentReportReceipt"
+    ManagedTorrentReportCasePage:
+      $ref: "./schemas/torrents.yaml#/ManagedTorrentReportCasePage"
+    CreateTorrentReportDecisionRequest:
+      $ref: "./schemas/torrents.yaml#/CreateTorrentReportDecisionRequest"
+    TorrentReportDecisionResult:
+      $ref: "./schemas/torrents.yaml#/TorrentReportDecisionResult"
+    TorrentPurchaseHistoryPage:
+      $ref: "./schemas/torrents.yaml#/TorrentPurchaseHistoryPage"
+    TorrentPurchasePolicySettings:
+      $ref: "./schemas/torrents.yaml#/TorrentPurchasePolicySettings"
+    UpdateTorrentPurchasePolicyRequest:
+      $ref: "./schemas/torrents.yaml#/UpdateTorrentPurchasePolicyRequest"
+    UpdateTorrentPurchasePriceRequest:
+      $ref: "./schemas/torrents.yaml#/UpdateTorrentPurchasePriceRequest"
+    TorrentPurchasePriceChange:
+      $ref: "./schemas/torrents.yaml#/TorrentPurchasePriceChange"
+    ManagedTorrentPurchasePage:
+      $ref: "./schemas/torrents.yaml#/ManagedTorrentPurchasePage"
+    RefundTorrentPurchaseRequest:
+      $ref: "./schemas/torrents.yaml#/RefundTorrentPurchaseRequest"
+    TorrentPurchaseRefundReceipt:
+      $ref: "./schemas/torrents.yaml#/TorrentPurchaseRefundReceipt"
+    PromotionCampaign:
+      $ref: "./schemas/promotions.yaml#/PromotionCampaign"
+    PromotionCampaignPage:
+      $ref: "./schemas/promotions.yaml#/PromotionCampaignPage"
+    SchedulePromotionCampaignRequest:
+      $ref: "./schemas/promotions.yaml#/SchedulePromotionCampaignRequest"
+    PromotionProductPolicy:
+      $ref: "./schemas/promotions.yaml#/PromotionProductPolicy"
+    PromotionProductOffer:
+      $ref: "./schemas/promotions.yaml#/PromotionProductOffer"
+    PurchasePromotionProductsRequest:
+      $ref: "./schemas/promotions.yaml#/PurchasePromotionProductsRequest"
+    PromotionProductOrder:
+      $ref: "./schemas/promotions.yaml#/PromotionProductOrder"
+    PromotionProductOrderPage:
+      $ref: "./schemas/promotions.yaml#/PromotionProductOrderPage"
+    UpdatePromotionProductPolicyRequest:
+      $ref: "./schemas/promotions.yaml#/UpdatePromotionProductPolicyRequest"
+    TrafficByteCount:
+      $ref: "./schemas/traffic.yaml#/TrafficByteCount"
+    EconomyOverview:
+      $ref: "./schemas/economy.yaml#/EconomyOverview"
+    AttendanceMode:
+      $ref: "./schemas/economy.yaml#/AttendanceMode"
+    AttendanceStreakMilestone:
+      $ref: "./schemas/economy.yaml#/AttendanceStreakMilestone"
+    AttendancePolicySettings:
+      $ref: "./schemas/economy.yaml#/AttendancePolicySettings"
+    AttendancePolicy:
+      $ref: "./schemas/economy.yaml#/AttendancePolicy"
+    AttendancePolicyPage:
+      $ref: "./schemas/economy.yaml#/AttendancePolicyPage"
+    IssueAttendancePolicyRequest:
+      $ref: "./schemas/economy.yaml#/IssueAttendancePolicyRequest"
+    ClaimAttendanceRequest:
+      $ref: "./schemas/economy.yaml#/ClaimAttendanceRequest"
+    AttendanceRecord:
+      $ref: "./schemas/economy.yaml#/AttendanceRecord"
+    AttendanceOverview:
+      $ref: "./schemas/economy.yaml#/AttendanceOverview"
+    MagicStatementEntry:
+      $ref: "./schemas/economy.yaml#/MagicStatementEntry"
+    ExperienceStatementEntry:
+      $ref: "./schemas/economy.yaml#/ExperienceStatementEntry"
+    ProgressOverview:
+      $ref: "./schemas/economy.yaml#/ProgressOverview"
+    LevelTarget:
+      $ref: "./schemas/economy.yaml#/LevelTarget"
+    SeedingRewardPolicyInput:
+      $ref: "./schemas/economy.yaml#/SeedingRewardPolicyInput"
+    SeedingRewardPolicy:
+      $ref: "./schemas/economy.yaml#/SeedingRewardPolicy"
+    SeedingRewardPolicyPage:
+      $ref: "./schemas/economy.yaml#/SeedingRewardPolicyPage"
+    IssueSeedingRewardPolicyRequest:
+      $ref: "./schemas/economy.yaml#/IssueSeedingRewardPolicyRequest"
+    SeedingRewardPolicyPreview:
+      $ref: "./schemas/economy.yaml#/SeedingRewardPolicyPreview"
+    ContributionExperiencePolicyInput:
+      $ref: "./schemas/economy.yaml#/ContributionExperiencePolicyInput"
+    ContributionExperiencePolicy:
+      $ref: "./schemas/economy.yaml#/ContributionExperiencePolicy"
+    ContributionExperiencePolicyPage:
+      $ref: "./schemas/economy.yaml#/ContributionExperiencePolicyPage"
+    IssueContributionExperiencePolicyRequest:
+      $ref: "./schemas/economy.yaml#/IssueContributionExperiencePolicyRequest"
+    LevelDefinition:
+      $ref: "./schemas/economy.yaml#/LevelDefinition"
+    LevelPolicy:
+      $ref: "./schemas/economy.yaml#/LevelPolicy"
+    LevelPolicyList:
+      $ref: "./schemas/economy.yaml#/LevelPolicyList"
+    LevelPolicyRuleInput:
+      $ref: "./schemas/economy.yaml#/LevelPolicyRuleInput"
+    IssueLevelPolicyRequest:
+      $ref: "./schemas/economy.yaml#/IssueLevelPolicyRequest"
+    EconomySettingsOverview:
+      $ref: "./schemas/operations.yaml#/EconomySettingsOverview"
+    TrackerOperationsOverview:
+      $ref: "./schemas/operations.yaml#/TrackerOperationsOverview"
+    WorkerOperationsOverview:
+      $ref: "./schemas/operations.yaml#/WorkerOperationsOverview"
+    StorageOperationsOverview:
+      $ref: "./schemas/operations.yaml#/StorageOperationsOverview"
+    VIPProfileSettingsOverview:
+      $ref: "./schemas/operations.yaml#/VIPProfileSettingsOverview"
+    EmailSettingsOverview:
+      $ref: "./schemas/operations.yaml#/EmailSettingsOverview"
+    TestEmailDeliveryRequest:
+      $ref: "./schemas/operations.yaml#/TestEmailDeliveryRequest"
+    EmailDeliveryTestReceipt:
+      $ref: "./schemas/operations.yaml#/EmailDeliveryTestReceipt"
+    TrafficEntryCount:
+      $ref: "./schemas/traffic.yaml#/TrafficEntryCount"
+    TrafficTotals:
+      $ref: "./schemas/traffic.yaml#/TrafficTotals"
+    TrafficTorrentReference:
+      $ref: "./schemas/traffic.yaml#/TrafficTorrentReference"
+    TrafficExplanationStatus:
+      $ref: "./schemas/traffic.yaml#/TrafficExplanationStatus"
+    TrafficExplanationSegment:
+      $ref: "./schemas/traffic.yaml#/TrafficExplanationSegment"
+    TrafficSettlementExplanation:
+      $ref: "./schemas/traffic.yaml#/TrafficSettlementExplanation"
+    TrafficEntry:
+      $ref: "./schemas/traffic.yaml#/TrafficEntry"
+    TrafficOverview:
+      $ref: "./schemas/traffic.yaml#/TrafficOverview"
+    HNRDurationSeconds:
+      $ref: "./schemas/traffic.yaml#/HNRDurationSeconds"
+    HNRRatioBasisPoints:
+      $ref: "./schemas/traffic.yaml#/HNRRatioBasisPoints"
+    HNRStatus:
+      $ref: "./schemas/traffic.yaml#/HNRStatus"
+    HNRSatisfiedBy:
+      $ref: "./schemas/traffic.yaml#/HNRSatisfiedBy"
+    HNRSummary:
+      $ref: "./schemas/traffic.yaml#/HNRSummary"
+    HNREntry:
+      $ref: "./schemas/traffic.yaml#/HNREntry"
+    HNRPage:
+      $ref: "./schemas/traffic.yaml#/HNRPage"
+    SeedboxReport:
+      $ref: "./schemas/seedbox.yaml#/SeedboxReport"
+    SeedboxReportPage:
+      $ref: "./schemas/seedbox.yaml#/SeedboxReportPage"
+    Problem:
+      $ref: "./schemas/problem.yaml#/Problem"

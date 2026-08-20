@@ -1,0 +1,145 @@
+MyNewcomerAssessmentPath:
+  get:
+    operationId: getMyNewcomerAssessment
+    summary: 获取自己的新人考核与两项达标进度
+    tags: [newcomer]
+    x-audience: [web]
+    x-owner: core-newcomer
+    x-permission: newcomer.assessment.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 不返回考核 UUID、规则 UUID、操作员或授权证据。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: "../schemas/newcomer.yaml#/MyNewcomerAssessmentStatus" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+NewcomerPolicyPath:
+  get:
+    operationId: listNewcomerPolicyRevisions
+    summary: 查询新人考核规则时间线、汇总和 Worker 状态
+    tags: [newcomer]
+    x-audience: [staff]
+    x-owner: core-newcomer
+    x-permission: newcomer.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 不可变规则时间线和当前考核汇总。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/newcomer.yaml#/NewcomerPolicyPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: issueNewcomerPolicyRevision
+    summary: 签发未来生效的新人考核规则
+    tags: [newcomer]
+    x-audience: [staff]
+    x-owner: core-newcomer
+    x-permission: newcomer.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/newcomer.yaml#/IssueNewcomerPolicyRequest" }
+    responses:
+      "201":
+        description: 规则已追加；只影响生效后新完成的注册。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/newcomer.yaml#/NewcomerPolicyRevision" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+NewcomerAssessmentsPath:
+  get:
+    operationId: listNewcomerAssessments
+    summary: 查询新人考核名单与当前进度
+    tags: [newcomer]
+    x-audience: [staff]
+    x-owner: core-newcomer
+    x-permission: newcomer.assessment.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: q
+        in: query
+        schema: { type: string, maxLength: 120, default: "" }
+      - name: filter
+        in: query
+        schema:
+          allOf: [{ $ref: "../schemas/newcomer.yaml#/NewcomerAssessmentFilter" }]
+          default: active
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 结构化考核进度；不包含邮箱、Tracker 凭据或原始 announce。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/newcomer.yaml#/NewcomerAssessmentPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+NewcomerAssessmentExemptionPath:
+  post:
+    operationId: exemptNewcomerAssessment
+    summary: 人工豁免一条未结束的新人考核
+    tags: [newcomer]
+    x-audience: [staff]
+    x-owner: core-newcomer
+    x-permission: newcomer.assessment.exempt
+    x-credential-audience: staff-session
+    parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/newcomer.yaml#/ExemptNewcomerAssessmentRequest" }
+    responses:
+      "200":
+        description: 只解除新人考核来源，不清除其他下载限制。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/newcomer.yaml#/NewcomerAssessment" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

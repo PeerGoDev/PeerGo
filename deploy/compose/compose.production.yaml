@@ -1,0 +1,420 @@
+name: peergo
+
+# This manifest orchestrates PeerGo application processes. PostgreSQL, NATS
+# JetStream and the public HTTPS reverse proxy remain operator-owned services;
+# their TLS endpoints and credentials are supplied through .env.production.
+x-runtime: &runtime
+  image: ${PEERGO_RUNTIME_IMAGE:-peergo/runtime:local}
+  build:
+    context: ../..
+    dockerfile: deploy/docker/runtime.Dockerfile
+  env_file:
+    - ${PEERGO_ENV_FILE:-../../.env.production}
+  init: true
+  stop_grace_period: 20s
+  volumes:
+    - peergo_objects:/var/lib/peergo/objects
+    - peergo_tracker:/var/lib/peergo/tracker
+    - peergo_audit:/var/lib/peergo/audit
+    - peergo_image_derivatives:/var/lib/peergo/image-derivative-tmp
+    - ${PEERGO_SECRET_DIR:-../../.local/production-secrets}:/run/secrets:ro
+
+x-long-running: &long-running
+  <<: *runtime
+  restart: unless-stopped
+
+x-core-migrated: &core-migrated
+  core-migrate:
+    condition: service_completed_successfully
+
+x-tracker-migrated: &tracker-migrated
+  tracker-migrate:
+    condition: service_completed_successfully
+
+services:
+  core-migrate:
+    <<: *runtime
+    command: ["/bin/sh", "-ec", "exec goose -dir /migrations/core postgres \"$$PEERGO_CORE_DATABASE_URL\" up"]
+    restart: "no"
+
+  vault-migrate:
+    <<: *runtime
+    command: ["/bin/sh", "-ec", "exec goose -dir /migrations/vault postgres \"$$PEERGO_VAULT_DATABASE_URL\" up"]
+    restart: "no"
+
+  tracker-migrate:
+    <<: *runtime
+    command: ["/bin/sh", "-ec", "exec goose -dir /migrations/tracker postgres \"$$PEERGO_TRACKER_DATABASE_URL\" up"]
+    restart: "no"
+
+  startup-preflight:
+    <<: *runtime
+    command: ["peergo-preflight"]
+    restart: "no"
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      vault-migrate:
+        condition: service_completed_successfully
+      tracker-migrate:
+        condition: service_completed_successfully
+
+  activation-check:
+    <<: *runtime
+    profiles: ["activation"]
+    command: ["peergo-preflight"]
+    restart: "no"
+    environment:
+      PEERGO_PREFLIGHT_STRICT_POLICIES: "true"
+      PEERGO_PREFLIGHT_REGISTRATION_MODE: ${PEERGO_PREFLIGHT_REGISTRATION_MODE:-invite}
+      PEERGO_PREFLIGHT_NEWCOMER_STATE: ${PEERGO_PREFLIGHT_NEWCOMER_STATE:-enabled}
+      PEERGO_PREFLIGHT_REQUIRE_SETTLEMENT_POLICY: "true"
+      PEERGO_PREFLIGHT_REQUIRE_HNR_POLICY: "true"
+      PEERGO_PREFLIGHT_REQUIRE_EMAIL_DELIVERY: "true"
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      vault-migrate:
+        condition: service_completed_successfully
+      tracker-migrate:
+        condition: service_completed_successfully
+
+  vault-api:
+    <<: *long-running
+    command: ["vault-api"]
+    depends_on:
+      vault-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${PEERGO_VAULT_HOST_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+  # The Relay owns SMTP credentials and template rendering. It is kept off the
+  # public network; Privacy Vault reaches it through an operator-managed private
+  # HTTPS endpoint configured by PEERGO_EMAIL_DELIVERY_URL.
+  email-relay:
+    <<: *long-running
+    command: ["email-relay"]
+    ports:
+      - "127.0.0.1:${PEERGO_EMAIL_RELAY_HOST_PORT:-8086}:8086"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8086/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  audit-sink:
+    <<: *long-running
+    command: ["audit-sink"]
+    ports:
+      - "127.0.0.1:${PEERGO_AUDIT_HOST_PORT:-8082}:8082"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8082/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  settlement-control-api:
+    <<: *long-running
+    command: ["settlement-control-api"]
+    depends_on: *tracker-migrated
+    ports:
+      - "127.0.0.1:${PEERGO_SETTLEMENT_CONTROL_HOST_PORT:-8085}:8085"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8085/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+  core-api:
+    <<: *long-running
+    command: ["core-api"]
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      startup-preflight:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+
+  web:
+    image: ${PEERGO_WEB_IMAGE:-peergo/web:local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 10s
+    depends_on:
+      core-api:
+        condition: service_healthy
+    ports:
+      - "${PEERGO_WEB_BIND_ADDRESS:-127.0.0.1}:${PEERGO_WEB_HOST_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  snapshot-bootstrap:
+    <<: *runtime
+    command: ["core-snapshot-publisher"]
+    restart: "no"
+    environment:
+      PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL: ""
+    depends_on: *core-migrated
+
+  snapshot-publisher:
+    <<: *long-running
+    command: ["core-snapshot-publisher"]
+    environment:
+      PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL: ${PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL:-30s}
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      snapshot-bootstrap:
+        condition: service_completed_successfully
+
+  tracker-announce-stream-init:
+    <<: *runtime
+    command: ["tracker-stream-init"]
+    restart: "no"
+
+  tracker-swarm-stream-init:
+    <<: *runtime
+    command: ["tracker-swarm-stream-init"]
+    restart: "no"
+
+  settlement-announce-consumer-init:
+    <<: *runtime
+    command: ["settlement-consumer-init"]
+    restart: "no"
+    depends_on:
+      tracker-announce-stream-init:
+        condition: service_completed_successfully
+
+  settlement-seeding-snapshot-consumer-init:
+    <<: *runtime
+    command: ["settlement-seeding-snapshot-consumer-init"]
+    restart: "no"
+    depends_on:
+      tracker-swarm-stream-init:
+        condition: service_completed_successfully
+
+  settlement-traffic-stream-init:
+    <<: *runtime
+    command: ["settlement-traffic-stream-init"]
+    restart: "no"
+
+  settlement-seeding-evidence-stream-init:
+    <<: *runtime
+    command: ["settlement-seeding-evidence-stream-init"]
+    restart: "no"
+
+  settlement-hnr-stream-init:
+    <<: *runtime
+    command: ["settlement-hnr-stream-init"]
+    restart: "no"
+
+  core-traffic-consumer-init:
+    <<: *runtime
+    command: ["core-traffic-consumer-init"]
+    restart: "no"
+    depends_on:
+      settlement-traffic-stream-init:
+        condition: service_completed_successfully
+
+  core-seeding-evidence-consumer-init:
+    <<: *runtime
+    command: ["core-seeding-evidence-consumer-init"]
+    restart: "no"
+    depends_on:
+      settlement-seeding-evidence-stream-init:
+        condition: service_completed_successfully
+
+  core-hnr-consumer-init:
+    <<: *runtime
+    command: ["core-hnr-consumer-init"]
+    restart: "no"
+    depends_on:
+      settlement-hnr-stream-init:
+        condition: service_completed_successfully
+
+  core-swarm-consumer-init:
+    <<: *runtime
+    command: ["core-swarm-consumer-init"]
+    restart: "no"
+    depends_on:
+      tracker-announce-stream-init:
+        condition: service_completed_successfully
+      tracker-swarm-stream-init:
+        condition: service_completed_successfully
+
+  tracker:
+    <<: *long-running
+    command: ["tracker"]
+    depends_on:
+      snapshot-bootstrap:
+        condition: service_completed_successfully
+      tracker-announce-stream-init:
+        condition: service_completed_successfully
+      tracker-swarm-stream-init:
+        condition: service_completed_successfully
+    ports:
+      - "${PEERGO_TRACKER_BIND_ADDRESS:-127.0.0.1}:${PEERGO_TRACKER_HOST_PORT:-8083}:8083"
+      - "127.0.0.1:${PEERGO_TRACKER_METRICS_HOST_PORT:-9093}:9093"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8083/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+
+  core-audit-worker:
+    <<: *long-running
+    command: ["core-audit-worker"]
+    depends_on: *core-migrated
+
+  core-control-projector:
+    <<: *long-running
+    command: ["core-control-projector"]
+    depends_on: *core-migrated
+
+  core-policy-worker:
+    <<: *long-running
+    command: ["core-policy-worker"]
+    depends_on: *core-migrated
+
+  core-image-derivative-worker:
+    <<: *long-running
+    command: ["core-image-derivative-worker"]
+    depends_on: *core-migrated
+
+  core-seeding-reward-worker:
+    <<: *long-running
+    command: ["core-seeding-reward-worker"]
+    depends_on: *core-migrated
+
+  core-contribution-experience-worker:
+    <<: *long-running
+    command: ["core-contribution-experience-worker"]
+    depends_on: *core-migrated
+
+  core-progression-level-worker:
+    <<: *long-running
+    command: ["core-progression-level-worker"]
+    depends_on: *core-migrated
+
+  settlement-ingest:
+    <<: *long-running
+    command: ["settlement-ingest"]
+    depends_on:
+      tracker-migrate:
+        condition: service_completed_successfully
+      settlement-announce-consumer-init:
+        condition: service_completed_successfully
+
+  settlement-seeding-snapshot-projector:
+    <<: *long-running
+    command: ["settlement-seeding-snapshot-projector"]
+    depends_on:
+      tracker-migrate:
+        condition: service_completed_successfully
+      settlement-seeding-snapshot-consumer-init:
+        condition: service_completed_successfully
+
+  settlement-seeding-evidence-worker:
+    <<: *long-running
+    command: ["settlement-seeding-evidence-worker"]
+    depends_on: *tracker-migrated
+
+  settlement-policy-worker:
+    <<: *long-running
+    command: ["settlement-policy-worker"]
+    depends_on: *tracker-migrated
+
+  settlement-traffic-dispatcher:
+    <<: *long-running
+    command: ["settlement-traffic-dispatcher"]
+    depends_on:
+      tracker-migrate:
+        condition: service_completed_successfully
+      settlement-traffic-stream-init:
+        condition: service_completed_successfully
+
+  settlement-seeding-evidence-dispatcher:
+    <<: *long-running
+    command: ["settlement-seeding-evidence-dispatcher"]
+    depends_on:
+      tracker-migrate:
+        condition: service_completed_successfully
+      settlement-seeding-evidence-stream-init:
+        condition: service_completed_successfully
+
+  settlement-hnr-worker:
+    <<: *long-running
+    command: ["settlement-hnr-worker"]
+    depends_on: *tracker-migrated
+
+  settlement-hnr-dispatcher:
+    <<: *long-running
+    command: ["settlement-hnr-dispatcher"]
+    depends_on:
+      tracker-migrate:
+        condition: service_completed_successfully
+      settlement-hnr-stream-init:
+        condition: service_completed_successfully
+
+  core-traffic-projector:
+    <<: *long-running
+    command: ["core-traffic-projector"]
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      core-traffic-consumer-init:
+        condition: service_completed_successfully
+
+  core-seeding-evidence-projector:
+    <<: *long-running
+    command: ["core-seeding-evidence-projector"]
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      core-seeding-evidence-consumer-init:
+        condition: service_completed_successfully
+
+  core-hnr-projector:
+    <<: *long-running
+    command: ["core-hnr-projector"]
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      core-hnr-consumer-init:
+        condition: service_completed_successfully
+
+  core-swarm-projector:
+    <<: *long-running
+    command: ["core-swarm-projector"]
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      core-swarm-consumer-init:
+        condition: service_completed_successfully
+
+volumes:
+  peergo_objects:
+  peergo_tracker:
+  peergo_audit:
+  peergo_image_derivatives:

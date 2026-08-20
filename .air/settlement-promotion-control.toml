@@ -1,0 +1,24 @@
+root = "../.."
+tmp_dir = ".local/air/settlement-promotion-control"
+
+[build]
+cmd = "go -C ../.. build -o ./.local/air/settlement-promotion-control/promotion-control-api ./services/settlement/cmd/promotion-control-api"
+entrypoint = ["./.local/air/settlement-promotion-control/promotion-control-api"]
+include_ext = ["go"]
+include_dir = ["services/settlement", "contracts/go"]
+exclude_regex = ["_test\\.go$"]
+exclude_unchanged = true
+delay = 300
+stop_on_error = true
+send_interrupt = true
+kill_delay = 500000000
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = false
+keep_scroll = true

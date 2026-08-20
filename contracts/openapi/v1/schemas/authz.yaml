@@ -1,0 +1,397 @@
+CapabilityAction:
+  type: string
+  enum:
+    - account.email.verify.self
+    - account.totp.manage.self
+    - announcement.comment.create.self
+    - announcement.create
+    - announcement.manage.read
+    - announcement.publish
+    - announcement.update
+    - announcement.withdraw
+    - authz.capability.read.self
+    - authz.grant.read
+    - authz.grant.revoke.approve.governance
+    - authz.grant.revoke.approve.security
+    - authz.grant.revoke.propose
+    - category.create
+    - category.manage.read
+    - category.update
+    - comment.delete.self
+    - comment.report.create.self
+    - comment.update.self
+    - economy.attendance.claim.self
+    - economy.attendance.policy.issue
+    - economy.attendance.policy.read
+    - economy.attendance.read.self
+    - economy.contenttip.create.self
+    - economy.contenttip.policy.issue
+    - economy.contenttip.policy.read
+    - economy.contenttip.read.self
+    - economy.medal.create
+    - economy.medal.manage.read
+    - economy.medal.purchase.self
+    - economy.medal.read.self
+    - economy.medal.update
+    - economy.medal.wear.self
+    - economy.membergift.create.self
+    - economy.membergift.policy.issue
+    - economy.membergift.policy.read
+    - economy.membergift.read.self
+    - economy.read.self
+    - economy.seedingreward.policy.issue
+    - economy.seedingreward.policy.read
+    - hnr.appeal.create.self
+    - hnr.assessment.manage
+    - hnr.policy.issue
+    - hnr.policy.read
+    - hnr.read.self
+    - invitation.issue.self
+    - invitation.read.self
+    - invitation.revoke.self
+    - newcomer.assessment.exempt
+    - newcomer.assessment.read
+    - newcomer.assessment.read.self
+    - newcomer.policy.issue
+    - newcomer.policy.read
+    - notification.archive.self
+    - notification.feedback.create.self
+    - notification.read.state.write.self
+    - notification.read.self
+    - operations.email.test
+    - operations.monitor.read
+    - progression.contribution.policy.issue
+    - progression.contribution.policy.read
+    - promotion.manage.read
+    - promotion.schedule
+    - progression.level.policy.issue
+    - progression.level.policy.read
+    - ratio.appeal.create.self
+    - ratio.assessment.manage
+    - ratio.assessment.read.self
+    - ratio.policy.issue
+    - ratio.policy.read
+    - rss.settings.manage.read
+    - rss.settings.update
+    - rss.subscription.manage.self
+    - rss.subscription.read.self
+    - session.read.self
+    - session.revoke.self
+    - site.display.manage.read
+    - site.display.update
+    - site.registration.manage.read
+    - site.registration.update
+    - social.post.comment.create.self
+    - social.post.create.self
+    - social.post.delete.self
+    - social.post.read
+    - social.post.update.self
+    - social.report.read
+    - social.report.resolve
+    - staff.credential.enroll.self
+    - staff.session.create.self
+    - torrent.bookmark.read.self
+    - torrent.bookmark.write.self
+    - torrent.comment.create.self
+    - torrent.content.change.review
+    - torrent.content.change.submit.self
+    - torrent.screenshot.change.review
+    - torrent.screenshot.change.submit.self
+    - torrent.upload.policy.issue
+    - torrent.download
+    - torrent.lifecycle.update
+    - torrent.manage.read
+    - torrent.metadata.update.self
+    - torrent.promotion.purchase.self
+    - torrent.purchase.create.self
+    - torrent.purchase.manage.read
+    - torrent.purchase.manage.refund
+    - torrent.purchase.manage.update
+    - torrent.purchase.read.self
+    - torrent.report.create.self
+    - torrent.report.review
+    - torrent.review
+    - torrent.review.vote
+    - torrent.submission.read.self
+    - torrent.submission.resubmit.self
+    - torrent.submit
+    - torrent.withdraw.request.self
+    - torrent.withdraw.review
+    - tracker.policy.issue
+    - tracker.policy.read
+    - tracker.seedbox.read.self
+    - tracker.seedbox.registry.read
+    - tracker.seedbox.report.create.self
+    - tracker.seedbox.report.decide
+    - traffic.read.self
+    - user.account.appeal.create.restricted
+    - user.account.appeal.decide
+    - user.account.appeal.read
+    - user.account.read
+    - user.account.restrict
+    - user.account.restriction.revoke
+    - user.downloadrestriction.appeal.create.self
+    - user.downloadrestriction.read.self
+    - user.downloadrestriction.restrict
+    - user.downloadrestriction.revoke
+    - user.vip.manage
+    - workgroup.application.create.self
+    - workgroup.application.decide
+    - workgroup.contribution.policy.issue
+    - workgroup.contribution.reminder.issue
+    - workgroup.manage.read
+    - workgroup.membership.manage
+    - workgroup.read.self
+    - workgroup.task.publish
+    - workgroup.task.review
+    - workgroup.task.submit.self
+
+CapabilityScope:
+  type: object
+  additionalProperties: false
+  required: [type, id]
+  properties:
+    type:
+      type: string
+      enum: [site, category]
+    id:
+      type: string
+      minLength: 1
+      maxLength: 128
+
+Capability:
+  type: object
+  additionalProperties: false
+  required: [action, description, scope, expires_at]
+  properties:
+    action:
+      $ref: "#/CapabilityAction"
+    description:
+      type: string
+      minLength: 1
+      maxLength: 200
+    scope:
+      $ref: "#/CapabilityScope"
+    expires_at:
+      type: string
+      format: date-time
+
+CapabilityList:
+  type: object
+  additionalProperties: false
+  required: [policy_version, items]
+  properties:
+    policy_version:
+      type: string
+      minLength: 1
+      maxLength: 64
+    items:
+      type: array
+      maxItems: 256
+      items:
+        $ref: "#/Capability"
+
+GrantScope:
+  type: object
+  additionalProperties: false
+  required: [type, id]
+  properties:
+    type:
+      type: string
+      enum: [site, category]
+    id:
+      type: string
+      minLength: 1
+      maxLength: 128
+
+GrantAdministrationGrant:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - subject_id
+    - subject_username
+    - subject_display_name
+    - role_id
+    - role_name
+    - mandate_id
+    - mandate_status
+    - scope
+    - valid_from
+    - valid_until
+    - version
+  properties:
+    id:
+      type: string
+      format: uuid
+    subject_id:
+      type: string
+      format: uuid
+    subject_username:
+      type: string
+      minLength: 1
+      maxLength: 40
+    subject_display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    role_id:
+      type: string
+      pattern: "^[a-z][a-z0-9_]{1,63}$"
+    role_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    mandate_id:
+      type: string
+      format: uuid
+    mandate_status:
+      type: string
+      enum: [active, suspended, expired, revoked]
+    scope:
+      $ref: "#/GrantScope"
+    valid_from:
+      type: string
+      format: date-time
+    valid_until:
+      type: string
+      format: date-time
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+    revoked_at:
+      type: string
+      format: date-time
+
+GrantRevocationReview:
+  type: object
+  additionalProperties: false
+  required: [id, reviewer_id, domain, decision, reason, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    reviewer_id:
+      type: string
+      format: uuid
+    domain:
+      type: string
+      enum: [governance, security]
+    decision:
+      type: string
+      enum: [approve, reject]
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    created_at:
+      type: string
+      format: date-time
+
+GrantRevocationRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - grant_id
+    - expected_grant_version
+    - target_subject_id
+    - proposer_id
+    - reason
+    - status
+    - created_at
+    - expires_at
+    - reviews
+  properties:
+    id:
+      type: string
+      format: uuid
+    grant_id:
+      type: string
+      format: uuid
+    expected_grant_version:
+      type: integer
+      format: int64
+      minimum: 1
+    resulting_grant_version:
+      type: integer
+      format: int64
+      minimum: 2
+    target_subject_id:
+      type: string
+      format: uuid
+    proposer_id:
+      type: string
+      format: uuid
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    status:
+      type: string
+      enum: [pending, rejected, applied, conflicted, expired]
+    created_at:
+      type: string
+      format: date-time
+    expires_at:
+      type: string
+      format: date-time
+    resolved_at:
+      type: string
+      format: date-time
+    reviews:
+      type: array
+      maxItems: 2
+      items:
+        $ref: "#/GrantRevocationReview"
+
+GrantAdministrationOverview:
+  type: object
+  additionalProperties: false
+  required: [policy_version, grants, requests]
+  properties:
+    policy_version:
+      type: string
+      minLength: 1
+      maxLength: 64
+    grants:
+      type: array
+      maxItems: 200
+      items:
+        $ref: "#/GrantAdministrationGrant"
+    requests:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/GrantRevocationRequest"
+
+CreateGrantRevocationRequest:
+  type: object
+  additionalProperties: false
+  required: [grant_id, expected_grant_version, reason]
+  properties:
+    grant_id:
+      type: string
+      format: uuid
+    expected_grant_version:
+      type: integer
+      format: int64
+      minimum: 1
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+ReviewGrantRevocationRequest:
+  type: object
+  additionalProperties: false
+  required: [decision, reason]
+  properties:
+    decision:
+      type: string
+      enum: [approve, reject]
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000

@@ -1,0 +1,617 @@
+-- name: InsertTorrentReviewNotification :one
+INSERT INTO community.torrent_review_notifications (
+    recipient_user_id,
+    review_decision_id,
+    torrent_id,
+    created_at
+)
+SELECT
+    torrent.uploader_id,
+    decision.id,
+    decision.torrent_id,
+    decision.occurred_at
+FROM review.torrent_decisions AS decision
+JOIN torrents.torrents AS torrent
+  ON torrent.id = decision.torrent_id
+WHERE decision.id = sqlc.arg(review_decision_id)::uuid
+RETURNING id;
+
+-- name: CountMyNotifications :one
+WITH inbox AS (
+    SELECT notification.read_at
+    FROM community.torrent_review_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT notification.read_at
+    FROM community.ratio_watch_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT notification.read_at
+    FROM community.ratio_watch_appeal_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT notification.read_at
+    FROM community.hnr_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT notification.read_at
+    FROM community.hnr_appeal_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT notification.read_at
+    FROM community.workgroup_contribution_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT notification.read_at
+    FROM community.member_gift_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT notification.read_at
+    FROM community.content_tip_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+)
+SELECT
+    count(*)::bigint AS total_count,
+    count(*) FILTER (WHERE read_at IS NULL)::bigint AS unread_count
+FROM inbox
+WHERE true
+  AND (NOT sqlc.arg(unread_only)::boolean OR read_at IS NULL);
+
+-- name: ListMyNotifications :many
+WITH inbox AS (
+    SELECT
+        notification.id,
+        'torrent_review'::text AS kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.torrent_review_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+
+    UNION ALL
+
+    SELECT
+        notification.id,
+        'ratio_watch'::text AS kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.ratio_watch_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+
+    UNION ALL
+
+    SELECT
+        notification.id,
+        'ratio_appeal'::text AS kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.ratio_watch_appeal_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+
+    UNION ALL
+
+    SELECT
+        notification.id,
+        'hnr'::text AS kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.hnr_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+
+    UNION ALL
+
+    SELECT
+        notification.id,
+        'hnr_appeal'::text AS kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.hnr_appeal_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+
+    UNION ALL
+
+    SELECT
+        notification.id,
+        'workgroup_contribution'::text AS kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.workgroup_contribution_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+
+    UNION ALL
+
+    SELECT
+        notification.id,
+        'member_gift'::text AS kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.member_gift_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+
+    UNION ALL
+
+    SELECT
+        notification.id,
+        'content_tip'::text AS kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.content_tip_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
+)
+SELECT
+    inbox.id,
+    inbox.kind,
+    review_notification.torrent_id,
+    torrent.title AS torrent_title,
+    decision.resulting_state AS outcome,
+    decision.reason_code,
+    decision.reason,
+    transition.to_status AS ratio_watch_status,
+    transition.ratio_basis_points,
+    revision.minimum_ratio_basis_points,
+    revision.restriction_ratio_basis_points,
+    assessment.deadline_at,
+    appeal_resolution.outcome AS ratio_appeal_status,
+    appeal_resolution.response AS ratio_appeal_response,
+    hnr_notification.event_kind AS hnr_status,
+    hnr_obligation.torrent_id AS hnr_torrent_id,
+    hnr_torrent.title AS hnr_torrent_title,
+    hnr_obligation.grace_ends_at AS hnr_grace_ends_at,
+    hnr_appeal_resolution.outcome AS hnr_appeal_status,
+    hnr_appeal_resolution.response AS hnr_appeal_response,
+    hnr_appeal_obligation.torrent_id AS hnr_appeal_torrent_id,
+    hnr_appeal_torrent.title AS hnr_appeal_torrent_title,
+    hnr_appeal_obligation.grace_ends_at AS hnr_appeal_grace_ends_at,
+    contribution_reminder.group_kind AS workgroup_group_kind,
+    contribution_reminder.metric AS workgroup_metric,
+    contribution_reminder.policy_revision AS workgroup_policy_revision,
+    contribution_reminder.period_starts_at AS workgroup_period_starts_at,
+    contribution_reminder.period_ends_at AS workgroup_period_ends_at,
+    contribution_reminder.observed_at AS workgroup_observed_at,
+    contribution_reminder.evidence_state AS workgroup_evidence_state,
+    contribution_reminder.current_value AS workgroup_current_value,
+    contribution_reminder.target_value AS workgroup_target_value,
+    contribution_reminder.assessment_state AS workgroup_assessment_state,
+    contribution_reminder.explanation_code AS workgroup_explanation_code,
+    contribution_reminder.reason AS workgroup_reason,
+    gift_sender.numeric_id AS member_gift_sender_numeric_id,
+    gift_sender.username AS member_gift_sender_username,
+    gift_sender.display_name AS member_gift_sender_display_name,
+    member_gift.net_amount AS member_gift_net_amount,
+    member_gift.message AS member_gift_message,
+    tip_sender.numeric_id AS content_tip_sender_numeric_id,
+    tip_sender.username AS content_tip_sender_username,
+    tip_sender.display_name AS content_tip_sender_display_name,
+    content_tip.net_amount AS content_tip_net_amount,
+    content_tip.target_kind AS content_tip_target_kind,
+    torrent_tip.torrent_id AS content_tip_torrent_id,
+    tip_post.public_id AS content_tip_post_id,
+    tip_comment.public_id AS content_tip_comment_id,
+    content_tip.target_title AS content_tip_target_title,
+    inbox.created_at,
+    inbox.read_at
+FROM inbox
+LEFT JOIN community.torrent_review_notifications AS review_notification
+  ON inbox.kind = 'torrent_review'
+ AND review_notification.id = inbox.id
+LEFT JOIN review.torrent_decisions AS decision
+  ON decision.id = review_notification.review_decision_id
+LEFT JOIN torrents.torrents AS torrent
+  ON torrent.id = decision.torrent_id
+ AND torrent.id = review_notification.torrent_id
+ AND torrent.uploader_id = review_notification.recipient_user_id
+LEFT JOIN community.ratio_watch_notifications AS ratio_notification
+  ON inbox.kind = 'ratio_watch'
+ AND ratio_notification.id = inbox.id
+LEFT JOIN ratio_watch.assessment_transitions AS transition
+  ON transition.assessment_id = ratio_notification.assessment_id
+ AND transition.sequence = ratio_notification.transition_sequence
+LEFT JOIN ratio_watch.assessments AS assessment
+  ON assessment.id = ratio_notification.assessment_id
+ AND assessment.user_id = ratio_notification.recipient_user_id
+LEFT JOIN ratio_watch.policy_revisions AS revision
+  ON revision.id = assessment.policy_revision_id
+LEFT JOIN community.ratio_watch_appeal_notifications AS appeal_notification
+  ON inbox.kind = 'ratio_appeal'
+ AND appeal_notification.id = inbox.id
+LEFT JOIN ratio_watch.appeal_resolutions AS appeal_resolution
+  ON appeal_resolution.id = appeal_notification.resolution_id
+ AND appeal_resolution.appeal_id = appeal_notification.appeal_id
+LEFT JOIN ratio_watch.appeals AS appeal
+  ON appeal.id = appeal_notification.appeal_id
+ AND appeal.user_id = appeal_notification.recipient_user_id
+LEFT JOIN community.hnr_notifications AS hnr_notification
+  ON inbox.kind = 'hnr'
+ AND hnr_notification.id = inbox.id
+LEFT JOIN traffic.user_hnr_obligations AS hnr_obligation
+  ON hnr_obligation.obligation_id = hnr_notification.obligation_id
+ AND hnr_obligation.user_id = hnr_notification.recipient_user_id
+LEFT JOIN torrents.torrents AS hnr_torrent
+  ON hnr_torrent.id = hnr_obligation.torrent_id
+LEFT JOIN community.hnr_appeal_notifications AS hnr_appeal_notification
+  ON inbox.kind = 'hnr_appeal'
+ AND hnr_appeal_notification.id = inbox.id
+LEFT JOIN traffic.hnr_appeal_resolutions AS hnr_appeal_resolution
+  ON hnr_appeal_resolution.id = hnr_appeal_notification.resolution_id
+ AND hnr_appeal_resolution.appeal_id = hnr_appeal_notification.appeal_id
+LEFT JOIN traffic.hnr_appeals AS hnr_appeal
+  ON hnr_appeal.id = hnr_appeal_notification.appeal_id
+ AND hnr_appeal.user_id = hnr_appeal_notification.recipient_user_id
+LEFT JOIN traffic.user_hnr_obligations AS hnr_appeal_obligation
+  ON hnr_appeal_obligation.obligation_id = hnr_appeal.obligation_id
+ AND hnr_appeal_obligation.user_id = hnr_appeal_notification.recipient_user_id
+LEFT JOIN torrents.torrents AS hnr_appeal_torrent
+  ON hnr_appeal_torrent.id = hnr_appeal_obligation.torrent_id
+LEFT JOIN community.workgroup_contribution_notifications AS contribution_notification
+  ON inbox.kind = 'workgroup_contribution'
+ AND contribution_notification.id = inbox.id
+LEFT JOIN workgroups.contribution_reminders AS contribution_reminder
+  ON contribution_reminder.id = contribution_notification.reminder_id
+ AND contribution_reminder.recipient_user_id = contribution_notification.recipient_user_id
+LEFT JOIN community.member_gift_notifications AS member_gift_notification
+  ON inbox.kind = 'member_gift'
+ AND member_gift_notification.id = inbox.id
+LEFT JOIN economy.member_gifts AS member_gift
+  ON member_gift.id = member_gift_notification.member_gift_id
+ AND member_gift.recipient_user_id = member_gift_notification.recipient_user_id
+LEFT JOIN identity.users AS gift_sender
+  ON gift_sender.id = member_gift.sender_user_id
+LEFT JOIN community.content_tip_notifications AS content_tip_notification
+  ON inbox.kind = 'content_tip'
+ AND content_tip_notification.id = inbox.id
+LEFT JOIN economy.content_tips AS content_tip
+  ON content_tip.id = content_tip_notification.content_tip_id
+ AND content_tip.recipient_user_id = content_tip_notification.recipient_user_id
+LEFT JOIN identity.users AS tip_sender
+  ON tip_sender.id = content_tip.tipper_user_id
+LEFT JOIN economy.torrent_content_tips AS torrent_tip
+  ON torrent_tip.content_tip_id = content_tip.id
+LEFT JOIN economy.post_content_tips AS post_tip
+  ON post_tip.content_tip_id = content_tip.id
+LEFT JOIN social.posts AS tip_post
+  ON tip_post.id = post_tip.post_id
+LEFT JOIN economy.comment_content_tips AS comment_tip
+  ON comment_tip.content_tip_id = content_tip.id
+LEFT JOIN social.comments AS tip_comment
+  ON tip_comment.id = comment_tip.comment_id
+WHERE NOT sqlc.arg(unread_only)::boolean OR inbox.read_at IS NULL
+ORDER BY inbox.created_at DESC, inbox.id DESC
+LIMIT sqlc.arg(result_limit)::integer
+OFFSET sqlc.arg(result_offset)::integer;
+
+-- name: MarkNotificationRead :one
+WITH review_target AS (
+    SELECT id, read_at
+    FROM community.torrent_review_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_review AS (
+    UPDATE community.torrent_review_notifications AS notification
+    SET read_at = COALESCE(target.read_at, sqlc.arg(read_at)::timestamptz)
+    FROM review_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
+),
+ratio_target AS (
+    SELECT id, read_at
+    FROM community.ratio_watch_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_ratio AS (
+    UPDATE community.ratio_watch_notifications AS notification
+    SET read_at = COALESCE(target.read_at, sqlc.arg(read_at)::timestamptz)
+    FROM ratio_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
+),
+appeal_target AS (
+    SELECT id, read_at
+    FROM community.ratio_watch_appeal_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_appeal AS (
+    UPDATE community.ratio_watch_appeal_notifications AS notification
+    SET read_at = COALESCE(target.read_at, sqlc.arg(read_at)::timestamptz)
+    FROM appeal_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
+),
+hnr_target AS (
+    SELECT id, read_at
+    FROM community.hnr_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_hnr AS (
+    UPDATE community.hnr_notifications AS notification
+    SET read_at = COALESCE(target.read_at, sqlc.arg(read_at)::timestamptz)
+    FROM hnr_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
+),
+hnr_appeal_target AS (
+    SELECT id, read_at
+    FROM community.hnr_appeal_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_hnr_appeal AS (
+    UPDATE community.hnr_appeal_notifications AS notification
+    SET read_at = COALESCE(target.read_at, sqlc.arg(read_at)::timestamptz)
+    FROM hnr_appeal_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
+),
+workgroup_target AS (
+    SELECT id, read_at
+    FROM community.workgroup_contribution_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_workgroup AS (
+    UPDATE community.workgroup_contribution_notifications AS notification
+    SET read_at = COALESCE(target.read_at, sqlc.arg(read_at)::timestamptz)
+    FROM workgroup_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
+),
+member_gift_target AS (
+    SELECT id, read_at
+    FROM community.member_gift_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_member_gift AS (
+    UPDATE community.member_gift_notifications AS notification
+    SET read_at = COALESCE(target.read_at, sqlc.arg(read_at)::timestamptz)
+    FROM member_gift_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
+),
+content_tip_target AS (
+    SELECT id, read_at
+    FROM community.content_tip_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_content_tip AS (
+    UPDATE community.content_tip_notifications AS notification
+    SET read_at = COALESCE(target.read_at, sqlc.arg(read_at)::timestamptz)
+    FROM content_tip_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
+)
+SELECT id, read_at, already_read FROM updated_review
+UNION ALL
+SELECT id, read_at, already_read FROM updated_ratio
+UNION ALL
+SELECT id, read_at, already_read FROM updated_appeal
+UNION ALL
+SELECT id, read_at, already_read FROM updated_hnr
+UNION ALL
+SELECT id, read_at, already_read FROM updated_hnr_appeal
+UNION ALL
+SELECT id, read_at, already_read FROM updated_workgroup
+UNION ALL
+SELECT id, read_at, already_read FROM updated_member_gift
+UNION ALL
+SELECT id, read_at, already_read FROM updated_content_tip
+LIMIT 1;
+
+-- name: MarkAllNotificationsRead :one
+WITH updated_reviews AS (
+    UPDATE community.torrent_review_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
+),
+updated_ratios AS (
+    UPDATE community.ratio_watch_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
+),
+updated_appeals AS (
+    UPDATE community.ratio_watch_appeal_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
+),
+updated_hnr AS (
+    UPDATE community.hnr_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
+),
+updated_hnr_appeals AS (
+    UPDATE community.hnr_appeal_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
+),
+updated_workgroups AS (
+    UPDATE community.workgroup_contribution_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
+),
+updated_member_gifts AS (
+    UPDATE community.member_gift_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
+),
+updated_content_tips AS (
+    UPDATE community.content_tip_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
+)
+SELECT (
+    (SELECT count(*) FROM updated_reviews)
+    + (SELECT count(*) FROM updated_ratios)
+    + (SELECT count(*) FROM updated_appeals)
+    + (SELECT count(*) FROM updated_hnr)
+    + (SELECT count(*) FROM updated_hnr_appeals)
+    + (SELECT count(*) FROM updated_workgroups)
+    + (SELECT count(*) FROM updated_member_gifts)
+    + (SELECT count(*) FROM updated_content_tips)
+)::bigint AS updated_count;
+
+-- name: ArchiveAllNotifications :one
+WITH archived_reviews AS (
+    UPDATE community.torrent_review_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
+),
+archived_ratios AS (
+    UPDATE community.ratio_watch_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
+),
+archived_appeals AS (
+    UPDATE community.ratio_watch_appeal_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
+),
+archived_hnr AS (
+    UPDATE community.hnr_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
+),
+archived_hnr_appeals AS (
+    UPDATE community.hnr_appeal_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
+),
+archived_workgroups AS (
+    UPDATE community.workgroup_contribution_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
+),
+archived_member_gifts AS (
+    UPDATE community.member_gift_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
+),
+archived_content_tips AS (
+    UPDATE community.content_tip_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
+)
+SELECT (
+    (SELECT count(*) FROM archived_reviews)
+    + (SELECT count(*) FROM archived_ratios)
+    + (SELECT count(*) FROM archived_appeals)
+    + (SELECT count(*) FROM archived_hnr)
+    + (SELECT count(*) FROM archived_hnr_appeals)
+    + (SELECT count(*) FROM archived_workgroups)
+    + (SELECT count(*) FROM archived_member_gifts)
+    + (SELECT count(*) FROM archived_content_tips)
+)::bigint AS updated_count;
+
+-- name: InsertSupportFeedback :one
+INSERT INTO community.support_feedbacks (
+    sender_user_id,
+    title,
+    content,
+    created_at,
+    updated_at
+) VALUES (
+    sqlc.arg(sender_user_id)::uuid,
+    sqlc.arg(title)::text,
+    sqlc.arg(content)::text,
+    sqlc.arg(created_at)::timestamptz,
+    sqlc.arg(created_at)::timestamptz
+)
+RETURNING id, created_at;

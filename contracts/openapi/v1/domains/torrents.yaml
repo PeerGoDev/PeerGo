@@ -1,0 +1,1834 @@
+TorrentsPath:
+  get:
+    operationId: listTorrents
+    summary: 获取最新种子摘要
+    tags: [catalog]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - name: limit
+        in: query
+        description: 返回数量上限。
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: query
+        in: query
+        description: 对名称和副标题进行不区分大小写的包含匹配。
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      - name: search_scope
+        in: query
+        description: 关键词匹配范围；省略时同时匹配标题和副标题。
+        required: false
+        schema:
+          type: string
+          enum: [title_subtitle, title, subtitle]
+          default: title_subtitle
+      - name: offset
+        in: query
+        description: 从匹配结果中跳过的数量，用于稳定分页。
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+      - name: category_id
+        in: query
+        description: 只返回指定启用分类的种子；省略时返回全部分类。
+        required: false
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+      - name: promotion
+        in: query
+        description: 只返回当前公开展示优惠匹配的种子；历史结算不读取此字段。
+        required: false
+        schema:
+          type: string
+          enum:
+            - none
+            - free
+            - double_upload
+            - double_upload_free
+            - half_download
+            - double_upload_half_download
+            - thirty_percent_download
+      - name: sort
+        in: query
+        description: 搜索结果排序；省略时按最新发布时间倒序。
+        required: false
+        schema:
+          type: string
+          enum:
+            [published_desc, published_asc, size_desc, size_asc, completed_desc]
+          default: published_desc
+    responses:
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "200":
+        description: 最新种子与异步 swarm 统计快照。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/TorrentList"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: submitTorrent
+    summary: 提交原始私有 v1 种子进入审核
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.submit
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            $ref: "../schemas/torrents.yaml#/TorrentSubmissionRequest"
+    responses:
+      "201":
+        description: >-
+          原始对象已完整回读校验，种子及文件清单已原子写入待审核状态。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentSubmission"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "413":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTorrentSubmissionsPath:
+  get:
+    operationId: listMyTorrentSubmissions
+    summary: 获取当前用户的种子提交状态与最近审核反馈
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.submission.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        description: 最近提交记录的返回上限。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+    responses:
+      "200":
+        description: >-
+          仅返回本人提交的稳定元数据、生命周期状态和最近审核反馈；不包含审核员、
+          授权决策、审计证据或 Tracker 内部标识。
+        headers:
+          Cache-Control:
+            description: 本人提交与审核反馈不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/MyTorrentSubmissionPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTorrentResubmissionPath:
+  put:
+    operationId: resubmitMyTorrentSubmission
+    summary: 整改自己的已驳回种子并重新送审
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-review
+    x-permission: torrent.submission.resubmit.self
+    x-credential-audience: web-session
+    parameters:
+      - name: torrent_id
+        in: path
+        required: true
+        description: 本人已驳回种子的数字 ID。
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/TorrentResubmissionRequest"
+    responses:
+      "200":
+        description: 可变发布资料和重新送审记录已在同一事务提交。
+        headers:
+          Cache-Control:
+            description: 本人整改结果不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentResubmission"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyPublishedTorrentMetadataPath:
+  put:
+    operationId: updateMyPublishedTorrentMetadata
+    summary: 修改自己已发布种子的基础发布资料
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.metadata.update.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/UpdatePublishedTorrentMetadataRequest"
+    responses:
+      "200":
+        description: 当前聚合与不可变资料修订已在同一事务提交；原始种子身份保持不变。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/PublishedTorrentMetadataRevision"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyPublishedTorrentContentChangePath:
+  post:
+    operationId: submitMyPublishedTorrentContentChange
+    summary: 提交自己已发布种子的内容资料修改候选
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.content.change.submit.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/SubmitPublishedTorrentContentChangeRequest"
+    responses:
+      "201":
+        description: 候选资料已冻结并进入审核；当前公开版本保持不变。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/PublishedTorrentContentChange"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyPublishedTorrentScreenshotChangePath:
+  post:
+    operationId: submitMyPublishedTorrentScreenshotChange
+    summary: 提交自己已发布种子的截图附件集修改候选
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.screenshot.change.submit.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            $ref: "../schemas/torrents.yaml#/SubmitPublishedTorrentScreenshotChangeRequest"
+    responses:
+      "201":
+        description: 候选附件集已冻结并进入审核；当前公开图集保持不变。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/PublishedTorrentScreenshotChange"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "413":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyPublishedTorrentWithdrawalPath:
+  post:
+    operationId: submitMyTorrentWithdrawal
+    summary: 申请撤回自己已发布的种子
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.withdraw.request.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/SubmitTorrentWithdrawalRequest"
+    responses:
+      "201":
+        description: >-
+          撤回申请、聚合停用、审计与 Tracker 准入关闭已原子提交；原始对象、
+          图片、账本和购买证据不会被删除。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentWithdrawalRequest"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTorrentBookmarksPath:
+  get:
+    operationId: listMyTorrentBookmarks
+    summary: 分页获取当前用户收藏的种子
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: torrent.bookmark.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        description: 单页收藏数量上限。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        description: 从零开始的收藏偏移量。
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+    responses:
+      "200":
+        description: 按收藏时间倒序返回本人收藏；公开种子摘要沿用目录契约。
+        headers:
+          Cache-Control:
+            description: 本人收藏不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentBookmarkPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTorrentBookmarkStatusesPath:
+  get:
+    operationId: listMyTorrentBookmarkStatuses
+    summary: 批量获取当前用户对种子的收藏状态
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: torrent.bookmark.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: torrent_id
+        in: query
+        required: true
+        description: 本页中需要检查的公开目录数字种子 ID；最多 100 个。
+        style: form
+        explode: true
+        schema:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+    responses:
+      "200":
+        description: 只返回已经收藏的标识；未返回的请求标识即未收藏。
+        headers:
+          Cache-Control:
+            description: 本人收藏状态不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentBookmarkStatusList"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTorrentBookmarkPath:
+  parameters:
+    - $ref: "#/TorrentCatalogIDPathParameter"
+  put:
+    operationId: putMyTorrentBookmark
+    summary: 幂等收藏一个公开目录种子
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: torrent.bookmark.write.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    responses:
+      "200":
+        description: 收藏已存在；重复 PUT 保留最初收藏时间。
+        headers:
+          Cache-Control:
+            description: 本人收藏状态不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentBookmarkState"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  delete:
+    operationId: deleteMyTorrentBookmark
+    summary: 幂等取消收藏一个公开目录种子
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: torrent.bookmark.write.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    responses:
+      "204":
+        description: 收藏已经不存在。
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentDetailPath:
+  get:
+    operationId: getTorrentDetail
+    summary: 获取单个已发布种子的稳定公开元数据
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: >-
+          已发布种子的稳定元数据；文件、评论、审核和实时 swarm 状态由独立查询边界提供。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPublicDetail"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentCoverPath:
+  get:
+    operationId: getTorrentCover
+    summary: 获取已发布种子的首张公开截图作为封面
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: >-
+          服务端从当前已配置的本地或对象存储读取首张截图，按 PostgreSQL
+          中的不可变长度与 SHA-256 证据完整校验后返回。对象键、后端位置、
+          版本号和存储凭据不会暴露给浏览器。
+        headers:
+          Cache-Control:
+            description: 短期公共缓存；未来显式封面替换无需沿用旧对象。
+            required: true
+            schema:
+              type: string
+          ETag:
+            description: 由不可变内容 SHA-256 生成的强校验标签。
+            required: true
+            schema:
+              type: string
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+          image/gif:
+            schema:
+              type: string
+              format: binary
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentScreenshotPath:
+  get:
+    operationId: getTorrentScreenshot
+    summary: 按稳定位置获取已发布种子的公开截图
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - name: position
+        in: path
+        required: true
+        description: 上传时确定的不可变截图位置；0 同时是封面。
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 5
+    responses:
+      "200":
+        description: >-
+          服务端从当前已配置的本地或对象存储读取指定截图，并按 PostgreSQL
+          中的不可变长度与 SHA-256 证据完整校验后返回。物理存储信息不暴露给浏览器。
+        headers:
+          Cache-Control:
+            description: 短期公共缓存，并允许后台重新验证。
+            required: true
+            schema:
+              type: string
+          ETag:
+            description: 由不可变内容 SHA-256 生成的强校验标签。
+            required: true
+            schema:
+              type: string
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+          image/gif:
+            schema:
+              type: string
+              format: binary
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentContentPath:
+  get:
+    operationId: getTorrentContent
+    summary: 获取单个已发布种子的长文本内容
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: >-
+          已发布种子的描述与原始 MediaInfo/BDInfo。长文本独立于首屏元数据读取，
+          避免没有展示需求的客户端无条件下载大型历史内容。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPublicContent"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentRelatedVersionsPath:
+  get:
+    operationId: getTorrentRelatedVersions
+    summary: 获取同一资源组的其它公开种子版本
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: >-
+          只返回同一受控资源组内的其它已发布种子，复用公开目录摘要，
+          不从标题或外部编号猜测关联关系。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentRelatedVersions"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentSwarmPath:
+  get:
+    operationId: getTorrentSwarm
+    summary: 获取单个已发布种子的做种统计
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: 最近一次异步汇总的做种、下载和完成数量；统计不可用或过期不影响种子详情。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentSwarmOverview"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentFilesPath:
+  get:
+    operationId: listTorrentFiles
+    summary: 分页获取单个已发布种子的文件清单
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - name: limit
+        in: query
+        required: false
+        description: 单页文件数量上限。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: offset
+        in: query
+        required: false
+        description: 从零开始的文件偏移量。
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+    responses:
+      "200":
+        description: 按原始 metainfo 文件序号排序的不可变文件清单分页。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentFilePage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentReviewsPath:
+  get:
+    operationId: listPendingTorrentReviews
+    summary: 获取最早提交的待审核种子
+    tags: [review]
+    x-audience: [staff]
+    x-owner: core-review
+    x-permission: torrent.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        description: 本次返回的待审核对象上限。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+    responses:
+      "200":
+        description: 脱敏审核队列；不包含邮箱、IP、passkey、流量或凭据字段。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/PendingTorrentReviewPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTorrentReviewsPath:
+  get:
+    operationId: listMyTorrentReviewAssignments
+    summary: 获取当前种审组成员尚未投票的待审核种子
+    tags: [review]
+    x-audience: [web]
+    x-owner: core-review
+    x-permission: torrent.review.vote
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+    responses:
+      "200":
+        description: 不含赞成/反对票分布的本人审核任务，避免投票前跟票。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/MyTorrentReviewAssignmentPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTorrentReviewVotesPath:
+  post:
+    operationId: createMyTorrentReviewVote
+    summary: 以有效种审组成员身份提交不可变审核票
+    tags: [review]
+    x-audience: [web]
+    x-owner: core-review
+    x-permission: torrent.review.vote
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/TorrentReviewDecisionRequest"
+    responses:
+      "201":
+        description: >-
+          投票与本轮计数已原子保存；达到终局时，种子状态、通知、审计和
+          Tracker outbox 也在同一事务提交。2:2 只升级，不自动发布或驳回。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentReviewVoteResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentsPath:
+  get:
+    operationId: listManagedTorrents
+    summary: 分页查询全部种子生命周期状态
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: query
+        in: query
+        required: false
+        description: 按数字种子 ID、标题、副标题、上传者用户名或显示名匹配。
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      - name: state
+        in: query
+        required: false
+        schema:
+          $ref: "../schemas/torrents.yaml#/TorrentLifecycleState"
+      - name: category_id
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 不含邮箱、passkey、客户端地址、存储键或结算证据的种子管理投影。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/ManagedTorrentPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedPublishedTorrentContentChangesPath:
+  get:
+    operationId: listManagedPublishedTorrentContentChanges
+    summary: 分页查询已发布种子的内容资料修改候选
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.content.change.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: "../schemas/torrents.yaml#/PublishedTorrentContentChangeStatus"
+      - name: limit
+        in: query
+        required: false
+        schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      - name: offset
+        in: query
+        required: false
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 返回审核所需的新旧内容快照，不包含邮箱、对象位置或 Tracker 凭据。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/ManagedPublishedTorrentContentChangePage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedPublishedTorrentContentChangeDecisionPath:
+  post:
+    operationId: decideManagedPublishedTorrentContentChange
+    summary: 批准或驳回一个已发布种子的内容资料修改候选
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.content.change.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/DecidePublishedTorrentContentChangeRequest"
+    responses:
+      "200":
+        description: 决定已经提交；批准时公开内容与外部编号在同一事务切换。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/PublishedTorrentContentChangeDecisionResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedPublishedTorrentScreenshotChangesPath:
+  get:
+    operationId: listManagedPublishedTorrentScreenshotChanges
+    summary: 分页查询已发布种子的截图附件修改候选
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.screenshot.change.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: "../schemas/torrents.yaml#/PublishedTorrentScreenshotChangeStatus"
+      - name: limit
+        in: query
+        required: false
+        schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      - name: offset
+        in: query
+        required: false
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 返回候选数量、基线数量和受控预览入口，不暴露对象位置。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/ManagedPublishedTorrentScreenshotChangePage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedPublishedTorrentScreenshotChangeDecisionPath:
+  post:
+    operationId: decideManagedPublishedTorrentScreenshotChange
+    summary: 批准或驳回一个截图附件集修改候选
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.screenshot.change.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/DecidePublishedTorrentScreenshotChangeRequest"
+    responses:
+      "200":
+        description: 决定已提交；批准时只原子切换当前附件集指针。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/PublishedTorrentScreenshotChangeDecisionResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedPublishedTorrentScreenshotChangeImagePath:
+  get:
+    operationId: getManagedPublishedTorrentScreenshotChangeImage
+    summary: 读取截图附件候选中的受控审核预览
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.screenshot.change.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: side
+        in: path
+        required: true
+        schema: { type: string, enum: [base, candidate] }
+      - name: position
+        in: path
+        required: true
+        schema: { type: integer, minimum: 0, maximum: 5 }
+    responses:
+      "200":
+        description: 经不可变长度与 SHA-256 完整校验后的后台预览。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+          ETag:
+            required: true
+            schema: { type: string }
+        content:
+          image/jpeg:
+            schema: { type: string, format: binary }
+          image/png:
+            schema: { type: string, format: binary }
+          image/webp:
+            schema: { type: string, format: binary }
+          image/gif:
+            schema: { type: string, format: binary }
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentWithdrawalsPath:
+  get:
+    operationId: listManagedTorrentWithdrawals
+    summary: 分页查询种子撤回申请
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.withdraw.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: "../schemas/torrents.yaml#/TorrentWithdrawalStatus"
+      - name: limit
+        in: query
+        required: false
+        schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      - name: offset
+        in: query
+        required: false
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: >-
+          返回撤回审核所需的冻结标题、理由、上传者和有效购买数，不包含邮箱、
+          对象位置、Tracker 凭据或授权证据。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/ManagedTorrentWithdrawalPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentWithdrawalDecisionPath:
+  post:
+    operationId: decideManagedTorrentWithdrawal
+    summary: 批准或驳回一个种子撤回申请
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.withdraw.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/DecideTorrentWithdrawalRequest"
+    responses:
+      "200":
+        description: >-
+          批准只写入 deleted 墓碑，驳回恢复 published；聚合、审核事实、审计和
+          Tracker 事件在同一事务提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentWithdrawalDecisionResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentAvailabilityPath:
+  post:
+    operationId: changeManagedTorrentAvailability
+    summary: 下架或恢复一个已审核种子
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.lifecycle.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/ChangeTorrentAvailabilityRequest"
+    responses:
+      "201":
+        description: 聚合、不可变命令、审计事件和 Tracker 控制事件已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentAvailabilityResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentPurchasePricePath:
+  put:
+    operationId: updateManagedTorrentPurchasePrice
+    summary: 设置单个种子的整数魔力值价格
+    tags: [torrents, economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: torrent.purchase.manage.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/UpdateTorrentPurchasePriceRequest"
+    responses:
+      "200":
+        description: 价格和种子版本已更新，既有永久购买权限保持不变。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPurchasePriceChange"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentPurchasesPath:
+  get:
+    operationId: listManagedTorrentPurchases
+    summary: 分页查询全站种子购买与退款记录
+    tags: [torrents, economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: torrent.purchase.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: query
+        in: query
+        required: false
+        description: 匹配用户数字 ID、用户名、显示名、种子数字 ID 或标题。
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [active, refunded]
+      - name: source
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [live_purchase, legacy_import]
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 使用数字用户与种子 ID 的后台购买投影，不公开内部 entitlement UUID。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/ManagedTorrentPurchasePage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentPurchaseRefundPath:
+  post:
+    operationId: refundManagedTorrentPurchase
+    summary: 撤销购买权限并由站点全额返还购买时的整数魔力值
+    tags: [torrents, economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: torrent.purchase.manage.refund
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/UserNumericIDPathParameter"
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/RefundTorrentPurchaseRequest"
+    responses:
+      "201":
+        description: 退款账本、余额投影和权限撤销已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPurchaseRefundReceipt"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentDownloadPath:
+  get:
+    operationId: downloadTorrent
+    summary: 下载绑定本人 Tracker 凭据的已发布种子副本
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.download
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: >-
+          原始对象已经完整 SHA-256/长度校验；响应只改写 info 字典外的
+          announce 字段，且不会在请求 URL 或 JSON 中返回 passkey。
+        headers:
+          Content-Disposition:
+            description: RFC 6266 attachment 文件名。
+            required: true
+            schema:
+              type: string
+          Cache-Control:
+            description: 凭据化响应必须禁止浏览器与中间缓存保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/x-bittorrent:
+            schema:
+              type: string
+              format: binary
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "402":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentPurchasePath:
+  get:
+    operationId: getMyTorrentPurchase
+    summary: 查看自己对指定种子的价格和购买状态
+    tags: [torrents, economy]
+    x-audience: [web]
+    x-owner: core-economy
+    x-permission: torrent.purchase.read.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: 当前整数价格、魔力值余额和永久访问状态。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPurchaseStatus"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: purchaseTorrent
+    summary: 使用整数魔力值购买指定种子的永久下载权限
+    tags: [torrents, economy]
+    x-audience: [web]
+    x-owner: core-economy
+    x-permission: torrent.purchase.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    responses:
+      "201":
+        description: 魔力值结算和永久访问凭证已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPurchaseReceipt"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTorrentPurchasesPath:
+  get:
+    operationId: listMyTorrentPurchases
+    summary: 分页查看自己的有效种子购买权限
+    tags: [torrents, economy]
+    x-audience: [web]
+    x-owner: core-economy
+    x-permission: torrent.purchase.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 当前仍有效的永久权限及购买当时的整数魔力值价格。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPurchaseHistoryPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentReviewDecisionsPath:
+  post:
+    operationId: decideTorrentReview
+    summary: 对单个待审核种子作出通过或驳回决定
+    tags: [review]
+    x-audience: [staff]
+    x-owner: core-review
+    x-permission: torrent.review
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/TorrentReviewDecisionRequest"
+    responses:
+      "201":
+        description: >-
+          决定、聚合状态和审计证据已经原子提交；通过决定同时进入
+          Tracker 控制 outbox，allowlist 由独立投影器异步更新。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentReviewDecisionResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+UserNumericIDPathParameter:
+  name: user_numeric_id
+  in: path
+  required: true
+  description: 后台展示和操作使用的用户正整数 ID。
+  schema:
+    type: integer
+    format: int64
+    minimum: 1
+
+TorrentIDPathParameter:
+  name: torrent_id
+  in: path
+  required: true
+  description: 种子的唯一正整数 ID；迁移数据保留旧站 ID，新数据从当前最大值继续递增。
+  schema:
+    type: integer
+    format: int64
+    minimum: 1
+
+TorrentCatalogIDPathParameter:
+  name: torrent_id
+  in: path
+  required: true
+  description: 公开目录种子的唯一正整数 ID。
+  schema:
+    type: integer
+    format: int64
+    minimum: 1
+
+TorrentReportsPath:
+  post:
+    operationId: createTorrentReport
+    summary: 举报一条他人已发布的种子
+    tags: [torrents, moderation]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.report.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/CreateTorrentReportRequest"
+    responses:
+      "201":
+        description: 举报陈述已作为不可变证据写入当前聚合案件。
+        headers:
+          Cache-Control:
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentReportReceipt"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentReportCasesPath:
+  get:
+    operationId: listManagedTorrentReportCases
+    summary: 读取种子举报审核队列
+    tags: [torrents, moderation]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.report.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: state
+        in: query
+        required: false
+        schema:
+          $ref: "../schemas/torrents.yaml#/TorrentReportCaseState"
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          default: 0
+    responses:
+      "200":
+        description: 举报人身份已移除的案件投影。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/ManagedTorrentReportCasePage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedTorrentReportCaseDecisionPath:
+  post:
+    operationId: decideManagedTorrentReportCase
+    summary: 关闭种子举报案件或临时下架种子
+    tags: [torrents, moderation]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.report.review
+    x-credential-audience: staff-session
+    parameters:
+      - name: case_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/torrents.yaml#/CreateTorrentReportDecisionRequest"
+    responses:
+      "200":
+        description: 案件决定已提交；下架决定同时进入审计与 Tracker outbox。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentReportDecisionResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"

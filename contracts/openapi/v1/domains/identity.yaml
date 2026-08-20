@@ -1,0 +1,1679 @@
+RegistrationsPath:
+  post:
+    operationId: createRegistration
+    summary: 按当前站点准入策略创建普通账户，并保留开放注册中的可选邀请关系
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.register.anonymous
+    x-credential-audience: anonymous
+    parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 浏览器为一次注册尝试生成并在安全重试时复用的 UUID。
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/CreateRegistrationRequest"
+    responses:
+      "201":
+        description: >-
+          账户与凭据已完成跨存储激活。邮箱仍待验证，首版应先使用用户名登录。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/RegistrationResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyInvitationsPath:
+  get:
+    operationId: getMyInvitations
+    summary: 查看自己的邀请资格、名额与邀请记录
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: invitation.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+    responses:
+      "200":
+        description: 邀请资格与不含任何邀请码明文的历史记录。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/InvitationOverview"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: issueMyInvitation
+    summary: 签发一个自己的单次注册邀请码
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: invitation.issue.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+    responses:
+      "201":
+        description: 邀请码已签发；明文 token 仅在本响应返回一次。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/InvitationIssueResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyInvitationRevocationPath:
+  parameters:
+    - name: invitation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  post:
+    operationId: revokeMyInvitation
+    summary: 撤销一个自己尚未被领取的邀请码
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: invitation.revoke.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+    responses:
+      "200":
+        description: 邀请码已撤销并立即释放名额。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/MemberInvitation"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+EmailVerificationsPath:
+  post:
+    operationId: requestEmailVerification
+    summary: 为当前账户请求邮箱验证邮件
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.email.verify.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/RequestEmailVerificationRequest"
+    responses:
+      "202":
+        description: >-
+          请求已按枚举安全语义处理；响应不说明重新输入的地址是否匹配。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/EmailVerificationDispatch"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+EmailVerificationConfirmationPath:
+  post:
+    operationId: confirmEmailVerification
+    summary: 使用一次性 bearer token 确认邮箱所有权
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.email.confirm.anonymous
+    x-credential-audience: anonymous
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/ConfirmEmailVerificationRequest"
+    responses:
+      "200":
+        description: Vault identifier 与 Core 用户投影均已完成验证。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/EmailVerificationResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+PasswordRecoveryRequestsPath:
+  post:
+    operationId: requestPasswordRecovery
+    summary: 使用注册邮箱请求一次性密码恢复链接
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.password.recovery.request.anonymous
+    x-credential-audience: anonymous
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/RequestPasswordRecoveryRequest"
+    responses:
+      "202":
+        description: >-
+          请求已按枚举安全语义处理；响应不说明邮箱是否命中已验证账户。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/PasswordRecoveryDispatch"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+PasswordRecoveryConfirmationPath:
+  post:
+    operationId: confirmPasswordRecovery
+    summary: 使用一次性密码恢复凭证设置新密码
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.password.recovery.confirm.anonymous
+    x-credential-audience: anonymous
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/ConfirmPasswordRecoveryRequest"
+    responses:
+      "200":
+        description: >-
+          Vault 密码已替换，Core 已撤销该账户的全部 Web 与 staff 会话。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/PasswordRecoveryResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+SessionPath:
+  get:
+    operationId: getWebSession
+    summary: 获取当前 Web 会话
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: session.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前有效 Web 会话。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/WebSession"
+      "204":
+        description: 当前没有有效会话。
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+  post:
+    operationId: createWebSession
+    summary: 使用站内凭据创建 Web 会话
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: session.create.self
+    x-credential-audience: anonymous
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/CreateSessionRequest"
+    responses:
+      "200":
+        description: 登录成功；原始会话 token 只通过 HttpOnly cookie 返回。
+        headers:
+          Set-Cookie:
+            description: HttpOnly、SameSite 会话 cookie。
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/WebSession"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "428":
+        description: >-
+          密码已验证，但该账户需要继续提交 TOTP 或一次性恢复码；此响应不会创建会话。
+        content:
+          application/problem+json:
+            schema:
+              $ref: "../schemas/problem.yaml#/Problem"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  delete:
+    operationId: deleteWebSession
+    summary: 撤销当前 Web 会话
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: session.revoke.self
+    x-credential-audience: web-session
+    parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: 与当前会话绑定的 CSRF token。
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+    responses:
+      "204":
+        description: 会话已撤销或已经不存在。
+        headers:
+          Set-Cookie:
+            description: 立即过期的会话 cookie。
+            schema:
+              type: string
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+PublicUserProfilePath:
+  parameters:
+    - name: username
+      in: path
+      required: true
+      description: 成员用户名；大小写不敏感，响应始终返回规范大小写。
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+  get:
+    operationId: getPublicUserProfile
+    summary: 获取站内成员的公开资料
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: user.profile.read.member
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 不包含邮箱、IP、限制状态或私密流量的成员公开资料。
+        headers:
+          Cache-Control:
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/PublicUserProfile"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+AccountProfilePath:
+  patch:
+    operationId: updateMyProfile
+    summary: 修改当前账户的公开资料
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.profile.update.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/UpdateMyProfileRequest"
+    responses:
+      "200":
+        description: 已更新的当前会话用户投影。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/SessionUser"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyAvatarPath:
+  put:
+    operationId: updateMyAvatar
+    summary: 上传并替换当前账户的公开头像
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.profile.update.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        image/jpeg:
+          schema:
+            type: string
+            format: binary
+            minLength: 1
+            maxLength: 1048576
+    responses:
+      "200":
+        description: 已完成完整回读校验并设为当前头像。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/AvatarRevision"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "413":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+PublicUserAvatarPath:
+  parameters:
+    - name: username
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+  get:
+    operationId: getPublicUserAvatar
+    summary: 获取站内成员当前公开头像
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: user.profile.read.member
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 已完成完整 SHA-256 与长度校验的公开头像。
+        headers:
+          Cache-Control:
+            required: true
+            schema:
+              type: string
+          ETag:
+            required: true
+            schema:
+              type: string
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+AccountSecurityPath:
+  get:
+    operationId: getAccountSecurity
+    summary: 获取当前账户的 Core 安全概览
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: session.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 只包含 Core 所有的脱敏安全状态。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/AccountSecurityOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTOTPEnrollmentsPath:
+  post:
+    operationId: startMyTOTPEnrollment
+    summary: 开始当前账户的 TOTP 登记
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.totp.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/StartTOTPEnrollmentRequest"
+    responses:
+      "200":
+        description: 一次性登记秘钥与标准 otpauth URI；确认前不会启用。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/TOTPEnrollmentStart"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTOTPEnrollmentConfirmationPath:
+  parameters:
+    - name: enrollment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  post:
+    operationId: confirmMyTOTPEnrollment
+    summary: 验证代码并启用当前账户的 TOTP
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.totp.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/ConfirmTOTPEnrollmentRequest"
+    responses:
+      "200":
+        description: TOTP 已启用；恢复码只在短暂可重试窗口内返回。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/TOTPEnrollmentResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "410":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTOTPRecoveryCodeRotationsPath:
+  post:
+    operationId: rotateMyTOTPRecoveryCodes
+    summary: 轮换当前账户的全部 TOTP 恢复码
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.totp.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+      - $ref: "#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/TwoFactorReauthenticationRequest"
+    responses:
+      "200":
+        description: 旧恢复码全部失效，新恢复码仅在本响应中展示。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/RecoveryCodeRotationResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "410":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyTOTPPath:
+  delete:
+    operationId: disableMyTOTP
+    summary: 关闭当前账户的 TOTP
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: account.totp.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+      - $ref: "#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/TwoFactorReauthenticationRequest"
+    responses:
+      "200":
+        description: TOTP 与所有剩余恢复码已失效，当前会话保留。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/TwoFactorDisableResult"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MySessionsPath:
+  get:
+    operationId: listMyWebSessions
+    summary: 列出当前账户的有效 Web 会话
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: session.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 有效会话的隐私最小化投影。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/UserWebSessionList"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  delete:
+    operationId: deleteMyOtherWebSessions
+    summary: 撤销除当前浏览器外的所有有效 Web 会话
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: session.revoke.self
+    x-credential-audience: web-session
+    parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: 与当前会话绑定的 CSRF token。
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+    responses:
+      "204":
+        description: 其他有效会话及其 staff 子会话均已撤销；当前会话保留。
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MySessionPath:
+  parameters:
+    - name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  delete:
+    operationId: deleteMyWebSession
+    summary: 撤销当前账户的一个有效 Web 会话
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: session.revoke.self
+    x-credential-audience: web-session
+    parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: 与当前会话绑定的 CSRF token。
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+    responses:
+      "204":
+        description: 目标会话已撤销或不再有效；若为当前会话则清除 cookie。
+        headers:
+          Set-Cookie:
+            description: 目标为当前会话时立即过期的 Web 会话 cookie。
+            schema:
+              type: string
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StaffElevationOptionsPath:
+  post:
+    operationId: beginStaffElevation
+    summary: 为当前 Web 会话创建一次性 staff WebAuthn assertion
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: staff.session.create.self
+    x-credential-audience: web-session
+    parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: 与当前普通 Web 会话绑定的 CSRF token。
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+    responses:
+      "200":
+        description: >-
+          一次性 assertion 选项。SessionData 只保存在服务端并绑定当前
+          Web session；浏览器仅收到 challenge ID 和标准 WebAuthn 选项。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/StaffElevationOptions"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StaffElevationPath:
+  post:
+    operationId: completeStaffElevation
+    summary: 验证 staff WebAuthn assertion 并创建独立后台会话
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: staff.session.create.self
+    x-credential-audience: web-session
+    parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: 与发起 assertion 的普通 Web 会话绑定的 CSRF token。
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/CompleteStaffElevationRequest"
+    responses:
+      "200":
+        description: >-
+          WebAuthn 验证成功；原始 staff token 只通过限定到
+          /api/v1/admin 的 HttpOnly cookie 返回。
+        headers:
+          Set-Cookie:
+            description: 独立、短期、SameSite staff session cookie。
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/StaffSession"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StaffEnrollmentOptionsPath:
+  post:
+    operationId: beginStaffEnrollment
+    summary: 使用一次性 bootstrap ticket 创建 staff WebAuthn registration
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: staff.credential.enroll.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/BeginStaffEnrollmentRequest"
+    responses:
+      "200":
+        description: >-
+          一次性 registration 选项。原始 bootstrap ticket、SessionData
+          与完整 credential record 均不会出现在响应或日志中。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/StaffEnrollmentOptions"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StaffEnrollmentPath:
+  post:
+    operationId: completeStaffEnrollment
+    summary: 验证 registration 并原子写入 staff WebAuthn credential
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: staff.credential.enroll.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/CompleteStaffEnrollmentRequest"
+    responses:
+      "201":
+        description: credential、ticket 消费与业务审计已在同一事务提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/StaffCredentialEnrollment"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StaffSessionPath:
+  get:
+    operationId: getStaffSession
+    summary: 获取当前独立后台会话
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: staff.session.read.self
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 当前有效且仍有对应 authority 的后台会话。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/StaffSession"
+      "204":
+        description: 当前没有有效后台会话。
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+  delete:
+    operationId: deleteStaffSession
+    summary: 撤销当前独立后台会话
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: staff.session.revoke.self
+    x-credential-audience: staff-session
+    parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: 与当前 staff session 绑定的 CSRF token。
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+    responses:
+      "204":
+        description: 后台会话已撤销或已经不存在。
+        headers:
+          Set-Cookie:
+            description: 立即过期且 Path 与 staff cookie 一致的 cookie。
+            schema:
+              type: string
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedUsersPath:
+  get:
+    operationId: listManagedUsers
+    summary: 分页读取后台账户目录
+    description: >-
+      返回 Core identity 的账户投影、运营统计与当前有效限制数量；完整邮箱仅在
+      user.account.read 授权成功后由 Privacy Vault 按需返回，Core 不持久化邮箱。
+      接口不会返回 credential reference、IP、passkey 或 Tracker 凭据。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.account.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: query
+        in: query
+        description: 按数字 ID、完整 UUID、用户名或显示名搜索。
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+      - name: filter
+        in: query
+        description: 按正常、封禁、待激活、当前 VIP、下载受限或邮箱未验证筛选。
+        schema:
+          $ref: "../schemas/identity.yaml#/ManagedUserDirectoryFilter"
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          default: 1
+      - name: page_size
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+    responses:
+      "200":
+        description: 已授权的后台账户分页。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedUserPath:
+  get:
+    operationId: getManagedUser
+    summary: 读取一个后台账户及当前有效限制
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.account.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      "200":
+        description: 已授权的后台账户详情。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserDetail"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedUserAccountRestrictionsPath:
+  post:
+    operationId: createManagedUserAccountRestriction
+    summary: 临时限制一个账户访问
+    description: >-
+      立即创建最长七天的 account_access 限制并撤销目标现有会话。
+      目标账户版本、重复时间窗口与同事务审计均由 identity 强制检查。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.account.restrict
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/CreateAccountRestrictionRequest"
+    responses:
+      "201":
+        description: 限制已创建；返回更新后的后台账户详情。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserDetail"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedUserAccountRestrictionRevocationsPath:
+  post:
+    operationId: revokeManagedUserAccountRestriction
+    summary: 显式撤销一个账户访问限制
+    description: >-
+      只撤销路径指定且当前有效的 account_access 限制；不会自动恢复会话，
+      也不会修改独立的账户状态。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.account.restriction.revoke
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: restriction_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/RevokeAccountRestrictionRequest"
+    responses:
+      "200":
+        description: 限制已撤销；返回更新后的后台账户详情。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserDetail"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedUserManualDownloadRestrictionPath:
+  parameters:
+    - name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  post:
+    operationId: createManagedUserManualDownloadRestriction
+    summary: 为账户签发独立的人工下载限制
+    description: >-
+      只阻止新种子下载，不撤销登录会话，也不修改长期分享率或 H&R 状态。
+      当前状态、不可变时间线与账户管理版本在同一事务内提交。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.downloadrestriction.restrict
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/ChangeManualDownloadRestrictionRequest"
+    responses:
+      "201":
+        description: 人工下载限制已签发；返回更新后的账户详情与时间线。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserDetail"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  put:
+    operationId: updateManagedUserManualDownloadRestriction
+    summary: 修改当前人工下载限制的类别和理由
+    description: >-
+      不覆盖历史记录；修改会递增限制状态版本并追加 updated 时间线事件。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.downloadrestriction.restrict
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/ChangeManualDownloadRestrictionRequest"
+    responses:
+      "200":
+        description: 人工下载限制已修改；返回更新后的账户详情与时间线。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserDetail"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedUserManualDownloadRestrictionRevocationsPath:
+  post:
+    operationId: revokeManagedUserManualDownloadRestriction
+    summary: 解除当前人工下载限制
+    description: >-
+      只清除旧站或人工来源；长期分享率与 H&R 仍可继续限制新下载。
+      解除操作会追加不可变时间线，不删除既有理由或申诉证据。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.downloadrestriction.revoke
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/RevokeManualDownloadRestrictionRequest"
+    responses:
+      "200":
+        description: 人工下载限制已解除；返回更新后的账户详情与时间线。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserDetail"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+ManagedUserVIPPath:
+  put:
+    operationId: changeManagedUserVIP
+    summary: 签发、续期或撤销一个账户的 VIP 身份
+    description: >-
+      在同一事务内更新当前 VIP 投影、不可变管理时间线、做种奖励权益时间线
+      和账户管理版本。永久 VIP 不提供 duration_days；撤销时 enabled=false。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.vip.manage
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/ChangeVIPRequest"
+    responses:
+      "200":
+        description: VIP 身份已变更；返回更新后的账户详情和时间线。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserDetail"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyDownloadRestrictionPath:
+  get:
+    operationId: getMyDownloadRestriction
+    summary: 查看当前用户的下载限制来源与人工限制申诉状态
+    description: >-
+      只读取聚合限制来源；旧站或人工来源可在本页面申诉，长期分享率和 H&R
+      必须进入各自页面处理。响应不包含 Tracker、政策或操作员证据。
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: user.downloadrestriction.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前用户的下载限制来源分解和旧站或人工限制申诉状态。
+        headers:
+          Cache-Control:
+            description: 本人限制与申诉内容不得进入浏览器或代理缓存。
+            required: true
+            schema: { type: string, enum: [no-store] }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/DownloadRestrictionStatus"
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyDownloadRestrictionAppealsPath:
+  post:
+    operationId: submitMyDownloadRestrictionAppeal
+    summary: 为当前用户的旧站或人工下载限制提交一次申诉
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: user.downloadrestriction.appeal.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WebCSRFHeader"
+      - $ref: "#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/SubmitDownloadRestrictionAppealRequest"
+    responses:
+      "201":
+        description: 申诉已绑定当前旧站或人工下载限制版本。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string, enum: [no-store] }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/AccountAccessAppeal"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AccountAccessStatusPath:
+  post:
+    operationId: inspectAccountAccess
+    summary: 使用本人凭据查询当前账户访问限制与既有申诉
+    description: >-
+      该端点不会创建会话；凭据仅用于本次 Vault 校验，禁止写入日志、缓存或数据库。
+      即使账户已被禁用，正确凭据仍可查看限制原因和申诉处理结果。
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: user.account.appeal.create.restricted
+    x-credential-audience: anonymous
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/InspectAccountAccessRequest"
+    responses:
+      "200":
+        description: 本人当前的账户访问状态。
+        headers:
+          Cache-Control:
+            description: 凭据校验结果不得进入浏览器或代理缓存。
+            required: true
+            schema: { type: string, enum: [no-store] }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/AccountAccessStatus"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "428": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AccountAccessAppealsPath:
+  post:
+    operationId: submitAccountAccessAppeal
+    summary: 使用本人凭据为当前账户访问限制提交一次申诉
+    tags: [identity]
+    x-audience: [web]
+    x-owner: core-identity
+    x-permission: user.account.appeal.create.restricted
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/SubmitAccountAccessAppealRequest"
+    responses:
+      "201":
+        description: 申诉已提交；相同幂等键和内容重试时返回原记录。
+        headers:
+          Cache-Control:
+            description: 本人申诉内容不得进入浏览器或代理缓存。
+            required: true
+            schema: { type: string, enum: [no-store] }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/AccountAccessAppeal"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      "428": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedAccountAccessAppealsPath:
+  get:
+    operationId: listManagedAccountAccessAppeals
+    summary: 在用户管理中查看账户访问与旧站或人工下载限制申诉队列
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.account.appeal.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: query
+        in: query
+        schema: { type: string, maxLength: 120 }
+      - name: status
+        in: query
+        schema: { $ref: "../schemas/identity.yaml#/AccountAccessAppealFilter" }
+      - name: limit
+        in: query
+        required: true
+        schema: { type: integer, minimum: 1, maximum: 50 }
+      - name: offset
+        in: query
+        required: true
+        schema: { type: integer, minimum: 0, maximum: 1000000 }
+    responses:
+      "200":
+        description: 待处理优先的账户访问与下载限制申诉分页。
+        headers:
+          Cache-Control:
+            description: 后台用户申诉数据不得进入共享缓存。
+            required: true
+            schema: { type: string, enum: [no-store] }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/AccountAccessAppealPage"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedAccountAccessAppealDecisionPath:
+  post:
+    operationId: decideManagedAccountAccessAppeal
+    summary: 只批准解除申诉绑定的账户或下载限制来源，或驳回并保持原限制
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.account.appeal.decide
+    x-credential-audience: staff-session
+    parameters:
+      - name: appeal_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/DecideAccountAccessAppealRequest"
+    responses:
+      "200":
+        description: 处理意见已固化；批准时只解除申诉快照对应的限制来源。
+        headers:
+          Cache-Control:
+            description: 后台处置结果不得进入共享缓存。
+            required: true
+            schema: { type: string, enum: [no-store] }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/AccountAccessAppeal"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+WebCSRFHeader:
+  name: X-CSRF-Token
+  in: header
+  required: true
+  description: 与当前普通 Web 会话绑定的 CSRF token。
+  schema:
+    type: string
+    minLength: 43
+    maxLength: 43
+
+IdempotencyKeyHeader:
+  name: Idempotency-Key
+  in: header
+  required: true
+  description: 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。
+  schema:
+    type: string
+    format: uuid

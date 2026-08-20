@@ -1,0 +1,375 @@
+CommentState:
+  type: string
+  enum: [visible, author_deleted, moderator_hidden]
+
+CommentBodyFormat:
+  type: string
+  enum: [plain_text, legacy_bbcode]
+
+CommentAuthor:
+  type: object
+  additionalProperties: false
+  required: [id, display_name]
+  properties:
+    id:
+      type: string
+      format: uuid
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+Comment:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - author
+    - body
+    - body_format
+    - state
+    - version
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    parent_comment_id:
+      type: string
+      format: uuid
+      nullable: true
+    author:
+      $ref: "#/CommentAuthor"
+    body:
+      type: string
+      maxLength: 2000
+      description: 可见评论正文；墓碑状态返回空字符串。
+    body_format:
+      $ref: "#/CommentBodyFormat"
+    state:
+      $ref: "#/CommentState"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+    edited_at:
+      type: string
+      format: date-time
+      nullable: true
+
+TorrentCommentPage:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, items, total, limit, offset]
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    items:
+      type: array
+      items:
+        $ref: "#/Comment"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999
+
+AnnouncementCommentPage:
+  type: object
+  additionalProperties: false
+  required: [announcement_id, items, total, limit, offset]
+  properties:
+    announcement_id:
+      type: string
+      minLength: 1
+      maxLength: 120
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    items:
+      type: array
+      items:
+        $ref: "#/Comment"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999
+
+CreateCommentRequest:
+  type: object
+  additionalProperties: false
+  required: [body]
+  properties:
+    body:
+      type: string
+      minLength: 1
+      maxLength: 2000
+    parent_comment_id:
+      type: string
+      format: uuid
+      nullable: true
+
+UpdateCommentRequest:
+  type: object
+  additionalProperties: false
+  required: [body, expected_version]
+  properties:
+    body:
+      type: string
+      minLength: 1
+      maxLength: 2000
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+
+CommentReportReasonCode:
+  type: string
+  enum: [spam, harassment, personal_information, off_topic, other]
+
+CreateCommentReportRequest:
+  type: object
+  additionalProperties: false
+  required: [reason_code]
+  properties:
+    reason_code:
+      $ref: "#/CommentReportReasonCode"
+    details:
+      type: string
+      maxLength: 500
+      description: 可选补充说明；只在 Core 的审核案件中保存，不进入外发审计。
+
+CommentReportReceipt:
+  type: object
+  additionalProperties: false
+  required: [id, comment_id, reason_code, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    comment_id:
+      type: string
+      format: uuid
+    reason_code:
+      $ref: "#/CommentReportReasonCode"
+    created_at:
+      type: string
+      format: date-time
+
+CommentModerationCaseState:
+  type: string
+  enum: [open, dismissed, comment_hidden]
+
+CommentModerationReport:
+  type: object
+  additionalProperties: false
+  required: [reason_code, details, created_at]
+  properties:
+    reason_code:
+      $ref: "#/CommentReportReasonCode"
+    details:
+      type: string
+      maxLength: 500
+    created_at:
+      type: string
+      format: date-time
+
+CommentModerationTargetKind:
+  type: string
+  enum: [torrent, announcement, post]
+
+CommentModerationTarget:
+  type: object
+  additionalProperties: false
+  required: [kind, title]
+  description: 由 Core 保证 torrent_id、announcement_id 与 post_id 恰有一个，并与 kind 对应。
+  properties:
+    kind:
+      $ref: "#/CommentModerationTargetKind"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+      nullable: true
+    announcement_id:
+      type: string
+      minLength: 1
+      maxLength: 120
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+      nullable: true
+    post_id:
+      type: string
+      format: uuid
+      nullable: true
+
+CommentModerationCase:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - state
+    - version
+    - target
+    - comment
+    - report_count
+    - reports
+    - opened_at
+    - latest_reported_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    state:
+      $ref: "#/CommentModerationCaseState"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+    target:
+      $ref: "#/CommentModerationTarget"
+    comment:
+      $ref: "#/Comment"
+    report_count:
+      type: integer
+      format: int64
+      minimum: 1
+      description: 案件内完整的不可变举报数量；reports 是有界的最近摘要。
+    reports:
+      type: array
+      minItems: 1
+      maxItems: 50
+      items:
+        $ref: "#/CommentModerationReport"
+    opened_at:
+      type: string
+      format: date-time
+    latest_reported_at:
+      type: string
+      format: date-time
+
+CommentModerationCasePage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/CommentModerationCase"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999
+
+CommentModerationDecision:
+  type: string
+  enum: [dismiss, hide_comment]
+
+CommentModerationDecisionReasonCode:
+  type: string
+  enum: [no_violation, spam, harassment, personal_information, off_topic, other]
+
+CreateCommentModerationDecisionRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - expected_case_version
+    - expected_comment_version
+    - decision
+    - reason_code
+    - note
+  properties:
+    expected_case_version:
+      type: integer
+      format: int64
+      minimum: 1
+    expected_comment_version:
+      type: integer
+      format: int64
+      minimum: 1
+    decision:
+      $ref: "#/CommentModerationDecision"
+    reason_code:
+      $ref: "#/CommentModerationDecisionReasonCode"
+    note:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+CommentModerationDecisionResult:
+  type: object
+  additionalProperties: false
+  required:
+    - decision_id
+    - case_id
+    - comment_id
+    - decision
+    - reason_code
+    - case_state
+    - comment_state
+    - case_version
+    - comment_version
+    - decided_at
+  properties:
+    decision_id:
+      type: string
+      format: uuid
+    case_id:
+      type: string
+      format: uuid
+    comment_id:
+      type: string
+      format: uuid
+    decision:
+      $ref: "#/CommentModerationDecision"
+    reason_code:
+      $ref: "#/CommentModerationDecisionReasonCode"
+    case_state:
+      $ref: "#/CommentModerationCaseState"
+    comment_state:
+      $ref: "#/CommentState"
+    case_version:
+      type: integer
+      format: int64
+      minimum: 2
+    comment_version:
+      type: integer
+      format: int64
+      minimum: 1
+    decided_at:
+      type: string
+      format: date-time

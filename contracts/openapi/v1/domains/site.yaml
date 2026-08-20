@@ -1,0 +1,245 @@
+SiteInfoPath:
+  get:
+    operationId: getSiteInfo
+    summary: 获取站点公开信息
+    tags: [site]
+    x-audience: [web]
+    x-owner: core
+    x-permission: site.read
+    x-credential-audience: anonymous
+    responses:
+      "200":
+        description: 当前站点名称、注册状态和在线人数。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/SiteInfo"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StaffSiteDisplaySettingsPath:
+  get:
+    operationId: getSiteDisplaySettings
+    summary: 读取版本化的站点与展示设置
+    tags: [site]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: site.display.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 当前已经生效的低风险站点与展示设置。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/SiteDisplaySettings"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  put:
+    operationId: updateSiteDisplaySettings
+    summary: 以乐观并发直接激活低风险站点与展示设置
+    tags: [site]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: site.display.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/catalog.yaml#/UpdateSiteDisplaySettingsRequest"
+    responses:
+      "200":
+        description: 新版本设置与不可变审计事件已经原子提交并立即生效。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/SiteDisplaySettings"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StaffRegistrationPolicySettingsPath:
+  get:
+    operationId: getRegistrationPolicySettings
+    summary: 读取版本化的注册准入策略
+    tags: [site]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: site.registration.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 当前已经生效的注册准入策略。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/RegistrationPolicySettings"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  put:
+    operationId: updateRegistrationPolicySettings
+    summary: 以乐观并发直接激活注册准入策略
+    tags: [site]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: site.registration.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/UpdateRegistrationPolicySettingsRequest"
+    responses:
+      "200":
+        description: 新版本注册策略与不可变审计事件已经原子提交并立即生效。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/RegistrationPolicySettings"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+LatestAnnouncementPath:
+  get:
+    operationId: getLatestAnnouncement
+    summary: 获取最新公告
+    tags: [announcement]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: announcement.read
+    x-credential-audience: anonymous
+    responses:
+      "200":
+        description: 最新已发布公告；没有公告时返回 204。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/AnnouncementSummary"
+      "204":
+        description: 当前没有已发布公告。
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+AnnouncementsPath:
+  get:
+    operationId: listAnnouncements
+    summary: 分页读取当前公开公告
+    tags: [announcement]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: announcement.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/AnnouncementLimitQueryParameter"
+      - $ref: "#/AnnouncementOffsetQueryParameter"
+    responses:
+      "200":
+        description: 按实际公开时间倒序排列的公告摘要；草稿、未到期排期和已撤回公告不会出现。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/AnnouncementPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+AnnouncementDetailPath:
+  get:
+    operationId: getAnnouncement
+    summary: 获取一篇已发布公告的稳定详情
+    tags: [announcement]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: announcement.read
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/AnnouncementIDPathParameter"
+    responses:
+      "200":
+        description: 已发布公告正文和稳定元数据。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/AnnouncementDetail"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+AnnouncementIDPathParameter:
+  name: announcement_id
+  in: path
+  required: true
+  description: 公告的稳定路由键；兼容旧站数字 ID 与 PeerGo slug。
+  schema:
+    type: string
+    minLength: 1
+    maxLength: 120
+    pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+
+AnnouncementLimitQueryParameter:
+  name: limit
+  in: query
+  required: false
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 50
+    default: 20
+
+AnnouncementOffsetQueryParameter:
+  name: offset
+  in: query
+  required: false
+  schema:
+    type: integer
+    minimum: 0
+    maximum: 1000000
+    default: 0

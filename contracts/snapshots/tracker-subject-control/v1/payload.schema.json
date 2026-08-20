@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peergo.dev/contracts/snapshots/tracker-subject-control/v1/payload.schema.json",
+  "title": "PeerGo Tracker subject control snapshot payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "control_sequence",
+    "state_sha256",
+    "subjects"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "control_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807
+    },
+    "state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "subjects": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": { "$ref": "#/$defs/subject" }
+    }
+  },
+  "$defs": {
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_id", "lookup_hmac", "credential_version"],
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "lookup_hmac": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "credential_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "download_restricted": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

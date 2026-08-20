@@ -1,0 +1,211 @@
+MyTrafficPath:
+  get:
+    operationId: getMyTraffic
+    summary: 获取当前用户的最终流量汇总与最近结算条目
+    tags: [traffic]
+    x-audience: [web]
+    x-owner: core-traffic
+    x-permission: traffic.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        description: 最近结算条目的返回上限。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+    responses:
+      "200":
+        description: >-
+          只读 Core 最终投影；不会实时查询 Tracker，也不会使用当前优惠重算历史。
+        headers:
+          Cache-Control:
+            description: 本人账本响应不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/traffic.yaml#/TrafficOverview"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyHitAndRunsPath:
+  get:
+    operationId: listMyHitAndRuns
+    summary: 获取当前用户的 H&R 义务与达标进度
+    tags: [traffic]
+    x-audience: [web]
+    x-owner: core-traffic
+    x-permission: hnr.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: status
+        in: query
+        required: false
+        description: 默认只返回仍需关注的义务；all 可查看全部历史状态。
+        schema:
+          type: string
+          enum: [all, open, tracking, grace, overdue, satisfied, exempt]
+          default: open
+      - name: limit
+        in: query
+        required: false
+        description: 当前页最多返回的义务数量。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        description: 上一页返回的不透明游标；不得自行拼接或修改。
+        schema:
+          type: string
+          minLength: 34
+          maxLength: 34
+          pattern: "^[A-Za-z0-9_-]{34}$"
+    responses:
+      "200":
+        description: >-
+          只读 Core 用户安全投影；状态由同一 PostgreSQL 事务时刻派生，
+          不查询 Tracker 热路径，也不包含客户端、IP、策略或内部证据。
+        headers:
+          Cache-Control:
+            description: 本人 H&R 响应不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/traffic.yaml#/HNRPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyHitAndRunAppealsPath:
+  post:
+    operationId: submitMyHNRAppeal
+    summary: 为自己的一条逾期 H&R 义务提交一次申诉
+    tags: [traffic]
+    x-audience: [web]
+    x-owner: core-traffic
+    x-permission: hnr.appeal.create.self
+    x-credential-audience: web-session
+    parameters:
+      - name: obligation_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/traffic.yaml#/SubmitHNRAppealRequest" }
+    responses:
+      "201":
+        description: 申诉已绑定这条 H&R 义务；同一幂等键重试不会重复创建。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: "../schemas/traffic.yaml#/MyHNRAppeal" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+HNRAppealsPath:
+  get:
+    operationId: listHNRAppeals
+    summary: 集中查询单种 H&R 申诉与处理结果
+    tags: [traffic]
+    x-audience: [staff]
+    x-owner: core-traffic
+    x-permission: hnr.policy.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: q
+        in: query
+        schema: { type: string, maxLength: 120, default: "" }
+      - name: filter
+        in: query
+        schema:
+          allOf: [{ $ref: "../schemas/traffic.yaml#/HNRAppealFilter" }]
+          default: pending
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 只包含用户、种子、申诉文本、当前进度和处理结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/traffic.yaml#/HNRAppealPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+HNRAppealDecisionPath:
+  post:
+    operationId: decideHNRAppeal
+    summary: 批准并豁免这条义务，或驳回并保持待补做状态
+    tags: [traffic]
+    x-audience: [staff]
+    x-owner: core-traffic
+    x-permission: hnr.assessment.manage
+    x-credential-audience: staff-session
+    parameters:
+      - name: appeal_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/traffic.yaml#/DecideHNRAppealRequest" }
+    responses:
+      "200":
+        description: 处理意见已固化；批准时同一事务签发本地 H&R 豁免。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/traffic.yaml#/HNRAppeal" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

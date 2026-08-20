@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v1/decision-recorded.schema.json",
+  "title": "Authorization decision recorded v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "decision_id",
+    "actor_pseudonym",
+    "pseudonym_key_epoch",
+    "action",
+    "credential_audience",
+    "scope",
+    "policy_version",
+    "result",
+    "reason"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_type": { "const": "authz.decision.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "decision_id": { "type": "string", "format": "uuid" },
+    "actor_pseudonym": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "target_pseudonym": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "pseudonym_key_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "action": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)+$" },
+        { "pattern": "^invalid_sha256_[0-9a-f]{64}$" }
+      ]
+    },
+    "credential_audience": {
+      "enum": ["anonymous", "web-session", "staff-session", "service", "invalid"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["site", "category", "invalid"] },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "purpose": { "type": "string", "maxLength": 500 },
+    "purpose_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "case_id": { "type": "string", "format": "uuid" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "result": { "enum": ["allow", "deny"] },
+    "reason": {
+      "enum": [
+        "allowed",
+        "action_unknown",
+        "subject_invalid",
+        "subject_inactive",
+        "credential_audience_mismatch",
+        "relationship_mismatch",
+        "authority_binding_mismatch",
+        "grant_missing",
+        "grant_revoked",
+        "grant_not_started",
+        "grant_expired",
+        "grant_invariant_failed",
+        "mandate_inactive",
+        "mandate_not_started",
+        "mandate_expired",
+        "scope_mismatch",
+        "context_missing"
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role_id", "grant_id", "grant_version", "mandate_id", "effective_until"],
+      "properties": {
+        "role_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "grant_id": { "type": "string", "format": "uuid" },
+        "grant_version": { "type": "integer", "minimum": 1 },
+        "mandate_id": { "type": "string", "format": "uuid" },
+        "effective_until": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "result": { "const": "allow" } }, "required": ["result"] },
+      "then": {
+        "required": ["authority"],
+        "properties": { "reason": { "const": "allowed" } }
+      },
+      "else": {
+        "allOf": [
+          { "not": { "required": ["authority"] } },
+          { "properties": { "reason": { "not": { "const": "allowed" } } } }
+        ]
+      }
+    },
+    {
+      "not": { "required": ["purpose", "purpose_sha256"] }
+    }
+  ]
+}

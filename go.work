@@ -1,0 +1,14 @@
+go 1.26.0
+
+use (
+	./contracts/go
+	./services/audit-sink
+	./services/core
+	./services/email-relay
+	./services/privacy-vault
+	./services/settlement
+	./services/tracker
+	./tools/devtools
+	./tools/migrator
+	./tools/traffic-corpus
+)

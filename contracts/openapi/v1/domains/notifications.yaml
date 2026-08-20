@@ -1,0 +1,243 @@
+MyNotificationsPath:
+  get:
+    operationId: listMyNotifications
+    summary: 分页读取当前用户的站内通知
+    tags: [notifications]
+    x-audience: [web]
+    x-owner: core-community
+    x-permission: notification.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        description: 单页通知数量上限。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        description: 从零开始的通知偏移量。
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+      - name: unread_only
+        in: query
+        required: false
+        description: 仅返回尚未读过的通知，并按过滤后的结果计算分页总数。
+        schema:
+          type: boolean
+          default: false
+    responses:
+      "200":
+        description: >-
+          当前用户按发生时间倒序排列的私有通知；首版只包含真实种子审核结果。
+        headers:
+          Cache-Control:
+            description: 私有通知不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/notifications.yaml#/MyNotificationPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyNotificationSummaryPath:
+  get:
+    operationId: getMyNotificationSummary
+    summary: 读取当前用户的未读通知数量
+    tags: [notifications]
+    x-audience: [web]
+    x-owner: core-community
+    x-permission: notification.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 仅用于导航提示的私有未读数量。
+        headers:
+          Cache-Control:
+            description: 私有通知摘要不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/notifications.yaml#/MyNotificationSummary"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyNotificationPath:
+  parameters:
+    - name: notification_id
+      in: path
+      required: true
+      description: 当前用户通知的稳定公开标识。
+      schema:
+        type: string
+        format: uuid
+  put:
+    operationId: markMyNotificationRead
+    summary: 幂等地把当前用户的一条通知标为已读
+    tags: [notifications]
+    x-audience: [web]
+    x-owner: core-community
+    x-permission: notification.read.state.write.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    responses:
+      "200":
+        description: 已读状态；重复请求保留首次已读时间。
+        headers:
+          Cache-Control:
+            description: 私有通知状态不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/notifications.yaml#/MyNotificationReadReceipt"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyNotificationReadAllPath:
+  put:
+    operationId: markAllMyNotificationsRead
+    summary: 幂等地把当前用户已有通知全部标为已读
+    tags: [notifications]
+    x-audience: [web]
+    x-owner: core-community
+    x-permission: notification.read.state.write.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    responses:
+      "200":
+        description: 本次从未读推进到已读的通知数量。
+        headers:
+          Cache-Control:
+            description: 私有通知状态不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/notifications.yaml#/MyNotificationReadAllReceipt"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyNotificationArchiveAllPath:
+  put:
+    operationId: archiveAllMyNotifications
+    summary: 幂等地从当前用户收件箱归档全部通知
+    tags: [notifications]
+    x-audience: [web]
+    x-owner: core-community
+    x-permission: notification.archive.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    responses:
+      "200":
+        description: >-
+          已从收件箱归档的通知数量；不可变业务来源和审计关联不会删除。
+        headers:
+          Cache-Control:
+            description: 私有通知状态不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/notifications.yaml#/MyNotificationArchiveAllReceipt"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyNotificationFeedbackPath:
+  post:
+    operationId: createMyNotificationFeedback
+    summary: 向站点管理员提交反馈工单
+    tags: [notifications]
+    x-audience: [web]
+    x-owner: core-community
+    x-permission: notification.feedback.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/notifications.yaml#/MyNotificationFeedbackRequest"
+    responses:
+      "201":
+        description: 反馈已进入后台处理队列。
+        headers:
+          Cache-Control:
+            description: 私有反馈回执不得由浏览器或中间缓存持久保存。
+            required: true
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/notifications.yaml#/MyNotificationFeedbackReceipt"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"

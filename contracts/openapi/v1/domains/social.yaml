@@ -1,0 +1,288 @@
+SocialPostsPath:
+  get:
+    operationId: listSocialPosts
+    summary: 分页读取成员可见的公开动态
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.read
+    x-credential-audience: web-session
+    parameters:
+      - name: sort
+        in: query
+        required: false
+        schema:
+          $ref: "../schemas/social.yaml#/SocialPostSort"
+        description: 首版只支持按发表时间排序。
+      - name: author_username
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+        description: 只读取指定成员仍然可见的动态；省略时读取完整成员动态流。
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+    responses:
+      "200":
+        description: 动态分页。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/social.yaml#/SocialPostPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: createSocialPost
+    summary: 发布一条公开纯文本动态
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+      - $ref: "./identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/social.yaml#/CreateSocialPostRequest"
+    responses:
+      "201":
+        description: 动态已发布；相同幂等键与正文重试时返回原动态。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/social.yaml#/SocialPost"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+SocialPostPath:
+  parameters:
+    - $ref: "#/SocialPostIDPathParameter"
+  get:
+    operationId: getSocialPost
+    summary: 读取一条可见动态
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.read
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 动态详情。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/social.yaml#/SocialPost"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  patch:
+    operationId: updateMySocialPost
+    summary: 使用期望版本编辑自己的可见动态
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.update.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/social.yaml#/UpdateSocialPostRequest"
+    responses:
+      "200":
+        description: 动态已编辑。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/social.yaml#/SocialPost"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  delete:
+    operationId: deleteMySocialPost
+    summary: 使用期望版本删除自己的动态并保留内部墓碑
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.delete.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+      - name: expected_version
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    responses:
+      "204":
+        description: 动态已删除。
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+SocialPostCommentsPath:
+  parameters:
+    - $ref: "#/SocialPostIDPathParameter"
+  get:
+    operationId: listSocialPostComments
+    summary: 分页读取可见动态的评论
+    tags: [social, comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.read
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 99999
+          default: 0
+    responses:
+      "200":
+        description: 动态评论与回复；删除项保留墓碑。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/social.yaml#/SocialPostCommentPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  post:
+    operationId: createSocialPostComment
+    summary: 在可见动态下发表评论或回复
+    tags: [social, comments]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.comment.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+      - $ref: "./identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/comments.yaml#/CreateCommentRequest"
+    responses:
+      "201":
+        description: 评论已创建。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/comments.yaml#/Comment"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+SocialPostIDPathParameter:
+  name: post_id
+  in: path
+  required: true
+  description: 动态的稳定公开 UUID。
+  schema:
+    type: string
+    format: uuid

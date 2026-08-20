@@ -1,0 +1,415 @@
+MyRatioWatchRestrictionSource:
+  type: string
+  enum: [none, ratio_watch, account, both]
+  description: >-
+    ratio_watch 表示由长期分享率考核限制，account 表示独立账户状态限制，
+    both 表示两种限制同时存在。不会公开账户限制的内部操作记录。
+
+MyRatioWatchPolicy:
+  type: object
+  additionalProperties: false
+  required:
+    [rule_version, enabled, download_threshold_bytes, minimum_ratio_basis_points,
+     watch_period_seconds, restriction_ratio_basis_points, vip_exempt, effective_at,
+     bound_to_assessment]
+  properties:
+    rule_version: { type: integer, format: int64, minimum: 1 }
+    enabled: { type: boolean }
+    download_threshold_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    minimum_ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    watch_period_seconds:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 31536000
+    restriction_ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    vip_exempt: { type: boolean }
+    effective_at: { type: string, format: date-time }
+    bound_to_assessment:
+      type: boolean
+      description: true 表示本次考核继续使用进入考核时绑定的不可变规则版本。
+
+MyRatioWatchAssessment:
+  type: object
+  additionalProperties: false
+  required: [status, started_at, deadline_at, restriction_started_at, updated_at]
+  properties:
+    status:
+      type: string
+      enum: [watching, warning, download_restricted]
+    started_at: { type: string, format: date-time }
+    deadline_at: { type: string, format: date-time }
+    restriction_started_at:
+      type: string
+      format: date-time
+      nullable: true
+    updated_at: { type: string, format: date-time }
+
+RatioWatchAppealStatus:
+  type: string
+  enum: [pending, approved, rejected, assessment_resolved]
+
+MyRatioWatchAppeal:
+  type: object
+  additionalProperties: false
+  required: [status, statement, submitted_at, resolved_at, response]
+  properties:
+    status: { $ref: "#/RatioWatchAppealStatus" }
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+    submitted_at: { type: string, format: date-time }
+    resolved_at:
+      type: string
+      format: date-time
+      nullable: true
+    response: { type: string, maxLength: 1000 }
+
+MyRatioWatch:
+  type: object
+  additionalProperties: false
+  required:
+    [observed_at, credited_uploaded_bytes, charged_downloaded_bytes,
+     current_ratio_basis_points, vip_active, download_restricted,
+     restriction_source, threshold_reached, minimum_ratio_reached,
+     recovery_uploaded_bytes, policy, assessment, appeal, can_appeal]
+  properties:
+    observed_at: { type: string, format: date-time }
+    credited_uploaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    charged_downloaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    current_ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    vip_active: { type: boolean }
+    download_restricted: { type: boolean }
+    restriction_source: { $ref: "#/MyRatioWatchRestrictionSource" }
+    threshold_reached:
+      type: boolean
+      description: 当前有效下载是否达到所展示规则的考核门槛。
+    minimum_ratio_reached:
+      type: boolean
+      description: 当前有效分享率是否达到所展示规则的解除目标。
+    recovery_uploaded_bytes:
+      allOf: [{ $ref: "traffic.yaml#/TrafficByteCount" }]
+      description: 在有效下载不再增加时，达到解除目标仍需增加的有效上传量。
+    policy:
+      type: object
+      allOf: [{ $ref: "#/MyRatioWatchPolicy" }]
+      nullable: true
+    assessment:
+      type: object
+      allOf: [{ $ref: "#/MyRatioWatchAssessment" }]
+      nullable: true
+    appeal:
+      type: object
+      allOf: [{ $ref: "#/MyRatioWatchAppeal" }]
+      nullable: true
+    can_appeal:
+      type: boolean
+      description: true 表示当前这期考核尚未提交过申诉。
+
+SubmitRatioWatchAppealRequest:
+  type: object
+  additionalProperties: false
+  required: [statement]
+  properties:
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+
+RatioWatchPolicyInput:
+  type: object
+  additionalProperties: false
+  required:
+    [enabled, download_threshold_bytes, minimum_ratio_basis_points, watch_period_seconds, restriction_ratio_basis_points]
+  properties:
+    enabled:
+      type: boolean
+    download_threshold_bytes:
+      $ref: "traffic.yaml#/TrafficByteCount"
+    minimum_ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    watch_period_seconds:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 31536000
+    restriction_ratio_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+
+RatioWatchPolicyRevision:
+  allOf:
+    - $ref: "#/RatioWatchPolicyInput"
+    - type: object
+      additionalProperties: false
+      required:
+        [id, rule_id, rule_version, vip_exempt, effective_at, reason, created_at, timeline_state, replayed]
+      properties:
+        id:
+          type: string
+          format: uuid
+        rule_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        rule_version:
+          type: integer
+          format: int64
+          minimum: 1
+        vip_exempt:
+          type: boolean
+        effective_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        created_at:
+          type: string
+          format: date-time
+        timeline_state:
+          type: string
+          enum: [scheduled, active]
+        replayed:
+          type: boolean
+
+RatioWatchAssessmentSummary:
+  type: object
+  additionalProperties: false
+  required: [watching, warning, download_restricted, satisfied, manually_cleared, vip_exempted]
+  properties:
+    watching: { $ref: "operations.yaml#/OperationsCount" }
+    warning: { $ref: "operations.yaml#/OperationsCount" }
+    download_restricted: { $ref: "operations.yaml#/OperationsCount" }
+    satisfied: { $ref: "operations.yaml#/OperationsCount" }
+    manually_cleared: { $ref: "operations.yaml#/OperationsCount" }
+    vip_exempted: { $ref: "operations.yaml#/OperationsCount" }
+
+RatioWatchWorkerState:
+  type: object
+  additionalProperties: false
+  required:
+    [last_started_at, last_completed_at, last_error_code, last_examined, last_created, last_transitioned, run_count]
+  properties:
+    last_started_at:
+      type: string
+      format: date-time
+      nullable: true
+    last_completed_at:
+      type: string
+      format: date-time
+      nullable: true
+    last_error_code:
+      type: string
+      maxLength: 64
+    last_examined: { $ref: "operations.yaml#/OperationsCount" }
+    last_created: { $ref: "operations.yaml#/OperationsCount" }
+    last_transitioned: { $ref: "operations.yaml#/OperationsCount" }
+    run_count: { $ref: "operations.yaml#/OperationsCount" }
+
+RatioWatchPolicyPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset, minimum_effective_from, current, summary, worker]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/RatioWatchPolicyRevision" }
+    total: { $ref: "operations.yaml#/OperationsCount" }
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+    minimum_effective_from:
+      type: string
+      format: date-time
+    current:
+      type: object
+      allOf:
+        - $ref: "#/RatioWatchPolicyRevision"
+      nullable: true
+    summary: { $ref: "#/RatioWatchAssessmentSummary" }
+    worker: { $ref: "#/RatioWatchWorkerState" }
+
+RatioWatchPolicyImpactPreview:
+  type: object
+  additionalProperties: false
+  required:
+    [policy, eligible_users, would_enter_watch, would_restrict_at_deadline, vip_exempt_users, legacy_restricted_users]
+  properties:
+    policy: { $ref: "#/RatioWatchPolicyInput" }
+    eligible_users: { $ref: "operations.yaml#/OperationsCount" }
+    would_enter_watch: { $ref: "operations.yaml#/OperationsCount" }
+    would_restrict_at_deadline: { $ref: "operations.yaml#/OperationsCount" }
+    vip_exempt_users: { $ref: "operations.yaml#/OperationsCount" }
+    legacy_restricted_users: { $ref: "operations.yaml#/OperationsCount" }
+
+IssueRatioWatchPolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [policy, effective_at, reason]
+  properties:
+    policy: { $ref: "#/RatioWatchPolicyInput" }
+    effective_at:
+      type: string
+      format: date-time
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+RatioWatchAssessmentStatus:
+  type: string
+  enum: [watching, warning, download_restricted, satisfied, manually_cleared, vip_exempted, ineligible]
+
+RatioWatchAssessmentFilter:
+  type: string
+  enum: [all, active, watching, warning, download_restricted, resolved]
+
+RatioWatchAssessment:
+  type: object
+  additionalProperties: false
+  required:
+    [id, user_id, user_numeric_id, username, policy_revision_id, policy_version, status,
+     started_at, deadline_at, opening_credited_uploaded_bytes, opening_charged_downloaded_bytes,
+     opening_ratio_basis_points, current_credited_uploaded_bytes, current_charged_downloaded_bytes,
+     current_ratio_basis_points, restriction_started_at, resolved_at, resolution_code,
+     resolution_reason, version, updated_at, legacy_download_restricted]
+  properties:
+    id: { type: string, format: uuid }
+    user_id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    policy_revision_id: { type: string, format: uuid }
+    policy_version: { type: integer, format: int64, minimum: 1 }
+    status: { $ref: "#/RatioWatchAssessmentStatus" }
+    started_at: { type: string, format: date-time }
+    deadline_at: { type: string, format: date-time }
+    opening_credited_uploaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    opening_charged_downloaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    opening_ratio_basis_points: { type: integer, format: int64, minimum: 0, maximum: 1000000 }
+    current_credited_uploaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    current_charged_downloaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    current_ratio_basis_points: { type: integer, format: int64, minimum: 0, maximum: 1000000 }
+    restriction_started_at:
+      type: string
+      format: date-time
+      nullable: true
+    resolved_at:
+      type: string
+      format: date-time
+      nullable: true
+    resolution_code:
+      type: string
+      maxLength: 64
+    resolution_reason:
+      type: string
+      maxLength: 1000
+    version: { type: integer, format: int64, minimum: 1 }
+    updated_at: { type: string, format: date-time }
+    legacy_download_restricted:
+      type: boolean
+      description: 来自 PtYes 迁移或独立人工状态；本考核解除不会清除此标记。
+
+RatioWatchAssessmentPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/RatioWatchAssessment" }
+    total: { $ref: "operations.yaml#/OperationsCount" }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+ClearRatioWatchAssessmentRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, reason]
+  properties:
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+RatioWatchAppealFilter:
+  type: string
+  enum: [all, pending, resolved]
+
+RatioWatchAppeal:
+  type: object
+  additionalProperties: false
+  required:
+    [id, assessment_id, user_id, user_numeric_id, username, statement, created_at,
+     status, response, resolved_at, assessment_status, assessment_version,
+     current_credited_uploaded_bytes, current_charged_downloaded_bytes,
+     current_ratio_basis_points, deadline_at, restriction_started_at,
+     legacy_download_restricted, replayed]
+  properties:
+    id: { type: string, format: uuid }
+    assessment_id: { type: string, format: uuid }
+    user_id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    statement: { type: string, minLength: 20, maxLength: 1000 }
+    created_at: { type: string, format: date-time }
+    status: { $ref: "#/RatioWatchAppealStatus" }
+    response: { type: string, maxLength: 1000 }
+    resolved_at:
+      type: string
+      format: date-time
+      nullable: true
+    assessment_status: { $ref: "#/RatioWatchAssessmentStatus" }
+    assessment_version: { type: integer, format: int64, minimum: 1 }
+    current_credited_uploaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    current_charged_downloaded_bytes: { $ref: "traffic.yaml#/TrafficByteCount" }
+    current_ratio_basis_points: { type: integer, format: int64, minimum: 0, maximum: 1000000 }
+    deadline_at: { type: string, format: date-time }
+    restriction_started_at:
+      type: string
+      format: date-time
+      nullable: true
+    legacy_download_restricted: { type: boolean }
+    replayed: { type: boolean }
+
+RatioWatchAppealPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/RatioWatchAppeal" }
+    total: { $ref: "operations.yaml#/OperationsCount" }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+DecideRatioWatchAppealRequest:
+  type: object
+  additionalProperties: false
+  required: [decision, expected_assessment_version, response]
+  properties:
+    decision:
+      type: string
+      enum: [approved, rejected]
+    expected_assessment_version: { type: integer, format: int64, minimum: 1 }
+    response: { type: string, minLength: 10, maxLength: 1000 }

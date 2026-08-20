@@ -1,0 +1,133 @@
+SocialPostAuthor:
+  type: object
+  additionalProperties: false
+  required: [id, username, display_name]
+  properties:
+    id:
+      type: string
+      format: uuid
+    username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+SocialPost:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - author
+    - content
+    - version
+    - comment_count
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    author:
+      $ref: "#/SocialPostAuthor"
+    content:
+      type: string
+      minLength: 1
+      maxLength: 2000
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+    comment_count:
+      type: integer
+      format: int64
+      minimum: 0
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+    edited_at:
+      type: string
+      format: date-time
+      nullable: true
+
+SocialPostSort:
+  type: string
+  enum: [newest, oldest]
+
+SocialPostPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset, sort]
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/SocialPost"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999
+    sort:
+      $ref: "#/SocialPostSort"
+
+CreateSocialPostRequest:
+  type: object
+  additionalProperties: false
+  required: [content]
+  properties:
+    content:
+      type: string
+      minLength: 1
+      maxLength: 2000
+
+UpdateSocialPostRequest:
+  type: object
+  additionalProperties: false
+  required: [content, expected_version]
+  properties:
+    content:
+      type: string
+      minLength: 1
+      maxLength: 2000
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+
+SocialPostCommentPage:
+  type: object
+  additionalProperties: false
+  required: [post_id, items, total, limit, offset]
+  properties:
+    post_id:
+      type: string
+      format: uuid
+    items:
+      type: array
+      items:
+        $ref: "./comments.yaml#/Comment"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999

@@ -1,0 +1,71 @@
+groups:
+  - name: peergo-tracker-cutover
+    interval: 15s
+    rules:
+      - alert: PeerGoTrackerDown
+        expr: up{job="peergo-tracker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: PeerGo Tracker metrics target is unavailable
+
+      - alert: PeerGoTrackerOperationalFailures
+        expr: |
+          sum(rate(peergo_tracker_requests_total{result=~"temporarily_unavailable|capacity_exhausted|failure_other"}[2m]))
+          /
+          clamp_min(sum(rate(peergo_tracker_requests_total[2m])), 1)
+          > 0.001
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Tracker operational failure rate exceeds 0.1%
+
+      - alert: PeerGoTrackerCompatibilityFailures
+        expr: |
+          sum(rate(peergo_tracker_requests_total{result=~"invalid_request|client_not_allowed|torrent_not_registered"}[5m]))
+          /
+          clamp_min(sum(rate(peergo_tracker_requests_total[5m])), 1)
+          > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Tracker client or migrated torrent compatibility failures exceed 1%
+
+      - alert: PeerGoTrackerAnnounceP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le) (rate(peergo_tracker_request_duration_seconds_bucket{action="announce",result="ok"}[5m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Successful announce p99 exceeds 100ms
+
+      - alert: PeerGoTrackerWALBacklogHigh
+        expr: |
+          peergo_tracker_wal_unacknowledged_bytes
+          /
+          clamp_min(peergo_tracker_wal_capacity_bytes, 1)
+          > 0.5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than half of the Tracker WAL is awaiting JetStream acknowledgement
+
+      - alert: PeerGoTrackerWALCapacityHigh
+        expr: |
+          peergo_tracker_wal_bytes
+          /
+          clamp_min(peergo_tracker_wal_capacity_bytes, 1)
+          > 0.8
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Tracker WAL exceeds 80% of configured capacity

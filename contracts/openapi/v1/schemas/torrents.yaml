@@ -1,0 +1,2238 @@
+TorrentSubmissionRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - category_id
+    - title
+    - torrent_file
+  properties:
+    category_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+      default: ""
+    description:
+      type: string
+      maxLength: 4194304
+      default: ""
+      description: Markdown 正文；服务端同时按 UTF-8 字节长度执行持久化上限。
+    media_info:
+      type: string
+      maxLength: 16777216
+      default: ""
+    anonymous:
+      type: boolean
+      default: false
+    imdb_id:
+      type: string
+      pattern: "^tt[0-9]{7,10}$"
+    tmdb_id:
+      type: string
+      pattern: "^[0-9]{1,20}$"
+    douban_id:
+      type: string
+      pattern: "^[0-9]{1,20}$"
+    facet_selections:
+      type: array
+      maxItems: 20
+      items:
+        $ref: "#/TorrentFacetSelectionInput"
+    screenshots:
+      type: array
+      maxItems: 6
+      description: 按顺序提交的种子截图；第一张作为封面。服务端按真实文件内容校验格式、尺寸与大小。
+      items:
+        type: string
+        format: binary
+        minLength: 1
+        maxLength: 2097152
+    torrent_file:
+      type: string
+      format: binary
+      minLength: 1
+      maxLength: 16777216
+
+TorrentFacetSelectionInput:
+  type: object
+  additionalProperties: false
+  required: [facet_id, option_keys]
+  properties:
+    facet_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    option_keys:
+      type: array
+      minItems: 1
+      maxItems: 32
+      uniqueItems: true
+      items:
+        type: string
+        minLength: 1
+        maxLength: 80
+
+TorrentSubmission:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - info_hash_v1
+    - state
+    - content_name
+    - total_size_bytes
+    - file_count
+    - submitted_at
+  properties:
+    id:
+      type: integer
+      format: int64
+      minimum: 1
+    info_hash_v1:
+      type: string
+      pattern: "^[0-9a-f]{40}$"
+    state:
+      type: string
+      enum: [pending_review, published]
+      description: 普通成员提交后等待审核；有效转种组成员通过全部机器校验后直接发布。
+    content_name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    total_size_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    file_count:
+      type: integer
+      minimum: 1
+      maximum: 100000
+    submitted_at:
+      type: string
+      format: date-time
+
+TorrentLifecycleState:
+  type: string
+  enum: [pending_review, published, rejected, disabled, deleted]
+
+TorrentReviewReasonCode:
+  type: string
+  enum:
+    - meets_requirements
+    - metadata_incomplete
+    - duplicate_or_superseded
+    - content_policy_violation
+    - quality_requirements_not_met
+    - uploader_action_required
+    - other
+
+TorrentPublicFacet:
+  type: object
+  additionalProperties: false
+  required: [facet_id, facet_name, option_key, option_label]
+  properties:
+    facet_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    facet_name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    option_key:
+      type: string
+      minLength: 1
+      maxLength: 80
+    option_label:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+TorrentExternalIdentifier:
+  type: object
+  additionalProperties: false
+  required: [provider, external_id]
+  properties:
+    provider:
+      type: string
+      enum: [imdb, tmdb, douban, bangumi, steam]
+    external_id:
+      type: string
+      minLength: 1
+      maxLength: 64
+
+TorrentPublicDetail:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - category
+    - title
+    - subtitle
+    - content_name
+    - uploader_display_name
+    - anonymous
+    - promotion
+    - promotion_ends_at
+    - sticky_until
+    - facets
+    - external_identifiers
+    - info_hash_v1
+    - total_size_bytes
+    - payload_size_bytes
+    - file_count
+    - padding_file_count
+    - screenshot_count
+    - piece_length_bytes
+    - piece_count
+    - state
+    - submitted_at
+    - published_at
+  properties:
+    id:
+      type: integer
+      format: int64
+      minimum: 1
+    category:
+      $ref: "../schemas/catalog.yaml#/Category"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    content_name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    uploader_display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+      description: 匿名发布时固定返回“匿名”，不会暴露真实发布者名称。
+    anonymous:
+      type: boolean
+    promotion:
+      type: string
+      enum:
+        - none
+        - free
+        - double_upload
+        - double_upload_free
+        - half_download
+        - double_upload_half_download
+        - thirty_percent_download
+      description: 当前公开展示优惠；历史流量结算不读取此字段。
+    promotion_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: 当前公开展示优惠的到期时间；永久或无优惠时为 null。
+    sticky_until:
+      type: string
+      format: date-time
+      nullable: true
+      description: 当前用户付费列表置顶的结束时间；未置顶时为 null。
+    facets:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/TorrentPublicFacet"
+    external_identifiers:
+      type: array
+      maxItems: 5
+      items:
+        $ref: "#/TorrentExternalIdentifier"
+    info_hash_v1:
+      type: string
+      pattern: "^[0-9a-f]{40}$"
+    total_size_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    payload_size_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    file_count:
+      type: integer
+      minimum: 1
+      maximum: 100000
+    padding_file_count:
+      type: integer
+      minimum: 0
+      maximum: 100000
+    screenshot_count:
+      type: integer
+      minimum: 0
+      maximum: 6
+      description: 已发布种子的公开截图数量；位置 0 同时作为封面。
+    piece_length_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    piece_count:
+      type: integer
+      minimum: 1
+    state:
+      type: string
+      enum: [published]
+    submitted_at:
+      type: string
+      format: date-time
+    published_at:
+      type: string
+      format: date-time
+
+TorrentPublicContent:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, description, description_format, media_info]
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    description:
+      type: string
+      maxLength: 4194304
+    description_format:
+      type: string
+      enum: [markdown, plain_text]
+    media_info:
+      type: string
+      maxLength: 16777216
+
+TorrentRelatedVersions:
+  type: object
+  additionalProperties: false
+  required: [items]
+  properties:
+    items:
+      type: array
+      maxItems: 10
+      items:
+        $ref: "../schemas/catalog.yaml#/TorrentSummary"
+
+TorrentSwarmOverview:
+  type: object
+  additionalProperties: false
+  required:
+    - torrent_id
+    - seeders
+    - leechers
+    - completed
+    - observed_at
+    - stale
+    - confidence
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    seeders:
+      type: integer
+      minimum: 0
+    leechers:
+      type: integer
+      minimum: 0
+    completed:
+      type: integer
+      minimum: 0
+    observed_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: 最近一次完整统计的时间；尚无统计时为 null。
+    stale:
+      type: boolean
+      description: true 表示统计尚未生成或已经超过服务端的新鲜度阈值。
+    confidence:
+      type: string
+      enum: [fresh, stale, unavailable]
+      description: fresh 为近期完整统计，stale 为过期完整统计，unavailable 为尚无完整统计。
+
+TorrentFile:
+  type: object
+  additionalProperties: false
+  required: [file_index, display_path, size_bytes, is_padding]
+  properties:
+    file_index:
+      type: integer
+      minimum: 0
+      maximum: 99999
+    display_path:
+      type: string
+      minLength: 1
+      maxLength: 4096
+    size_bytes:
+      type: integer
+      format: int64
+      minimum: 0
+    is_padding:
+      type: boolean
+
+TorrentFilePage:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, items, total, limit, offset]
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    items:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/TorrentFile"
+    total:
+      type: integer
+      minimum: 1
+      maximum: 100000
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999
+
+TorrentReviewFeedback:
+  type: object
+  additionalProperties: false
+  required: [outcome, reason_code, reason, decided_at]
+  properties:
+    outcome:
+      type: string
+      enum: [published, rejected]
+    reason_code:
+      $ref: "#/TorrentReviewReasonCode"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+    decided_at:
+      type: string
+      format: date-time
+
+MyTorrentSubmission:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - category
+    - title
+    - subtitle
+    - content_name
+    - info_hash_v1
+    - total_size_bytes
+    - file_count
+    - state
+    - version
+    - submitted_at
+    - published_at
+    - state_changed_at
+    - latest_review
+    - latest_content_change
+    - latest_screenshot_change
+    - latest_withdrawal
+    - resubmission_allowed
+  properties:
+    id:
+      type: integer
+      format: int64
+      minimum: 1
+    category:
+      $ref: "../schemas/catalog.yaml#/Category"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    content_name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    info_hash_v1:
+      type: string
+      pattern: "^[0-9a-f]{40}$"
+    total_size_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    file_count:
+      type: integer
+      minimum: 1
+      maximum: 100000
+    state:
+      $ref: "#/TorrentLifecycleState"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    submitted_at:
+      type: string
+      format: date-time
+    published_at:
+      type: string
+      format: date-time
+      nullable: true
+    state_changed_at:
+      type: string
+      format: date-time
+    latest_review:
+      type: object
+      allOf:
+        - $ref: "#/TorrentReviewFeedback"
+      nullable: true
+    latest_content_change:
+      type: object
+      allOf:
+        - $ref: "#/MyPublishedTorrentContentChangeStatus"
+      nullable: true
+    latest_screenshot_change:
+      type: object
+      allOf:
+        - $ref: "#/MyPublishedTorrentScreenshotChangeStatus"
+      nullable: true
+    latest_withdrawal:
+      type: object
+      allOf:
+        - $ref: "#/MyTorrentWithdrawalStatus"
+      nullable: true
+    resubmission_allowed:
+      type: boolean
+      description: 当前驳回结果是否允许只修改发布资料并重新送审；最终仍需独立写权限。
+
+MyPublishedTorrentContentChangeStatus:
+  type: object
+  additionalProperties: false
+  required: [status, submitted_at, decided_at, decision_reason]
+  properties:
+    status:
+      $ref: "#/PublishedTorrentContentChangeStatus"
+    submitted_at:
+      type: string
+      format: date-time
+    decided_at:
+      type: string
+      format: date-time
+      nullable: true
+    decision_reason:
+      type: string
+      nullable: true
+      description: 仅在已批准或已驳回时返回审核说明；不包含审核员身份。
+
+MyPublishedTorrentScreenshotChangeStatus:
+  type: object
+  additionalProperties: false
+  required: [status, submitted_at, decided_at, decision_reason]
+  properties:
+    status:
+      $ref: "#/PublishedTorrentScreenshotChangeStatus"
+    submitted_at:
+      type: string
+      format: date-time
+    decided_at:
+      type: string
+      format: date-time
+      nullable: true
+    decision_reason:
+      type: string
+      nullable: true
+      description: 仅在附件修改已经处理后返回审核说明；不包含审核员身份。
+
+MyTorrentWithdrawalStatus:
+  type: object
+  additionalProperties: false
+  required: [status, submitted_at, decided_at, decision_reason]
+  properties:
+    status:
+      $ref: "#/TorrentWithdrawalStatus"
+    submitted_at:
+      type: string
+      format: date-time
+    decided_at:
+      type: string
+      format: date-time
+      nullable: true
+    decision_reason:
+      type: string
+      nullable: true
+      description: 仅在审核完成后返回处理说明；不包含审核员身份和授权证据。
+
+MyTorrentSubmissionPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/MyTorrentSubmission"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+
+TorrentResubmissionRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - expected_version
+    - category_id
+    - title
+    - subtitle
+    - correction_note
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    category_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    correction_note:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+TorrentResubmission:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - torrent_id
+    - state
+    - version
+    - category_id
+    - title
+    - subtitle
+    - review_requested_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    state:
+      type: string
+      enum: [pending_review]
+    version:
+      type: integer
+      format: int64
+      minimum: 2
+      maximum: 9007199254740991
+    category_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    review_requested_at:
+      type: string
+      format: date-time
+
+UpdatePublishedTorrentMetadataRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, category_id, title, subtitle, reason]
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    category_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+PublishedTorrentMetadataRevision:
+  type: object
+  additionalProperties: false
+  required: [id, torrent_id, version, category_id, title, subtitle, reason, updated_at]
+  properties:
+    id: { type: string, format: uuid }
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    version:
+      type: integer
+      format: int64
+      minimum: 2
+      maximum: 9007199254740991
+    category_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    title: { type: string, minLength: 1, maxLength: 240 }
+    subtitle: { type: string, maxLength: 300 }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+    updated_at: { type: string, format: date-time }
+
+PublishedTorrentContentSnapshot:
+  type: object
+  additionalProperties: false
+  required: [description, media_info, external_identifiers]
+  properties:
+    description:
+      type: string
+      maxLength: 4194304
+    media_info:
+      type: string
+      maxLength: 16777216
+    external_identifiers:
+      type: array
+      maxItems: 5
+      items:
+        $ref: "#/TorrentExternalIdentifier"
+
+SubmitPublishedTorrentContentChangeRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, description, media_info, external_identifiers, reason]
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    description:
+      type: string
+      minLength: 1
+      maxLength: 4194304
+    media_info:
+      type: string
+      maxLength: 16777216
+    external_identifiers:
+      type: array
+      maxItems: 5
+      items:
+        $ref: "#/TorrentExternalIdentifier"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+PublishedTorrentContentChangeStatus:
+  type: string
+  enum: [pending, approved, rejected]
+
+PublishedTorrentContentChange:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - torrent_id
+    - base_torrent_version
+    - base
+    - candidate
+    - reason
+    - status
+    - version
+    - created_at
+  properties:
+    id: { type: string, format: uuid }
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    base_torrent_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    base:
+      $ref: "#/PublishedTorrentContentSnapshot"
+    candidate:
+      $ref: "#/PublishedTorrentContentSnapshot"
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+    status:
+      $ref: "#/PublishedTorrentContentChangeStatus"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 2
+    created_at: { type: string, format: date-time }
+    decided_at:
+      type: string
+      format: date-time
+      nullable: true
+      default: null
+
+ManagedPublishedTorrentContentChange:
+  type: object
+  additionalProperties: false
+  required:
+    - change
+    - uploader_numeric_id
+    - uploader_username
+    - uploader_display_name
+    - torrent_title
+  properties:
+    change:
+      $ref: "#/PublishedTorrentContentChange"
+    uploader_numeric_id: { type: integer, format: int64, minimum: 1 }
+    uploader_username: { type: string, minLength: 1, maxLength: 64 }
+    uploader_display_name: { type: string, minLength: 1, maxLength: 80 }
+    torrent_title: { type: string, minLength: 1, maxLength: 240 }
+
+ManagedPublishedTorrentContentChangePage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/ManagedPublishedTorrentContentChange"
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 50 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+DecidePublishedTorrentContentChangeRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_request_version, decision, reason]
+  properties:
+    expected_request_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 1
+    decision:
+      type: string
+      enum: [approve, reject]
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+PublishedTorrentContentChangeDecisionResult:
+  type: object
+  additionalProperties: false
+  required:
+    - decision_id
+    - request_id
+    - torrent_id
+    - decision
+    - request_status
+    - request_version
+    - torrent_version
+    - decided_at
+  properties:
+    decision_id: { type: string, format: uuid }
+    request_id: { type: string, format: uuid }
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    decision: { type: string, enum: [approve, reject] }
+    request_status:
+      $ref: "#/PublishedTorrentContentChangeStatus"
+    request_version: { type: integer, format: int64, minimum: 2, maximum: 2 }
+    torrent_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    decided_at: { type: string, format: date-time }
+
+ScreenshotManifestItem:
+  type: object
+  additionalProperties: false
+  required: [source, index]
+  properties:
+    source: { type: string, enum: [existing, upload] }
+    index: { type: integer, minimum: 0, maximum: 5 }
+
+SubmitPublishedTorrentScreenshotChangeRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, manifest, reason]
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    manifest:
+      type: array
+      maxItems: 6
+      items:
+        $ref: "#/ScreenshotManifestItem"
+    uploads:
+      type: array
+      maxItems: 6
+      items:
+        type: string
+        format: binary
+        minLength: 1
+        maxLength: 2097152
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+PublishedTorrentScreenshotChangeStatus:
+  type: string
+  enum: [pending, approved, rejected]
+
+PublishedTorrentScreenshotChange:
+  type: object
+  additionalProperties: false
+  required: [id, torrent_id, base_torrent_version, base_set_version, base_count, candidate_count, reason, status, version, created_at]
+  properties:
+    id: { type: string, format: uuid }
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    base_torrent_version: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    base_set_version: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
+    base_count: { type: integer, minimum: 0, maximum: 6 }
+    candidate_count: { type: integer, minimum: 0, maximum: 6 }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+    status:
+      $ref: "#/PublishedTorrentScreenshotChangeStatus"
+    version: { type: integer, format: int64, minimum: 1, maximum: 2 }
+    created_at: { type: string, format: date-time }
+    decided_at: { type: string, format: date-time, nullable: true }
+
+ManagedPublishedTorrentScreenshotChange:
+  type: object
+  additionalProperties: false
+  required: [change, uploader_numeric_id, uploader_username, uploader_display_name, torrent_title]
+  properties:
+    change:
+      $ref: "#/PublishedTorrentScreenshotChange"
+    uploader_numeric_id: { type: integer, format: int64, minimum: 1 }
+    uploader_username: { type: string, minLength: 1, maxLength: 64 }
+    uploader_display_name: { type: string, minLength: 1, maxLength: 80 }
+    torrent_title: { type: string, minLength: 1, maxLength: 240 }
+
+ManagedPublishedTorrentScreenshotChangePage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/ManagedPublishedTorrentScreenshotChange"
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 50 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+DecidePublishedTorrentScreenshotChangeRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_request_version, decision, reason]
+  properties:
+    expected_request_version: { type: integer, format: int64, minimum: 1, maximum: 1 }
+    decision: { type: string, enum: [approve, reject] }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+
+PublishedTorrentScreenshotChangeDecisionResult:
+  type: object
+  additionalProperties: false
+  required: [decision_id, request_id, torrent_id, decision, request_status, request_version, attachment_version, decided_at]
+  properties:
+    decision_id: { type: string, format: uuid }
+    request_id: { type: string, format: uuid }
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    decision: { type: string, enum: [approve, reject] }
+    request_status:
+      $ref: "#/PublishedTorrentScreenshotChangeStatus"
+    request_version: { type: integer, format: int64, minimum: 2, maximum: 2 }
+    attachment_version: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
+    decided_at: { type: string, format: date-time }
+
+TorrentWithdrawalStatus:
+  type: string
+  enum: [pending, approved, rejected]
+
+SubmitTorrentWithdrawalRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, reason]
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+TorrentWithdrawalRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - torrent_id
+    - torrent_title
+    - reason
+    - expected_torrent_version
+    - disabled_torrent_version
+    - status
+    - version
+    - created_at
+    - decided_at
+  properties:
+    id: { type: string, format: uuid }
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    torrent_title: { type: string, minLength: 1, maxLength: 240 }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+    expected_torrent_version: { type: integer, format: int64, minimum: 1 }
+    disabled_torrent_version: { type: integer, format: int64, minimum: 2 }
+    status:
+      $ref: "#/TorrentWithdrawalStatus"
+    version: { type: integer, format: int64, minimum: 1, maximum: 2 }
+    created_at: { type: string, format: date-time }
+    decided_at:
+      type: string
+      format: date-time
+      nullable: true
+
+ManagedTorrentWithdrawalRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - request
+    - uploader_numeric_id
+    - uploader_username
+    - uploader_display_name
+    - active_purchase_count
+  properties:
+    request:
+      $ref: "#/TorrentWithdrawalRequest"
+    uploader_numeric_id: { type: integer, format: int64, minimum: 1 }
+    uploader_username: { type: string, minLength: 1, maxLength: 64 }
+    uploader_display_name: { type: string, minLength: 1, maxLength: 80 }
+    active_purchase_count: { type: integer, format: int64, minimum: 0 }
+
+ManagedTorrentWithdrawalPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/ManagedTorrentWithdrawalRequest"
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 50 }
+    offset: { type: integer, minimum: 0, maximum: 1000000 }
+
+DecideTorrentWithdrawalRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_request_version, decision, reason]
+  properties:
+    expected_request_version: { type: integer, format: int64, minimum: 1, maximum: 1 }
+    decision:
+      type: string
+      enum: [approve, reject]
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+TorrentWithdrawalDecisionResult:
+  type: object
+  additionalProperties: false
+  required:
+    - decision_id
+    - request_id
+    - torrent_id
+    - decision
+    - request_status
+    - request_version
+    - torrent_state
+    - torrent_version
+    - decided_at
+  properties:
+    decision_id: { type: string, format: uuid }
+    request_id: { type: string, format: uuid }
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    decision: { type: string, enum: [approve, reject] }
+    request_status:
+      $ref: "#/TorrentWithdrawalStatus"
+    request_version: { type: integer, format: int64, minimum: 2, maximum: 2 }
+    torrent_state:
+      type: string
+      enum: [published, deleted]
+    torrent_version: { type: integer, format: int64, minimum: 2 }
+    decided_at: { type: string, format: date-time }
+
+TorrentBookmark:
+  type: object
+  additionalProperties: false
+  required: [torrent, bookmarked_at]
+  properties:
+    torrent:
+      $ref: "../schemas/catalog.yaml#/TorrentSummary"
+    bookmarked_at:
+      type: string
+      format: date-time
+
+TorrentBookmarkPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/TorrentBookmark"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 99999
+
+TorrentBookmarkStatusList:
+  type: object
+  additionalProperties: false
+  required: [bookmarked_ids]
+  properties:
+    bookmarked_ids:
+      type: array
+      maxItems: 100
+      uniqueItems: true
+      items:
+        type: integer
+        format: int64
+        minimum: 1
+
+TorrentBookmarkState:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, bookmarked, bookmarked_at]
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    bookmarked:
+      type: boolean
+      description: PUT 成功后恒为 true。
+    bookmarked_at:
+      type: string
+      format: date-time
+
+PendingTorrentReview:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - uploader_id
+    - uploader_display_name
+    - category_id
+    - category_name
+    - title
+    - subtitle
+    - content_name
+    - info_hash_v1
+    - total_size_bytes
+    - file_count
+    - version
+    - submitted_at
+    - review_requested_at
+  properties:
+    id:
+      type: integer
+      format: int64
+      minimum: 1
+    uploader_id:
+      type: string
+      format: uuid
+    uploader_display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    category_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    category_name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    content_name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    info_hash_v1:
+      type: string
+      pattern: "^[0-9a-f]{40}$"
+    total_size_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    file_count:
+      type: integer
+      minimum: 1
+      maximum: 100000
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    submitted_at:
+      type: string
+      format: date-time
+    review_requested_at:
+      type: string
+      format: date-time
+      description: 本轮进入审核队列的时间；首次提交时与 submitted_at 相同。
+
+PendingTorrentReviewPage:
+  type: object
+  additionalProperties: false
+  required: [items, total]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/PendingTorrentReview"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+
+MyTorrentReviewAssignment:
+  allOf:
+    - $ref: "#/PendingTorrentReview"
+    - type: object
+      additionalProperties: false
+      required: [votes_cast, required_votes, maximum_votes]
+      properties:
+        votes_cast:
+          type: integer
+          minimum: 0
+          maximum: 4
+          description: 当前总票数；投票前不暴露赞成与反对分布。
+        required_votes:
+          type: integer
+          enum: [3]
+        maximum_votes:
+          type: integer
+          enum: [4]
+
+MyTorrentReviewAssignmentPage:
+  type: object
+  additionalProperties: false
+  required: [items, total]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/MyTorrentReviewAssignment"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+
+TorrentReviewDecisionRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, decision, reason_code, reason]
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    decision:
+      type: string
+      enum: [approve, reject]
+    reason_code:
+      $ref: "#/TorrentReviewReasonCode"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+TorrentReviewDecisionResult:
+  type: object
+  additionalProperties: false
+  required:
+    - decision_id
+    - torrent_id
+    - decision
+    - reason_code
+    - state
+    - version
+    - decided_at
+  properties:
+    decision_id:
+      type: string
+      format: uuid
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    decision:
+      type: string
+      enum: [approve, reject]
+    reason_code:
+      $ref: "#/TorrentReviewReasonCode"
+    state:
+      type: string
+      enum: [published, rejected]
+    version:
+      type: integer
+      format: int64
+      minimum: 2
+      maximum: 9007199254740991
+    decided_at:
+      type: string
+      format: date-time
+
+TorrentReviewRoundOutcome:
+  type: string
+  enum: [waiting, published, rejected, escalated]
+
+TorrentReviewVoteResult:
+  type: object
+  additionalProperties: false
+  required:
+    - vote_id
+    - round_id
+    - torrent_id
+    - decision
+    - votes_cast
+    - required_votes
+    - maximum_votes
+    - outcome
+    - voted_at
+  properties:
+    vote_id:
+      type: string
+      format: uuid
+    round_id:
+      type: string
+      format: uuid
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    decision:
+      type: string
+      enum: [approve, reject]
+    votes_cast:
+      type: integer
+      minimum: 1
+      maximum: 4
+    required_votes:
+      type: integer
+      enum: [3]
+    maximum_votes:
+      type: integer
+      enum: [4]
+    outcome:
+      $ref: "#/TorrentReviewRoundOutcome"
+    final_decision:
+      $ref: "#/TorrentReviewDecisionResult"
+    voted_at:
+      type: string
+      format: date-time
+
+ManagedTorrentCategory:
+  type: object
+  additionalProperties: false
+  required: [id, name, enabled]
+  properties:
+    id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    enabled:
+      type: boolean
+
+ManagedTorrentStateCounts:
+  type: object
+  additionalProperties: false
+  required: [pending_review, published, rejected, disabled, deleted]
+  properties:
+    pending_review:
+      type: integer
+      format: int64
+      minimum: 0
+    published:
+      type: integer
+      format: int64
+      minimum: 0
+    rejected:
+      type: integer
+      format: int64
+      minimum: 0
+    disabled:
+      type: integer
+      format: int64
+      minimum: 0
+    deleted:
+      type: integer
+      format: int64
+      minimum: 0
+
+ManagedTorrent:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - uploader_numeric_id
+    - uploader_username
+    - uploader_display_name
+    - category_id
+    - category_name
+    - title
+    - subtitle
+    - total_size_bytes
+    - purchase_price
+    - state
+    - version
+    - promotion
+    - promotion_ends_at
+    - seeders
+    - leechers
+    - completed
+    - submitted_at
+    - published_at
+    - state_changed_at
+    - updated_at
+  properties:
+    id:
+      type: integer
+      format: int64
+      minimum: 1
+    uploader_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+    uploader_username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    uploader_display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    category_id:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+    category_name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    total_size_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    purchase_price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+      description: 当前整数魔力值价格；0 表示无需购买。
+    state:
+      $ref: "#/TorrentLifecycleState"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+    promotion:
+      type: string
+      enum: [none, free, double_upload, double_upload_free, half_download, double_upload_half_download, thirty_percent_download]
+    promotion_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+    seeders:
+      type: integer
+      minimum: 0
+    leechers:
+      type: integer
+      minimum: 0
+    completed:
+      type: integer
+      minimum: 0
+    submitted_at:
+      type: string
+      format: date-time
+    published_at:
+      type: string
+      format: date-time
+      nullable: true
+    state_changed_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+ManagedTorrentPage:
+  type: object
+  additionalProperties: false
+  required: [items, categories, state_counts, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/ManagedTorrent"
+    categories:
+      type: array
+      maxItems: 200
+      items:
+        $ref: "#/ManagedTorrentCategory"
+    state_counts:
+      $ref: "#/ManagedTorrentStateCounts"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+
+ChangeTorrentAvailabilityRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, action, reason]
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+    action:
+      type: string
+      enum: [disable, restore]
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+TorrentAvailabilityResult:
+  type: object
+  additionalProperties: false
+  required: [change_id, torrent_id, action, state, version, changed_at]
+  properties:
+    change_id:
+      type: string
+      format: uuid
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    action:
+      type: string
+      enum: [disable, restore]
+    state:
+      type: string
+      enum: [published, disabled]
+    version:
+      type: integer
+      format: int64
+      minimum: 2
+    changed_at:
+      type: string
+      format: date-time
+
+TorrentPurchaseAccessState:
+  type: string
+  enum: [free, uploader, purchased, purchase_required, purchase_disabled]
+
+TorrentPurchaseStatus:
+  type: object
+  additionalProperties: false
+  required:
+    - torrent_id
+    - title
+    - price
+    - tax
+    - seller_income
+    - magic_balance
+    - state
+    - policy_revision
+    - legacy_import
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,17})$"
+      description: 购买时扣除的整数魔力值。
+    tax:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,17})$"
+    seller_income:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,17})$"
+    magic_balance:
+      type: string
+      pattern: "^-?(0|[1-9][0-9]{0,17})$"
+    state:
+      $ref: "#/TorrentPurchaseAccessState"
+    policy_revision:
+      type: string
+      maxLength: 64
+    purchased_at:
+      type: string
+      format: date-time
+      nullable: true
+    legacy_import:
+      type: boolean
+
+TorrentPurchaseReceipt:
+  type: object
+  additionalProperties: false
+  required:
+    - entitlement_id
+    - request_id
+    - torrent_id
+    - price
+    - tax
+    - seller_income
+    - balance_after
+    - policy_revision
+    - purchased_at
+    - replayed
+  properties:
+    entitlement_id:
+      type: string
+      format: uuid
+    request_id:
+      type: string
+      format: uuid
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,17})$"
+    tax:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,17})$"
+    seller_income:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,17})$"
+    balance_after:
+      type: string
+      pattern: "^-?(0|[1-9][0-9]{0,17})$"
+    policy_revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    purchased_at:
+      type: string
+      format: date-time
+    replayed:
+      type: boolean
+
+TorrentPurchaseHistoryItem:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, title, category_name, torrent_state, price, purchased_at, legacy_import]
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    category_name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    torrent_state:
+      $ref: "#/TorrentLifecycleState"
+    price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,17})$"
+    purchased_at:
+      type: string
+      format: date-time
+    legacy_import:
+      type: boolean
+
+TorrentPurchaseHistoryPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/TorrentPurchaseHistoryItem"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+
+TorrentPurchasePolicySettings:
+  type: object
+  additionalProperties: false
+  required: [enabled, tax_basis_points, revision, effective_from]
+  properties:
+    enabled:
+      type: boolean
+    tax_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 10000
+    revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    effective_from:
+      type: string
+      format: date-time
+
+UpdateTorrentPurchasePolicyRequest:
+  type: object
+  additionalProperties: false
+  required: [enabled, tax_basis_points, expected_revision, reason]
+  properties:
+    enabled:
+      type: boolean
+    tax_basis_points:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 10000
+    expected_revision:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+UpdateTorrentPurchasePriceRequest:
+  type: object
+  additionalProperties: false
+  required: [price, expected_version, reason]
+  properties:
+    price:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 1000000
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+TorrentPurchasePriceChange:
+  type: object
+  additionalProperties: false
+  required: [request_id, torrent_id, title, price, version, changed_at, replayed]
+  properties:
+    request_id:
+      type: string
+      format: uuid
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    version:
+      type: integer
+      format: int64
+      minimum: 2
+    changed_at:
+      type: string
+      format: date-time
+    replayed:
+      type: boolean
+
+ManagedTorrentPurchaseStatus:
+  type: string
+  enum: [active, refunded]
+
+ManagedTorrentPurchaseSource:
+  type: string
+  enum: [live_purchase, legacy_import]
+
+ManagedTorrentPurchase:
+  type: object
+  additionalProperties: false
+  required:
+    - buyer_numeric_id
+    - buyer_username
+    - buyer_display_name
+    - seller_numeric_id
+    - seller_username
+    - torrent_id
+    - torrent_title
+    - category_name
+    - source
+    - status
+    - price
+    - tax
+    - seller_income
+    - purchased_at
+  properties:
+    buyer_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+    buyer_username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    buyer_display_name:
+      type: string
+      maxLength: 80
+    seller_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+    seller_username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    torrent_title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    category_name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    source:
+      $ref: "#/ManagedTorrentPurchaseSource"
+    status:
+      $ref: "#/ManagedTorrentPurchaseStatus"
+    price:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    tax:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    seller_income:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    purchased_at:
+      type: string
+      format: date-time
+    refunded_at:
+      type: string
+      format: date-time
+      nullable: true
+    refund_reason:
+      type: string
+      maxLength: 1000
+    refunded_by_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+      nullable: true
+    refunded_by_username:
+      type: string
+      maxLength: 64
+    refunded_balance_after:
+      type: string
+      pattern: "^-?(0|[1-9][0-9]{0,17})$"
+      nullable: true
+
+ManagedTorrentPurchasePage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/ManagedTorrentPurchase"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+
+RefundTorrentPurchaseRequest:
+  type: object
+  additionalProperties: false
+  required: [reason]
+  properties:
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+TorrentPurchaseRefundReceipt:
+  type: object
+  additionalProperties: false
+  required:
+    - request_id
+    - buyer_numeric_id
+    - torrent_id
+    - torrent_title
+    - refund_amount
+    - balance_after
+    - refunded_at
+    - replayed
+  properties:
+    request_id:
+      type: string
+      format: uuid
+    buyer_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    torrent_title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    refund_amount:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,6})$"
+    balance_after:
+      type: string
+      pattern: "^-?(0|[1-9][0-9]{0,17})$"
+    refunded_at:
+      type: string
+      format: date-time
+    replayed:
+      type: boolean
+
+TorrentReportReasonCode:
+  type: string
+  enum: [content_mismatch, copyright, duplicate_or_spam, malicious, other]
+
+CreateTorrentReportRequest:
+  type: object
+  additionalProperties: false
+  required: [reason_code, details]
+  properties:
+    reason_code:
+      $ref: "#/TorrentReportReasonCode"
+    details:
+      type: string
+      maxLength: 1000
+      description: other 类别必须提供至少 10 个字符；其他类别可留空。
+
+TorrentReportReceipt:
+  type: object
+  additionalProperties: false
+  required: [id, case_id, torrent_id, reason_code, created_at]
+  properties:
+    id:
+      type: string
+      format: uuid
+    case_id:
+      type: string
+      format: uuid
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    reason_code:
+      $ref: "#/TorrentReportReasonCode"
+    created_at:
+      type: string
+      format: date-time
+
+TorrentReportCaseState:
+  type: string
+  enum: [open, dismissed, torrent_disabled]
+
+TorrentReportAllegation:
+  type: object
+  additionalProperties: false
+  required: [reason_code, details, created_at]
+  properties:
+    reason_code:
+      $ref: "#/TorrentReportReasonCode"
+    details:
+      type: string
+      maxLength: 1000
+    created_at:
+      type: string
+      format: date-time
+
+ManagedTorrentReportCase:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - state
+    - version
+    - torrent_id
+    - torrent_title
+    - torrent_state
+    - torrent_version
+    - uploader_numeric_id
+    - uploader_username
+    - uploader_display_name
+    - report_count
+    - reports
+    - active_purchase_count
+    - opened_at
+    - latest_reported_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    state:
+      $ref: "#/TorrentReportCaseState"
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    torrent_title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    torrent_state:
+      $ref: "#/TorrentLifecycleState"
+    torrent_version:
+      type: integer
+      format: int64
+      minimum: 1
+    uploader_numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+    uploader_username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    uploader_display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+    report_count:
+      type: integer
+      format: int64
+      minimum: 1
+    reports:
+      type: array
+      minItems: 1
+      maxItems: 50
+      items:
+        $ref: "#/TorrentReportAllegation"
+    active_purchase_count:
+      type: integer
+      format: int64
+      minimum: 0
+    opened_at:
+      type: string
+      format: date-time
+    latest_reported_at:
+      type: string
+      format: date-time
+
+ManagedTorrentReportCasePage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/ManagedTorrentReportCase"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+
+TorrentReportDecision:
+  type: string
+  enum: [dismiss, disable_torrent]
+
+TorrentReportDecisionReasonCode:
+  type: string
+  enum: [no_violation, content_mismatch, copyright, duplicate_or_spam, malicious, other]
+
+CreateTorrentReportDecisionRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - expected_case_version
+    - expected_torrent_version
+    - decision
+    - reason_code
+    - note
+  properties:
+    expected_case_version:
+      type: integer
+      format: int64
+      minimum: 1
+    expected_torrent_version:
+      type: integer
+      format: int64
+      minimum: 1
+    decision:
+      $ref: "#/TorrentReportDecision"
+    reason_code:
+      $ref: "#/TorrentReportDecisionReasonCode"
+    note:
+      type: string
+      minLength: 10
+      maxLength: 1000
+
+TorrentReportDecisionResult:
+  type: object
+  additionalProperties: false
+  required:
+    - decision_id
+    - case_id
+    - torrent_id
+    - decision
+    - case_state
+    - case_version
+    - torrent_state
+    - torrent_version
+    - decided_at
+  properties:
+    decision_id:
+      type: string
+      format: uuid
+    case_id:
+      type: string
+      format: uuid
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    decision:
+      $ref: "#/TorrentReportDecision"
+    case_state:
+      $ref: "#/TorrentReportCaseState"
+    case_version:
+      type: integer
+      format: int64
+      minimum: 2
+    torrent_state:
+      $ref: "#/TorrentLifecycleState"
+    torrent_version:
+      type: integer
+      format: int64
+      minimum: 1
+    decided_at:
+      type: string
+      format: date-time

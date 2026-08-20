@@ -1,0 +1,58 @@
+SeedboxReportStatus:
+  type: string
+  enum: [pending, approved, rejected]
+
+SeedboxReport:
+  type: object
+  additionalProperties: false
+  required: [id, user_numeric_id, username, address, provider, bandwidth_mbps, statement, status, version, submitted_at, decision_reason]
+  properties:
+    id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 32 }
+    address: { type: string, minLength: 2, maxLength: 64 }
+    provider: { type: string, minLength: 2, maxLength: 100 }
+    bandwidth_mbps: { type: integer, format: int64, minimum: 1, maximum: 10000000 }
+    statement: { type: string, minLength: 10, maxLength: 1000 }
+    status: { $ref: "#/SeedboxReportStatus" }
+    version: { type: integer, format: int64, minimum: 1 }
+    submitted_at: { type: string, format: date-time }
+    decided_at: { type: string, format: date-time }
+    decision_reason: { type: string, maxLength: 1000 }
+    policy_sequence: { type: string, pattern: "^[1-9][0-9]*$" }
+
+SeedboxReportPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/SeedboxReport" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 100 }
+    offset: { type: integer, minimum: 0 }
+
+CreateSeedboxReportRequest:
+  type: object
+  additionalProperties: false
+  required: [address, provider, bandwidth_mbps, statement]
+  properties:
+    address:
+      type: string
+      minLength: 2
+      maxLength: 64
+      description: 仅接受单个 IPv4 或 IPv6 地址，不接受用户自行申报网段。
+    provider: { type: string, minLength: 2, maxLength: 100 }
+    bandwidth_mbps: { type: integer, format: int64, minimum: 1, maximum: 10000000 }
+    statement: { type: string, minLength: 10, maxLength: 1000 }
+
+DecideSeedboxReportRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, decision, reason]
+  properties:
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    decision: { type: string, enum: [approve, reject] }
+    reason: { type: string, minLength: 10, maxLength: 1000 }

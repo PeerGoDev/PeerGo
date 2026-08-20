@@ -1,0 +1,22 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: ../../db/tracker/migrations
+    queries:
+      - internal/ingest/repository_postgres.sql
+      - internal/settler/repository_postgres.sql
+      - internal/hnr/repository_postgres.sql
+      - internal/seedingevidence/repository_postgres.sql
+    gen:
+      go:
+        package: ledgerdb
+        out: internal/generated/ledgerdb
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID

@@ -1,0 +1,214 @@
+MyCapabilitiesPath:
+  get:
+    operationId: getMyCapabilities
+    summary: 获取当前用户在站点 scope 下的有效能力
+    tags: [authz]
+    x-audience: [web]
+    x-owner: core-authz
+    x-permission: authz.capability.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前用户可发现的有效能力；服务端鉴权仍是最终安全边界。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/authz.yaml#/CapabilityList"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+MyStaffCapabilitiesPath:
+  get:
+    operationId: getMyStaffCapabilities
+    summary: 获取当前独立后台会话可发现的 staff 能力
+    tags: [authz]
+    x-audience: [staff]
+    x-owner: core-authz
+    x-permission: authz.capability.read.staff.self
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: >-
+          仅返回 staff-session audience 的可发现能力；入口发现不能替代
+          owning use case 的逐命令鉴权。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/authz.yaml#/CapabilityList"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+GrantAdministrationPath:
+  get:
+    operationId: getGrantAdministration
+    summary: 获取 grant、任期和撤权审批概览
+    tags: [authz]
+    x-audience: [staff]
+    x-owner: core-authz
+    x-permission: authz.grant.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 当前受控范围内的 grant 与最近撤权审批。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/authz.yaml#/GrantAdministrationOverview"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+GrantRevocationsPath:
+  post:
+    operationId: createGrantRevocation
+    summary: 提议撤销一个已有 grant
+    tags: [authz]
+    x-audience: [staff]
+    x-owner: core-authz
+    x-permission: authz.grant.revoke.propose
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/authz.yaml#/CreateGrantRevocationRequest"
+    responses:
+      "201":
+        description: 撤权申请已创建，等待治理与安全职责分别复核。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/authz.yaml#/GrantRevocationRequest"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+GrantGovernanceReviewPath:
+  post:
+    operationId: reviewGrantRevocationAsGovernance
+    summary: 以治理职责批准或拒绝 grant 撤销
+    tags: [authz]
+    x-audience: [staff]
+    x-owner: core-authz
+    x-permission: authz.grant.revoke.approve.governance
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GrantRevocationRequestID"
+      - $ref: "#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/authz.yaml#/ReviewGrantRevocationRequest"
+    responses:
+      "200":
+        description: 治理职责复核已记录；双职责完成时撤权同步生效。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/authz.yaml#/GrantRevocationRequest"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+GrantSecurityReviewPath:
+  post:
+    operationId: reviewGrantRevocationAsSecurity
+    summary: 以安全职责批准或拒绝 grant 撤销
+    tags: [authz]
+    x-audience: [staff]
+    x-owner: core-authz
+    x-permission: authz.grant.revoke.approve.security
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GrantRevocationRequestID"
+      - $ref: "#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/authz.yaml#/ReviewGrantRevocationRequest"
+    responses:
+      "200":
+        description: 安全职责复核已记录；双职责完成时撤权同步生效。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/authz.yaml#/GrantRevocationRequest"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+StaffCSRFHeader:
+  name: X-CSRF-Token
+  in: header
+  required: true
+  description: 与当前 staff session 绑定的 CSRF token。
+  schema:
+    type: string
+    minLength: 43
+    maxLength: 43
+
+GrantRevocationRequestID:
+  name: request_id
+  in: path
+  required: true
+  description: grant 撤销申请 ID。
+  schema:
+    type: string
+    format: uuid
