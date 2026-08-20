@@ -1496,7 +1496,7 @@ development Compose 配置，会先把现有 Core/Vault/Tracker 数据库导出�
 `.local/objects` 与旧 Tracker 快照移动到同一可恢复备份；随后重建本地卷、恢复只读源库，
 先按 SQL 压缩包摘要和快照时间幂等写入完整的 normal 1× Settlement 基准，再依次执行用户、
 勋章、种子、已购买永久授权、图片、终态对账、Tracker 投影、签名快照和 acceptance。ZIP 直接只读，
-不会先解压 22GB 图片包；最终只有数据库引用的种子海报/图集进入 PeerGo，头像和孤儿上传不迁移。干净的本地还原不依赖已经运行的开发 worker：脚本会在 loopback 临时启动 Settlement 控制端，并复用统一 Core policy worker 的有限排空模式投递迁移保种权益，确认全部收到后自动关闭临时进程。生产迁移不启动临时服务，必须由已部署的常驻控制端和统一 worker 完成投递，最终 acceptance 会拒绝任何仍待投递的迁移权益。
+不会先解压 22GB 图片包；最终只有数据库引用的种子海报/图集进入 PeerGo，头像和孤儿上传不迁移。干净的本地还原不依赖已经运行的开发 worker：脚本会在 loopback 临时启动 Settlement 控制端，并复用统一 Core policy worker 的有限排空模式投递迁移保种权益，确认全部收到后自动关闭临时进程。生产 cutover 镜像使用相同的有限模式，但控制端和 worker 只在该只读根文件系统容器的 loopback 内短暂运行；它不依赖尚未激活的常驻应用，也不开放宿主机端口。最终 acceptance 会拒绝任何仍待投递的迁移权益。
 
 首次本地还原不需要先注册任何 PeerGo 用户。快捷入口会自行启动空的本地基础设施、执行全部
 Core/Vault/Tracker migration，并由 migration 写入 `PeerGo` 站点资料和默认关闭注册的准入策略；
@@ -1865,6 +1865,10 @@ core-postgres + vault-postgres + tracker-postgres + web-valkey + nats + minio + 
 开发环境和小站可以共用物理机器；生产 Tracker 节点与 Ledger 必须和 Web/Core 分故障域。无论规模如何，逻辑进程、端口、database、凭据和资源限制都保持独立。
 
 ### 19.4 首版生产编排与激活门槛
+
+可直接执行的精简步骤见 [首版生产部署](./docs/operations/production-deployment.md)；只使用
+`rousi.sql.gz + torrents.zip + uploads.zip` 的正式迁移见
+[RousiPro 三包生产迁移](./docs/operations/rousi-cutover.md)。
 
 `deploy/compose/compose.production.yaml` 是单机/首版应用进程编排，不替代生产
 PostgreSQL、NATS JetStream、HTTPS 入口和备份设施。它会按依赖顺序执行三库 migration、

@@ -1,5 +1,5 @@
 .PHONY: generate format test check test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
-.PHONY: legacy-migrate rousi-restore-local production-config production-build production-up production-down production-status production-activation-check
+.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status production-config production-build production-up production-down production-status production-activation-check production-admin production-admin-revoke
 
 # These values are synthetic and limited to the loopback-only local Compose
 # environment. Production processes require explicit secret-backed variables.
@@ -132,6 +132,30 @@ legacy-migrate:
 rousi-restore-local:
 	PEERGO_LOCAL_RESTORE_CONFIRM="$(CONFIRM_ROUSI_LOCAL_RESET)" \
 		./scripts/restore-rousi-local.sh \
+		"$(ROUSI_DUMP)" "$(ROUSI_TORRENTS)" "$(ROUSI_UPLOADS)"
+
+# Formal production cutover uses the same three immutable inputs as the local
+# rehearsal, but never resets a target or automatically approves a physically
+# missing .torrent. Prepare is source-only; apply requires an exact candidate
+# digest whenever prepare emitted one.
+rousi-restore-production-prepare:
+	PEERGO_PRODUCTION_RESTORE_CONFIRM="$(CONFIRM_ROUSI_PRODUCTION)" \
+	PEERGO_CUTOVER_BACKUP_REFERENCE="$(ROUSI_BACKUP_REFERENCE)" \
+	PEERGO_CUTOVER_WRITES_STOPPED_AT="$(ROUSI_WRITES_STOPPED_AT)" \
+		./scripts/restore-rousi-production.sh prepare \
+		"$(ROUSI_DUMP)" "$(ROUSI_TORRENTS)" "$(ROUSI_UPLOADS)"
+
+rousi-restore-production-apply:
+	PEERGO_PRODUCTION_RESTORE_CONFIRM="$(CONFIRM_ROUSI_PRODUCTION)" \
+	PEERGO_CUTOVER_BACKUP_REFERENCE="$(ROUSI_BACKUP_REFERENCE)" \
+	PEERGO_CUTOVER_WRITES_STOPPED_AT="$(ROUSI_WRITES_STOPPED_AT)" \
+	PEERGO_CUTOVER_OPERATOR_REFERENCE="$(ROUSI_OPERATOR_REFERENCE)" \
+	PEERGO_ROUSI_MISSING_TORRENTS_APPROVAL="$(CONFIRM_ROUSI_MISSING_TORRENTS)" \
+		./scripts/restore-rousi-production.sh apply \
+		"$(ROUSI_DUMP)" "$(ROUSI_TORRENTS)" "$(ROUSI_UPLOADS)"
+
+rousi-restore-production-status:
+	./scripts/restore-rousi-production.sh status \
 		"$(ROUSI_DUMP)" "$(ROUSI_TORRENTS)" "$(ROUSI_UPLOADS)"
 
 dev-web:
@@ -947,6 +971,18 @@ production-status: production-config
 # It is read-only and also requires the production Relay status to be healthy.
 production-activation-check: production-config
 	docker compose --env-file .env.production -f deploy/compose/compose.production.yaml --profile activation run --rm --no-deps activation-check
+
+# The first administrator is always an explicit existing account. Migration
+# order, numeric ID or legacy level never grants site administration.
+production-admin: production-config
+	test -n "$(USERNAME)"
+	docker compose --env-file .env.production -f deploy/compose/compose.production.yaml \
+		run --rm --no-deps --entrypoint core-admin core-api --username "$(USERNAME)"
+
+production-admin-revoke: production-config
+	test -n "$(USERNAME)"
+	docker compose --env-file .env.production -f deploy/compose/compose.production.yaml \
+		run --rm --no-deps --entrypoint core-admin core-api --username "$(USERNAME)" --revoke
 
 db-migrate:
 	GOWORK=off go -C tools/migrator tool goose -dir ../../db/core/migrations postgres "$(CORE_DATABASE_URL)" up

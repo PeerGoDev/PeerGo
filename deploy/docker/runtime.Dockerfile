@@ -12,6 +12,7 @@ COPY tools/traffic-corpus ./tools/traffic-corpus
 
 RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-api ./services/core/cmd/api && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-admin ./services/core/cmd/admin && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-audit-worker ./services/core/cmd/worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-control-projector ./services/core/cmd/projector && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-snapshot-publisher ./services/core/cmd/snapshot-builder && \
@@ -57,7 +58,7 @@ FROM alpine:3.22
 RUN apk add --no-cache ca-certificates curl tzdata vips-tools && \
     addgroup -S -g 10001 peergo && \
     adduser -S -D -H -u 10001 -G peergo peergo && \
-    mkdir -p /var/lib/peergo/objects /var/lib/peergo/tracker /var/lib/peergo/audit /var/lib/peergo/image-derivatives && \
+    mkdir -p /var/lib/peergo/objects /var/lib/peergo/tracker /var/lib/peergo/audit /var/lib/peergo/image-derivative-tmp && \
     chown -R peergo:peergo /var/lib/peergo
 
 COPY --from=build /out/ /usr/local/bin/

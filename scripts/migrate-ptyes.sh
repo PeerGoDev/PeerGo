@@ -106,6 +106,38 @@ required_command() {
     command -v "$1" >/dev/null 2>&1 || fail "$1 is required"
 }
 
+# Development runs the typed importers from source. The production cutover
+# image supplies the exact same commands as immutable binaries so the server
+# does not need a Go toolchain and the orchestration below remains the single
+# migration order of record.
+run_core_command() {
+    local command_name="$1"
+    shift
+    if [[ -n "${PEERGO_LEGACY_BIN_DIR:-}" ]]; then
+        [[ "${PEERGO_LEGACY_BIN_DIR}" = /* ]] || fail "PEERGO_LEGACY_BIN_DIR must be absolute"
+        local binary="${PEERGO_LEGACY_BIN_DIR}/${command_name}"
+        [[ -x "${binary}" ]] || fail "migration binary is unavailable: ${binary}"
+        "${binary}" "$@"
+        return
+    fi
+    required_command go
+    go -C "${repo_root}/services/core" run "./cmd/${command_name}" "$@"
+}
+
+run_vault_command() {
+    local command_name="$1"
+    shift
+    if [[ -n "${PEERGO_LEGACY_BIN_DIR:-}" ]]; then
+        [[ "${PEERGO_LEGACY_BIN_DIR}" = /* ]] || fail "PEERGO_LEGACY_BIN_DIR must be absolute"
+        local binary="${PEERGO_LEGACY_BIN_DIR}/${command_name}"
+        [[ -x "${binary}" ]] || fail "migration binary is unavailable: ${binary}"
+        "${binary}" "$@"
+        return
+    fi
+    required_command go
+    go -C "${repo_root}/services/privacy-vault" run "./cmd/${command_name}" "$@"
+}
+
 sha256_file() {
     local file="$1"
     if command -v shasum >/dev/null 2>&1; then
@@ -205,7 +237,7 @@ read_migration_status() {
     inspect_inputs
     require_status_identity
     note "reading run-scoped migration checkpoints and target evidence"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action status
+    run_core_command legacy-torrents --action status
 }
 
 run_cutover_preflight() {
@@ -217,7 +249,7 @@ run_cutover_preflight() {
     [[ -f "${PEERGO_LEGACY_TORRENT_ROOT}" ]] || fail "formal cutover preflight requires an immutable torrents.zip"
     [[ -f "${PEERGO_LEGACY_IMAGE_ROOT}" ]] || fail "formal cutover preflight requires an immutable image ZIP"
     note "running read-only database and destination storage cutover checks"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action preflight
+    run_core_command legacy-torrents --action preflight
     preflight_passed=true
 }
 
@@ -249,37 +281,37 @@ restore_source() {
 run_users() {
     ensure_cutover_preflight
     note "validating PtYes users"
-    PEERGO_LEGACY_MODE=validate go -C "${repo_root}/services/privacy-vault" run ./cmd/legacy-users
+    PEERGO_LEGACY_MODE=validate run_vault_command legacy-users
     note "importing PtYes users"
-    PEERGO_LEGACY_MODE=import go -C "${repo_root}/services/privacy-vault" run ./cmd/legacy-users
+    PEERGO_LEGACY_MODE=import run_vault_command legacy-users
     note "verifying an idempotent all-skipped user retry"
-    PEERGO_LEGACY_MODE=import go -C "${repo_root}/services/privacy-vault" run ./cmd/legacy-users
+    PEERGO_LEGACY_MODE=import run_vault_command legacy-users
     note "importing PtYes traffic, integer magic, experience, activity and attendance openings"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-user-state
+    run_core_command legacy-user-state
     note "verifying an idempotent user operational-state retry"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-user-state
+    run_core_command legacy-user-state
 }
 
 run_medals() {
     ensure_cutover_preflight
     note "importing PtYes medal definitions, user ownership and benefit openings"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-medals --action import
+    run_core_command legacy-medals --action import
     note "verifying an idempotent medal retry and full source-to-target reconciliation"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-medals --action import
+    run_core_command legacy-medals --action import
 }
 
 verify_medals() {
     require_run_identity
     note "verifying medal definitions, ownership and benefit openings without target writes"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-medals --action verify
+    run_core_command legacy-medals --action verify
 }
 
 run_torrent_validation() {
     ensure_cutover_preflight
     note "inventorying PtYes torrent metadata"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action inventory
+    run_core_command legacy-torrents --action inventory
     note "validating SQL-referenced immutable torrent objects"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action validate
+    run_core_command legacy-torrents --action validate
 }
 
 write_torrent_exclusion_candidate() {
@@ -287,39 +319,39 @@ write_torrent_exclusion_candidate() {
     require_run_identity
     required_env PEERGO_LEGACY_TORRENT_EXCLUSIONS_OUTPUT
     note "writing a snapshot-bound missing-object candidate for human review"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action exclusions-template
+    run_core_command legacy-torrents --action exclusions-template
 }
 
 run_torrent_import() {
     ensure_cutover_preflight
     note "importing verified torrent objects and parsed file trees"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action import
+    run_core_command legacy-torrents --action import
 }
 
 run_torrent_purchases() {
     ensure_cutover_preflight
     note "importing PtYes integer torrent prices and completed purchase rights"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action purchases
+    run_core_command legacy-torrents --action purchases
     note "verifying an idempotent torrent purchase retry"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action purchases
+    run_core_command legacy-torrents --action purchases
 }
 
 run_media_validation() {
     ensure_cutover_preflight
     note "validating PtYes torrent gallery and poster image references"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-media --action validate
+    run_core_command legacy-media --action validate
 }
 
 run_media_import() {
     ensure_cutover_preflight
     note "normalizing and importing PtYes torrent images"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-media --action import
+    run_core_command legacy-media --action import
 }
 
 run_media_reconciliation() {
     ensure_cutover_preflight
     note "fully reading back and reconciling imported torrent images"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-media --action reconcile
+    run_core_command legacy-media --action reconcile
 }
 
 run_image_derivatives() {
@@ -334,7 +366,7 @@ run_image_derivatives() {
     mkdir -p "${PEERGO_IMAGE_DERIVATIVE_TEMP_DIR}"
     chmod 700 "${PEERGO_IMAGE_DERIVATIVE_TEMP_DIR}"
     note "generating and fully verifying WebP image derivatives with ${concurrency} cooperating processors"
-    go -C "${repo_root}/services/core" run ./cmd/image-derivative-worker \
+    run_core_command image-derivative-worker \
         --drain --drain-timeout=24h --concurrency="${concurrency}"
 }
 
@@ -342,7 +374,7 @@ run_reconciliation() {
     ensure_cutover_preflight
     run_media_reconciliation
     note "running verify-only torrent retry and terminal Core/Vault reconciliation"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action reconcile
+    run_core_command legacy-torrents --action reconcile
 }
 
 run_cutover_acceptance() {
@@ -370,7 +402,7 @@ run_cutover_acceptance() {
         fail "formal cutover acceptance requires the immutable image ZIP"
     verify_medals
     note "running read-only post-reconciliation cutover acceptance"
-    go -C "${repo_root}/services/core" run ./cmd/legacy-torrents --action acceptance
+    run_core_command legacy-torrents --action acceptance
 }
 
 command_name="${1:-}"

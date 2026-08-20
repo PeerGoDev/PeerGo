@@ -3,7 +3,7 @@ name: Quality
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
@@ -80,3 +80,6 @@ jobs:
 
       - name: Build web image
         run: docker build --file deploy/docker/web.Dockerfile --tag peergo/web:ci .
+
+      - name: Build Rousi cutover image
+        run: docker build --file deploy/docker/cutover.Dockerfile --tag peergo/cutover:ci .

@@ -1,0 +1,53 @@
+name: peergo
+
+# One-shot production migration overlay. It is never started by
+# `production-up`; operators must select the `cutover` profile explicitly via
+# scripts/restore-rousi-production.sh. The three source archives are mounted as
+# individual read-only files and never enter an application container.
+
+services:
+  rousi-cutover:
+    profiles: ["cutover"]
+    image: ${PEERGO_CUTOVER_IMAGE:-peergo/cutover:local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/cutover.Dockerfile
+    env_file:
+      - ${PEERGO_ENV_FILE:-../../.env.production}
+    init: true
+    read_only: true
+    network_mode: bridge
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+    environment:
+      PEERGO_ENV: production
+      PEERGO_LEGACY_DUMP_PATH: /cutover/input/rousi.sql.gz
+      PEERGO_LEGACY_TORRENT_ROOT: /cutover/input/torrents.zip
+      PEERGO_LEGACY_IMAGE_ROOT: /cutover/input/uploads.zip
+      PEERGO_LEGACY_RUN_ID: ${PEERGO_LEGACY_RUN_ID:?set by restore-rousi-production.sh}
+      PEERGO_LEGACY_SNAPSHOT_SHA256: ${PEERGO_LEGACY_SNAPSHOT_SHA256:?set by restore-rousi-production.sh}
+      PEERGO_LEGACY_OCCURRED_AT: ${PEERGO_LEGACY_OCCURRED_AT:?set by restore-rousi-production.sh}
+      PEERGO_LEGACY_RECONCILED_AT: ${PEERGO_LEGACY_RECONCILED_AT:?set by restore-rousi-production.sh}
+      PEERGO_CUTOVER_BACKUP_REFERENCE: ${PEERGO_CUTOVER_BACKUP_REFERENCE:?set by restore-rousi-production.sh}
+      PEERGO_CUTOVER_WRITES_STOPPED_AT: ${PEERGO_CUTOVER_WRITES_STOPPED_AT:?set by restore-rousi-production.sh}
+      PEERGO_CUTOVER_OPERATOR_REFERENCE: ${PEERGO_CUTOVER_OPERATOR_REFERENCE:-status-only}
+      PEERGO_ROUSI_MISSING_TORRENTS_APPROVAL: ${PEERGO_ROUSI_MISSING_TORRENTS_APPROVAL:-}
+      PEERGO_CUTOVER_HOST_UID: ${PEERGO_CUTOVER_HOST_UID:?set by restore-rousi-production.sh}
+      PEERGO_CUTOVER_HOST_GID: ${PEERGO_CUTOVER_HOST_GID:?set by restore-rousi-production.sh}
+      PEERGO_IMAGE_DERIVATIVE_TEMP_DIR: /var/lib/peergo/image-derivative-tmp
+      PEERGO_TRACKER_SNAPSHOT_PATH: /var/lib/peergo/tracker/control.snapshot
+      PEERGO_TRACKER_SUBJECT_SNAPSHOT_PATH: /var/lib/peergo/tracker/subjects.snapshot
+      PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_PATH: /var/lib/peergo/tracker/runtime-policy.snapshot
+    volumes:
+      - peergo_objects:/var/lib/peergo/objects
+      - peergo_tracker:/var/lib/peergo/tracker
+      - peergo_image_derivatives:/var/lib/peergo/image-derivative-tmp
+      - ${PEERGO_SECRET_DIR:-../../.local/production-secrets}:/run/secrets:ro
+      - ${PEERGO_CUTOVER_DUMP_HOST_PATH:?set by restore-rousi-production.sh}:/cutover/input/rousi.sql.gz:ro
+      - ${PEERGO_CUTOVER_TORRENTS_HOST_PATH:?set by restore-rousi-production.sh}:/cutover/input/torrents.zip:ro
+      - ${PEERGO_CUTOVER_UPLOADS_HOST_PATH:?set by restore-rousi-production.sh}:/cutover/input/uploads.zip:ro
+      - ${PEERGO_CUTOVER_OUTPUT_HOST_PATH:?set by restore-rousi-production.sh}:/cutover/output
+    entrypoint: ["/usr/local/bin/rousi-cutover-container"]

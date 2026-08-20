@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -39,7 +40,13 @@ func LoadPromotionWorker() (PromotionWorkerConfig, error) {
 		return PromotionWorkerConfig{}, errors.New("PEERGO_SETTLEMENT_CONTROL_URL must use http or https")
 	}
 	if environment == "production" && parsed.Scheme != "https" {
-		return PromotionWorkerConfig{}, errors.New("PEERGO_SETTLEMENT_CONTROL_URL must use https in production")
+		// The finite cutover runner starts Settlement control in the same
+		// container and reaches it only through a kernel loopback address. Keep
+		// clear-text traffic forbidden for every routable production endpoint.
+		address := net.ParseIP(parsed.Hostname())
+		if parsed.Scheme != "http" || address == nil || !address.IsLoopback() {
+			return PromotionWorkerConfig{}, errors.New("PEERGO_SETTLEMENT_CONTROL_URL must use https or an IP loopback HTTP origin in production")
+		}
 	}
 	token, err := required("PEERGO_SETTLEMENT_CONTROL_SERVICE_TOKEN")
 	if err != nil || len(token) < 32 {
