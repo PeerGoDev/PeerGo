@@ -163,6 +163,25 @@ make production-admin USERNAME=admin
 make production-admin-revoke USERNAME=admin
 ```
 
+如果不建立临时公网预览入口，可通过 loopback Web API 签发上线所需的首版策略：
+
+```bash
+make production-policy-bootstrap \
+  USERNAME=admin \
+  CONFIRM_PEERGO_PRODUCTION_POLICIES=APPLY_PEERGO_PRODUCTION_POLICIES
+```
+
+命令只接受 `single-server` 的 loopback Web 监听器，并在终端隐式读取管理员密码；密码、
+会话 cookie 与 CSRF token 均不会写入参数、环境或磁盘。它沿用当前注册设置，仅把模式改为
+`invite`；成员自行签发邀请是否开放保持原值。若时间线上尚无对应版本，则签发：
+
+- 新人考核：30 天内累计 50 GiB 计费上传并累计 72 小时有效做种；
+- H&R：7 天考察期内累计 72 小时有效做种或达到 1.0 分享率，另有 24 小时宽限期。
+
+两个不可变策略至少提前 5 分钟签发，命令会等待其生效并确认 H&R 已投递。迁移账号不会被
+追溯纳入新人考核；只有策略生效后完成注册的新账号会创建考核记录。命令可安全重跑，已有
+启用中或待生效版本不会被默认值覆盖。
+
 随后在后台核对注册模式、新人考核、分类、Tracker 客户端规则、上传限制、优惠、H&R、
 分享率、做种奖励、经验等级、邮件和站点展示。向真实外部邮箱发送测试邮件并确认收到。
 

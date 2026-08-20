@@ -113,6 +113,15 @@ make production-status
 make production-admin USERNAME=admin
 ```
 
+直接切换且不开放临时预览入口时，先通过 loopback 管理 API 签发首版邀请注册、新人考核与
+H&R 策略（密码仅在终端隐式输入）：
+
+```bash
+make production-policy-bootstrap \
+  USERNAME=admin \
+  CONFIRM_PEERGO_PRODUCTION_POLICIES=APPLY_PEERGO_PRODUCTION_POLICIES
+```
+
 登录后台核对政策和邮件，并设置
 `PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT` 为实际 Tracker 切换 UTC 整点。重启受影响
 服务后执行：
