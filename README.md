@@ -1916,7 +1916,8 @@ make production-status
 make production-activation-check
 ```
 
-默认激活门槛要求邀请注册、新人考核已开启、结算优惠政策与 H&R 政策均存在；同时会使用
+默认激活门槛要求邀请注册、新人考核已开启、结算优惠政策与 H&R 政策均存在；首版 H&R
+基线明确为 `disabled`，存在不等于开启，必须由管理员审阅真实 Tracker 数据后另行启用。同时会使用
 Vault 内部服务凭据读取真实邮件状态，要求生产 HTTPS Relay、邮箱验证/密码找回的公开 HTTPS
 来源和两套必需模板均已就绪。可通过 `PEERGO_PREFLIGHT_REGISTRATION_MODE` 和
 `PEERGO_PREFLIGHT_NEWCOMER_STATE` 明确调整注册与考核预期，但不能用“当前优惠”或隐式 1x

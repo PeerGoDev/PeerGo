@@ -114,7 +114,7 @@ make production-admin USERNAME=admin
 ```
 
 直接切换且不开放临时预览入口时，先通过 loopback 管理 API 签发首版邀请注册、新人考核与
-H&R 策略（密码仅在终端隐式输入）：
+默认关闭的 H&R 基线策略（密码仅在终端隐式输入）：
 
 ```bash
 make production-policy-bootstrap \

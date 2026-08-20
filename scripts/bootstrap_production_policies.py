@@ -52,12 +52,15 @@ DEFAULT_NEWCOMER_POLICY = {
     "minimum_seeding_active_seconds": 72 * 60 * 60,
 }
 DEFAULT_HNR_POLICY = {
-    "mode": "enforced",
-    "required_seed_seconds": 72 * 60 * 60,
-    "required_ratio_basis_points": 10_000,
-    "assessment_window_seconds": 7 * 24 * 60 * 60,
-    "grace_period_seconds": 24 * 60 * 60,
-    "max_interval_credit_seconds": 60 * 60,
+    # Production starts with an explicit disabled revision. This proves that
+    # the complete H&R control/delivery path works without silently imposing
+    # obligations before operators review real post-cutover Tracker evidence.
+    "mode": "disabled",
+    "required_seed_seconds": 0,
+    "required_ratio_basis_points": 0,
+    "assessment_window_seconds": 0,
+    "grace_period_seconds": 0,
+    "max_interval_credit_seconds": 0,
 }
 
 
@@ -431,7 +434,7 @@ def bootstrap(client: ApiClient, *, wait: bool, wait_timeout_seconds: int, poll_
                 csrf=True,
                 idempotency_key=str(uuid.uuid4()),
             )
-            print("PeerGo production policies: 已签发 H&R（7 天内做种 72 小时或分享率 1.0，宽限 24 小时）。", flush=True)
+            print("PeerGo production policies: 已签发 H&R 关闭基线；上线后需由管理员显式开启。", flush=True)
         else:
             print("PeerGo production policies: 已有 H&R 版本，未覆盖。", flush=True)
     else:

@@ -122,6 +122,19 @@ class ProductionPolicyBootstrapTest(unittest.TestCase):
         }
         self.assertFalse(MODULE.newcomer_has_enabled_revision(historical))
 
+    def test_production_hnr_baseline_is_explicitly_disabled(self) -> None:
+        self.assertEqual(
+            MODULE.DEFAULT_HNR_POLICY,
+            {
+                "mode": "disabled",
+                "required_seed_seconds": 0,
+                "required_ratio_basis_points": 0,
+                "assessment_window_seconds": 0,
+                "grace_period_seconds": 0,
+                "max_interval_credit_seconds": 0,
+            },
+        )
+
     def test_api_client_keeps_credentials_in_memory_and_sends_write_boundaries(self) -> None:
         observed = {}
 
