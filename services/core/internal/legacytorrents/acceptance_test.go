@@ -41,6 +41,10 @@ func TestCutoverAcceptanceManifestRoundTripAndNoOverwrite(t *testing.T) {
 		RunState: "reconciled", CoreRuntimeDefaultsReady: true,
 		LegacyMemberAuthorizationReady: true, ReadyToActivate: true,
 		Users: 1, AttendanceOpenings: 1,
+		SeedboxPolicySequence:            1,
+		SeedboxUploadFactorBasisPoints:   5_000,
+		SeedboxDownloadFactorBasisPoints: 20_000,
+		StandardSpeedLimitBytesPerSecond: 25 * 1024 * 1024,
 	}
 	acceptancePath := filepath.Join(directory, "acceptance.json")
 	digest, err := WriteCutoverAcceptanceManifest(acceptancePath, report)

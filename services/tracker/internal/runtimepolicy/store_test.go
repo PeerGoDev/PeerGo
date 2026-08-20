@@ -27,6 +27,10 @@ func TestStoreActivatesAndRejectsRollback(t *testing.T) {
 				DefaultNumWant: 50, MaxNumWant: 100, ScrapeEnabled: true, MaxScrapeHashes: 50,
 				ClientMode: trackerruntimepolicyv1.ClientModeAllowAll, AllowedClients: []trackerruntimepolicyv1.ClientRule{},
 				UserRequestsPerMinute: 30, UserBurst: 60, AddressRequestsPerMinute: 120, AddressBurst: 240,
+				Seedbox: trackerruntimepolicyv1.SeedboxPolicy{
+					UploadFactorBasisPoints: 5_000, DownloadFactorBasisPoints: 10_000,
+					Rules: []trackerruntimepolicyv1.SeedboxRule{},
+				},
 			},
 		}, "key", privateKey)
 		if err != nil {

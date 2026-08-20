@@ -538,9 +538,10 @@ LEFT JOIN LATERAL (
 	// intervals wholly covered by VIP are recorded as exempt, never as a user
 	// violation or an automatic restriction.
 	benefits.SpeedLimitExempt = true
-	// Settlement applies the signed Seedbox evidence only after the VIP
-	// timeline overlay, so an active VIP interval is never upload-discounted.
-	benefits.SeedboxNoDiscount = true
+	// VIP benefits and torrent promotions are resolved first; the immutable
+	// box accounting factor then applies to the resulting traffic. Free
+	// download remains free, while VIP box upload still receives the box factor.
+	benefits.SeedboxNoDiscount = false
 	return stats, benefits, nil
 }
 

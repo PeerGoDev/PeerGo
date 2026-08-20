@@ -277,6 +277,10 @@ func runtimeSeedboxPolicyJSON(policy trackerruntimepolicyv1.SeedboxPolicy) ([]by
 }
 
 func decodeRuntimeSeedboxPolicy(encoded []byte, destination *trackerruntimepolicyv1.SeedboxPolicy) error {
+	// Persisted revisions are append-only. Revisions written before the
+	// download factor was introduced omit it and retain neutral 1x semantics;
+	// preinitializing the destination upgrades only the in-memory view.
+	*destination = trackerruntimepolicyv1.SeedboxPolicy{DownloadFactorBasisPoints: 10_000}
 	if err := jsonStrict(encoded, destination); err != nil {
 		return errors.New("persisted Tracker seedbox policy is invalid")
 	}
@@ -285,6 +289,7 @@ func decodeRuntimeSeedboxPolicy(encoded []byte, destination *trackerruntimepolic
 
 func seedboxPoliciesEqual(left, right trackerruntimepolicyv1.SeedboxPolicy) bool {
 	return left.Enabled == right.Enabled && left.UploadFactorBasisPoints == right.UploadFactorBasisPoints &&
+		left.DownloadFactorBasisPoints == right.DownloadFactorBasisPoints &&
 		left.SeedboxSpeedLimitBytesPerSecond == right.SeedboxSpeedLimitBytesPerSecond &&
 		left.StandardSpeedLimitBytesPerSecond == right.StandardSpeedLimitBytesPerSecond &&
 		slices.Equal(left.Rules, right.Rules)

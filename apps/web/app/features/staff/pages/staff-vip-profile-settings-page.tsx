@@ -120,11 +120,11 @@ function VIPProfileSettingsContent() {
         : "当前未接入 Tracker 控制规则",
     },
     {
-      label: "盒子上传不打折",
-      enabled: benefits.seedbox_no_discount,
+      label: "VIP 兼容盒子政策",
+      enabled: !benefits.seedbox_no_discount,
       value: benefits.seedbox_no_discount
-        ? "VIP 生效时段内的盒子上传按原始上传量结算"
-        : "当前未接入盒子结算规则",
+        ? "VIP 盒子免除流量折算"
+        : "VIP 免费下载等权益照常生效，随后应用盒子上传/下载倍率",
     },
   ]
 

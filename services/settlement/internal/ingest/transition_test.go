@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -33,19 +34,23 @@ func TestEvaluateCopiesAnnounceNetworkEvidenceIntoRawInterval(t *testing.T) {
 		t.Fatal(err)
 	}
 	second := ingestTestEvent(time.Minute, 150, 240, 200, "")
+	downloadFactor := int64(20_000)
 	second.NetworkEvidence = &trackerannouncev1.NetworkEvidence{
 		PolicySequence: 9, PolicyRevision: "seedbox-v9", Class: trackerannouncev1.NetworkClassSeedbox,
-		RuleID: "trusted-box", UploadFactorBasisPoints: 5_000, SpeedLimitBytesPerSecond: 100 << 20,
+		RuleID: "trusted-box", UploadFactorBasisPoints: 5_000,
+		DownloadFactorBasisPoints: &downloadFactor, SpeedLimitBytesPerSecond: 100 << 20,
 	}
 	result, err := Evaluate(&baseline.State, second)
 	if err != nil || result.Interval == nil || result.Interval.NetworkEvidence == nil {
 		t.Fatalf("interval = %+v, %v", result.Interval, err)
 	}
-	if *result.Interval.NetworkEvidence != *second.NetworkEvidence {
+	if !reflect.DeepEqual(result.Interval.NetworkEvidence, second.NetworkEvidence) {
 		t.Fatalf("network evidence = %+v, want %+v", result.Interval.NetworkEvidence, second.NetworkEvidence)
 	}
 	second.NetworkEvidence.RuleID = "mutated"
-	if result.Interval.NetworkEvidence.RuleID != "trusted-box" {
+	*second.NetworkEvidence.DownloadFactorBasisPoints = 30_000
+	if result.Interval.NetworkEvidence.RuleID != "trusted-box" ||
+		*result.Interval.NetworkEvidence.DownloadFactorBasisPoints != 20_000 {
 		t.Fatal("raw interval retained a mutable event evidence pointer")
 	}
 }

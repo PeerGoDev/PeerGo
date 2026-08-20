@@ -127,21 +127,26 @@ type Benefits struct {
 	Medal             *FactorGrant
 }
 
-// SeedboxPenalty discounts credited upload after ordinary benefits. A VIP
-// exemption is resolved by the policy snapshot builder by omitting this rule.
+// SeedboxPenalty is applied after public promotions and member benefits. This
+// preserves freeleech/VIP semantics while making the box accounting factor an
+// explicit, explainable multiplier rather than a hidden override.
 type SeedboxPenalty struct {
-	Rule         RuleRef
-	UploadFactor BasisPoints
+	Rule           RuleRef
+	UploadFactor   BasisPoints
+	DownloadFactor BasisPoints
 }
 
 func (penalty SeedboxPenalty) validate() error {
 	if err := penalty.Rule.validate(); err != nil {
 		return err
 	}
-	if penalty.Rule.Source != SourceSeedbox || penalty.UploadFactor > OneX {
+	if penalty.Rule.Source != SourceSeedbox || penalty.UploadFactor > OneX || penalty.DownloadFactor < OneX {
 		return fmt.Errorf("%w: invalid seedbox penalty", ErrInvalidRule)
 	}
-	return penalty.UploadFactor.Validate()
+	if err := penalty.UploadFactor.Validate(); err != nil {
+		return err
+	}
+	return penalty.DownloadFactor.Validate()
 }
 
 // SpeedPenalty is an adverse override. It intentionally ignores freeleech and

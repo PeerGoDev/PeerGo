@@ -13,6 +13,7 @@ COPY tools/traffic-corpus ./tools/traffic-corpus
 
 RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/legacy-torrents ./services/core/cmd/legacy-torrents && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/legacy-seedboxes ./services/core/cmd/legacy-seedboxes && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/legacy-user-state ./services/core/cmd/legacy-user-state && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/legacy-medals ./services/core/cmd/legacy-medals && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/legacy-media ./services/core/cmd/legacy-media && \

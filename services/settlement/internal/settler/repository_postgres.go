@@ -46,7 +46,8 @@ func (repository *PostgresRepository) ClaimNext(ctx context.Context, now time.Ti
 	}
 	if _, err := rawFromClaim(row.IntervalEventID, row.UserID, row.TorrentID, row.StartsAt, row.EndsAt, row.RawUploaded, row.RawDownloaded, row.TorrentControlSequence, row.SubjectControlSequence,
 		row.NetworkPolicySequence, row.NetworkPolicyRevision, row.NetworkClass, row.NetworkRuleID,
-		row.SeedboxUploadFactorBasisPoints, row.SpeedLimitBytesPerSecond); err != nil ||
+		row.SeedboxUploadFactorBasisPoints, row.SeedboxDownloadFactorBasisPoints,
+		row.SeedboxDownloadFactorExplicit, row.SpeedLimitBytesPerSecond); err != nil ||
 		!row.LeaseToken.Valid || uuid.UUID(row.LeaseToken.Bytes) != leaseToken || row.Attempts < 1 {
 		return PendingWork{}, false, ErrInvariant
 	}
@@ -80,7 +81,8 @@ func (repository *PostgresRepository) Settle(ctx context.Context, pending Pendin
 	}
 	raw, err := rawFromClaim(row.IntervalEventID, row.UserID, row.TorrentID, row.StartsAt, row.EndsAt, row.RawUploaded, row.RawDownloaded, row.TorrentControlSequence, row.SubjectControlSequence,
 		row.NetworkPolicySequence, row.NetworkPolicyRevision, row.NetworkClass, row.NetworkRuleID,
-		row.SeedboxUploadFactorBasisPoints, row.SpeedLimitBytesPerSecond)
+		row.SeedboxUploadFactorBasisPoints, row.SeedboxDownloadFactorBasisPoints,
+		row.SeedboxDownloadFactorExplicit, row.SpeedLimitBytesPerSecond)
 	if err != nil || raw.EventID != pending.IntervalEventID || row.Attempts != pending.Attempts {
 		return ErrInvariant
 	}
@@ -385,7 +387,8 @@ func rawFromClaim(
 	rawUploaded, rawDownloaded, torrentSequence, subjectSequence int64,
 	networkSequence pgtype.Int8,
 	networkRevision, networkClass, networkRuleID pgtype.Text,
-	uploadFactor pgtype.Int4,
+	uploadFactor, downloadFactor pgtype.Int4,
+	downloadFactorExplicit pgtype.Bool,
 	speedLimit pgtype.Int8,
 ) (rawInterval, error) {
 	if eventID == uuid.Nil || userID == uuid.Nil || torrentID < 1 || !startsAt.Valid || !endsAt.Valid ||
@@ -393,18 +396,23 @@ func rawFromClaim(
 		return rawInterval{}, ErrInvariant
 	}
 	var networkEvidence *policy.NetworkEvidence
-	hasAnyNetworkEvidence := networkSequence.Valid || networkRevision.Valid || networkClass.Valid || networkRuleID.Valid || uploadFactor.Valid || speedLimit.Valid
+	hasAnyNetworkEvidence := networkSequence.Valid || networkRevision.Valid || networkClass.Valid || networkRuleID.Valid ||
+		uploadFactor.Valid || downloadFactor.Valid || downloadFactorExplicit.Valid || speedLimit.Valid
 	if hasAnyNetworkEvidence {
 		if !networkSequence.Valid || networkSequence.Int64 < 1 || !networkRevision.Valid || !networkClass.Valid ||
-			!uploadFactor.Valid || uploadFactor.Int32 < 0 || uploadFactor.Int32 > 10_000 || !speedLimit.Valid || speedLimit.Int64 < 0 ||
-			(networkClass.String == policy.NetworkClassStandard && (networkRuleID.Valid || uploadFactor.Int32 != 10_000)) ||
-			(networkClass.String == policy.NetworkClassSeedbox && (!networkRuleID.Valid || networkRuleID.String == "")) {
+			!uploadFactor.Valid || uploadFactor.Int32 < 0 || uploadFactor.Int32 > 10_000 ||
+			!downloadFactor.Valid || downloadFactor.Int32 < 0 || downloadFactor.Int32 > 100_000 ||
+			!downloadFactorExplicit.Valid || !speedLimit.Valid || speedLimit.Int64 < 0 ||
+			(networkClass.String == policy.NetworkClassStandard && (networkRuleID.Valid ||
+				uploadFactor.Int32 != 10_000 || downloadFactor.Int32 != 10_000)) ||
+			(networkClass.String == policy.NetworkClassSeedbox && (!networkRuleID.Valid || networkRuleID.String == "" || downloadFactor.Int32 < 10_000)) {
 			return rawInterval{}, ErrInvariant
 		}
 		networkEvidence = &policy.NetworkEvidence{
 			PolicySequence: uint64(networkSequence.Int64), PolicyRevision: networkRevision.String,
 			Class: networkClass.String, UploadFactorBasisPoints: policy.BasisPoints(uploadFactor.Int32),
-			SpeedLimitBytesPerSecond: speedLimit.Int64,
+			DownloadFactorBasisPoints: policy.BasisPoints(downloadFactor.Int32),
+			SpeedLimitBytesPerSecond:  speedLimit.Int64,
 		}
 		if networkRuleID.Valid {
 			networkEvidence.RuleID = networkRuleID.String

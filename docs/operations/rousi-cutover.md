@@ -78,12 +78,19 @@ Apply 按固定顺序执行：
 2. 正式只读 preflight；
 3. 用户、状态、累计签到、整数魔力值、经验、VIP/限制；
 4. 勋章定义/持有/佩戴/权益与工作组；
-5. 种子元数据、原始 `.torrent`、文件树、价格和已购买权益；
-6. 种子引用原图与三档 WebP；
-7. 全量 read-back reconciliation；
-8. 正常 1x Settlement 基线、保种组收益时间线与 Tracker allowlist 投影；
-9. 三份签名 Tracker 快照；
-10. acceptance 与 `ready_to_activate=true`。
+5. 用户绑定的盒子 IP/CIDR 与不可变迁移凭证；
+6. 种子元数据、原始 `.torrent`、文件树、价格和已购买权益；
+7. 种子引用原图与三档 WebP；
+8. 全量 read-back reconciliation；
+9. 正常 1x Settlement 基线、保种组收益时间线与 Tracker allowlist 投影；
+10. 三份签名 Tracker 快照；
+11. acceptance 与 `ready_to_activate=true`。
+
+迁入的首版盒子政策固定为盒子不限速、优惠与 VIP 权益正常生效；优惠结算后上传按
+`0.5x` 计入、下载按 `2x` 计费。普通线路继续沿用旧站
+`seedbox.non_seedbox_max_speed`（旧站的 Mbps 按原算法换算），VIP 继续豁免速度观察。免费与
+VIP 免费下载结算为零后仍为零，H&R 和做种证据始终使用原始流量。盒子地址只保留在
+Core/Tracker 控制面，不随 announce 事件发送给 Settlement。
 
 阶段可按相同三包安全续跑；run ID、候选批准和 preflight 都绑定三包摘要。任何输入变化都会
 创建新 run，不能混用旧证据。
@@ -97,13 +104,16 @@ make rousi-restore-production-status \
   ROUSI_UPLOADS='/opt/peergo/input/uploads.zip'
 ```
 
-只有运行目录中的 `ready-to-activate.env` 明确包含：
+只有运行目录中的 `ready-to-activate.env` 明确包含当前验收版本：
 
 ```text
+schema=peergo.rousi-production-ready.v2
+acceptance_schema=peergo.legacy-cutover-acceptance.v7
 ready_to_activate=true
 ```
 
-才可进入非公开启动。
+才可进入非公开启动。旧版 `ready-to-activate.env` 不包含盒子规则验收，必须用当前代码续跑
+同一组三包，不能作为切流依据。
 
 ## 4. 启动、管理员和最终激活
 

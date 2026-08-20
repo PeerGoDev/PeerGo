@@ -8,6 +8,9 @@ func TestMigrationStatusCheckpointsComplete(t *testing.T) {
 		ImportedUsers: 12, ImportedTorrents: 9, ImportedTorrentObjects: 9,
 		ExcludedTorrents: 1, ExcludedTorrentObjects: 1,
 		UserMappings: 12, TorrentMappings: 9, VerifiedPreferredObjects: 9,
+		SeedboxSourceRows: 2, SeedboxEnabledRows: 2,
+		SeedboxExpectedBindings: 3, SeedboxImportedBindings: 3,
+		SeedboxPolicySequence: 4,
 	}
 	if !complete.CheckpointsComplete() {
 		t.Fatal("complete migration status was reported incomplete")
@@ -25,6 +28,9 @@ func TestMigrationStatusCheckpointsComplete(t *testing.T) {
 		{name: "missing user mapping", mutate: func(value *MigrationStatus) { value.UserMappings-- }},
 		{name: "missing torrent mapping", mutate: func(value *MigrationStatus) { value.TorrentMappings-- }},
 		{name: "unverified object", mutate: func(value *MigrationStatus) { value.VerifiedPreferredObjects-- }},
+		{name: "missing seedbox receipt", mutate: func(value *MigrationStatus) { value.SeedboxPolicySequence = 0 }},
+		{name: "missing seedbox binding", mutate: func(value *MigrationStatus) { value.SeedboxImportedBindings-- }},
+		{name: "invalid seedbox inventory", mutate: func(value *MigrationStatus) { value.SeedboxEnabledRows++ }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

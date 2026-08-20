@@ -71,8 +71,11 @@ type SeedboxRule struct {
 // the same signed revision. A zero speed limit means "observe no limit"; it
 // does not silently invent an environment-specific default.
 type SeedboxPolicy struct {
-	Enabled                          bool          `json:"enabled"`
-	UploadFactorBasisPoints          int           `json:"upload_factor_basis_points"`
+	Enabled                 bool `json:"enabled"`
+	UploadFactorBasisPoints int  `json:"upload_factor_basis_points"`
+	// Omit zero only for decoding already-signed v1 artifacts created before
+	// this factor existed. New policies must explicitly carry a value.
+	DownloadFactorBasisPoints        int           `json:"download_factor_basis_points,omitempty"`
 	SeedboxSpeedLimitBytesPerSecond  int64         `json:"seedbox_speed_limit_bytes_per_second"`
 	StandardSpeedLimitBytesPerSecond int64         `json:"standard_speed_limit_bytes_per_second"`
 	Rules                            []SeedboxRule `json:"rules"`
@@ -240,6 +243,9 @@ func normalizeAndValidate(snapshot Snapshot, preparing bool) (Snapshot, error) {
 		policy.UserRequestsPerMinute < 1 || policy.UserRequestsPerMinute > 600 || policy.UserBurst < 1 || policy.UserBurst > 1_200 ||
 		policy.AddressRequestsPerMinute < 1 || policy.AddressRequestsPerMinute > 5_000 || policy.AddressBurst < 1 || policy.AddressBurst > 10_000 ||
 		policy.Seedbox.UploadFactorBasisPoints < 0 || policy.Seedbox.UploadFactorBasisPoints > 10_000 ||
+		policy.Seedbox.DownloadFactorBasisPoints > 100_000 ||
+		(policy.Seedbox.DownloadFactorBasisPoints != 0 && policy.Seedbox.DownloadFactorBasisPoints < 10_000) ||
+		(preparing && policy.Seedbox.DownloadFactorBasisPoints == 0) ||
 		policy.Seedbox.SeedboxSpeedLimitBytesPerSecond < 0 || policy.Seedbox.StandardSpeedLimitBytesPerSecond < 0 ||
 		len(policy.Seedbox.Rules) > MaxSeedboxRules {
 		return Snapshot{}, ErrInvalid

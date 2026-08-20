@@ -153,7 +153,9 @@ func TestServiceUsesOneReadOnlyOperationsCapability(t *testing.T) {
 		MaxSwarms: 100000, MaxPeers: 1000000, MaxPeersPerSwarm: 100000,
 	}}, trackerPolicyAdministrationStub{}, settlementSettingsReaderStub{settings: settlementoperationsv1.Settings{
 		GeneratedAt: now.UTC(),
-		Seedbox:     settlementoperationsv1.SeedboxPolicy{SettlementPrimitiveSupported: true},
+		Seedbox: settlementoperationsv1.SeedboxPolicy{
+			SettlementPrimitiveSupported: true, DownloadFactorBasisPoints: 10_000,
+		},
 	}}, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)

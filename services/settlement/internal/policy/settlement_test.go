@@ -25,7 +25,9 @@ func TestSettlePeerGoCombinesBenefitsWithoutArbitraryStacking(t *testing.T) {
 		Uploader:          &FactorGrant{Rule: testRule(SourceUploader, "uploader-default", 4), Factors: Factors{Upload: 20_000, Download: OneX}},
 		Medal:             &FactorGrant{Rule: testRule(SourceMedal, "medal-seeder", 2), Factors: Factors{Upload: 15_000, Download: 8_000}},
 	}
-	snapshot.Seedbox = &SeedboxPenalty{Rule: testRule(SourceSeedbox, "seedbox-tier-a", 5), UploadFactor: 5_000}
+	snapshot.Seedbox = &SeedboxPenalty{
+		Rule: testRule(SourceSeedbox, "seedbox-tier-a", 5), UploadFactor: 5_000, DownloadFactor: OneX,
+	}
 
 	result, err := SettleDelta(snapshot, 100, 100)
 	if err != nil {
@@ -85,7 +87,9 @@ func TestSettlePtYesPreservesLegacyOrderAndRounding(t *testing.T) {
 	snapshot := testSnapshot(ProfilePtYesV1, "ptyes-cutover-v1", promotion)
 	snapshot.Benefits.Uploader = &FactorGrant{Rule: testRule(SourceUploader, "legacy-uploader", 1), Factors: Factors{Upload: 30_000, Download: OneX}}
 	snapshot.Benefits.Medal = &FactorGrant{Rule: testRule(SourceMedal, "legacy-medal", 1), Factors: Factors{Upload: 15_000, Download: 5_000}}
-	snapshot.Seedbox = &SeedboxPenalty{Rule: testRule(SourceSeedbox, "legacy-seedbox", 1), UploadFactor: 5_000}
+	snapshot.Seedbox = &SeedboxPenalty{
+		Rule: testRule(SourceSeedbox, "legacy-seedbox", 1), UploadFactor: 5_000, DownloadFactor: OneX,
+	}
 
 	result, err := SettleDelta(snapshot, 100, 100)
 	if err != nil {

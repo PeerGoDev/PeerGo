@@ -43,7 +43,9 @@ func (stub stubAppender) AppendVIPBenefit(context.Context, []byte, time.Time) (b
 func (stub stubAppender) Settings(_ context.Context, now time.Time) (settlementoperationsv1.Settings, error) {
 	return settlementoperationsv1.Settings{
 		GeneratedAt: now,
-		Seedbox:     settlementoperationsv1.SeedboxPolicy{SettlementPrimitiveSupported: true},
+		Seedbox: settlementoperationsv1.SeedboxPolicy{
+			SettlementPrimitiveSupported: true, DownloadFactorBasisPoints: 10_000,
+		},
 	}, stub.err
 }
 

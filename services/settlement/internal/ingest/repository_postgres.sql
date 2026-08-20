@@ -158,6 +158,8 @@ INSERT INTO ledger.raw_session_intervals (
     network_class,
     network_rule_id,
     seedbox_upload_factor_basis_points,
+    seedbox_download_factor_basis_points,
+    seedbox_download_factor_explicit,
     speed_limit_bytes_per_second,
     created_at
 ) VALUES (
@@ -190,6 +192,8 @@ INSERT INTO ledger.raw_session_intervals (
     sqlc.narg(network_class)::text,
     sqlc.narg(network_rule_id)::text,
     sqlc.narg(seedbox_upload_factor_basis_points)::integer,
+    sqlc.narg(seedbox_download_factor_basis_points)::integer,
+    sqlc.narg(seedbox_download_factor_explicit)::boolean,
     sqlc.narg(speed_limit_bytes_per_second)::bigint,
     sqlc.arg(created_at)::timestamptz
 );

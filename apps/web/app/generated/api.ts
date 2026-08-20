@@ -7799,6 +7799,7 @@ export interface components {
         TrackerSeedboxRuntimePolicy: {
             enabled: boolean;
             upload_factor_basis_points: number;
+            download_factor_basis_points: number;
             /** Format: int64 */
             seedbox_speed_limit_bytes_per_second: number;
             /** Format: int64 */
@@ -7950,6 +7951,8 @@ export interface components {
             global_policy_configured: boolean;
             /** Format: int64 */
             upload_factor_basis_points: number;
+            /** Format: int64 */
+            download_factor_basis_points: number;
             classification_connected: boolean;
             registry_connected: boolean;
             speed_observation_connected: boolean;

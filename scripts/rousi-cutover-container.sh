@@ -325,9 +325,11 @@ apply_cutover() {
     if [[ "${run_state}" == 'reconciled' ]]; then
         preflight_manifest="$(find "${output_root}" -maxdepth 1 -type f -name 'preflight-*.json' -print | sort | tail -n 1)"
         [[ -n "${preflight_manifest}" ]] || fail "reconciled resume has no preflight manifest"
-        note "run is already reconciled; replaying only idempotent medal and image verification"
+        note "run is already reconciled; replaying idempotent medal, seedbox and image verification"
         "${binary_root}/legacy-medals" --action import | tee -a "${output_root}/migration.log"
         "${binary_root}/legacy-medals" --action import | tee -a "${output_root}/migration.log"
+        "${binary_root}/legacy-seedboxes" --action import | tee -a "${output_root}/migration.log"
+        "${binary_root}/legacy-seedboxes" --action import | tee -a "${output_root}/migration.log"
         "${migration_script}" image-derivatives | tee -a "${output_root}/migration.log"
     else
         preflight_manifest="${output_root}/preflight-${attempt_id}.json"
@@ -356,7 +358,8 @@ apply_cutover() {
     local acceptance_sha256
     acceptance_sha256="$(sha256_file "${acceptance_output}")"
     {
-        printf 'schema=peergo.rousi-production-ready.v1\n'
+        printf 'schema=peergo.rousi-production-ready.v2\n'
+        printf 'acceptance_schema=peergo.legacy-cutover-acceptance.v7\n'
         printf 'run_id=%s\n' "${PEERGO_LEGACY_RUN_ID}"
         printf 'acceptance=%s\n' "$(basename "${acceptance_output}")"
         printf 'acceptance_sha256=%s\n' "${acceptance_sha256}"

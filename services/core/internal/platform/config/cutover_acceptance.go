@@ -13,9 +13,11 @@ type CutoverAcceptanceProcessConfig struct {
 	Environment         string
 	SnapshotPath        string
 	SubjectSnapshotPath string
+	RuntimePolicyPath   string
 	TrustedKeys         map[string]ed25519.PublicKey
 	SnapshotMaxAge      time.Duration
 	SubjectMaxAge       time.Duration
+	RuntimePolicyMaxAge time.Duration
 	MaxFutureSkew       time.Duration
 }
 
@@ -34,8 +36,15 @@ func LoadCutoverAcceptance() (CutoverAcceptanceProcessConfig, error) {
 	if err != nil || !filepath.IsAbs(subjectPath) {
 		return CutoverAcceptanceProcessConfig{}, errors.New("PEERGO_TRACKER_SUBJECT_SNAPSHOT_PATH must be absolute")
 	}
-	if filepath.Clean(snapshotPath) == filepath.Clean(subjectPath) {
-		return CutoverAcceptanceProcessConfig{}, errors.New("Tracker torrent and subject snapshot paths must differ")
+	runtimePolicyPath, err := required("PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_PATH")
+	if err != nil || !filepath.IsAbs(runtimePolicyPath) {
+		return CutoverAcceptanceProcessConfig{}, errors.New("PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_PATH must be absolute")
+	}
+	cleanedPaths := map[string]struct{}{
+		filepath.Clean(snapshotPath): {}, filepath.Clean(subjectPath): {}, filepath.Clean(runtimePolicyPath): {},
+	}
+	if len(cleanedPaths) != 3 {
+		return CutoverAcceptanceProcessConfig{}, errors.New("Tracker snapshot paths must be distinct")
 	}
 	trustedValue, err := required("PEERGO_TRACKER_SNAPSHOT_TRUSTED_KEYS")
 	if err != nil {
@@ -53,14 +62,19 @@ func LoadCutoverAcceptance() (CutoverAcceptanceProcessConfig, error) {
 	if err != nil {
 		return CutoverAcceptanceProcessConfig{}, err
 	}
+	runtimePolicyMaxAge, err := cutoverDuration("PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_MAX_AGE", time.Second, 10*time.Minute)
+	if err != nil {
+		return CutoverAcceptanceProcessConfig{}, err
+	}
 	futureSkew, err := cutoverDuration("PEERGO_TRACKER_SNAPSHOT_MAX_FUTURE_SKEW", 0, 10*time.Minute)
 	if err != nil {
 		return CutoverAcceptanceProcessConfig{}, err
 	}
 	return CutoverAcceptanceProcessConfig{
 		Environment: environment, SnapshotPath: filepath.Clean(snapshotPath),
-		SubjectSnapshotPath: filepath.Clean(subjectPath), TrustedKeys: trustedKeys,
-		SnapshotMaxAge: snapshotMaxAge, SubjectMaxAge: subjectMaxAge, MaxFutureSkew: futureSkew,
+		SubjectSnapshotPath: filepath.Clean(subjectPath), RuntimePolicyPath: filepath.Clean(runtimePolicyPath),
+		TrustedKeys: trustedKeys, SnapshotMaxAge: snapshotMaxAge, SubjectMaxAge: subjectMaxAge,
+		RuntimePolicyMaxAge: runtimePolicyMaxAge, MaxFutureSkew: futureSkew,
 	}, nil
 }
 

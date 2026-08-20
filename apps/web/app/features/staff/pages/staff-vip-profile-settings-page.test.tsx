@@ -29,7 +29,7 @@ describe("StaffVIPProfileSettingsPage", () => {
     expect(screen.getByText("+20%")).toBeVisible()
     expect(screen.getByText("超速观察按 VIP 历史时段自动豁免")).toBeVisible()
     expect(
-      screen.getByText("VIP 生效时段内的盒子上传按原始上传量结算")
+      screen.getByText("VIP 免费下载等权益照常生效，随后应用盒子上传/下载倍率")
     ).toBeVisible()
     expect(
       screen.queryByText("未接入 Tracker 控制规则")
@@ -101,7 +101,7 @@ function createQueryClient() {
       share_ratio_exempt: false,
       newcomer_assessment_exempt: true,
       speed_limit_exempt: true,
-      seedbox_no_discount: true,
+      seedbox_no_discount: false,
     },
   })
   return queryClient

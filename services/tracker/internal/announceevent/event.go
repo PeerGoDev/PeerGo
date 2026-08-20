@@ -94,6 +94,10 @@ func cloneNetworkEvidence(evidence *trackerannouncev1.NetworkEvidence) *trackera
 		return nil
 	}
 	copy := *evidence
+	if evidence.DownloadFactorBasisPoints != nil {
+		factor := *evidence.DownloadFactorBasisPoints
+		copy.DownloadFactorBasisPoints = &factor
+	}
 	return &copy
 }
 

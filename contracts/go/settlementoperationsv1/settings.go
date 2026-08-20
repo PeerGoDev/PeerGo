@@ -22,6 +22,7 @@ type SeedboxPolicy struct {
 	SettlementPrimitiveSupported bool  `json:"settlement_primitive_supported"`
 	GlobalPolicyConfigured       bool  `json:"global_policy_configured"`
 	UploadFactorBasisPoints      int64 `json:"upload_factor_basis_points"`
+	DownloadFactorBasisPoints    int64 `json:"download_factor_basis_points"`
 	ClassificationConnected      bool  `json:"classification_connected"`
 	RegistryConnected            bool  `json:"registry_connected"`
 	SpeedObservationConnected    bool  `json:"speed_observation_connected"`
@@ -36,7 +37,8 @@ type Settings struct {
 
 func (settings Settings) Valid() bool {
 	if settings.GeneratedAt.IsZero() || !settings.Seedbox.SettlementPrimitiveSupported ||
-		settings.Seedbox.UploadFactorBasisPoints < 0 || settings.Seedbox.UploadFactorBasisPoints > 10_000 {
+		settings.Seedbox.UploadFactorBasisPoints < 0 || settings.Seedbox.UploadFactorBasisPoints > 10_000 ||
+		settings.Seedbox.DownloadFactorBasisPoints < 10_000 || settings.Seedbox.DownloadFactorBasisPoints > 100_000 {
 		return false
 	}
 	if !settings.HNR.Configured {

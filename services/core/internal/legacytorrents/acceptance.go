@@ -19,14 +19,16 @@ import (
 
 	"github.com/peergo/peergo/contracts/go/signedsnapshotv1"
 	"github.com/peergo/peergo/contracts/go/trackercontrolv1"
+	"github.com/peergo/peergo/contracts/go/trackerruntimepolicyv1"
 	"github.com/peergo/peergo/contracts/go/trackersubjectcontrolv1"
 	"github.com/peergo/peergo/services/core/internal/legacymedia"
+	"github.com/peergo/peergo/services/core/internal/legacyseedboxes"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	platformpostgres "github.com/peergo/peergo/services/core/internal/platform/postgres"
 )
 
 const (
-	CutoverAcceptanceSchema = "peergo.legacy-cutover-acceptance.v6"
+	CutoverAcceptanceSchema = "peergo.legacy-cutover-acceptance.v7"
 	maxCutoverManifestBytes = 1 << 20
 )
 
@@ -49,9 +51,11 @@ type CutoverAcceptanceConfig struct {
 	PreflightManifestSHA256    [sha256.Size]byte
 	TrackerSnapshotPath        string
 	TrackerSubjectSnapshotPath string
+	TrackerRuntimePolicyPath   string
 	TrackerTrustedKeys         map[string]ed25519.PublicKey
 	TrackerSnapshotMaxAge      time.Duration
 	TrackerSubjectMaxAge       time.Duration
+	TrackerRuntimePolicyMaxAge time.Duration
 	TrackerMaxFutureSkew       time.Duration
 	// RefreshTrackerSnapshots is a production-cutover freshness barrier. When
 	// supplied, it runs after all expensive immutable-object reads and must
@@ -70,50 +74,61 @@ type CutoverAcceptanceProgress struct {
 }
 
 type CutoverAcceptanceReport struct {
-	Schema                         string    `json:"schema"`
-	CheckedAt                      time.Time `json:"checked_at"`
-	RunID                          uuid.UUID `json:"run_id"`
-	RunState                       string    `json:"run_state"`
-	ReconciledAt                   time.Time `json:"reconciled_at"`
-	PreflightManifestSHA256        string    `json:"preflight_manifest_sha256"`
-	DatabaseDumpSHA256             string    `json:"database_dump_sha256"`
-	TorrentArchiveSHA256           string    `json:"torrent_archive_sha256"`
-	ImageArchiveSHA256             string    `json:"image_archive_sha256"`
-	StorageBackendID               string    `json:"storage_backend_id"`
-	Users                          int64     `json:"users"`
-	VaultCredentials               int64     `json:"vault_credentials"`
-	AttendanceOpenings             int64     `json:"attendance_openings"`
-	AttendanceStatsUsers           int64     `json:"attendance_stats_users"`
-	AttendanceSourceRecords        int64     `json:"attendance_source_records"`
-	AttendanceTotalDays            int64     `json:"attendance_total_days"`
-	AttendanceRetroactiveCards     int64     `json:"attendance_retroactive_cards"`
-	Torrents                       int64     `json:"torrents"`
-	ExcludedTorrents               int64     `json:"excluded_torrents"`
-	TorrentFiles                   int64     `json:"torrent_files"`
-	TorrentFacetValues             int64     `json:"torrent_facet_values"`
-	TorrentExternalIdentifiers     int64     `json:"torrent_external_identifiers"`
-	ResourceGroups                 int64     `json:"resource_groups"`
-	ResourceGroupExternalIDs       int64     `json:"resource_group_external_identifiers"`
-	PublishedTorrents              int64     `json:"published_torrents"`
-	VerifiedStoredObjects          int64     `json:"verified_stored_objects"`
-	VerifiedStoredObjectBytes      int64     `json:"verified_stored_object_bytes"`
-	TorrentImages                  int64     `json:"torrent_images"`
-	VerifiedImageObjects           int64     `json:"verified_image_objects"`
-	VerifiedImageObjectBytes       int64     `json:"verified_image_object_bytes"`
-	TorrentPurchaseRows            int64     `json:"torrent_purchase_rows"`
-	TorrentPurchaseRights          int64     `json:"torrent_purchase_rights"`
-	TorrentPurchaseEvidenceOnly    int64     `json:"torrent_purchase_evidence_only"`
-	TrackerControlSequence         int64     `json:"tracker_control_sequence"`
-	TrackerTorrentCount            int       `json:"tracker_torrent_count"`
-	TrackerSnapshotGeneratedAt     time.Time `json:"tracker_snapshot_generated_at"`
-	TrackerSnapshotSHA256          string    `json:"tracker_snapshot_sha256"`
-	TrackerSubjectSequence         int64     `json:"tracker_subject_sequence"`
-	TrackerSubjectCount            int       `json:"tracker_subject_count"`
-	TrackerSubjectGeneratedAt      time.Time `json:"tracker_subject_generated_at"`
-	TrackerSubjectSnapshotSHA256   string    `json:"tracker_subject_snapshot_sha256"`
-	CoreRuntimeDefaultsReady       bool      `json:"core_runtime_defaults_ready"`
-	LegacyMemberAuthorizationReady bool      `json:"legacy_member_authorization_ready"`
-	ReadyToActivate                bool      `json:"ready_to_activate"`
+	Schema                           string    `json:"schema"`
+	CheckedAt                        time.Time `json:"checked_at"`
+	RunID                            uuid.UUID `json:"run_id"`
+	RunState                         string    `json:"run_state"`
+	ReconciledAt                     time.Time `json:"reconciled_at"`
+	PreflightManifestSHA256          string    `json:"preflight_manifest_sha256"`
+	DatabaseDumpSHA256               string    `json:"database_dump_sha256"`
+	TorrentArchiveSHA256             string    `json:"torrent_archive_sha256"`
+	ImageArchiveSHA256               string    `json:"image_archive_sha256"`
+	StorageBackendID                 string    `json:"storage_backend_id"`
+	Users                            int64     `json:"users"`
+	VaultCredentials                 int64     `json:"vault_credentials"`
+	AttendanceOpenings               int64     `json:"attendance_openings"`
+	AttendanceStatsUsers             int64     `json:"attendance_stats_users"`
+	AttendanceSourceRecords          int64     `json:"attendance_source_records"`
+	AttendanceTotalDays              int64     `json:"attendance_total_days"`
+	AttendanceRetroactiveCards       int64     `json:"attendance_retroactive_cards"`
+	Torrents                         int64     `json:"torrents"`
+	ExcludedTorrents                 int64     `json:"excluded_torrents"`
+	TorrentFiles                     int64     `json:"torrent_files"`
+	TorrentFacetValues               int64     `json:"torrent_facet_values"`
+	TorrentExternalIdentifiers       int64     `json:"torrent_external_identifiers"`
+	ResourceGroups                   int64     `json:"resource_groups"`
+	ResourceGroupExternalIDs         int64     `json:"resource_group_external_identifiers"`
+	PublishedTorrents                int64     `json:"published_torrents"`
+	VerifiedStoredObjects            int64     `json:"verified_stored_objects"`
+	VerifiedStoredObjectBytes        int64     `json:"verified_stored_object_bytes"`
+	TorrentImages                    int64     `json:"torrent_images"`
+	VerifiedImageObjects             int64     `json:"verified_image_objects"`
+	VerifiedImageObjectBytes         int64     `json:"verified_image_object_bytes"`
+	TorrentPurchaseRows              int64     `json:"torrent_purchase_rows"`
+	TorrentPurchaseRights            int64     `json:"torrent_purchase_rights"`
+	TorrentPurchaseEvidenceOnly      int64     `json:"torrent_purchase_evidence_only"`
+	TrackerControlSequence           int64     `json:"tracker_control_sequence"`
+	TrackerTorrentCount              int       `json:"tracker_torrent_count"`
+	TrackerSnapshotGeneratedAt       time.Time `json:"tracker_snapshot_generated_at"`
+	TrackerSnapshotSHA256            string    `json:"tracker_snapshot_sha256"`
+	TrackerSubjectSequence           int64     `json:"tracker_subject_sequence"`
+	TrackerSubjectCount              int       `json:"tracker_subject_count"`
+	TrackerSubjectGeneratedAt        time.Time `json:"tracker_subject_generated_at"`
+	TrackerSubjectSnapshotSHA256     string    `json:"tracker_subject_snapshot_sha256"`
+	SeedboxSourceRows                int64     `json:"seedbox_source_rows"`
+	SeedboxEnabledRows               int64     `json:"seedbox_enabled_rows"`
+	SeedboxBindingRows               int64     `json:"seedbox_binding_rows"`
+	SeedboxPolicySequence            int64     `json:"seedbox_policy_sequence"`
+	SeedboxPolicyRevision            string    `json:"seedbox_policy_revision"`
+	SeedboxUploadFactorBasisPoints   int       `json:"seedbox_upload_factor_basis_points"`
+	SeedboxDownloadFactorBasisPoints int       `json:"seedbox_download_factor_basis_points"`
+	SeedboxSpeedLimitBytesPerSecond  int64     `json:"seedbox_speed_limit_bytes_per_second"`
+	StandardSpeedLimitBytesPerSecond int64     `json:"standard_speed_limit_bytes_per_second"`
+	TrackerRuntimeGeneratedAt        time.Time `json:"tracker_runtime_generated_at"`
+	TrackerRuntimeSnapshotSHA256     string    `json:"tracker_runtime_snapshot_sha256"`
+	CoreRuntimeDefaultsReady         bool      `json:"core_runtime_defaults_ready"`
+	LegacyMemberAuthorizationReady   bool      `json:"legacy_member_authorization_ready"`
+	ReadyToActivate                  bool      `json:"ready_to_activate"`
 }
 
 type acceptedSourceCounts struct {
@@ -204,7 +219,7 @@ func InspectCutoverAcceptance(
 		config.PreflightManifestSHA256 == ([sha256.Size]byte{}) ||
 		config.StorageDriver == "" || string(store.BackendID()) != config.StorageBackendID ||
 		len(config.TrackerTrustedKeys) == 0 ||
-		config.TrackerSnapshotMaxAge <= 0 || config.TrackerSubjectMaxAge <= 0 ||
+		config.TrackerSnapshotMaxAge <= 0 || config.TrackerSubjectMaxAge <= 0 || config.TrackerRuntimePolicyMaxAge <= 0 ||
 		config.TrackerMaxFutureSkew < 0 {
 		return CutoverAcceptanceReport{}, errors.New("legacy cutover acceptance configuration is invalid")
 	}
@@ -305,6 +320,13 @@ WHERE id = $1 AND state = 'reconciled'`, config.Inventory.RunID).Scan(&reconcile
 	if err != nil {
 		return CutoverAcceptanceReport{}, err
 	}
+	seedboxes, err := legacyseedboxes.Verify(ctx, source, core, legacyseedboxes.Config{
+		RunID: config.Inventory.RunID, SnapshotSHA256: config.Inventory.SnapshotSHA256,
+		MappingVersion: config.Inventory.MappingVersion, ImportedAt: config.OccurredAt,
+	})
+	if err != nil {
+		return CutoverAcceptanceReport{}, fmt.Errorf("verify migrated seedboxes: %w", err)
+	}
 
 	sourceCounts, err := inspectAcceptedSourceCounts(ctx, source, core, config.Inventory.RunID)
 	if err != nil {
@@ -358,6 +380,10 @@ WHERE id = $1 AND state = 'reconciled'`, config.Inventory.RunID).Scan(&reconcile
 	if err != nil {
 		return CutoverAcceptanceReport{}, err
 	}
+	runtimeSnapshot, err := verifyAcceptedRuntimePolicySnapshot(config, seedboxes, reconciledAt, checkedAt)
+	if err != nil {
+		return CutoverAcceptanceReport{}, err
+	}
 	completedAt := config.Now().UTC().Truncate(time.Microsecond)
 	if completedAt.Before(checkedAt) {
 		return CutoverAcceptanceReport{}, errors.New("cutover acceptance clock moved backwards")
@@ -371,6 +397,12 @@ WHERE id = $1 AND state = 'reconciled'`, config.Inventory.RunID).Scan(&reconcile
 	if err := requireAcceptedSnapshotTime(
 		subjectSnapshot.Snapshot.GeneratedAt, reconciledAt, completedAt,
 		config.TrackerSubjectMaxAge, config.TrackerMaxFutureSkew,
+	); err != nil {
+		return CutoverAcceptanceReport{}, err
+	}
+	if err := requireAcceptedSnapshotTime(
+		runtimeSnapshot.Snapshot.GeneratedAt, reconciledAt, completedAt,
+		config.TrackerRuntimePolicyMaxAge, config.TrackerMaxFutureSkew,
 	); err != nil {
 		return CutoverAcceptanceReport{}, err
 	}
@@ -393,24 +425,35 @@ WHERE id = $1 AND state = 'reconciled'`, config.Inventory.RunID).Scan(&reconcile
 		TorrentFacetValues: sourceCounts.FacetValues, TorrentExternalIdentifiers: sourceCounts.ExternalIdentifiers,
 		ResourceGroups: sourceCounts.Groups, ResourceGroupExternalIDs: sourceCounts.GroupExternalIdentifiers,
 		PublishedTorrents: sourceCounts.Published, VerifiedStoredObjects: verifiedObjects,
-		VerifiedStoredObjectBytes:      verifiedBytes,
-		TorrentImages:                  verifiedImages.MappedImages,
-		VerifiedImageObjects:           verifiedImages.UniqueObjects,
-		VerifiedImageObjectBytes:       verifiedImages.VerifiedBytes,
-		TorrentPurchaseRows:            purchases.SourceRows,
-		TorrentPurchaseRights:          purchases.Entitlements,
-		TorrentPurchaseEvidenceOnly:    purchases.EvidenceOnly,
-		TrackerControlSequence:         controlSnapshot.Snapshot.ControlSequence,
-		TrackerTorrentCount:            len(controlSnapshot.Snapshot.Torrents),
-		TrackerSnapshotGeneratedAt:     controlSnapshot.Snapshot.GeneratedAt,
-		TrackerSnapshotSHA256:          hex.EncodeToString(controlSnapshot.ArtifactSHA256[:]),
-		TrackerSubjectSequence:         subjectSnapshot.Snapshot.ControlSequence,
-		TrackerSubjectCount:            len(subjectSnapshot.Snapshot.Subjects),
-		TrackerSubjectGeneratedAt:      subjectSnapshot.Snapshot.GeneratedAt,
-		TrackerSubjectSnapshotSHA256:   hex.EncodeToString(subjectSnapshot.ArtifactSHA256[:]),
-		CoreRuntimeDefaultsReady:       true,
-		LegacyMemberAuthorizationReady: true,
-		ReadyToActivate:                true,
+		VerifiedStoredObjectBytes:        verifiedBytes,
+		TorrentImages:                    verifiedImages.MappedImages,
+		VerifiedImageObjects:             verifiedImages.UniqueObjects,
+		VerifiedImageObjectBytes:         verifiedImages.VerifiedBytes,
+		TorrentPurchaseRows:              purchases.SourceRows,
+		TorrentPurchaseRights:            purchases.Entitlements,
+		TorrentPurchaseEvidenceOnly:      purchases.EvidenceOnly,
+		TrackerControlSequence:           controlSnapshot.Snapshot.ControlSequence,
+		TrackerTorrentCount:              len(controlSnapshot.Snapshot.Torrents),
+		TrackerSnapshotGeneratedAt:       controlSnapshot.Snapshot.GeneratedAt,
+		TrackerSnapshotSHA256:            hex.EncodeToString(controlSnapshot.ArtifactSHA256[:]),
+		TrackerSubjectSequence:           subjectSnapshot.Snapshot.ControlSequence,
+		TrackerSubjectCount:              len(subjectSnapshot.Snapshot.Subjects),
+		TrackerSubjectGeneratedAt:        subjectSnapshot.Snapshot.GeneratedAt,
+		TrackerSubjectSnapshotSHA256:     hex.EncodeToString(subjectSnapshot.ArtifactSHA256[:]),
+		SeedboxSourceRows:                seedboxes.SourceRows,
+		SeedboxEnabledRows:               seedboxes.EnabledRows,
+		SeedboxBindingRows:               seedboxes.BindingRows,
+		SeedboxPolicySequence:            seedboxes.PolicySequence,
+		SeedboxPolicyRevision:            seedboxes.PolicyRevision,
+		SeedboxUploadFactorBasisPoints:   legacyseedboxes.UploadFactorBasisPoints,
+		SeedboxDownloadFactorBasisPoints: legacyseedboxes.DownloadFactorBasisPoints,
+		SeedboxSpeedLimitBytesPerSecond:  0,
+		StandardSpeedLimitBytesPerSecond: seedboxes.StandardSpeedLimitBytesPerSecond,
+		TrackerRuntimeGeneratedAt:        runtimeSnapshot.Snapshot.GeneratedAt,
+		TrackerRuntimeSnapshotSHA256:     hex.EncodeToString(runtimeSnapshot.ArtifactSHA256[:]),
+		CoreRuntimeDefaultsReady:         true,
+		LegacyMemberAuthorizationReady:   true,
+		ReadyToActivate:                  true,
 	}, nil
 }
 
@@ -868,6 +911,38 @@ ORDER BY passkey.lookup_hmac`, verified.Snapshot.GeneratedAt)
 	return verified, nil
 }
 
+func verifyAcceptedRuntimePolicySnapshot(
+	config CutoverAcceptanceConfig,
+	seedboxes legacyseedboxes.Result,
+	reconciledAt, checkedAt time.Time,
+) (trackerruntimepolicyv1.VerifiedSnapshot, error) {
+	raw, err := readCutoverArtifact(config.TrackerRuntimePolicyPath, signedsnapshotv1.MaxArtifactBytes)
+	if err != nil {
+		return trackerruntimepolicyv1.VerifiedSnapshot{}, fmt.Errorf("read Tracker runtime policy snapshot: %w", err)
+	}
+	verified, err := trackerruntimepolicyv1.Verify(raw, config.TrackerTrustedKeys)
+	if err != nil {
+		return trackerruntimepolicyv1.VerifiedSnapshot{}, fmt.Errorf("verify Tracker runtime policy snapshot: %w", err)
+	}
+	if err := requireAcceptedSnapshotTime(
+		verified.Snapshot.GeneratedAt, reconciledAt, checkedAt,
+		config.TrackerRuntimePolicyMaxAge, config.TrackerMaxFutureSkew,
+	); err != nil {
+		return trackerruntimepolicyv1.VerifiedSnapshot{}, err
+	}
+	policy := verified.Snapshot.Policy
+	if verified.Snapshot.ControlSequence != seedboxes.PolicySequence ||
+		policy.Revision != seedboxes.PolicyRevision || !policy.Seedbox.Enabled ||
+		policy.Seedbox.UploadFactorBasisPoints != legacyseedboxes.UploadFactorBasisPoints ||
+		policy.Seedbox.DownloadFactorBasisPoints != legacyseedboxes.DownloadFactorBasisPoints ||
+		policy.Seedbox.SeedboxSpeedLimitBytesPerSecond != 0 ||
+		policy.Seedbox.StandardSpeedLimitBytesPerSecond != seedboxes.StandardSpeedLimitBytesPerSecond ||
+		int64(len(policy.Seedbox.Rules)) != seedboxes.BindingRows {
+		return trackerruntimepolicyv1.VerifiedSnapshot{}, errors.New("Tracker runtime policy snapshot does not match migrated seedboxes")
+	}
+	return verified, nil
+}
+
 func requireAcceptedSnapshotTime(
 	generatedAt, reconciledAt, checkedAt time.Time,
 	maxAge, maxFutureSkew time.Duration,
@@ -917,6 +992,12 @@ func WriteCutoverAcceptanceManifest(path string, report CutoverAcceptanceReport)
 	if report.Schema != CutoverAcceptanceSchema || !report.CoreRuntimeDefaultsReady ||
 		!report.LegacyMemberAuthorizationReady || !report.ReadyToActivate ||
 		report.AttendanceOpenings != report.Users ||
+		report.SeedboxSourceRows < report.SeedboxEnabledRows ||
+		report.SeedboxBindingRows < report.SeedboxEnabledRows || report.SeedboxPolicySequence < 1 ||
+		report.SeedboxUploadFactorBasisPoints != legacyseedboxes.UploadFactorBasisPoints ||
+		report.SeedboxDownloadFactorBasisPoints != legacyseedboxes.DownloadFactorBasisPoints ||
+		report.SeedboxSpeedLimitBytesPerSecond != 0 ||
+		report.StandardSpeedLimitBytesPerSecond <= 0 ||
 		report.TorrentPurchaseRows != report.TorrentPurchaseRights+report.TorrentPurchaseEvidenceOnly {
 		return [sha256.Size]byte{}, errors.New("cutover acceptance manifest is invalid")
 	}

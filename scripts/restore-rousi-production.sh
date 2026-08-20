@@ -247,6 +247,10 @@ case "${action}" in
     apply)
         [[ -f "${run_dir}/ready-to-activate.env" ]] ||
             fail "cutover container exited without ready-to-activate evidence"
+        grep -Fqx 'schema=peergo.rousi-production-ready.v2' "${run_dir}/ready-to-activate.env" ||
+            fail "ready-to-activate evidence uses an obsolete schema; rerun the current acceptance"
+        grep -Fqx 'acceptance_schema=peergo.legacy-cutover-acceptance.v7' "${run_dir}/ready-to-activate.env" ||
+            fail "ready-to-activate evidence does not include the current seedbox acceptance"
         grep -Fqx 'ready_to_activate=true' "${run_dir}/ready-to-activate.env" ||
             fail "ready-to-activate evidence is invalid"
         note "migration acceptance passed: ${run_dir}/ready-to-activate.env"

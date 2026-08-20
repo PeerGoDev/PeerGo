@@ -244,6 +244,7 @@ func trackerPolicySettingsDTO(policy trackerruntimepolicyv1.Policy) generated.Tr
 		AddressRequestsPerMinute: int64(policy.AddressRequestsPerMinute), AddressBurst: int64(policy.AddressBurst),
 		Seedbox: generated.TrackerSeedboxRuntimePolicy{
 			Enabled: policy.Seedbox.Enabled, UploadFactorBasisPoints: policy.Seedbox.UploadFactorBasisPoints,
+			DownloadFactorBasisPoints:        policy.Seedbox.DownloadFactorBasisPoints,
 			SeedboxSpeedLimitBytesPerSecond:  policy.Seedbox.SeedboxSpeedLimitBytesPerSecond,
 			StandardSpeedLimitBytesPerSecond: policy.Seedbox.StandardSpeedLimitBytesPerSecond,
 			Rules:                            seedboxRules,
@@ -284,6 +285,7 @@ func trackerPolicySettingsFromDTO(settings generated.TrackerPolicySettings) trac
 		AddressRequestsPerMinute: int(settings.AddressRequestsPerMinute), AddressBurst: int(settings.AddressBurst),
 		Seedbox: trackerruntimepolicyv1.SeedboxPolicy{
 			Enabled: settings.Seedbox.Enabled, UploadFactorBasisPoints: settings.Seedbox.UploadFactorBasisPoints,
+			DownloadFactorBasisPoints:        settings.Seedbox.DownloadFactorBasisPoints,
 			SeedboxSpeedLimitBytesPerSecond:  settings.Seedbox.SeedboxSpeedLimitBytesPerSecond,
 			StandardSpeedLimitBytesPerSecond: settings.Seedbox.StandardSpeedLimitBytesPerSecond,
 			Rules:                            seedboxRules,
@@ -501,6 +503,7 @@ func (h *Handler) GetSettlementSettings(ctx context.Context, _ generated.GetSett
 			SettlementPrimitiveSupported: settings.Seedbox.SettlementPrimitiveSupported,
 			GlobalPolicyConfigured:       settings.Seedbox.GlobalPolicyConfigured,
 			UploadFactorBasisPoints:      settings.Seedbox.UploadFactorBasisPoints,
+			DownloadFactorBasisPoints:    settings.Seedbox.DownloadFactorBasisPoints,
 			ClassificationConnected:      settings.Seedbox.ClassificationConnected,
 			RegistryConnected:            settings.Seedbox.RegistryConnected,
 			SpeedObservationConnected:    settings.Seedbox.SpeedObservationConnected,

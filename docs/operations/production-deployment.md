@@ -139,7 +139,9 @@ make production-build
 ```
 
 这两个命令不代表可以切流。首次迁移先执行
-[Rousi 三包生产迁移](./rousi-cutover.md)，取得 `ready_to_activate=true`。
+[Rousi 三包生产迁移](./rousi-cutover.md)，取得当前 v2 `ready_to_activate=true`；验收同时要求
+旧站用户绑定盒子规则已经迁入，并由签名 Tracker 运行策略证明盒子不限速、上传 `0.5x`、
+下载 `2x`，且优惠和 VIP 权益先于盒子倍率结算；普通线路速度阈值继续沿用旧站设置。
 
 三包迁移的 WebP 阶段默认使用 4 个协作处理器，并按 CPU 数量分配 libvips 线程；至少
 8 核且内存、磁盘吞吐充足的单机可在 `.env.production` 设置

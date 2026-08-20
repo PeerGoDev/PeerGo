@@ -212,6 +212,8 @@ RETURNING
     raw.network_class,
     raw.network_rule_id,
     raw.seedbox_upload_factor_basis_points,
+    raw.seedbox_download_factor_basis_points,
+    raw.seedbox_download_factor_explicit,
     raw.speed_limit_bytes_per_second;
 
 -- name: GetClaimedPolicyWorkForUpdate :one
@@ -231,6 +233,8 @@ SELECT
     raw.network_class,
     raw.network_rule_id,
     raw.seedbox_upload_factor_basis_points,
+    raw.seedbox_download_factor_basis_points,
+    raw.seedbox_download_factor_explicit,
     raw.speed_limit_bytes_per_second
 FROM settlement.policy_work AS work
 INNER JOIN ledger.raw_session_intervals AS raw ON raw.event_id = work.interval_event_id

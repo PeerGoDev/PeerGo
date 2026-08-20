@@ -176,6 +176,9 @@ function SeedboxPolicyEditor({
   const [uploadFactor, setUploadFactor] = useState(
     String(configured.seedbox.upload_factor_basis_points / 10_000)
   )
+  const [downloadFactor, setDownloadFactor] = useState(
+    String(configured.seedbox.download_factor_basis_points / 10_000)
+  )
   const [seedboxSpeed, setSeedboxSpeed] = useState(
     bytesToMiB(configured.seedbox.seedbox_speed_limit_bytes_per_second)
   )
@@ -201,12 +204,16 @@ function SeedboxPolicyEditor({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const factor = Number(uploadFactor)
+    const chargedDownloadFactor = Number(downloadFactor)
     const seedboxSpeedMiB = Number(seedboxSpeed)
     const standardSpeedMiB = Number(standardSpeed)
     if (
       !Number.isFinite(factor) ||
       factor < 0 ||
       factor > 1 ||
+      !Number.isFinite(chargedDownloadFactor) ||
+      chargedDownloadFactor < 1 ||
+      chargedDownloadFactor > 10 ||
       !Number.isFinite(seedboxSpeedMiB) ||
       seedboxSpeedMiB < 0 ||
       !Number.isFinite(standardSpeedMiB) ||
@@ -233,6 +240,9 @@ function SeedboxPolicyEditor({
             seedbox: {
               enabled,
               upload_factor_basis_points: Math.round(factor * 10_000),
+              download_factor_basis_points: Math.round(
+                chargedDownloadFactor * 10_000
+              ),
               seedbox_speed_limit_bytes_per_second: miBToBytes(seedboxSpeedMiB),
               standard_speed_limit_bytes_per_second:
                 miBToBytes(standardSpeedMiB),
@@ -257,7 +267,8 @@ function SeedboxPolicyEditor({
         <div>
           <h1 className="font-heading text-xl font-semibold">盒子设置</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Tracker 只发布分类证据，不把用户 IP 传给 Settlement。
+            Tracker 只发布分类证据，不把用户 IP 传给 Settlement；优惠和 VIP
+            权益先结算，再应用盒子流量倍率。
           </p>
         </div>
         <Badge variant={activationPending ? "secondary" : "outline"}>
@@ -265,7 +276,7 @@ function SeedboxPolicyEditor({
         </Badge>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           title="整体状态"
           value={effectiveReady ? "已启用" : "未启用"}
@@ -276,9 +287,16 @@ function SeedboxPolicyEditor({
         <MetricCard
           title="当前上传折算"
           value={formatFactor(effective.seedbox.upload_factor_basis_points)}
-          description="VIP 盒子不应用此折算"
+          description="优惠及 VIP 权益结算后应用"
           icon={<GaugeIcon />}
           tone="primary"
+        />
+        <MetricCard
+          title="当前下载折算"
+          value={formatFactor(effective.seedbox.download_factor_basis_points)}
+          description="免费/VIP 免费下载仍为 0"
+          icon={<GaugeIcon />}
+          tone="warning"
         />
         <MetricCard
           title="可信网段"
@@ -289,8 +307,14 @@ function SeedboxPolicyEditor({
         />
         <MetricCard
           title="超速观察"
-          value={speedObservationConnected ? "已接入" : "未接入"}
-          description="只记录脱敏证据，不自动封禁"
+          value={
+            effective.seedbox.seedbox_speed_limit_bytes_per_second === 0
+              ? "不限速"
+              : speedObservationConnected
+                ? "已接入"
+                : "未接入"
+          }
+          description="0 阈值不会生成超速处罚"
           icon={<BadgeCheckIcon />}
           tone={speedObservationConnected ? "positive" : "warning"}
         />
@@ -329,15 +353,15 @@ function SeedboxPolicyEditor({
           <CardContent>
             <FieldGroup>
               <Field orientation="horizontal">
-                <FieldTitle>启用盒子识别与上传折算</FieldTitle>
+                <FieldTitle>启用盒子识别与流量折算</FieldTitle>
                 <Switch
                   checked={enabled}
                   onCheckedChange={setEnabled}
                   disabled={!canIssue || mutation.isPending}
-                  aria-label="启用盒子识别与上传折算"
+                  aria-label="启用盒子识别与流量折算"
                 />
               </Field>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Field>
                   <FieldLabel htmlFor="seedbox-upload-factor">
                     上传倍率
@@ -354,6 +378,24 @@ function SeedboxPolicyEditor({
                   />
                   <FieldDescription>
                     例如 0.5 表示上传按 50% 计入。
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="seedbox-download-factor">
+                    下载倍率
+                  </FieldLabel>
+                  <Input
+                    id="seedbox-download-factor"
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="0.01"
+                    value={downloadFactor}
+                    onChange={(event) => setDownloadFactor(event.target.value)}
+                    disabled={!canIssue || mutation.isPending}
+                  />
+                  <FieldDescription>
+                    例如 2 表示优惠后的下载量再按 2 倍扣除。
                   </FieldDescription>
                 </Field>
                 <Field>

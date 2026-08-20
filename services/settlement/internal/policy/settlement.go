@@ -215,9 +215,13 @@ func settlePeerGo(result Result, snapshot Snapshot) (Result, error) {
 		if err != nil {
 			return Result{}, err
 		}
+		result.ChargedDownloaded, err = snapshot.Seedbox.DownloadFactor.Apply(result.ChargedDownloaded)
+		if err != nil {
+			return Result{}, err
+		}
 		result.Applications = append(result.Applications, Application{
 			Rule: snapshot.Seedbox.Rule, Operation: OperationPenalty,
-			Factors: Factors{Upload: snapshot.Seedbox.UploadFactor, Download: OneX},
+			Factors: Factors{Upload: snapshot.Seedbox.UploadFactor, Download: snapshot.Seedbox.DownloadFactor},
 		})
 	}
 	return result, nil
@@ -274,9 +278,13 @@ func settlePtYes(result Result, snapshot Snapshot) (Result, error) {
 		if err != nil {
 			return Result{}, err
 		}
+		result.ChargedDownloaded, err = snapshot.Seedbox.DownloadFactor.Apply(result.ChargedDownloaded)
+		if err != nil {
+			return Result{}, err
+		}
 		result.Applications = append(result.Applications, Application{
 			Rule: snapshot.Seedbox.Rule, Operation: OperationPenalty,
-			Factors: Factors{Upload: snapshot.Seedbox.UploadFactor, Download: OneX},
+			Factors: Factors{Upload: snapshot.Seedbox.UploadFactor, Download: snapshot.Seedbox.DownloadFactor},
 		})
 	}
 	return result, nil

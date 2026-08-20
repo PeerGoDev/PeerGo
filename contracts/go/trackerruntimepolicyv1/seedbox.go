@@ -6,10 +6,11 @@ import "net/netip"
 // makes overlapping provider ranges deterministic while the signed snapshot
 // still rejects duplicate prefixes and rule identities.
 type SeedboxClassification struct {
-	Seedbox                  bool
-	RuleID                   string
-	UploadFactorBasisPoints  int
-	SpeedLimitBytesPerSecond int64
+	Seedbox                   bool
+	RuleID                    string
+	UploadFactorBasisPoints   int
+	DownloadFactorBasisPoints int
+	SpeedLimitBytesPerSecond  int64
 }
 
 func (policy Policy) ClassifyAddress(address netip.Addr) (SeedboxClassification, error) {
@@ -20,13 +21,19 @@ func (policy Policy) ClassifyAddress(address netip.Addr) (SeedboxClassification,
 // together with reviewed member-bound addresses. A member-bound rule never
 // applies to another account, even when both clients use the same provider.
 func (policy Policy) ClassifyAddressForUser(address netip.Addr, userNumericID int64) (SeedboxClassification, error) {
+	// A verified snapshot may legitimately be an old canonical v1 artifact
+	// whose JSON predates the download factor. Its immutable meaning is 1x.
+	if policy.Seedbox.DownloadFactorBasisPoints == 0 {
+		policy.Seedbox.DownloadFactorBasisPoints = 10_000
+	}
 	normalized, err := NormalizePolicy(policy)
 	if err != nil || !address.IsValid() || userNumericID < 0 {
 		return SeedboxClassification{}, ErrInvalid
 	}
 	standard := SeedboxClassification{
-		UploadFactorBasisPoints:  10_000,
-		SpeedLimitBytesPerSecond: normalized.Seedbox.StandardSpeedLimitBytesPerSecond,
+		UploadFactorBasisPoints:   10_000,
+		DownloadFactorBasisPoints: 10_000,
+		SpeedLimitBytesPerSecond:  normalized.Seedbox.StandardSpeedLimitBytesPerSecond,
 	}
 	if !normalized.Seedbox.Enabled {
 		return standard, nil
@@ -49,8 +56,9 @@ func (policy Policy) ClassifyAddressForUser(address netip.Addr, userNumericID in
 			bestUserBound = userBound
 			result = SeedboxClassification{
 				Seedbox: true, RuleID: rule.ID,
-				UploadFactorBasisPoints:  normalized.Seedbox.UploadFactorBasisPoints,
-				SpeedLimitBytesPerSecond: normalized.Seedbox.SeedboxSpeedLimitBytesPerSecond,
+				UploadFactorBasisPoints:   normalized.Seedbox.UploadFactorBasisPoints,
+				DownloadFactorBasisPoints: normalized.Seedbox.DownloadFactorBasisPoints,
+				SpeedLimitBytesPerSecond:  normalized.Seedbox.SeedboxSpeedLimitBytesPerSecond,
 			}
 		}
 	}

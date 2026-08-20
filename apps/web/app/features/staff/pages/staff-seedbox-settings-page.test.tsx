@@ -40,6 +40,7 @@ describe("StaffSeedboxSettingsPage", () => {
         settlement_primitive_supported: true,
         global_policy_configured: true,
         upload_factor_basis_points: 5000,
+        download_factor_basis_points: 20000,
         classification_connected: false,
         registry_connected: false,
         speed_observation_connected: false,
@@ -60,12 +61,15 @@ describe("StaffSeedboxSettingsPage", () => {
     ).toBeVisible()
     expect(screen.getByText("未启用")).toBeVisible()
     expect(screen.getByText("0.50x")).toBeVisible()
+    expect(screen.getByText("2.00x")).toBeVisible()
     expect(screen.getByRole("switch")).toBeVisible()
     expect(screen.getByLabelText("可信网段")).toHaveValue(
       "demo-box = 203.0.113.8/32"
     )
     expect(
-      screen.getByText("Tracker 只发布分类证据，不把用户 IP 传给 Settlement。")
+      screen.getByText(
+        "Tracker 只发布分类证据，不把用户 IP 传给 Settlement；优惠和 VIP 权益先结算，再应用盒子流量倍率。"
+      )
     ).toBeVisible()
   })
 })
@@ -98,6 +102,7 @@ function trackerPolicySettings() {
     seedbox: {
       enabled: false,
       upload_factor_basis_points: 5000,
+      download_factor_basis_points: 20000,
       seedbox_speed_limit_bytes_per_second: 104857600,
       standard_speed_limit_bytes_per_second: 52428800,
       rules: [{ id: "demo-box", cidr: "203.0.113.8/32" }],

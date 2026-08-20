@@ -43,6 +43,11 @@ type MigrationStatus struct {
 	ReviewMemberships         int64
 	RetentionMemberships      int64
 	PendingWorkgroupBenefits  int64
+	SeedboxSourceRows         int64
+	SeedboxEnabledRows        int64
+	SeedboxExpectedBindings   int64
+	SeedboxImportedBindings   int64
+	SeedboxPolicySequence     int64
 	TrackerRunOutboxEvents    int64
 	TrackerPendingEvents      int64
 	TrackerProjectionSequence int64
@@ -69,7 +74,11 @@ func (status MigrationStatus) CheckpointsComplete() bool {
 		status.UnresolvedDiscrepancies == 0 &&
 		status.UserMappings == status.ImportedUsers &&
 		status.TorrentMappings == status.ImportedTorrents &&
-		status.VerifiedPreferredObjects == status.ImportedTorrents
+		status.VerifiedPreferredObjects == status.ImportedTorrents &&
+		status.SeedboxSourceRows >= status.SeedboxEnabledRows &&
+		status.SeedboxExpectedBindings >= status.SeedboxEnabledRows &&
+		status.SeedboxImportedBindings == status.SeedboxExpectedBindings &&
+		status.SeedboxPolicySequence > 0
 }
 
 // InspectMigrationStatus never locks or mutates migration/domain rows. It is
@@ -186,6 +195,17 @@ WITH checkpoints AS (
 		  WHERE opening.first_run_id = $1
 		    AND opening.group_kind = 'retention'
 		    AND outbox.delivered_at IS NULL) AS pending_workgroup_benefits
+), seedbox_state AS (
+	SELECT
+		COALESCE(max(import.source_rows), 0)::bigint AS source_rows,
+		COALESCE(max(import.enabled_rows), 0)::bigint AS enabled_rows,
+		COALESCE(max(import.binding_rows), 0)::bigint AS expected_bindings,
+		(SELECT count(*)::bigint
+		 FROM migration.legacy_seedbox_bindings
+		 WHERE run_id = $1) AS imported_bindings,
+		COALESCE(max(import.policy_sequence), 0)::bigint AS policy_sequence
+	FROM migration.legacy_seedbox_imports AS import
+	WHERE import.run_id = $1
 ), tracker_state AS (
     SELECT
         projection.last_sequence AS projection_sequence,
@@ -225,6 +245,11 @@ SELECT
 	medal_state.review_memberships,
 	medal_state.retention_memberships,
 	medal_state.pending_workgroup_benefits,
+	seedbox_state.source_rows,
+	seedbox_state.enabled_rows,
+	seedbox_state.expected_bindings,
+	seedbox_state.imported_bindings,
+	seedbox_state.policy_sequence,
 	tracker_run.outbox_events,
     tracker_state.pending_events,
     tracker_state.projection_sequence,
@@ -239,6 +264,7 @@ CROSS JOIN unresolved
 CROSS JOIN tracker_run
 CROSS JOIN purchase_state
 CROSS JOIN medal_state
+CROSS JOIN seedbox_state
 CROSS JOIN tracker_state
 WHERE run.id = $1`, config.RunID).Scan(
 		&snapshot,
@@ -268,6 +294,11 @@ WHERE run.id = $1`, config.RunID).Scan(
 		&result.ReviewMemberships,
 		&result.RetentionMemberships,
 		&result.PendingWorkgroupBenefits,
+		&result.SeedboxSourceRows,
+		&result.SeedboxEnabledRows,
+		&result.SeedboxExpectedBindings,
+		&result.SeedboxImportedBindings,
+		&result.SeedboxPolicySequence,
 		&result.TrackerRunOutboxEvents,
 		&result.TrackerPendingEvents,
 		&result.TrackerProjectionSequence,

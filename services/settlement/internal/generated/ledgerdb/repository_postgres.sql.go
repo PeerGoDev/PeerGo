@@ -522,6 +522,8 @@ RETURNING
     raw.network_class,
     raw.network_rule_id,
     raw.seedbox_upload_factor_basis_points,
+    raw.seedbox_download_factor_basis_points,
+    raw.seedbox_download_factor_explicit,
     raw.speed_limit_bytes_per_second
 `
 
@@ -532,23 +534,25 @@ type ClaimNextPolicyWorkParams struct {
 }
 
 type ClaimNextPolicyWorkRow struct {
-	IntervalEventID                uuid.UUID
-	LeaseToken                     pgtype.UUID
-	Attempts                       int32
-	UserID                         uuid.UUID
-	TorrentID                      int64
-	StartsAt                       pgtype.Timestamptz
-	EndsAt                         pgtype.Timestamptz
-	RawUploaded                    int64
-	RawDownloaded                  int64
-	TorrentControlSequence         int64
-	SubjectControlSequence         int64
-	NetworkPolicySequence          pgtype.Int8
-	NetworkPolicyRevision          pgtype.Text
-	NetworkClass                   pgtype.Text
-	NetworkRuleID                  pgtype.Text
-	SeedboxUploadFactorBasisPoints pgtype.Int4
-	SpeedLimitBytesPerSecond       pgtype.Int8
+	IntervalEventID                  uuid.UUID
+	LeaseToken                       pgtype.UUID
+	Attempts                         int32
+	UserID                           uuid.UUID
+	TorrentID                        int64
+	StartsAt                         pgtype.Timestamptz
+	EndsAt                           pgtype.Timestamptz
+	RawUploaded                      int64
+	RawDownloaded                    int64
+	TorrentControlSequence           int64
+	SubjectControlSequence           int64
+	NetworkPolicySequence            pgtype.Int8
+	NetworkPolicyRevision            pgtype.Text
+	NetworkClass                     pgtype.Text
+	NetworkRuleID                    pgtype.Text
+	SeedboxUploadFactorBasisPoints   pgtype.Int4
+	SeedboxDownloadFactorBasisPoints pgtype.Int4
+	SeedboxDownloadFactorExplicit    pgtype.Bool
+	SpeedLimitBytesPerSecond         pgtype.Int8
 }
 
 func (q *Queries) ClaimNextPolicyWork(ctx context.Context, arg ClaimNextPolicyWorkParams) (ClaimNextPolicyWorkRow, error) {
@@ -571,6 +575,8 @@ func (q *Queries) ClaimNextPolicyWork(ctx context.Context, arg ClaimNextPolicyWo
 		&i.NetworkClass,
 		&i.NetworkRuleID,
 		&i.SeedboxUploadFactorBasisPoints,
+		&i.SeedboxDownloadFactorBasisPoints,
+		&i.SeedboxDownloadFactorExplicit,
 		&i.SpeedLimitBytesPerSecond,
 	)
 	return i, err
@@ -898,6 +904,8 @@ SELECT
     raw.network_class,
     raw.network_rule_id,
     raw.seedbox_upload_factor_basis_points,
+    raw.seedbox_download_factor_basis_points,
+    raw.seedbox_download_factor_explicit,
     raw.speed_limit_bytes_per_second
 FROM settlement.policy_work AS work
 INNER JOIN ledger.raw_session_intervals AS raw ON raw.event_id = work.interval_event_id
@@ -913,22 +921,24 @@ type GetClaimedPolicyWorkForUpdateParams struct {
 }
 
 type GetClaimedPolicyWorkForUpdateRow struct {
-	IntervalEventID                uuid.UUID
-	Attempts                       int32
-	UserID                         uuid.UUID
-	TorrentID                      int64
-	StartsAt                       pgtype.Timestamptz
-	EndsAt                         pgtype.Timestamptz
-	RawUploaded                    int64
-	RawDownloaded                  int64
-	TorrentControlSequence         int64
-	SubjectControlSequence         int64
-	NetworkPolicySequence          pgtype.Int8
-	NetworkPolicyRevision          pgtype.Text
-	NetworkClass                   pgtype.Text
-	NetworkRuleID                  pgtype.Text
-	SeedboxUploadFactorBasisPoints pgtype.Int4
-	SpeedLimitBytesPerSecond       pgtype.Int8
+	IntervalEventID                  uuid.UUID
+	Attempts                         int32
+	UserID                           uuid.UUID
+	TorrentID                        int64
+	StartsAt                         pgtype.Timestamptz
+	EndsAt                           pgtype.Timestamptz
+	RawUploaded                      int64
+	RawDownloaded                    int64
+	TorrentControlSequence           int64
+	SubjectControlSequence           int64
+	NetworkPolicySequence            pgtype.Int8
+	NetworkPolicyRevision            pgtype.Text
+	NetworkClass                     pgtype.Text
+	NetworkRuleID                    pgtype.Text
+	SeedboxUploadFactorBasisPoints   pgtype.Int4
+	SeedboxDownloadFactorBasisPoints pgtype.Int4
+	SeedboxDownloadFactorExplicit    pgtype.Bool
+	SpeedLimitBytesPerSecond         pgtype.Int8
 }
 
 func (q *Queries) GetClaimedPolicyWorkForUpdate(ctx context.Context, arg GetClaimedPolicyWorkForUpdateParams) (GetClaimedPolicyWorkForUpdateRow, error) {
@@ -950,6 +960,8 @@ func (q *Queries) GetClaimedPolicyWorkForUpdate(ctx context.Context, arg GetClai
 		&i.NetworkClass,
 		&i.NetworkRuleID,
 		&i.SeedboxUploadFactorBasisPoints,
+		&i.SeedboxDownloadFactorBasisPoints,
+		&i.SeedboxDownloadFactorExplicit,
 		&i.SpeedLimitBytesPerSecond,
 	)
 	return i, err
@@ -1737,6 +1749,8 @@ INSERT INTO ledger.raw_session_intervals (
     network_class,
     network_rule_id,
     seedbox_upload_factor_basis_points,
+    seedbox_download_factor_basis_points,
+    seedbox_download_factor_explicit,
     speed_limit_bytes_per_second,
     created_at
 ) VALUES (
@@ -1769,43 +1783,47 @@ INSERT INTO ledger.raw_session_intervals (
     $27::text,
     $28::text,
     $29::integer,
-    $30::bigint,
-    $31::timestamptz
+    $30::integer,
+    $31::boolean,
+    $32::bigint,
+    $33::timestamptz
 )
 `
 
 type InsertRawSessionIntervalParams struct {
-	EventID                        uuid.UUID
-	PreviousEventID                uuid.UUID
-	UserID                         uuid.UUID
-	TorrentID                      int64
-	SessionToken                   []byte
-	InfoHashV1                     []byte
-	SessionEpoch                   int64
-	StartsAt                       pgtype.Timestamptz
-	EndsAt                         pgtype.Timestamptz
-	EventKind                      string
-	AddressFamily                  int16
-	CredentialVersion              int64
-	TorrentControlSequence         int64
-	SubjectControlSequence         int64
-	PreviousUploaded               int64
-	CurrentUploaded                int64
-	PreviousDownloaded             int64
-	CurrentDownloaded              int64
-	PreviousLeft                   int64
-	CurrentLeft                    int64
-	RawUploaded                    int64
-	RawDownloaded                  int64
-	CompletedTransition            bool
-	CompletionID                   []byte
-	NetworkPolicySequence          pgtype.Int8
-	NetworkPolicyRevision          pgtype.Text
-	NetworkClass                   pgtype.Text
-	NetworkRuleID                  pgtype.Text
-	SeedboxUploadFactorBasisPoints pgtype.Int4
-	SpeedLimitBytesPerSecond       pgtype.Int8
-	CreatedAt                      pgtype.Timestamptz
+	EventID                          uuid.UUID
+	PreviousEventID                  uuid.UUID
+	UserID                           uuid.UUID
+	TorrentID                        int64
+	SessionToken                     []byte
+	InfoHashV1                       []byte
+	SessionEpoch                     int64
+	StartsAt                         pgtype.Timestamptz
+	EndsAt                           pgtype.Timestamptz
+	EventKind                        string
+	AddressFamily                    int16
+	CredentialVersion                int64
+	TorrentControlSequence           int64
+	SubjectControlSequence           int64
+	PreviousUploaded                 int64
+	CurrentUploaded                  int64
+	PreviousDownloaded               int64
+	CurrentDownloaded                int64
+	PreviousLeft                     int64
+	CurrentLeft                      int64
+	RawUploaded                      int64
+	RawDownloaded                    int64
+	CompletedTransition              bool
+	CompletionID                     []byte
+	NetworkPolicySequence            pgtype.Int8
+	NetworkPolicyRevision            pgtype.Text
+	NetworkClass                     pgtype.Text
+	NetworkRuleID                    pgtype.Text
+	SeedboxUploadFactorBasisPoints   pgtype.Int4
+	SeedboxDownloadFactorBasisPoints pgtype.Int4
+	SeedboxDownloadFactorExplicit    pgtype.Bool
+	SpeedLimitBytesPerSecond         pgtype.Int8
+	CreatedAt                        pgtype.Timestamptz
 }
 
 func (q *Queries) InsertRawSessionInterval(ctx context.Context, arg InsertRawSessionIntervalParams) error {
@@ -1839,6 +1857,8 @@ func (q *Queries) InsertRawSessionInterval(ctx context.Context, arg InsertRawSes
 		arg.NetworkClass,
 		arg.NetworkRuleID,
 		arg.SeedboxUploadFactorBasisPoints,
+		arg.SeedboxDownloadFactorBasisPoints,
+		arg.SeedboxDownloadFactorExplicit,
 		arg.SpeedLimitBytesPerSecond,
 		arg.CreatedAt,
 	)

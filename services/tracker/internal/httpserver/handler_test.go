@@ -258,7 +258,7 @@ func TestHandlerEmitsSeedboxClassificationWithoutSocketAddress(t *testing.T) {
 	handler, events := testHandler(t, hash, passkey, true)
 	policy := handler.policy.(*staticRuntimePolicy)
 	policy.policy.Seedbox = trackerruntimepolicyv1.SeedboxPolicy{
-		Enabled: true, UploadFactorBasisPoints: 5_000,
+		Enabled: true, UploadFactorBasisPoints: 5_000, DownloadFactorBasisPoints: 20_000,
 		SeedboxSpeedLimitBytesPerSecond: 100 << 20,
 		Rules:                           []trackerruntimepolicyv1.SeedboxRule{{ID: "trusted-box", CIDR: "192.0.2.0/24"}},
 	}
@@ -273,7 +273,8 @@ func TestHandlerEmitsSeedboxClassificationWithoutSocketAddress(t *testing.T) {
 	evidence := events.events[0].NetworkEvidence
 	if evidence == nil || evidence.Class != trackerannouncev1.NetworkClassSeedbox || evidence.RuleID != "trusted-box" ||
 		evidence.PolicySequence != 1 || evidence.PolicyRevision != "deployment-fallback" ||
-		evidence.UploadFactorBasisPoints != 5_000 || evidence.SpeedLimitBytesPerSecond != 100<<20 {
+		evidence.UploadFactorBasisPoints != 5_000 || evidence.DownloadFactorBasisPoints == nil ||
+		*evidence.DownloadFactorBasisPoints != 20_000 || evidence.SpeedLimitBytesPerSecond != 100<<20 {
 		t.Fatalf("network evidence = %+v", evidence)
 	}
 	encoded, err := announceevent.Encode(events.events[0])

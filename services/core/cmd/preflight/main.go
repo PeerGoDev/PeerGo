@@ -22,7 +22,7 @@ import (
 	"github.com/peergo/peergo/contracts/go/schemaversionv1"
 )
 
-const trackerMigrationVersion int64 = 202608180003
+const trackerMigrationVersion int64 = 202608210001
 
 type checkStatus string
 
@@ -205,6 +205,7 @@ func run(ctx context.Context, config settings) report {
 			policyExistsCheck(ctx, core, "attendance_reward_policy", "economy.attendance_policy_revisions", "effective_from", true),
 			policyExistsCheck(ctx, core, "contribution_experience_policy", "progression.contribution_experience_policy_revisions", "effective_from", true),
 			contributionExperienceAuthoritiesCheck(ctx, core),
+			legacySeedboxCutoverCheck(ctx, core),
 		)
 	}
 
@@ -449,6 +450,82 @@ JOIN progression.experience_policy_revisions AS authority
 		return failed("contribution_experience_authorities", "Current contribution policy is missing its publish or activity authority")
 	}
 	return passed("contribution_experience_authorities", "publish and activity authorities match the current contribution policy")
+}
+
+func legacySeedboxCutoverCheck(ctx context.Context, database *pgxpool.Pool) checkResult {
+	var reconciledRuns int64
+	if err := database.QueryRow(ctx, `
+SELECT count(*)::bigint
+FROM migration.runs
+WHERE source_system = 'ptyes' AND state = 'reconciled'`).Scan(&reconciledRuns); err != nil {
+		return failed("legacy_seedbox_cutover", "Rousi migration state could not be read")
+	}
+	if reconciledRuns == 0 {
+		return passed("legacy_seedbox_cutover", "no reconciled Rousi migration requires box bindings")
+	}
+
+	var sourceRows, enabledRows, expectedBindings, importedBindings int64
+	var receiptUploadFactor, receiptDownloadFactor int
+	var receiptSeedboxSpeedLimit, receiptStandardSpeedLimit int64
+	var policyEnabled bool
+	var policyUploadFactor, policyDownloadFactor int
+	var policySeedboxSpeedLimit, policyStandardSpeedLimit int64
+	var policyRules int64
+	err := database.QueryRow(ctx, `
+SELECT
+    receipt.source_rows,
+    receipt.enabled_rows,
+    receipt.binding_rows,
+    (SELECT count(*)::bigint
+       FROM migration.legacy_seedbox_bindings AS binding
+      WHERE binding.run_id = run.id),
+    receipt.upload_factor_basis_points,
+    receipt.download_factor_basis_points,
+    receipt.seedbox_speed_limit_bytes_per_second,
+    receipt.standard_speed_limit_bytes_per_second,
+    (policy.seedbox_policy ->> 'enabled')::boolean,
+    (policy.seedbox_policy ->> 'upload_factor_basis_points')::integer,
+    (policy.seedbox_policy ->> 'download_factor_basis_points')::integer,
+    (policy.seedbox_policy ->> 'seedbox_speed_limit_bytes_per_second')::bigint,
+    (policy.seedbox_policy ->> 'standard_speed_limit_bytes_per_second')::bigint,
+    jsonb_array_length(policy.seedbox_policy -> 'rules')::bigint
+FROM migration.runs AS run
+JOIN migration.legacy_seedbox_imports AS receipt ON receipt.run_id = run.id
+JOIN tracker_control.runtime_policy_revisions AS policy
+  ON policy.sequence = receipt.policy_sequence
+WHERE run.source_system = 'ptyes' AND run.state = 'reconciled'
+ORDER BY run.completed_at DESC, run.id DESC
+LIMIT 1`).Scan(
+		&sourceRows,
+		&enabledRows,
+		&expectedBindings,
+		&importedBindings,
+		&receiptUploadFactor,
+		&receiptDownloadFactor,
+		&receiptSeedboxSpeedLimit,
+		&receiptStandardSpeedLimit,
+		&policyEnabled,
+		&policyUploadFactor,
+		&policyDownloadFactor,
+		&policySeedboxSpeedLimit,
+		&policyStandardSpeedLimit,
+		&policyRules,
+	)
+	if err != nil {
+		return failed("legacy_seedbox_cutover", "Rousi box migration receipt is missing or unreadable")
+	}
+	if sourceRows < enabledRows || expectedBindings < enabledRows || importedBindings != expectedBindings ||
+		receiptUploadFactor != 5_000 || receiptDownloadFactor != 20_000 || !policyEnabled ||
+		policyUploadFactor != receiptUploadFactor || policyDownloadFactor != receiptDownloadFactor ||
+		receiptSeedboxSpeedLimit != 0 || receiptStandardSpeedLimit <= 0 ||
+		policySeedboxSpeedLimit != receiptSeedboxSpeedLimit ||
+		policyStandardSpeedLimit != receiptStandardSpeedLimit || policyRules != expectedBindings {
+		return failed("legacy_seedbox_cutover", "Rousi box bindings or 0.5x/2x unlimited-speed policy do not reconcile")
+	}
+	return passed(
+		"legacy_seedbox_cutover",
+		fmt.Sprintf("%d enabled Rousi boxes map to %d user-bound rules with 0.5x upload, 2x download and no box speed limit", enabledRows, expectedBindings),
+	)
 }
 
 func passed(name, detail string) checkResult {

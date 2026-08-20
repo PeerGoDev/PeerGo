@@ -270,7 +270,8 @@ func insertInterval(
 	}
 	var networkPolicySequence pgtype.Int8
 	var networkPolicyRevision, networkClass, networkRuleID pgtype.Text
-	var uploadFactor pgtype.Int4
+	var uploadFactor, downloadFactor pgtype.Int4
+	var downloadFactorExplicit pgtype.Bool
 	var speedLimit pgtype.Int8
 	if interval.NetworkEvidence != nil {
 		evidence := interval.NetworkEvidence
@@ -281,6 +282,13 @@ func insertInterval(
 			networkRuleID = pgtype.Text{String: evidence.RuleID, Valid: true}
 		}
 		uploadFactor = pgtype.Int4{Int32: int32(evidence.UploadFactorBasisPoints), Valid: true}
+		downloadFactorValue := int64(10_000)
+		downloadFactorWasExplicit := evidence.DownloadFactorBasisPoints != nil
+		if downloadFactorWasExplicit {
+			downloadFactorValue = *evidence.DownloadFactorBasisPoints
+		}
+		downloadFactor = pgtype.Int4{Int32: int32(downloadFactorValue), Valid: true}
+		downloadFactorExplicit = pgtype.Bool{Bool: downloadFactorWasExplicit, Valid: true}
 		speedLimit = pgtype.Int8{Int64: evidence.SpeedLimitBytesPerSecond, Valid: true}
 	}
 	if err := queries.InsertRawSessionInterval(ctx, ledgerdb.InsertRawSessionIntervalParams{
@@ -298,8 +306,11 @@ func insertInterval(
 		CompletedTransition: interval.CompletedTransition, CompletionID: completionID,
 		NetworkPolicySequence: networkPolicySequence, NetworkPolicyRevision: networkPolicyRevision,
 		NetworkClass: networkClass, NetworkRuleID: networkRuleID,
-		SeedboxUploadFactorBasisPoints: uploadFactor, SpeedLimitBytesPerSecond: speedLimit,
-		CreatedAt: timestamp(processedAt),
+		SeedboxUploadFactorBasisPoints:   uploadFactor,
+		SeedboxDownloadFactorBasisPoints: downloadFactor,
+		SeedboxDownloadFactorExplicit:    downloadFactorExplicit,
+		SpeedLimitBytesPerSecond:         speedLimit,
+		CreatedAt:                        timestamp(processedAt),
 	}); err != nil {
 		return repositoryOperationError("insert raw Tracker ledger interval", err)
 	}

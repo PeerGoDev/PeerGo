@@ -60,6 +60,38 @@ func TestCompletionIdentityIsOptionalAndBoundToCompletedEvent(t *testing.T) {
 	}
 }
 
+func TestNetworkEvidenceKeepsLegacyV1EventsReplayableAndNewFactorsExplicit(t *testing.T) {
+	t.Parallel()
+	legacy := contractTestEvent()
+	legacy.NetworkEvidence = &NetworkEvidence{
+		PolicySequence: 1, PolicyRevision: "legacy-policy-v1", Class: NetworkClassSeedbox,
+		RuleID: "legacy-box", UploadFactorBasisPoints: 5_000,
+	}
+	encoded, err := Encode(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(encoded, []byte("download_factor_basis_points")) {
+		t.Fatalf("legacy canonical event unexpectedly gained a field: %s", encoded)
+	}
+	decoded, err := Decode(encoded)
+	if err != nil || decoded.NetworkEvidence == nil || decoded.NetworkEvidence.DownloadFactorBasisPoints != nil {
+		t.Fatalf("legacy decode = %+v, %v", decoded.NetworkEvidence, err)
+	}
+
+	downloadFactor := int64(20_000)
+	current := legacy
+	current.NetworkEvidence = &NetworkEvidence{
+		PolicySequence: 2, PolicyRevision: "seedbox-policy-v2", Class: NetworkClassSeedbox,
+		RuleID: "member-box", UploadFactorBasisPoints: 5_000,
+		DownloadFactorBasisPoints: &downloadFactor,
+	}
+	encoded, err = Encode(current)
+	if err != nil || !bytes.Contains(encoded, []byte(`"download_factor_basis_points":20000`)) {
+		t.Fatalf("current encode = %s, %v", encoded, err)
+	}
+}
+
 func contractTestEvent() Event {
 	return Event{
 		SchemaVersion: SchemaVersion, EventID: "0198f20a-6da8-7e51-9c64-111111111111",

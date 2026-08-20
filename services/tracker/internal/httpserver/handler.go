@@ -331,11 +331,13 @@ func (handler *Handler) serveTracker(response http.ResponseWriter, request *http
 	if classification.Seedbox {
 		networkClass = trackerannouncev1.NetworkClassSeedbox
 	}
+	downloadFactor := int64(classification.DownloadFactorBasisPoints)
 	networkEvidence := &trackerannouncev1.NetworkEvidence{
 		PolicySequence: status.ControlSequence, PolicyRevision: status.Revision,
 		Class: networkClass, RuleID: classification.RuleID,
-		UploadFactorBasisPoints:  int64(classification.UploadFactorBasisPoints),
-		SpeedLimitBytesPerSecond: classification.SpeedLimitBytesPerSecond,
+		UploadFactorBasisPoints:   int64(classification.UploadFactorBasisPoints),
+		DownloadFactorBasisPoints: &downloadFactor,
+		SpeedLimitBytesPerSecond:  classification.SpeedLimitBytesPerSecond,
 	}
 	event, err := handler.eventFactory.New(announceevent.Input{
 		ReceivedAt: now, UserID: subjectAdmission.Subject.UserID,
@@ -461,6 +463,10 @@ func newStaticRuntimePolicy(parser protocol.AnnounceParser, interval, minInterva
 			ScrapeEnabled: false, MaxScrapeHashes: 50, ClientMode: trackerruntimepolicyv1.ClientModeAllowAll,
 			AllowedClients: []trackerruntimepolicyv1.ClientRule{}, UserRequestsPerMinute: 600, UserBurst: 1200,
 			AddressRequestsPerMinute: 5000, AddressBurst: 10000,
+			Seedbox: trackerruntimepolicyv1.SeedboxPolicy{
+				UploadFactorBasisPoints: 5_000, DownloadFactorBasisPoints: 10_000,
+				Rules: []trackerruntimepolicyv1.SeedboxRule{},
+			},
 		},
 		status: runtimepolicy.Status{Loaded: true, ControlSequence: 1, Revision: "deployment-fallback", GeneratedAt: generatedAt},
 	}

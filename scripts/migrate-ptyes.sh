@@ -25,6 +25,8 @@ Commands:
   medals             Import and fully reconcile medal definitions, ownership,
                      wear/expiry state, settings, reward benefit openings, and
                      typed workgroup memberships derived from reviewed medals.
+  seedboxes           Import and verify user-bound box IP/CIDR rules, then
+                     append the 0.5x upload / 2x download Tracker policy.
   torrents-exclusions
                      Write a missing-object candidate TSV for human review.
   torrents-validate  Inventory and validate every SQL-referenced .torrent.
@@ -37,8 +39,8 @@ Commands:
   reconcile          Prove stable torrent/image retries and close the run.
   acceptance         Verify the reconciled target, stored bytes, and signed
                      Tracker snapshots; write a non-overwriting final gate.
-  all                Run users, medals, torrents, purchase rights, media, reconciliation,
-                     and verified WebP derivative generation.
+  all                Run users, medals, seedboxes, torrents, purchase rights,
+                     media, reconciliation, and verified WebP derivatives.
                      It intentionally stops before Tracker projection/acceptance.
 
 inspect requires:
@@ -60,9 +62,11 @@ acceptance additionally requires:
   PEERGO_LEGACY_ACCEPTANCE_OUTPUT  absolute new JSON path; never overwritten
   PEERGO_TRACKER_SNAPSHOT_PATH
   PEERGO_TRACKER_SUBJECT_SNAPSHOT_PATH
+  PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_PATH
   PEERGO_TRACKER_SNAPSHOT_TRUSTED_KEYS
   PEERGO_TRACKER_SNAPSHOT_MAX_AGE
   PEERGO_TRACKER_SUBJECT_SNAPSHOT_MAX_AGE
+  PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_MAX_AGE
   PEERGO_TRACKER_SNAPSHOT_MAX_FUTURE_SKEW
 
 Mutation-capable phases additionally require:
@@ -309,8 +313,8 @@ restore_source() {
         pg_restore --exit-on-error --no-owner --no-privileges --dbname="${PEERGO_LEGACY_RESTORE_DATABASE_URL}"
     local required_tables
     required_tables="$(psql "${PEERGO_LEGACY_RESTORE_DATABASE_URL}" -X -A -t -v ON_ERROR_STOP=1 -c \
-        "SELECT count(*) FROM (VALUES (to_regclass('public.users')), (to_regclass('public.user_attendance_stats')), (to_regclass('public.attendance_records')), (to_regclass('public.torrents')), (to_regclass('public.torrent_files'))) AS required(table_name) WHERE table_name IS NOT NULL")"
-    [[ "${required_tables}" == "5" ]] || fail "restored source is missing required PtYes user, attendance, or torrent tables"
+        "SELECT count(*) FROM (VALUES (to_regclass('public.users')), (to_regclass('public.user_attendance_stats')), (to_regclass('public.attendance_records')), (to_regclass('public.torrents')), (to_regclass('public.torrent_files')), (to_regclass('public.seed_boxes')), (to_regclass('public.site_settings'))) AS required(table_name) WHERE table_name IS NOT NULL")"
+    [[ "${required_tables}" == "7" ]] || fail "restored source is missing required PtYes user, attendance, torrent, seedbox, or site-settings tables"
     note "source restore completed"
 }
 
@@ -334,6 +338,20 @@ run_medals() {
     run_core_command legacy-medals --action import
     note "verifying an idempotent medal retry and full source-to-target reconciliation"
     run_core_command legacy-medals --action import
+}
+
+run_seedboxes() {
+    ensure_cutover_preflight
+    note "importing user-bound PtYes seedbox addresses and strict accounting factors"
+    run_core_command legacy-seedboxes --action import
+    note "verifying an idempotent seedbox retry and exact source-to-policy bindings"
+    run_core_command legacy-seedboxes --action import
+}
+
+verify_seedboxes() {
+    require_run_identity
+    note "verifying migrated seedbox bindings and the latest Core runtime policy"
+    run_core_command legacy-seedboxes --action verify
 }
 
 verify_medals() {
@@ -423,9 +441,11 @@ run_cutover_acceptance() {
     required_env PEERGO_LEGACY_ACCEPTANCE_OUTPUT
     required_env PEERGO_TRACKER_SNAPSHOT_PATH
     required_env PEERGO_TRACKER_SUBJECT_SNAPSHOT_PATH
+    required_env PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_PATH
     required_env PEERGO_TRACKER_SNAPSHOT_TRUSTED_KEYS
     required_env PEERGO_TRACKER_SNAPSHOT_MAX_AGE
     required_env PEERGO_TRACKER_SUBJECT_SNAPSHOT_MAX_AGE
+    required_env PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_MAX_AGE
     required_env PEERGO_TRACKER_SNAPSHOT_MAX_FUTURE_SKEW
     [[ "${PEERGO_LEGACY_PREFLIGHT_MANIFEST}" = /* && -f "${PEERGO_LEGACY_PREFLIGHT_MANIFEST}" ]] ||
         fail "preflight manifest must be an absolute regular file"
@@ -437,6 +457,7 @@ run_cutover_acceptance() {
     [[ -f "${PEERGO_LEGACY_IMAGE_ROOT}" ]] ||
         fail "formal cutover acceptance requires the immutable image ZIP"
     verify_medals
+    verify_seedboxes
     note "running read-only post-reconciliation cutover acceptance"
     run_core_command legacy-torrents --action acceptance
 }
@@ -460,6 +481,9 @@ case "${command_name}" in
         ;;
     medals)
         run_medals
+        ;;
+    seedboxes)
+        run_seedboxes
         ;;
     torrents-exclusions)
         write_torrent_exclusion_candidate
@@ -494,6 +518,7 @@ case "${command_name}" in
     all)
         run_users
         run_medals
+        run_seedboxes
         run_torrent_validation
         run_torrent_import
         run_torrent_purchases

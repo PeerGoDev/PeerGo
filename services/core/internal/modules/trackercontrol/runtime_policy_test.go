@@ -189,6 +189,18 @@ func TestRuntimePolicySnapshotBuilderSignsLatestImmutableRevision(t *testing.T) 
 	}
 }
 
+func TestDecodeRuntimeSeedboxPolicyDefaultsLegacyDownloadFactor(t *testing.T) {
+	t.Parallel()
+	var policy trackerruntimepolicyv1.SeedboxPolicy
+	err := decodeRuntimeSeedboxPolicy([]byte(`{"enabled":false,"upload_factor_basis_points":5000,"seedbox_speed_limit_bytes_per_second":0,"standard_speed_limit_bytes_per_second":0,"rules":[]}`), &policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if policy.DownloadFactorBasisPoints != 10_000 {
+		t.Fatalf("download factor = %d, want historical 1x", policy.DownloadFactorBasisPoints)
+	}
+}
+
 func testRuntimePolicy() trackerruntimepolicyv1.Policy {
 	return trackerruntimepolicyv1.Policy{
 		Revision: "tracker-runtime-test-v1", AnnounceIntervalSeconds: 1800,
@@ -196,5 +208,9 @@ func testRuntimePolicy() trackerruntimepolicyv1.Policy {
 		ScrapeEnabled: true, MaxScrapeHashes: 50, ClientMode: trackerruntimepolicyv1.ClientModeAllowAll,
 		AllowedClients: []trackerruntimepolicyv1.ClientRule{}, UserRequestsPerMinute: 30,
 		UserBurst: 60, AddressRequestsPerMinute: 120, AddressBurst: 240,
+		Seedbox: trackerruntimepolicyv1.SeedboxPolicy{
+			UploadFactorBasisPoints: 5_000, DownloadFactorBasisPoints: 10_000,
+			Rules: []trackerruntimepolicyv1.SeedboxRule{},
+		},
 	}
 }

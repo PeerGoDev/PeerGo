@@ -235,6 +235,7 @@ func (repository *Repository) Settings(ctx context.Context, now time.Time) (sett
 		GeneratedAt: now.UTC().Round(0),
 		Seedbox: settlementoperationsv1.SeedboxPolicy{
 			SettlementPrimitiveSupported: true,
+			DownloadFactorBasisPoints:    int64(policy.OneX),
 			ClassificationConnected:      true,
 			RegistryConnected:            true,
 			SpeedObservationConnected:    true,
@@ -291,6 +292,7 @@ LIMIT 1`, now).Scan(&snapshotJSON)
 		if snapshot.Seedbox != nil {
 			result.Seedbox.GlobalPolicyConfigured = true
 			result.Seedbox.UploadFactorBasisPoints = int64(snapshot.Seedbox.UploadFactor)
+			result.Seedbox.DownloadFactorBasisPoints = int64(snapshot.Seedbox.DownloadFactor)
 		}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return settlementoperationsv1.Settings{}, fmt.Errorf("read current global traffic policy: %w", err)

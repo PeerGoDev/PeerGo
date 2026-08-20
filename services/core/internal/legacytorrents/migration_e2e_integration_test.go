@@ -16,6 +16,7 @@ import (
 
 	"github.com/peergo/peergo/services/core/internal/contracts/objectstorage"
 	"github.com/peergo/peergo/services/core/internal/legacymedia"
+	"github.com/peergo/peergo/services/core/internal/legacyseedboxes"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	"github.com/peergo/peergo/services/core/internal/modules/trackercontrol"
 	platformobjectstore "github.com/peergo/peergo/services/core/internal/platform/objectstore"
@@ -214,6 +215,21 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 		reconciled.PurchaseRows != 1 || reconciled.PurchaseRights != 1 || reconciled.PurchaseEvidence != 0 {
 		t.Fatalf("reconciliation result = %+v", reconciled)
 	}
+	seedboxResult, err := legacyseedboxes.Import(ctx, source, core, legacyseedboxes.Config{
+		RunID: runID, SnapshotSHA256: snapshot, MappingVersion: "ptyes-v1",
+		ImportedAt: now.Add(65 * time.Minute),
+	})
+	if err != nil || seedboxResult.SourceRows != 1 || seedboxResult.EnabledRows != 1 ||
+		seedboxResult.BindingRows != 1 || seedboxResult.PolicySequence < 1 {
+		t.Fatalf("import legacy seedboxes = %+v, %v", seedboxResult, err)
+	}
+	seedboxRetry, err := legacyseedboxes.Import(ctx, source, core, legacyseedboxes.Config{
+		RunID: runID, SnapshotSHA256: snapshot, MappingVersion: "ptyes-v1",
+		ImportedAt: now.Add(65 * time.Minute),
+	})
+	if err != nil || !seedboxRetry.Duplicate || seedboxRetry.PolicySequence != seedboxResult.PolicySequence {
+		t.Fatalf("retry legacy seedboxes = %+v, %v", seedboxRetry, err)
+	}
 	status, err := InspectMigrationStatus(ctx, core, inventory)
 	if err != nil {
 		t.Fatal(err)
@@ -247,6 +263,7 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 	snapshotDirectory := t.TempDir()
 	controlPath := filepath.Join(snapshotDirectory, "control.snapshot")
 	subjectPath := filepath.Join(snapshotDirectory, "subjects.snapshot")
+	runtimePolicyPath := filepath.Join(snapshotDirectory, "runtime-policy.snapshot")
 	privateKey := ed25519.NewKeyFromSeed(bytesOf(0x61, ed25519.SeedSize))
 	controlPublisher, err := trackersnapshot.NewFilesystemPublisher(controlPath)
 	if err != nil {
@@ -276,6 +293,25 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 	if err != nil || subjectResult.SubjectCount != 1 {
 		t.Fatalf("build Tracker subject snapshot = %+v, %v", subjectResult, err)
 	}
+	runtimePolicyRepository, err := trackercontrol.NewPostgresRuntimePolicyRepository(core)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimePolicyPublisher, err := trackersnapshot.NewRuntimePolicyFilesystemPublisher(runtimePolicyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimePolicyBuilder, err := trackercontrol.NewRuntimePolicySnapshotBuilder(
+		runtimePolicyRepository, runtimePolicyPublisher, "legacy-e2e", privateKey,
+		func() time.Time { return snapshotAt },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimePolicyResult, err := runtimePolicyBuilder.BuildAndPublish(ctx)
+	if err != nil || runtimePolicyResult.ControlSequence != seedboxResult.PolicySequence {
+		t.Fatalf("build Tracker runtime policy snapshot = %+v, %v", runtimePolicyResult, err)
+	}
 	preflightPath := filepath.Join(t.TempDir(), "preflight.json")
 	preflightSHA256, err := WriteCutoverPreflightManifest(preflightPath, preflight)
 	if err != nil {
@@ -298,11 +334,13 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 			StorageConfigSHA256: storageConfigSHA256, Preflight: preflight,
 			PreflightManifestSHA256: preflightSHA256, TrackerSnapshotPath: controlPath,
 			TrackerSubjectSnapshotPath: subjectPath,
+			TrackerRuntimePolicyPath:   runtimePolicyPath,
 			TrackerTrustedKeys: map[string]ed25519.PublicKey{
 				"legacy-e2e": privateKey.Public().(ed25519.PublicKey),
 			},
 			TrackerSnapshotMaxAge: 5 * time.Minute, TrackerSubjectMaxAge: 5 * time.Minute,
-			TrackerMaxFutureSkew: time.Second,
+			TrackerRuntimePolicyMaxAge: 5 * time.Minute,
+			TrackerMaxFutureSkew:       time.Second,
 		},
 		nil,
 	)
@@ -314,7 +352,11 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 		accepted.TorrentImages != 1 || accepted.VerifiedImageObjects != 1 ||
 		accepted.TorrentPurchaseRows != 1 || accepted.TorrentPurchaseRights != 1 ||
 		accepted.TorrentPurchaseEvidenceOnly != 0 || accepted.TrackerTorrentCount != 1 ||
-		accepted.TrackerSubjectCount != 1 {
+		accepted.TrackerSubjectCount != 1 || accepted.SeedboxBindingRows != 1 ||
+		accepted.SeedboxUploadFactorBasisPoints != 5_000 ||
+		accepted.SeedboxDownloadFactorBasisPoints != 20_000 ||
+		accepted.SeedboxSpeedLimitBytesPerSecond != 0 ||
+		accepted.StandardSpeedLimitBytesPerSecond != 25*1024*1024 {
 		t.Fatalf("cutover acceptance = %+v", accepted)
 	}
 
@@ -455,6 +497,22 @@ func createSyntheticPtYesSource(
             is_cover boolean,
             sort_order integer
         )`,
+		`CREATE TABLE seed_boxes (
+			id bigint PRIMARY KEY,
+			user_id bigint,
+			ip_start text NOT NULL,
+			ip_end text NOT NULL,
+			ip text,
+			c_id_r text,
+			operator text,
+			bandwidth text,
+			comment text,
+			type integer NOT NULL,
+			status integer NOT NULL,
+			created_at timestamptz NOT NULL,
+			updated_at timestamptz NOT NULL
+		)`,
+		`CREATE TABLE site_settings (key text PRIMARY KEY, value text NOT NULL)`,
 	}
 	for _, statement := range statements {
 		if _, err := db.Exec(ctx, statement); err != nil {
@@ -462,6 +520,27 @@ func createSyntheticPtYesSource(
 		}
 	}
 	if _, err := db.Exec(ctx, `INSERT INTO users (id) VALUES (1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `
+INSERT INTO seed_boxes (
+    id, user_id, ip_start, ip_end, ip, c_id_r, operator, bandwidth,
+    comment, type, status, created_at, updated_at
+) VALUES (1, 1, '192.0.2.10', '192.0.2.10', '192.0.2.10', '',
+          'synthetic', '1Gbps', '', 2, 1, $1, $1)`, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `
+INSERT INTO site_settings (key, value) VALUES
+    ('seedbox.enabled', 'true'),
+    ('seedbox.upload_ratio', '0.5'),
+    ('seedbox.max_speed', '400'),
+    ('seedbox.non_seedbox_max_speed', '200'),
+    ('seedbox.uploader_max_speed', '600'),
+    ('seedbox.uploader_upload_ratio', '0.5'),
+    ('seedbox.warning_limit', '3'),
+    ('vip.no_speed_limit', 'true'),
+    ('vip.seedbox_no_discount', 'false')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `INSERT INTO categories (id, name) VALUES (1, 'movie')`); err != nil {

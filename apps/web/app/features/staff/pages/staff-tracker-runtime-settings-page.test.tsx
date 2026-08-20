@@ -116,6 +116,7 @@ function trackerPolicySettings() {
     seedbox: {
       enabled: false,
       upload_factor_basis_points: 5000,
+      download_factor_basis_points: 20000,
       seedbox_speed_limit_bytes_per_second: 0,
       standard_speed_limit_bytes_per_second: 0,
       rules: [],

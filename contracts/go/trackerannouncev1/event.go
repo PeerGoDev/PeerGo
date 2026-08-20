@@ -42,12 +42,16 @@ const (
 // policy lookup. It intentionally excludes the socket address. Settlement can
 // still explain every factor using the immutable policy sequence and rule ID.
 type NetworkEvidence struct {
-	PolicySequence           int64  `json:"policy_sequence"`
-	PolicyRevision           string `json:"policy_revision"`
-	Class                    string `json:"class"`
-	RuleID                   string `json:"rule_id,omitempty"`
-	UploadFactorBasisPoints  int64  `json:"upload_factor_basis_points"`
-	SpeedLimitBytesPerSecond int64  `json:"speed_limit_bytes_per_second"`
+	PolicySequence          int64  `json:"policy_sequence"`
+	PolicyRevision          string `json:"policy_revision"`
+	Class                   string `json:"class"`
+	RuleID                  string `json:"rule_id,omitempty"`
+	UploadFactorBasisPoints int64  `json:"upload_factor_basis_points"`
+	// DownloadFactorBasisPoints was added without changing the v1 envelope so
+	// already-published canonical announce events remain replayable. A missing
+	// field is historical 1x; newly emitted events always carry a value.
+	DownloadFactorBasisPoints *int64 `json:"download_factor_basis_points,omitempty"`
+	SpeedLimitBytesPerSecond  int64  `json:"speed_limit_bytes_per_second"`
 }
 
 type Event struct {
@@ -85,12 +89,18 @@ func Validate(event Event) error {
 	}
 	if event.NetworkEvidence != nil {
 		evidence := event.NetworkEvidence
+		downloadFactor := int64(10_000)
+		if evidence.DownloadFactorBasisPoints != nil {
+			downloadFactor = *evidence.DownloadFactorBasisPoints
+		}
 		if evidence.PolicySequence < 1 || !revisionPattern.MatchString(evidence.PolicyRevision) ||
 			(evidence.Class != NetworkClassStandard && evidence.Class != NetworkClassSeedbox) ||
 			evidence.UploadFactorBasisPoints < 0 || evidence.UploadFactorBasisPoints > 10_000 ||
+			downloadFactor < 0 || downloadFactor > 100_000 ||
 			evidence.SpeedLimitBytesPerSecond < 0 ||
-			(evidence.Class == NetworkClassStandard && (evidence.RuleID != "" || evidence.UploadFactorBasisPoints != 10_000)) ||
-			(evidence.Class == NetworkClassSeedbox && !revisionPattern.MatchString(evidence.RuleID)) {
+			(evidence.Class == NetworkClassStandard && (evidence.RuleID != "" ||
+				evidence.UploadFactorBasisPoints != 10_000 || downloadFactor != 10_000)) ||
+			(evidence.Class == NetworkClassSeedbox && (!revisionPattern.MatchString(evidence.RuleID) || downloadFactor < 10_000)) {
 			return ErrInvalid
 		}
 	}

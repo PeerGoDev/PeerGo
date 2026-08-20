@@ -113,10 +113,11 @@ TrackerSeedboxRule:
 TrackerSeedboxRuntimePolicy:
   type: object
   additionalProperties: false
-  required: [enabled, upload_factor_basis_points, seedbox_speed_limit_bytes_per_second, standard_speed_limit_bytes_per_second, rules]
+  required: [enabled, upload_factor_basis_points, download_factor_basis_points, seedbox_speed_limit_bytes_per_second, standard_speed_limit_bytes_per_second, rules]
   properties:
     enabled: { type: boolean }
     upload_factor_basis_points: { type: integer, minimum: 0, maximum: 10000 }
+    download_factor_basis_points: { type: integer, minimum: 10000, maximum: 100000 }
     seedbox_speed_limit_bytes_per_second: { type: integer, format: int64, minimum: 0 }
     standard_speed_limit_bytes_per_second: { type: integer, format: int64, minimum: 0 }
     rules:
@@ -317,11 +318,12 @@ HNRPolicySettings:
 SeedboxPolicySettings:
   type: object
   additionalProperties: false
-  required: [settlement_primitive_supported, global_policy_configured, upload_factor_basis_points, classification_connected, registry_connected, speed_observation_connected]
+  required: [settlement_primitive_supported, global_policy_configured, upload_factor_basis_points, download_factor_basis_points, classification_connected, registry_connected, speed_observation_connected]
   properties:
     settlement_primitive_supported: { type: boolean }
     global_policy_configured: { type: boolean }
     upload_factor_basis_points: { type: integer, format: int64, minimum: 0, maximum: 10000 }
+    download_factor_basis_points: { type: integer, format: int64, minimum: 10000, maximum: 100000 }
     classification_connected: { type: boolean }
     registry_connected: { type: boolean }
     speed_observation_connected: { type: boolean }

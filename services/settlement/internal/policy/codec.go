@@ -100,8 +100,9 @@ type benefitsWire struct {
 }
 
 type seedboxWire struct {
-	Rule         ruleRefWire `json:"rule"`
-	UploadFactor BasisPoints `json:"upload_factor"`
+	Rule           ruleRefWire `json:"rule"`
+	UploadFactor   BasisPoints `json:"upload_factor"`
+	DownloadFactor BasisPoints `json:"download_factor"`
 }
 
 type speedWire struct {
@@ -217,14 +218,20 @@ func seedboxToWire(seedbox *SeedboxPenalty) *seedboxWire {
 	if seedbox == nil {
 		return nil
 	}
-	return &seedboxWire{Rule: ruleRefToWire(seedbox.Rule), UploadFactor: seedbox.UploadFactor}
+	return &seedboxWire{
+		Rule: ruleRefToWire(seedbox.Rule), UploadFactor: seedbox.UploadFactor,
+		DownloadFactor: seedbox.DownloadFactor,
+	}
 }
 
 func (wire *seedboxWire) toSeedbox() *SeedboxPenalty {
 	if wire == nil {
 		return nil
 	}
-	return &SeedboxPenalty{Rule: wire.Rule.toRuleRef(), UploadFactor: wire.UploadFactor}
+	return &SeedboxPenalty{
+		Rule: wire.Rule.toRuleRef(), UploadFactor: wire.UploadFactor,
+		DownloadFactor: wire.DownloadFactor,
+	}
 }
 
 func speedToWire(speed *SpeedPenalty) *speedWire {
