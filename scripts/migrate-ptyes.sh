@@ -148,6 +148,35 @@ sha256_file() {
     sha256sum "$file" | awk '{print $1}'
 }
 
+# Some historical PtYes archives produced by Go's ZIP writer are valid and
+# pass the host-side integrity gate, but Alpine's patched Info-ZIP can report a
+# false-positive "overlapped components" error for very large ZIP64 files.
+# Retry only that exact failure, only after the read-only archive's digest has
+# been matched to the digest supplied by the production cutover wrapper. The
+# compatibility retry still inflates every entry and verifies its CRC; the Go
+# importers additionally enforce entry counts, canonical paths, object sizes
+# and exact uncompressed lengths before accepting any object.
+verify_legacy_zip_integrity() {
+    local archive="$1"
+    local label="$2"
+    local actual_sha="$3"
+    local expected_sha="$4"
+    local output
+
+    if output="$(unzip -tq "${archive}" 2>&1)"; then
+        return
+    fi
+    if [[ "${output}" == *'invalid zip file with overlapped components (possible zip bomb)'* &&
+          -n "${expected_sha}" && "${actual_sha}" == "${expected_sha}" ]]; then
+        note "${label}_zip_compatibility=infozip-overlap-false-positive"
+        UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip -tq "${archive}" >/dev/null ||
+            fail "${label} ZIP failed CRC verification in compatibility mode"
+        return
+    fi
+    printf '%s\n' "${output}" >&2
+    fail "${label} ZIP failed integrity verification"
+}
+
 inspect_inputs() {
     if [[ "${inputs_inspected}" == true ]]; then
         return
@@ -187,15 +216,16 @@ inspect_inputs() {
     export PEERGO_LEGACY_SNAPSHOT_SHA256="${dump_sha}"
     note "database_dump_sha256=${dump_sha}"
 
-    unzip -tq "${image_source}" >/dev/null
-    local image_objects
-    image_objects="$(unzip -Z -1 "${image_source}" | awk '/^uploads\/images\/[0-9a-f][0-9a-f]\/[0-9a-f-]+\.(jpg|png|webp|gif)$/ { count++ } END { print count + 0 }')"
-    [[ "${image_objects}" -gt 0 ]] || fail "image ZIP contains no uploads/images objects"
     local image_sha
     image_sha="$(sha256_file "${image_source}")"
     if [[ -n "${PEERGO_LEGACY_IMAGE_ARCHIVE_SHA256:-}" && "${PEERGO_LEGACY_IMAGE_ARCHIVE_SHA256}" != "${image_sha}" ]]; then
         fail "PEERGO_LEGACY_IMAGE_ARCHIVE_SHA256 does not match the image archive"
     fi
+    verify_legacy_zip_integrity \
+        "${image_source}" image "${image_sha}" "${PEERGO_LEGACY_IMAGE_ARCHIVE_SHA256:-}"
+    local image_objects
+    image_objects="$(unzip -Z -1 "${image_source}" | awk '/^uploads\/images\/[0-9a-f][0-9a-f]\/[0-9a-f-]+\.(jpg|png|webp|gif)$/ { count++ } END { print count + 0 }')"
+    [[ "${image_objects}" -gt 0 ]] || fail "image ZIP contains no uploads/images objects"
     export PEERGO_LEGACY_IMAGE_ARCHIVE_SHA256="${image_sha}"
     note "image_zip_sha256=${image_sha}"
     note "image_zip_objects=${image_objects}"
@@ -205,15 +235,21 @@ inspect_inputs() {
         inputs_inspected=true
         return
     fi
+    local torrent_sha
+    torrent_sha="$(sha256_file "${torrent_source}")"
+    if [[ -n "${PEERGO_LEGACY_TORRENT_ARCHIVE_SHA256:-}" && "${PEERGO_LEGACY_TORRENT_ARCHIVE_SHA256}" != "${torrent_sha}" ]]; then
+        fail "PEERGO_LEGACY_TORRENT_ARCHIVE_SHA256 does not match the torrent archive"
+    fi
     if [[ "${torrent_source}" != "${image_source}" ]]; then
-        unzip -tq "$torrent_source" >/dev/null
+        verify_legacy_zip_integrity \
+            "${torrent_source}" torrent "${torrent_sha}" "${PEERGO_LEGACY_TORRENT_ARCHIVE_SHA256:-}"
     fi
     local torrent_objects
     torrent_objects="$(unzip -Z -1 "${torrent_source}" | awk '/^(torrents\/)?[0-9a-f][0-9a-f]\/[0-9a-f-]+\.torrent$/ { count++ } END { print count + 0 }')"
     [[ "${torrent_objects}" -gt 0 ]] || fail "torrent ZIP contains no .torrent objects"
     note "torrent_source=zip"
     note "torrent_zip_objects=${torrent_objects}"
-    note "torrent_zip_sha256=$(sha256_file "$torrent_source")"
+    note "torrent_zip_sha256=${torrent_sha}"
     inputs_inspected=true
 }
 

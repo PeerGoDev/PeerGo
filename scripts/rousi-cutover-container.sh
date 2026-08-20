@@ -139,6 +139,10 @@ prepare_environment() {
     export PEERGO_ENV=production
     export PEERGO_LEGACY_BIN_DIR="${binary_root}"
     export PEERGO_LEGACY_SNAPSHOT_SHA256="${dump_sha256}"
+    # Bind the archive compatibility gate in migrate-ptyes.sh to the exact
+    # read-only inputs already hashed by this cutover container.
+    export PEERGO_LEGACY_TORRENT_ARCHIVE_SHA256="${torrent_sha256}"
+    export PEERGO_LEGACY_IMAGE_ARCHIVE_SHA256="${image_sha256}"
     export PEERGO_LEGACY_MAPPING_VERSION="${PEERGO_LEGACY_MAPPING_VERSION:-ptyes-v1}"
     export PEERGO_LEGACY_RECONCILED_AT="${PEERGO_LEGACY_RECONCILED_AT:-${PEERGO_LEGACY_OCCURRED_AT}}"
     export PEERGO_LEGACY_PROGRESS_EVERY="${PEERGO_LEGACY_PROGRESS_EVERY:-250}"
