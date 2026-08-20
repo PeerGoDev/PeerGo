@@ -156,6 +156,7 @@ func run(logger *slog.Logger) error {
 	handler, err := httpserver.NewHandler(torrentStore, subjectStore, engine, eventWAL, announceevent.NewFactory(nil), parser, httpserver.Config{
 		TorrentSnapshotMaxAge: settings.Control.MaxAge,
 		SubjectSnapshotMaxAge: settings.Control.SubjectMaxAge,
+		TrustedProxyCIDRs:     settings.TrustedProxyCIDRs,
 		Interval:              settings.AnnounceInterval, MinInterval: settings.MinAnnounceInterval,
 		RuntimePolicy: runtimePolicyStore, RuntimePolicyMaxAge: settings.Control.RuntimePolicyMaxAge,
 		Observer: trackerMetrics,

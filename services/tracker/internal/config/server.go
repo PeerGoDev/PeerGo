@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ type ServerConfig struct {
 	Control                Config
 	ListenAddress          string
 	MetricsListenAddress   string
+	TrustedProxyCIDRs      []netip.Prefix
 	ServiceToken           string
 	SnapshotReloadInterval time.Duration
 	ShutdownTimeout        time.Duration
@@ -68,6 +70,10 @@ func LoadServer() (ServerConfig, error) {
 	}
 	if metricsListenAddress == listenAddress {
 		return ServerConfig{}, errors.New("PEERGO_TRACKER_METRICS_LISTEN_ADDRESS must differ from the public Tracker listen address")
+	}
+	trustedProxyCIDRs, err := parseTrustedProxyCIDRs()
+	if err != nil {
+		return ServerConfig{}, err
 	}
 	serviceToken, err := required("PEERGO_TRACKER_SERVICE_TOKEN")
 	if err != nil {
@@ -236,7 +242,8 @@ func LoadServer() (ServerConfig, error) {
 	}
 	return ServerConfig{
 		Control: control, ListenAddress: listenAddress, MetricsListenAddress: metricsListenAddress,
-		ServiceToken: serviceToken, SnapshotReloadInterval: reloadInterval,
+		TrustedProxyCIDRs: trustedProxyCIDRs,
+		ServiceToken:      serviceToken, SnapshotReloadInterval: reloadInterval,
 		ShutdownTimeout: shutdownTimeout, AnnounceInterval: announceInterval,
 		MinAnnounceInterval: minInterval, DefaultNumWant: defaultNumWant, MaxNumWant: maxNumWant,
 		WALPath: filepath.Clean(walPath), MaxWALBytes: maxWALBytes, WALCompactAtBytes: walCompactAtBytes,
@@ -254,6 +261,33 @@ func LoadServer() (ServerConfig, error) {
 			MaxPeersPerSwarm: maxPeersPerSwarm, PeerTTL: peerTTL, SweepBudget: sweepBudget,
 		},
 	}, nil
+}
+
+func parseTrustedProxyCIDRs() ([]netip.Prefix, error) {
+	const maximumTrustedProxyCIDRs = 16
+	value := strings.TrimSpace(os.Getenv("PEERGO_TRACKER_TRUSTED_PROXY_CIDRS"))
+	if value == "" {
+		return nil, nil
+	}
+	rawPrefixes := strings.Split(value, ",")
+	if len(rawPrefixes) > maximumTrustedProxyCIDRs {
+		return nil, fmt.Errorf("PEERGO_TRACKER_TRUSTED_PROXY_CIDRS must contain at most %d CIDRs", maximumTrustedProxyCIDRs)
+	}
+	prefixes := make([]netip.Prefix, 0, len(rawPrefixes))
+	for _, raw := range rawPrefixes {
+		candidate := strings.TrimSpace(raw)
+		prefix, err := netip.ParsePrefix(candidate)
+		if err != nil || prefix.Addr().Is4In6() || prefix != prefix.Masked() {
+			return nil, errors.New("PEERGO_TRACKER_TRUSTED_PROXY_CIDRS must contain canonical IPv4 or IPv6 CIDRs")
+		}
+		for _, existing := range prefixes {
+			if existing.Contains(prefix.Addr()) || prefix.Contains(existing.Addr()) {
+				return nil, errors.New("PEERGO_TRACKER_TRUSTED_PROXY_CIDRS must not contain duplicate or overlapping CIDRs")
+			}
+		}
+		prefixes = append(prefixes, prefix)
+	}
+	return prefixes, nil
 }
 
 func parseListenAddress(name string) (string, error) {

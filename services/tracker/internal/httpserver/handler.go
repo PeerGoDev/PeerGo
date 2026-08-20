@@ -76,6 +76,7 @@ type EventAppender interface {
 type Config struct {
 	TorrentSnapshotMaxAge time.Duration
 	SubjectSnapshotMaxAge time.Duration
+	TrustedProxyCIDRs     []netip.Prefix
 	Interval              int
 	MinInterval           int
 	RuntimePolicy         RuntimePolicy
@@ -130,6 +131,10 @@ func NewHandler(torrents TorrentAdmission, subjects SubjectAdmission, swarms Swa
 		config.MinInterval > config.Interval || now == nil {
 		return nil, ErrConfig
 	}
+	if !validTrustedProxyCIDRs(config.TrustedProxyCIDRs) {
+		return nil, ErrConfig
+	}
+	config.TrustedProxyCIDRs = append([]netip.Prefix(nil), config.TrustedProxyCIDRs...)
 	policy := config.RuntimePolicy
 	if policy == nil {
 		policy = newStaticRuntimePolicy(parser, config.Interval, config.MinInterval, now().UTC())
@@ -229,7 +234,7 @@ func (handler *Handler) serveTracker(response http.ResponseWriter, request *http
 		handler.writeTracker(response, protocol.EncodeFailure("tracker temporarily unavailable"))
 		return
 	}
-	address, ok := remoteAddress(request.RemoteAddr)
+	address, ok := clientAddress(request, handler.config.TrustedProxyCIDRs)
 	if !ok {
 		handler.writeTracker(response, protocol.EncodeFailure("invalid request"))
 		return
@@ -496,6 +501,61 @@ func remoteAddress(remote string) (netip.Addr, bool) {
 		return netip.Addr{}, false
 	}
 	return address, true
+}
+
+// clientAddress trusts X-Forwarded-For only when the immediate TCP peer is an
+// explicitly configured reverse proxy. The proxy must overwrite the header
+// with one address; accepting caller-supplied chains would let public clients
+// choose their rate-limit key, swarm endpoint and seedbox classification.
+func clientAddress(request *http.Request, trustedProxyCIDRs []netip.Prefix) (netip.Addr, bool) {
+	peer, ok := remoteAddress(request.RemoteAddr)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	trusted := false
+	for _, prefix := range trustedProxyCIDRs {
+		if prefix.Contains(peer) {
+			trusted = true
+			break
+		}
+	}
+	if !trusted {
+		return peer, true
+	}
+	values := request.Header.Values("X-Forwarded-For")
+	if len(values) != 1 {
+		return netip.Addr{}, false
+	}
+	raw := strings.TrimSpace(values[0])
+	if raw == "" || strings.Contains(raw, ",") {
+		return netip.Addr{}, false
+	}
+	address, err := netip.ParseAddr(raw)
+	if err != nil {
+		return netip.Addr{}, false
+	}
+	address = address.Unmap()
+	if address.Zone() != "" || (!address.Is4() && !address.Is6()) {
+		return netip.Addr{}, false
+	}
+	return address, true
+}
+
+func validTrustedProxyCIDRs(prefixes []netip.Prefix) bool {
+	if len(prefixes) > 16 {
+		return false
+	}
+	for index, prefix := range prefixes {
+		if !prefix.IsValid() || prefix.Addr().Is4In6() || prefix != prefix.Masked() {
+			return false
+		}
+		for _, existing := range prefixes[:index] {
+			if existing.Contains(prefix.Addr()) || prefix.Contains(existing.Addr()) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (handler *Handler) writeTracker(response http.ResponseWriter, body []byte) {

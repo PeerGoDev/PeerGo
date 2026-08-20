@@ -30,7 +30,8 @@ git rev-parse HEAD
 2. 启用 TLS 和 JetStream 的 NATS 集群。生产默认按三副本 stream/durable 验证漂移；
    各 publisher、consumer、provisioner 使用独立 `.creds`。
 3. Web 与 Tracker 两个 HTTPS 入口。Web 反代宿主机 `127.0.0.1:8080`；Tracker 反代
-   `127.0.0.1:8083`。不得转发 `9093` 指标端口。
+   `127.0.0.1:8083`。Tracker 入口必须覆盖写入单值
+   `X-Forwarded-For $remote_addr`，不能沿用客户端传入的链；不得转发 `9093` 指标端口。
 4. 本地对象存储卷及其快照。首版默认
    `filesystem:/var/lib/peergo/objects`，原图、三档 WebP 和 `.torrent` 都进入该卷。
 5. SMTP、SPF、DKIM、DMARC，以及仅私网可达的邮件 Relay HTTPS 入口。
@@ -57,6 +58,8 @@ make single-server-bootstrap
 脚本是幂等的：创建缺失目录、随机密钥、专用 Docker 网络、数据库和角色；已有 PeerGo 数据库
 owner 不符合预期时会停止，不会 drop、truncate 或重置 1Panel PostgreSQL。它把现有 PostgreSQL
 额外接入 `peergo-single` 网络并仅在该网络登记别名 `postgresql`，原 `1panel-network` 不变。
+脚本还会把该网络的精确 bridge gateway `/32`（启用 IPv6 时另含 `/128`）写入
+`PEERGO_TRACKER_TRUSTED_PROXY_CIDRS`。不要把它扩大成整个 Docker 私网。
 
 非默认容器、根目录或域名通过环境变量显式传入：
 
@@ -110,6 +113,7 @@ chmod 600 .env.production
 - 三个目标数据库 URL，以及临时源库的 restore/read-only URL；
 - Vault、Tracker passkey、session、WebAuthn、审计和服务间令牌；
 - Web/Tracker canonical HTTPS 域名和可信 Origin；
+- Tracker HTTPS 入口的精确代理 CIDR；只有入口覆盖写入的单值 `X-Forwarded-For` 才会被采信；
 - Tracker Ed25519 签名私钥、key ID 与对应 trusted public key；
 - NATS URLs、根 CA 和 `/run/secrets` 下的各身份凭据；
 - SMTP/Relay；

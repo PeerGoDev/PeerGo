@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -143,6 +144,69 @@ func TestHandlerAnnouncesUsingSocketAddressAndCompactResponse(t *testing.T) {
 	if len(events.events) != 2 || events.events[1].TorrentControlSequence != 7 || events.events[1].SubjectControlSequence != 3 ||
 		events.events[1].AddressFamily != 4 {
 		t.Fatalf("events = %+v", events.events)
+	}
+}
+
+func TestClientAddressUsesOnlySingleHeaderFromTrustedProxy(t *testing.T) {
+	t.Parallel()
+	trusted := []netip.Prefix{
+		netip.MustParsePrefix("172.30.0.1/32"),
+		netip.MustParsePrefix("2001:db8:1::1/128"),
+	}
+	for name, fixture := range map[string]struct {
+		remote  string
+		headers []string
+		want    string
+		ok      bool
+	}{
+		"trusted_ipv4":         {remote: "172.30.0.1:51000", headers: []string{"198.51.100.20"}, want: "198.51.100.20", ok: true},
+		"trusted_ipv6":         {remote: "[2001:db8:1::1]:51000", headers: []string{"2001:db8:2::20"}, want: "2001:db8:2::20", ok: true},
+		"untrusted_ignores":    {remote: "192.0.2.44:51000", headers: []string{"198.51.100.20"}, want: "192.0.2.44", ok: true},
+		"trusted_missing":      {remote: "172.30.0.1:51000", ok: false},
+		"trusted_chain":        {remote: "172.30.0.1:51000", headers: []string{"198.51.100.20, 192.0.2.1"}, ok: false},
+		"trusted_multi_header": {remote: "172.30.0.1:51000", headers: []string{"198.51.100.20", "192.0.2.1"}, ok: false},
+		"trusted_host_port":    {remote: "172.30.0.1:51000", headers: []string{"198.51.100.20:443"}, ok: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			request := httptest.NewRequest(http.MethodGet, "/tracker/passkey/announce", nil)
+			request.RemoteAddr = fixture.remote
+			for _, value := range fixture.headers {
+				request.Header.Add("X-Forwarded-For", value)
+			}
+			address, ok := clientAddress(request, trusted)
+			if ok != fixture.ok || (ok && address.String() != fixture.want) {
+				t.Fatalf("clientAddress() = %q, %t; want %q, %t", address, ok, fixture.want, fixture.ok)
+			}
+		})
+	}
+}
+
+func TestHandlerUsesForwardedClientAddressForSwarmEndpoint(t *testing.T) {
+	t.Parallel()
+	passkey := "00112233445566778899aabbccddeeff"
+	var hash [20]byte
+	copy(hash[:], "aaaaaaaaaaaaaaaaaaaa")
+	handler, _ := testHandler(t, hash, passkey, true)
+	handler.config.TrustedProxyCIDRs = []netip.Prefix{netip.MustParsePrefix("172.30.0.1/32")}
+
+	first := httptest.NewRequest(http.MethodGet, "/tracker/"+passkey+"/announce?"+announceQuery("aaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbb", 100), nil)
+	first.RemoteAddr = "172.30.0.1:51000"
+	first.Header.Set("X-Forwarded-For", "198.51.100.20")
+	firstResponse := httptest.NewRecorder()
+	handler.ServeHTTP(firstResponse, first)
+	if bytes.Contains(firstResponse.Body.Bytes(), []byte("failure reason")) {
+		t.Fatalf("first response = %q", firstResponse.Body.Bytes())
+	}
+
+	second := httptest.NewRequest(http.MethodGet, "/tracker/"+passkey+"/announce?"+announceQuery("aaaaaaaaaaaaaaaaaaaa", "cccccccccccccccccccc", 0), nil)
+	second.RemoteAddr = "172.30.0.1:51001"
+	second.Header.Set("X-Forwarded-For", "198.51.100.21")
+	secondResponse := httptest.NewRecorder()
+	handler.ServeHTTP(secondResponse, second)
+	if !bytes.Contains(secondResponse.Body.Bytes(), []byte{198, 51, 100, 20, 0x1a, 0xe1}) ||
+		bytes.Contains(secondResponse.Body.Bytes(), []byte{172, 30, 0, 1}) {
+		t.Fatalf("second response = %q", secondResponse.Body.Bytes())
 	}
 }
 

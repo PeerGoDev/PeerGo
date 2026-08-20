@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -23,9 +24,32 @@ func TestLoadServerBuildsBoundedRuntimeConfiguration(t *testing.T) {
 		settings.SnapshotReloadInterval != 5*time.Second ||
 		settings.AnnounceInterval != 1800 || settings.MaxNumWant != 100 || settings.Swarm.ShardCount != 16 ||
 		settings.Swarm.MaxPeers != 100000 || len(settings.NATSURLs) != 1 ||
+		len(settings.TrustedProxyCIDRs) != 2 || settings.TrustedProxyCIDRs[0] != netip.MustParsePrefix("192.0.2.10/32") ||
+		settings.TrustedProxyCIDRs[1] != netip.MustParsePrefix("2001:db8::10/128") ||
 		settings.AnnounceStream != "PEERGO_TRACKER_ANNOUNCE_V1" || settings.PublishTimeout != 3*time.Second ||
 		settings.SwarmSnapshotStream != "PEERGO_TRACKER_SWARM_SNAPSHOT_V1" || settings.SwarmRoutingEpoch != 1 {
 		t.Fatalf("settings = %+v", settings)
+	}
+}
+
+func TestLoadServerRejectsUnsafeTrustedProxyCIDRs(t *testing.T) {
+	for name, value := range map[string]string{
+		"host_without_prefix": "192.0.2.10",
+		"non_canonical":       "192.0.2.10/24",
+		"overlapping":         "192.0.2.0/24,192.0.2.10/32",
+		"mapped_ipv4":         "::ffff:192.0.2.10/128",
+		"empty_member":        "192.0.2.10/32,",
+	} {
+		t.Run(name, func(t *testing.T) {
+			values := serverTestValues(t.TempDir())
+			values["PEERGO_TRACKER_TRUSTED_PROXY_CIDRS"] = value
+			for envName, envValue := range values {
+				t.Setenv(envName, envValue)
+			}
+			if _, err := LoadServer(); err == nil || !strings.Contains(err.Error(), "TRUSTED_PROXY_CIDRS") {
+				t.Fatalf("LoadServer() error = %v", err)
+			}
+		})
 	}
 }
 
@@ -79,6 +103,7 @@ func serverTestValues(directory string) map[string]string {
 		"PEERGO_TRACKER_PASSKEY_LOOKUP_KEY":               "tracker-passkey-lookup-key-test-2026",
 		"PEERGO_TRACKER_LISTEN_ADDRESS":                   "127.0.0.1:8083",
 		"PEERGO_TRACKER_METRICS_LISTEN_ADDRESS":           "127.0.0.1:9093",
+		"PEERGO_TRACKER_TRUSTED_PROXY_CIDRS":              "192.0.2.10/32, 2001:db8::10/128",
 		"PEERGO_TRACKER_SERVICE_TOKEN":                    "peergo-test-tracker-service-token-2026",
 		"PEERGO_TRACKER_SNAPSHOT_RELOAD_INTERVAL":         "5s",
 		"PEERGO_TRACKER_SHUTDOWN_TIMEOUT":                 "10s",

@@ -130,7 +130,9 @@ make production-policy-bootstrap \
 make production-activation-check
 ```
 
-随后先做站务 hosts/DNS 定向验证，再在维护窗口一次切换 Web 与旧 Tracker 域名。
+随后先做站务 hosts/DNS 定向验证，再在维护窗口一次切换 Web 与旧 Tracker 域名。Tracker
+反向代理必须使用 `proxy_set_header X-Forwarded-For $remote_addr;` 覆盖用户输入，禁止使用会
+保留用户伪造链的 `$proxy_add_x_forwarded_for`；PeerGo 只接受 bootstrap 记录的直接代理网关。
 
 ## 5. 回滚边界
 

@@ -436,6 +436,29 @@ if ! docker network inspect "${network_name}" >/dev/null 2>&1; then
     docker network create --driver bridge "${network_name}" >/dev/null
 fi
 
+# The host HTTPS proxy reaches Tracker through its loopback-published port.
+# Docker presents that connection to the container as the bridge gateway, so
+# trust only those exact gateway addresses rather than an entire private range.
+# This lets Tracker use the proxy-overwritten client address without allowing
+# sibling containers to spoof rate-limit, peer endpoint or seedbox identity.
+trusted_proxy_cidrs=()
+while IFS= read -r gateway; do
+    [[ -z "${gateway}" ]] && continue
+    [[ "${gateway}" != *[[:space:],/]* ]] ||
+        fail "Docker network ${network_name} returned an invalid gateway"
+    if [[ "${gateway}" == *:* ]]; then
+        trusted_proxy_cidrs+=("${gateway}/128")
+    elif [[ "${gateway}" == *.* ]]; then
+        trusted_proxy_cidrs+=("${gateway}/32")
+    else
+        fail "Docker network ${network_name} returned an invalid gateway"
+    fi
+done < <(docker network inspect --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' "${network_name}")
+((${#trusted_proxy_cidrs[@]} > 0)) ||
+    fail "Docker network ${network_name} has no gateway for the host HTTPS proxy"
+trusted_proxy_value="$(IFS=,; printf '%s' "${trusted_proxy_cidrs[*]}")"
+set_env PEERGO_TRACKER_TRUSTED_PROXY_CIDRS "${trusted_proxy_value}"
+
 attached_names="$(docker network inspect --format '{{range .Containers}}{{println .Name}}{{end}}' "${network_name}")"
 if ! grep -Fqx "${postgres_container}" <<<"${attached_names}"; then
     note "connecting PostgreSQL container to ${network_name} as postgresql"

@@ -40,6 +40,7 @@ require_value PEERGO_SMTP_HOST
 require_value PEERGO_SMTP_USERNAME
 require_value PEERGO_SMTP_PASSWORD
 require_value PEERGO_SMTP_FROM_ADDRESS
+require_value PEERGO_TRACKER_TRUSTED_PROXY_CIDRS
 [[ "$(env_get PEERGO_SMTP_HOST)" != smtp.example.com ]] || fail "replace the example SMTP host"
 
 seeding_start="$(env_get PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT)"
@@ -51,6 +52,30 @@ deployment_mode="${deployment_mode:-cluster}"
 case "${deployment_mode}" in
     cluster) ;;
     single-server)
+        network_name="$(env_get PEERGO_SINGLE_SERVER_NETWORK)"
+        [[ "${network_name}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] ||
+            fail "PEERGO_SINGLE_SERVER_NETWORK is invalid"
+        docker network inspect "${network_name}" >/dev/null 2>&1 ||
+            fail "single-server Docker network does not exist: ${network_name}"
+        expected_proxy_cidrs=()
+        while IFS= read -r gateway; do
+            [[ -z "${gateway}" ]] && continue
+            [[ "${gateway}" != *[[:space:],/]* ]] ||
+                fail "Docker network ${network_name} returned an invalid gateway"
+            if [[ "${gateway}" == *:* ]]; then
+                expected_proxy_cidrs+=("${gateway}/128")
+            elif [[ "${gateway}" == *.* ]]; then
+                expected_proxy_cidrs+=("${gateway}/32")
+            else
+                fail "Docker network ${network_name} returned an invalid gateway"
+            fi
+        done < <(docker network inspect --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' "${network_name}")
+        ((${#expected_proxy_cidrs[@]} > 0)) ||
+            fail "Docker network ${network_name} has no gateway for the host HTTPS proxy"
+        expected_proxy_value="$(IFS=,; printf '%s' "${expected_proxy_cidrs[*]}")"
+        [[ "$(env_get PEERGO_TRACKER_TRUSTED_PROXY_CIDRS)" == "${expected_proxy_value}" ]] ||
+            fail "PEERGO_TRACKER_TRUSTED_PROXY_CIDRS must equal the exact ${network_name} gateway CIDR(s): ${expected_proxy_value}"
+
         directory_names=(
             PEERGO_OBJECTS_VOLUME_SOURCE
             PEERGO_TRACKER_VOLUME_SOURCE
