@@ -2988,6 +2988,52 @@ func TestOpenAPIValidationReturnsProblemJSON(t *testing.T) {
 	}
 }
 
+func TestProductionRegistrationPolicyUpdatePassesOpenAPIValidation(t *testing.T) {
+	t.Parallel()
+
+	body := `{
+		"mode":"invite",
+		"member_invites_enabled":true,
+		"invite_valid_days":7,
+		"max_invites_per_member":5,
+		"minimum_invite_account_age_days":30,
+		"minimum_invite_level":2,
+		"username_min_characters":3,
+		"username_max_characters":32,
+		"reserved_usernames":[],
+		"email_domain_mode":"any",
+		"email_domains":[],
+		"session_valid_hours":24,
+		"remember_session_valid_hours":720,
+		"human_verification_provider":"disabled",
+		"human_verification_site_key":"",
+		"human_verification_registration_enabled":false,
+		"human_verification_login_enabled":false,
+		"human_verification_password_recovery_enabled":false,
+		"expected_version":1,
+		"reason":"生产上线前启用邀请注册准入策略。"
+	}`
+	request := httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/admin/settings/registration",
+		strings.NewReader(body),
+	)
+	request.Host = "rousi.pro"
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Origin", "https://rousi.pro")
+	request.Header.Set("X-Forwarded-Proto", "https")
+	request.Header.Set("X-CSRF-Token", "opaque-csrf-token")
+	request.Header.Set("Cookie", "__Host-peergo_session=opaque-session-token")
+	response := httptest.NewRecorder()
+
+	testHandler(t).ServeHTTP(response, request)
+
+	if response.Code == http.StatusBadRequest && strings.Contains(response.Body.String(), "contract_validation_failed") {
+		t.Fatalf("production registration update failed contract validation: %s", response.Body.String())
+	}
+}
+
 func TestCreateWebSessionRejectsWriteWithoutTrustedOrigin(t *testing.T) {
 	t.Parallel()
 

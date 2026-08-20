@@ -66,7 +66,14 @@ class BootstrapError(RuntimeError):
 
 
 class ApiError(BootstrapError):
-    def __init__(self, status: int, payload: dict[str, Any] | None) -> None:
+    def __init__(
+        self,
+        status: int,
+        payload: dict[str, Any] | None,
+        *,
+        method: str = "",
+        path: str = "",
+    ) -> None:
         self.status = status
         self.payload = payload or {}
         code = self.payload.get("code", "http_error")
@@ -74,7 +81,8 @@ class ApiError(BootstrapError):
         detail = self.payload.get("detail", "服务未返回可读错误详情。")
         request_id = self.payload.get("request_id", "")
         suffix = f" request_id={request_id}" if request_id else ""
-        super().__init__(f"HTTP {status} {code}: {title}；{detail}{suffix}")
+        operation = f"{method} {path} " if method and path else ""
+        super().__init__(f"{operation}HTTP {status} {code}: {title}；{detail}{suffix}")
 
 
 class NoRedirect(request.HTTPRedirectHandler):
@@ -166,6 +174,14 @@ def registration_update_payload(current: dict[str, Any]) -> dict[str, Any]:
     if missing:
         raise BootstrapError("注册策略响应缺少字段：" + ", ".join(missing))
     payload = {name: current[name] for name in REGISTRATION_FIELDS}
+    # Older Core containers encode an empty PostgreSQL text[] as JSON null.
+    # The update contract correctly requires arrays, so normalize the two
+    # collection fields before echoing the current settings back to Core.
+    for name in ("reserved_usernames", "email_domains"):
+        if payload[name] is None:
+            payload[name] = []
+        elif not isinstance(payload[name], list):
+            raise BootstrapError(f"注册策略响应字段 {name} 不是数组。")
     payload.update(
         {
             "mode": "invite",
@@ -259,7 +275,12 @@ class ApiClient:
                 problem = json.loads(raw_body.decode("utf-8")) if raw_body else None
             except (UnicodeDecodeError, json.JSONDecodeError):
                 problem = None
-            raise ApiError(exc.code, problem if isinstance(problem, dict) else None) from None
+            raise ApiError(
+                exc.code,
+                problem if isinstance(problem, dict) else None,
+                method=method,
+                path=path,
+            ) from None
         except (error.URLError, TimeoutError, OSError) as exc:
             raise BootstrapError(f"无法连接 loopback 管理 API：{exc}") from exc
 

@@ -56,6 +56,8 @@ class ProductionPolicyBootstrapTest(unittest.TestCase):
         current.update(
             {
                 "member_invites_enabled": False,
+                "reserved_usernames": ["admin", "root"],
+                "email_domains": [],
                 "version": 7,
                 "mode": "closed",
                 "human_verification_secret_configured": True,
@@ -66,6 +68,36 @@ class ProductionPolicyBootstrapTest(unittest.TestCase):
         self.assertEqual(payload["expected_version"], 7)
         self.assertFalse(payload["member_invites_enabled"])
         self.assertNotIn("human_verification_secret_configured", payload)
+
+    def test_registration_update_normalizes_legacy_null_collections(self) -> None:
+        current = {name: f"value-{name}" for name in MODULE.REGISTRATION_FIELDS}
+        current.update(
+            {
+                "reserved_usernames": None,
+                "email_domains": None,
+                "version": 7,
+                "mode": "closed",
+            }
+        )
+
+        payload = MODULE.registration_update_payload(current)
+
+        self.assertEqual(payload["reserved_usernames"], [])
+        self.assertEqual(payload["email_domains"], [])
+
+    def test_registration_update_rejects_non_array_collections(self) -> None:
+        current = {name: f"value-{name}" for name in MODULE.REGISTRATION_FIELDS}
+        current.update(
+            {
+                "reserved_usernames": "admin",
+                "email_domains": [],
+                "version": 7,
+                "mode": "closed",
+            }
+        )
+
+        with self.assertRaisesRegex(MODULE.BootstrapError, "reserved_usernames"):
+            MODULE.registration_update_payload(current)
 
     def test_effective_time_has_margin_and_honors_server_minimum(self) -> None:
         now = datetime(2026, 8, 20, 16, 45, tzinfo=timezone.utc)
