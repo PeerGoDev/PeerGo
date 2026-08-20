@@ -52,12 +52,15 @@ func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, payload
 	if err != nil {
 		return ApplyResult{}, ErrInput
 	}
-	receivedAt = receivedAt.UTC().Round(0)
-	observedAt := chunk.ObservedAt.UTC().Round(0)
+	receivedAt = canonicalSwarmTime(receivedAt)
+	observedAt := canonicalSwarmTime(chunk.ObservedAt)
+	// Events published before Tracker canonicalized its clock may contain
+	// nanoseconds. Keep ordering and persistence on the same database-safe value.
+	chunk.ObservedAt = observedAt
 	if observedAt.After(receivedAt.Add(repository.maxFutureSkew)) {
 		return ApplyResult{}, ErrInput
 	}
-	appliedAt := repository.now().UTC().Round(0)
+	appliedAt := canonicalSwarmTime(repository.now())
 	if appliedAt.Before(receivedAt) {
 		appliedAt = receivedAt
 	}
@@ -220,8 +223,8 @@ func (repository *PostgresRepository) ApplyCompletion(ctx context.Context, paylo
 	if event.CompletionID == "" {
 		return ApplyResult{EventID: eventID, Noop: true}, nil
 	}
-	receivedAt = receivedAt.UTC().Round(0)
-	occurredAt := event.ReceivedAt.UTC().Round(0)
+	receivedAt = canonicalSwarmTime(receivedAt)
+	occurredAt := canonicalSwarmTime(event.ReceivedAt)
 	if occurredAt.After(receivedAt.Add(repository.maxFutureSkew)) {
 		return ApplyResult{}, ErrInput
 	}
@@ -234,7 +237,7 @@ func (repository *PostgresRepository) ApplyCompletion(ctx context.Context, paylo
 		return ApplyResult{}, ErrInput
 	}
 	payloadDigest := sha256.Sum256(payload)
-	appliedAt := repository.now().UTC().Round(0)
+	appliedAt := canonicalSwarmTime(repository.now())
 	if appliedAt.Before(receivedAt) {
 		appliedAt = receivedAt
 	}
@@ -339,7 +342,14 @@ func snapshotOrder(state swarmdb.GetSwarmProjectionStateForUpdateRow, chunk trac
 }
 
 func swarmTimestamp(value time.Time) pgtype.Timestamptz {
-	return pgtype.Timestamptz{Time: value.UTC().Round(0), Valid: true}
+	return pgtype.Timestamptz{Time: canonicalSwarmTime(value), Valid: true}
+}
+
+// PostgreSQL timestamptz and pgx preserve microseconds, not Go's full
+// nanosecond precision. All values that cross this boundary must use the same
+// representation or an insert-then-read replay can be mistaken for a conflict.
+func canonicalSwarmTime(value time.Time) time.Time {
+	return value.UTC().Truncate(time.Microsecond)
 }
 
 func classifyRowsError(operation string, rows int64, err error) error {

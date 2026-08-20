@@ -15,7 +15,9 @@ func TestFactoryBuildsSortedCompleteChunks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chunks, err := factory.Build(8, time.Date(2026, 8, 9, 10, 0, 0, 0, time.UTC), []swarm.SnapshotEntry{
+	observedAt := time.Date(2026, 8, 9, 10, 0, 0, 123_456_789, time.FixedZone("UTC+8", 8*60*60))
+	wantObservedAt := observedAt.UTC().Truncate(time.Microsecond)
+	chunks, err := factory.Build(8, observedAt, []swarm.SnapshotEntry{
 		{InfoHash: [20]byte{3}, Seeders: 3, Leechers: 1},
 		{InfoHash: [20]byte{1}, Seeders: 1, Leechers: 2},
 		{InfoHash: [20]byte{2}, Seeders: 2, Leechers: 3},
@@ -29,7 +31,10 @@ func TestFactoryBuildsSortedCompleteChunks(t *testing.T) {
 		t.Fatalf("unexpected chunk metadata: %+v", chunks)
 	}
 	for _, chunk := range chunks {
-		if decoded, decodeErr := trackerswarmv1.Decode(chunk.Payload); decodeErr != nil || decoded.EventID != chunk.Event.EventID {
+		decoded, decodeErr := trackerswarmv1.Decode(chunk.Payload)
+		if decodeErr != nil || decoded.EventID != chunk.Event.EventID ||
+			!chunk.Event.ObservedAt.Equal(wantObservedAt) || !decoded.ObservedAt.Equal(wantObservedAt) ||
+			chunk.Event.ObservedAt.Nanosecond()%1_000 != 0 {
 			t.Fatalf("decode=%+v error=%v", decoded, decodeErr)
 		}
 	}

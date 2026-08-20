@@ -74,8 +74,10 @@ func TestIntegrationClosesUnionedHourAndDetectsLateInterval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	selected := snapshotChunk(t, "tracker-primary", 1, windowStart.Add(50*time.Minute), infoHash, 3, 1)
-	fence := snapshotChunk(t, "tracker-primary", 2, windowEnd.Add(time.Minute), infoHash, 4, 0)
+	// Exercise replay of pre-fix Tracker messages whose timestamps carry more
+	// precision than PostgreSQL timestamptz can store.
+	selected := snapshotChunk(t, "tracker-primary", 1, windowStart.Add(50*time.Minute).Add(789*time.Nanosecond), infoHash, 3, 1)
+	fence := snapshotChunk(t, "tracker-primary", 2, windowEnd.Add(time.Minute).Add(789*time.Nanosecond), infoHash, 4, 0)
 	for index, chunk := range []trackerswarmv1.SnapshotChunk{selected, fence} {
 		payload, encodeErr := trackerswarmv1.Encode(chunk)
 		if encodeErr != nil {

@@ -46,7 +46,10 @@ func (factory *Factory) Build(sequence int64, observedAt time.Time, source []swa
 	if factory == nil || factory.random == nil || sequence < 1 || observedAt.IsZero() {
 		return nil, ErrConfig
 	}
-	observedAt = observedAt.UTC().Round(0)
+	// Snapshot consumers persist this value in PostgreSQL timestamptz columns,
+	// whose precision is microseconds. Canonicalize before encoding so replayed
+	// events compare identically after a database round trip.
+	observedAt = observedAt.UTC().Truncate(time.Microsecond)
 	entries := slices.Clone(source)
 	slices.SortFunc(entries, func(left, right swarm.SnapshotEntry) int {
 		return slices.Compare(left.InfoHash[:], right.InfoHash[:])

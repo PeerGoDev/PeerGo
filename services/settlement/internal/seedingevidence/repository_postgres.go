@@ -75,8 +75,10 @@ func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, deliver
 	if err != nil {
 		return SnapshotApplyResult{}, ErrInput
 	}
-	receivedAt := repository.now().UTC().Round(0)
-	observedAt := chunk.ObservedAt.UTC().Round(0)
+	receivedAt := canonicalEvidenceTime(repository.now())
+	// Older queued Tracker snapshots can carry nanoseconds. Normalize before
+	// persistence and comparison so they remain safe to replay after cutover.
+	observedAt := canonicalEvidenceTime(chunk.ObservedAt)
 	if receivedAt.IsZero() || observedAt.After(receivedAt.Add(repository.config.MaxFutureSkew)) {
 		return SnapshotApplyResult{}, ErrInput
 	}
@@ -555,11 +557,18 @@ func validWindowStart(value time.Time) bool {
 }
 
 func timestamp(value time.Time) pgtype.Timestamptz {
-	return pgtype.Timestamptz{Time: value.UTC().Round(0), Valid: true}
+	return pgtype.Timestamptz{Time: canonicalEvidenceTime(value), Valid: true}
 }
 
 func sameTimestamp(value pgtype.Timestamptz, expected time.Time) bool {
-	return value.Valid && value.Time.UTC().Round(0).Equal(expected.UTC().Round(0))
+	return value.Valid && canonicalEvidenceTime(value.Time).Equal(canonicalEvidenceTime(expected))
+}
+
+// PostgreSQL timestamptz truncates sub-microsecond precision. Canonicalizing
+// on both sides prevents a valid immutable event from looking contradictory
+// immediately after it has been inserted and read back.
+func canonicalEvidenceTime(value time.Time) time.Time {
+	return value.UTC().Truncate(time.Microsecond)
 }
 
 func isConstraintError(err error) bool {

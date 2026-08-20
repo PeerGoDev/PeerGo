@@ -69,7 +69,7 @@ func (publisher *Publisher) publishSnapshot(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("reserve Tracker swarm snapshot sequence: %w", err)
 	}
-	observedAt := publisher.now().UTC().Round(0)
+	observedAt := publisher.now().UTC().Truncate(time.Microsecond)
 	chunks, err := publisher.factory.Build(sequence, observedAt, publisher.source.Snapshot())
 	if err != nil {
 		return fmt.Errorf("build Tracker swarm snapshot: %w", err)

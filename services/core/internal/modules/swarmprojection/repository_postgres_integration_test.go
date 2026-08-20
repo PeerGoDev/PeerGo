@@ -54,7 +54,10 @@ func TestIntegrationAppliesOnlyCompleteSnapshotsAndDeduplicatesCompletions(t *te
 	routingEpoch := time.Now().UTC().UnixNano()
 	sourceID := "integration-" + strings.ToLower(strings.ReplaceAll(uuid.NewString()[:8], "-", ""))
 	snapshotID := mustUUIDV7(t)
-	observedAt := now.Add(-30 * time.Second).Round(0)
+	// Production Tracker events created before timestamp canonicalization can
+	// contain nanoseconds that PostgreSQL cannot retain. The consumer must still
+	// apply and replay them without reporting a false conflict.
+	observedAt := now.Add(-30 * time.Second).Add(789 * time.Nanosecond)
 	unknownHash := sha256.Sum256([]byte("unknown-swarm-entry-" + snapshotID.String()))
 	chunks := []trackerswarmv1.SnapshotChunk{
 		newSnapshotChunk(t, snapshotID, mustUUIDV7(t), sourceID, routingEpoch, 2, observedAt, 0, 2, []trackerswarmv1.Entry{{
