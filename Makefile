@@ -965,10 +965,12 @@ production-ready: production-config
 	./scripts/validate-production-env.sh
 
 production-build: production-config
-	./scripts/production-compose.sh build
+	# Every Go process uses the same runtime image. Building one representative
+	# service avoids Docker Compose 5 exporting that tag concurrently per service.
+	./scripts/production-compose.sh build core-api web
 
-production-up: production-ready
-	./scripts/production-compose.sh up -d --build --wait
+production-up: production-ready production-build
+	./scripts/production-compose.sh up -d --wait
 
 production-down: production-config
 	./scripts/production-compose.sh down
