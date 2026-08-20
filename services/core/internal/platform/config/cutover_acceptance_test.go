@@ -21,7 +21,7 @@ func TestLoadCutoverAcceptanceUsesOnlyVerificationMaterial(t *testing.T) {
 	t.Setenv("PEERGO_TRACKER_SNAPSHOT_TRUSTED_KEYS", "active="+base64.StdEncoding.EncodeToString(publicKey))
 	t.Setenv("PEERGO_TRACKER_SNAPSHOT_MAX_AGE", "15m")
 	t.Setenv("PEERGO_TRACKER_SUBJECT_SNAPSHOT_MAX_AGE", "2m")
-	t.Setenv("PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_MAX_AGE", "3m")
+	t.Setenv("PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_MAX_AGE", "15m")
 	t.Setenv("PEERGO_TRACKER_SNAPSHOT_MAX_FUTURE_SKEW", "30s")
 
 	settings, err := LoadCutoverAcceptance()
@@ -30,7 +30,7 @@ func TestLoadCutoverAcceptanceUsesOnlyVerificationMaterial(t *testing.T) {
 	}
 	if settings.Environment != "production" || len(settings.TrustedKeys) != 1 ||
 		settings.SnapshotMaxAge != 15*time.Minute || settings.SubjectMaxAge != 2*time.Minute ||
-		settings.RuntimePolicyMaxAge != 3*time.Minute ||
+		settings.RuntimePolicyMaxAge != 15*time.Minute ||
 		settings.MaxFutureSkew != 30*time.Second {
 		t.Fatalf("settings = %+v", settings)
 	}
@@ -56,5 +56,11 @@ func TestLoadCutoverAcceptanceRejectsSharedPathsAndUnsafeDurations(t *testing.T)
 	t.Setenv("PEERGO_TRACKER_SNAPSHOT_MAX_AGE", "2h")
 	if _, err := LoadCutoverAcceptance(); err == nil {
 		t.Fatal("acceptance configuration allowed an excessive snapshot age")
+	}
+
+	t.Setenv("PEERGO_TRACKER_SNAPSHOT_MAX_AGE", "15m")
+	t.Setenv("PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_MAX_AGE", "2h")
+	if _, err := LoadCutoverAcceptance(); err == nil {
+		t.Fatal("acceptance configuration allowed an excessive runtime policy snapshot age")
 	}
 }

@@ -62,7 +62,7 @@ func LoadCutoverAcceptance() (CutoverAcceptanceProcessConfig, error) {
 	if err != nil {
 		return CutoverAcceptanceProcessConfig{}, err
 	}
-	runtimePolicyMaxAge, err := cutoverDuration("PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_MAX_AGE", time.Second, 10*time.Minute)
+	runtimePolicyMaxAge, err := cutoverDuration("PEERGO_TRACKER_RUNTIME_POLICY_SNAPSHOT_MAX_AGE", 10*time.Second, time.Hour)
 	if err != nil {
 		return CutoverAcceptanceProcessConfig{}, err
 	}
