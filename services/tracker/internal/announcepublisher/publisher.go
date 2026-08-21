@@ -33,6 +33,21 @@ type Sink interface {
 	Publish(context.Context, string, []byte) error
 }
 
+// Message is one immutable WAL event prepared for a storage-acknowledged
+// batch publish. BatchSink implementations must not return success until every
+// message has received an authoritative storage ACK.
+type Message struct {
+	EventID string
+	Payload []byte
+}
+
+// BatchSink lets a transport pipeline multiple ordered messages across one
+// network round trip window. The publisher still advances the local durable
+// cursor only after the complete batch succeeds.
+type BatchSink interface {
+	PublishBatch(context.Context, []Message) error
+}
+
 type Config struct {
 	PublishTimeout time.Duration
 	RetryMinimum   time.Duration
@@ -85,10 +100,10 @@ func (publisher *Publisher) Run(ctx context.Context) error {
 			continue
 		}
 
-		for _, record := range records {
+		if batchSink, ok := publisher.sink.(BatchSink); ok {
 			for {
 				attemptCtx, cancel := context.WithTimeout(ctx, publisher.config.PublishTimeout)
-				err := publisher.sink.Publish(attemptCtx, record.Event.EventID, record.Payload)
+				err := batchSink.PublishBatch(attemptCtx, messages(records))
 				cancel()
 				if err == nil {
 					backoff = publisher.config.RetryMinimum
@@ -99,6 +114,23 @@ func (publisher *Publisher) Run(ctx context.Context) error {
 					return nil
 				}
 				backoff = nextBackoff(backoff, publisher.config.RetryMaximum)
+			}
+		} else {
+			for _, record := range records {
+				for {
+					attemptCtx, cancel := context.WithTimeout(ctx, publisher.config.PublishTimeout)
+					err := publisher.sink.Publish(attemptCtx, record.Event.EventID, record.Payload)
+					cancel()
+					if err == nil {
+						backoff = publisher.config.RetryMinimum
+						break
+					}
+					publisher.logger.Warn("Tracker announce event publish failed", "error", err, "retry_in", backoff)
+					if !wait(ctx, backoff) {
+						return nil
+					}
+					backoff = nextBackoff(backoff, publisher.config.RetryMaximum)
+				}
 			}
 		}
 
@@ -120,6 +152,14 @@ func (publisher *Publisher) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func messages(records []wal.Record) []Message {
+	result := make([]Message, len(records))
+	for index, record := range records {
+		result[index] = Message{EventID: record.Event.EventID, Payload: record.Payload}
+	}
+	return result
 }
 
 func nextBackoff(current, maximum time.Duration) time.Duration {

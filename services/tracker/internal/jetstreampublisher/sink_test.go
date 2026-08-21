@@ -7,8 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/peergo/peergo/services/tracker/internal/announceevent"
+	"github.com/peergo/peergo/services/tracker/internal/announcepublisher"
 )
 
 func TestSinkPublishesCanonicalEventWithIdempotencyAndStreamExpectation(t *testing.T) {
@@ -53,6 +55,52 @@ func TestSinkRejectsMismatchedEventAndInvalidAcknowledgement(t *testing.T) {
 	}
 }
 
+func TestSinkPublishesBatchAndWaitsForEveryStorageAcknowledgement(t *testing.T) {
+	event := jetStreamTestEvent(t)
+	payload, err := announceevent.Encode(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &jetStreamTestClient{asyncAcks: []*jetstream.PubAck{
+		{Stream: "PEERGO_TRACKER_ANNOUNCE_V1", Sequence: 10},
+		{Stream: "PEERGO_TRACKER_ANNOUNCE_V1", Sequence: 11},
+	}}
+	sink, err := NewSink(client, "PEERGO_TRACKER_ANNOUNCE_V1", "peergo.tracker.announce.v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := []announcepublisher.Message{
+		{EventID: event.EventID, Payload: payload},
+		{EventID: event.EventID, Payload: payload},
+	}
+	if err := sink.PublishBatch(context.Background(), messages); err != nil {
+		t.Fatal(err)
+	}
+	if client.asyncCalls != 2 || client.asyncOptionCounts[0] != 3 || client.asyncOptionCounts[1] != 3 {
+		t.Fatalf("async calls=%d option_counts=%v", client.asyncCalls, client.asyncOptionCounts)
+	}
+}
+
+func TestSinkValidatesCompleteBatchBeforePublishing(t *testing.T) {
+	event := jetStreamTestEvent(t)
+	payload, err := announceevent.Encode(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &jetStreamTestClient{}
+	sink, err := NewSink(client, "PEERGO_TRACKER_ANNOUNCE_V1", "peergo.tracker.announce.v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = sink.PublishBatch(context.Background(), []announcepublisher.Message{
+		{EventID: event.EventID, Payload: payload},
+		{EventID: "0198f20a-6da8-7e51-9c64-222222222222", Payload: payload},
+	})
+	if !errors.Is(err, ErrConfig) || client.asyncCalls != 0 {
+		t.Fatalf("PublishBatch() error=%v async_calls=%d", err, client.asyncCalls)
+	}
+}
+
 func TestNamesRejectWildcardsAndPathCharacters(t *testing.T) {
 	if !ValidStreamName("PEERGO_TRACKER_ANNOUNCE_V1") || ValidStreamName("bad.name") || ValidStreamName("bad/name") {
 		t.Fatal("stream name validation boundary is incorrect")
@@ -63,11 +111,15 @@ func TestNamesRejectWildcardsAndPathCharacters(t *testing.T) {
 }
 
 type jetStreamTestClient struct {
-	ack         *jetstream.PubAck
-	err         error
-	subject     string
-	payload     []byte
-	optionCount int
+	ack               *jetstream.PubAck
+	err               error
+	subject           string
+	payload           []byte
+	optionCount       int
+	asyncAcks         []*jetstream.PubAck
+	asyncErrors       []error
+	asyncCalls        int
+	asyncOptionCounts []int
 }
 
 func (client *jetStreamTestClient) Publish(_ context.Context, subject string, payload []byte, options ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
@@ -76,6 +128,34 @@ func (client *jetStreamTestClient) Publish(_ context.Context, subject string, pa
 	client.optionCount = len(options)
 	return client.ack, client.err
 }
+
+func (client *jetStreamTestClient) PublishAsync(subject string, payload []byte, options ...jetstream.PublishOpt) (jetstream.PubAckFuture, error) {
+	index := client.asyncCalls
+	client.asyncCalls++
+	client.subject = subject
+	client.payload = append([]byte(nil), payload...)
+	client.asyncOptionCounts = append(client.asyncOptionCounts, len(options))
+	if index < len(client.asyncErrors) && client.asyncErrors[index] != nil {
+		return nil, client.asyncErrors[index]
+	}
+	var ack *jetstream.PubAck
+	if index < len(client.asyncAcks) {
+		ack = client.asyncAcks[index]
+	}
+	ok := make(chan *jetstream.PubAck, 1)
+	ok <- ack
+	return &jetStreamTestFuture{ok: ok, err: make(chan error), msg: &nats.Msg{Subject: subject, Data: payload}}, nil
+}
+
+type jetStreamTestFuture struct {
+	ok  <-chan *jetstream.PubAck
+	err <-chan error
+	msg *nats.Msg
+}
+
+func (future *jetStreamTestFuture) Ok() <-chan *jetstream.PubAck { return future.ok }
+func (future *jetStreamTestFuture) Err() <-chan error            { return future.err }
+func (future *jetStreamTestFuture) Msg() *nats.Msg               { return future.msg }
 
 func jetStreamTestEvent(t *testing.T) announceevent.Event {
 	t.Helper()

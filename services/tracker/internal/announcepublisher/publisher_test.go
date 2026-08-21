@@ -76,6 +76,50 @@ func TestPublisherDoesNotCheckpointPartiallyPublishedBatch(t *testing.T) {
 	}
 }
 
+func TestPublisherRetriesStorageAcknowledgedBatchBeforeOneCheckpoint(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	log := &publisherTestLog{records: []wal.Record{
+		{Event: announceevent.Event{EventID: "first"}, Payload: []byte("first-payload")},
+		{Event: announceevent.Event{EventID: "second"}, Payload: []byte("second-payload")},
+	}}
+	sink := &publisherTestBatchSink{failures: 1, cancel: cancel}
+	publisher, err := New(log, sink, Config{
+		PublishTimeout: 100 * time.Millisecond, RetryMinimum: time.Millisecond,
+		RetryMaximum: 4 * time.Millisecond, CompactAtBytes: 1,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := publisher.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if sink.calls != 2 || log.acknowledged != 2 || log.acknowledgeCalls != 1 {
+		t.Fatalf("batch calls=%d acknowledged=%d acknowledge_calls=%d", sink.calls, log.acknowledged, log.acknowledgeCalls)
+	}
+}
+
+func TestPublisherDoesNotCheckpointFailedBatch(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	log := &publisherTestLog{records: []wal.Record{
+		{Event: announceevent.Event{EventID: "first"}, Payload: []byte("first-payload")},
+		{Event: announceevent.Event{EventID: "second"}, Payload: []byte("second-payload")},
+	}}
+	sink := &publisherCancelBatchSink{cancel: cancel}
+	publisher, err := New(log, sink, Config{
+		PublishTimeout: 100 * time.Millisecond, RetryMinimum: time.Millisecond,
+		RetryMaximum: 4 * time.Millisecond, CompactAtBytes: 1,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := publisher.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if sink.calls != 1 || log.acknowledged != 0 || log.acknowledgeCalls != 0 {
+		t.Fatalf("batch calls=%d acknowledged=%d acknowledge_calls=%d", sink.calls, log.acknowledged, log.acknowledgeCalls)
+	}
+}
+
 type publisherTestLog struct {
 	records          []wal.Record
 	acknowledged     int
@@ -122,6 +166,38 @@ type publisherTestSink struct {
 type publisherCancelSink struct {
 	cancel context.CancelFunc
 	calls  int
+}
+
+type publisherTestBatchSink struct {
+	publisherTestSink
+	failures int
+	calls    int
+	cancel   context.CancelFunc
+}
+
+type publisherCancelBatchSink struct {
+	publisherTestSink
+	cancel context.CancelFunc
+	calls  int
+}
+
+func (sink *publisherCancelBatchSink) PublishBatch(_ context.Context, _ []Message) error {
+	sink.calls++
+	sink.cancel()
+	return context.Canceled
+}
+
+func (sink *publisherTestBatchSink) PublishBatch(_ context.Context, batch []Message) error {
+	sink.calls++
+	if sink.failures > 0 {
+		sink.failures--
+		return errors.New("temporary batch failure")
+	}
+	if len(batch) != 2 || batch[0].EventID != "first" || batch[1].EventID != "second" {
+		return errors.New("unexpected batch")
+	}
+	sink.cancel()
+	return nil
 }
 
 func (sink *publisherCancelSink) Publish(_ context.Context, _ string, _ []byte) error {
