@@ -82,7 +82,7 @@ func (repository *PostgresRepository) Claim(ctx context.Context, now time.Time, 
 			Payload:       []byte(row.PayloadJson),
 			PayloadSHA256: digest,
 		}
-		if err := validateEvent(event); err != nil {
+		if err := validatePersistedEvent(event); err != nil {
 			return nil, fmt.Errorf("validate claimed audit event %s: %w", row.EventID, err)
 		}
 		events = append(events, PendingEvent{Event: event, Attempts: row.Attempts})
@@ -127,6 +127,20 @@ func (repository *PostgresRepository) Release(ctx context.Context, eventID uuid.
 }
 
 func validateEvent(event Event) error {
+	return validateEventEnvelope(event, false)
+}
+
+// validatePersistedEvent preserves the envelope invariant after a PostgreSQL
+// round trip. pgx stores timestamptz at PostgreSQL's microsecond precision,
+// while the immutable JSON payload intentionally retains the original
+// nanoseconds. Comparing both timestamps within the same database precision
+// prevents valid evidence from being rejected without weakening the remaining
+// metadata and digest checks.
+func validatePersistedEvent(event Event) error {
+	return validateEventEnvelope(event, true)
+}
+
+func validateEventEnvelope(event Event, persisted bool) error {
 	if event.ID == uuid.Nil || event.Type == "" || event.SchemaVersion == "" || event.OccurredAt.IsZero() {
 		return errors.New("audit event is missing required metadata")
 	}
@@ -143,7 +157,7 @@ func validateEvent(event Event) error {
 		SchemaVersion string    `json:"schema_version"`
 		OccurredAt    time.Time `json:"occurred_at"`
 	}
-	if err := json.Unmarshal(event.Payload, &envelope); err != nil || envelope.EventID != event.ID || envelope.EventType != event.Type || envelope.SchemaVersion != event.SchemaVersion || !envelope.OccurredAt.Equal(event.OccurredAt) {
+	if err := json.Unmarshal(event.Payload, &envelope); err != nil || envelope.EventID != event.ID || envelope.EventType != event.Type || envelope.SchemaVersion != event.SchemaVersion || !auditTimestampsMatch(envelope.OccurredAt, event.OccurredAt, persisted) {
 		return errors.New("audit event envelope does not match outbox metadata")
 	}
 	digest := sha256.Sum256(event.Payload)
@@ -151,6 +165,13 @@ func validateEvent(event Event) error {
 		return errors.New("audit event payload digest does not match")
 	}
 	return nil
+}
+
+func auditTimestampsMatch(envelopeTime, metadataTime time.Time, persisted bool) bool {
+	if !persisted {
+		return envelopeTime.Equal(metadataTime)
+	}
+	return envelopeTime.UTC().Truncate(time.Microsecond).Equal(metadataTime.UTC().Truncate(time.Microsecond))
 }
 
 func sanitizeDeliveryError(reason string) string {

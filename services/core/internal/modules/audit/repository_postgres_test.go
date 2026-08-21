@@ -85,3 +85,28 @@ func TestPostgresRepositoryDetectsLostDeliveryState(t *testing.T) {
 		t.Fatalf("Release() error = %v, want state conflict", err)
 	}
 }
+
+func TestPostgresRepositoryClaimAcceptsPostgresTimestampPrecision(t *testing.T) {
+	t.Parallel()
+
+	eventID := uuid.New()
+	payload := []byte(`{"event_id":"` + eventID.String() + `","event_type":"authz.decision.recorded","schema_version":"1.0.0","occurred_at":"2026-08-20T19:58:27.399356514Z"}`)
+	digest := sha256.Sum256(payload)
+	persistedAt := time.Date(2026, time.August, 20, 19, 58, 27, 399356000, time.UTC)
+	queries := &fakeAuditQueries{claimRows: []auditdb.ClaimPendingAuditEventsRow{{
+		EventID: eventID, EventType: DecisionRecordedEventType, SchemaVersion: DecisionRecordedSchemaVersion,
+		OccurredAt: pgtype.Timestamptz{Time: persistedAt, Valid: true}, PayloadJson: string(payload),
+		PayloadSha256: digest[:],
+	}}}
+	repository := &PostgresRepository{queries: queries}
+
+	claimed, err := repository.Claim(context.Background(), persistedAt.Add(time.Second), 20, 30*time.Second)
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("Claim(database timestamp precision) = (%+v, %v)", claimed, err)
+	}
+
+	queries.claimRows[0].OccurredAt.Time = persistedAt.Add(time.Microsecond)
+	if _, err := repository.Claim(context.Background(), persistedAt.Add(time.Second), 20, 30*time.Second); err == nil {
+		t.Fatal("Claim(timestamp mismatch) error = nil")
+	}
+}
