@@ -31,8 +31,8 @@ func TestPublisherRetriesInOrderAndCheckpointsOnlyAcknowledgedRecords(t *testing
 	if want := []string{"first", "first", "second"}; !reflect.DeepEqual(sink.calls, want) {
 		t.Fatalf("publish calls = %v, want %v", sink.calls, want)
 	}
-	if log.acknowledged != 2 || log.compactions < 1 {
-		t.Fatalf("log acknowledged=%d compactions=%d", log.acknowledged, log.compactions)
+	if log.acknowledged != 2 || log.acknowledgeCalls != 1 || log.compactions < 1 {
+		t.Fatalf("log acknowledged=%d acknowledge_calls=%d compactions=%d", log.acknowledged, log.acknowledgeCalls, log.compactions)
 	}
 }
 
@@ -53,25 +53,51 @@ func TestPublisherStopsOnCheckpointInvariantFailure(t *testing.T) {
 	}
 }
 
-type publisherTestLog struct {
-	records      []wal.Record
-	acknowledged int
-	compactions  int
-	ackError     error
-}
-
-func (log *publisherTestLog) Next() (wal.Record, bool, error) {
-	if log.acknowledged >= len(log.records) {
-		return wal.Record{}, false, nil
+func TestPublisherDoesNotCheckpointPartiallyPublishedBatch(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	log := &publisherTestLog{records: []wal.Record{
+		{Event: announceevent.Event{EventID: "first"}, Payload: []byte("first-payload")},
+		{Event: announceevent.Event{EventID: "second"}, Payload: []byte("second-payload")},
+		{Event: announceevent.Event{EventID: "third"}, Payload: []byte("third-payload")},
+	}}
+	sink := &publisherCancelSink{cancel: cancel}
+	publisher, err := New(log, sink, Config{
+		PublishTimeout: 100 * time.Millisecond, RetryMinimum: time.Millisecond,
+		RetryMaximum: 4 * time.Millisecond, CompactAtBytes: 1,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return log.records[log.acknowledged], true, nil
+	if err := publisher.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if sink.calls != 2 || log.acknowledged != 0 || log.acknowledgeCalls != 0 {
+		t.Fatalf("publish calls=%d acknowledged=%d acknowledge_calls=%d", sink.calls, log.acknowledged, log.acknowledgeCalls)
+	}
 }
 
-func (log *publisherTestLog) Acknowledge(wal.Record) error {
+type publisherTestLog struct {
+	records          []wal.Record
+	acknowledged     int
+	acknowledgeCalls int
+	compactions      int
+	ackError         error
+}
+
+func (log *publisherTestLog) NextBatch(maxRecords int) ([]wal.Record, error) {
+	if log.acknowledged >= len(log.records) {
+		return nil, nil
+	}
+	end := min(log.acknowledged+maxRecords, len(log.records))
+	return append([]wal.Record(nil), log.records[log.acknowledged:end]...), nil
+}
+
+func (log *publisherTestLog) AcknowledgeBatch(records []wal.Record) error {
 	if log.ackError != nil {
 		return log.ackError
 	}
-	log.acknowledged++
+	log.acknowledgeCalls++
+	log.acknowledged += len(records)
 	return nil
 }
 
@@ -91,6 +117,20 @@ type publisherTestSink struct {
 	cancelAfter int
 	cancel      context.CancelFunc
 	calls       []string
+}
+
+type publisherCancelSink struct {
+	cancel context.CancelFunc
+	calls  int
+}
+
+func (sink *publisherCancelSink) Publish(_ context.Context, _ string, _ []byte) error {
+	sink.calls++
+	if sink.calls == 2 {
+		sink.cancel()
+		return context.Canceled
+	}
+	return nil
 }
 
 func (sink *publisherTestSink) Publish(_ context.Context, eventID string, _ []byte) error {

@@ -22,23 +22,59 @@ type Record struct {
 }
 
 func (wal *File) Next() (Record, bool, error) {
+	records, err := wal.NextBatch(1)
+	if err != nil {
+		return Record{}, false, err
+	}
+	if len(records) == 0 {
+		return Record{}, false, nil
+	}
+	return records[0], true, nil
+}
+
+// NextBatch returns a bounded, consecutive prefix beginning at the durable
+// acknowledgement cursor. Reading a batch does not advance that cursor.
+func (wal *File) NextBatch(maxRecords int) ([]Record, error) {
+	if maxRecords < 1 {
+		return nil, ErrConfig
+	}
 	wal.mu.Lock()
 	defer wal.mu.Unlock()
 	if wal.fault != nil {
-		return Record{}, false, wal.fault
+		return nil, wal.fault
 	}
 	if wal.handle == nil {
-		return Record{}, false, ErrUnsafe
+		return nil, ErrUnsafe
 	}
-	record, found, err := readRecordAt(wal.handle, wal.ackOffset, wal.size)
-	if err != nil {
-		wal.fault = err
-		return Record{}, false, err
+	records := make([]Record, 0, maxRecords)
+	offset := wal.ackOffset
+	for len(records) < maxRecords {
+		record, found, err := readRecordAt(wal.handle, offset, wal.size)
+		if err != nil {
+			wal.fault = err
+			return nil, err
+		}
+		if !found {
+			break
+		}
+		records = append(records, record)
+		offset = record.NextOffset
 	}
-	return record, found, nil
+	return records, nil
 }
 
 func (wal *File) Acknowledge(record Record) error {
+	return wal.AcknowledgeBatch([]Record{record})
+}
+
+// AcknowledgeBatch durably commits a consecutive batch with one checkpoint
+// replacement. The caller must first obtain a storage ACK for every record.
+// A crash before this method completes can only replay stable event IDs; it
+// cannot skip an unpublished event.
+func (wal *File) AcknowledgeBatch(records []Record) error {
+	if len(records) == 0 {
+		return ErrCursor
+	}
 	wal.mu.Lock()
 	defer wal.mu.Unlock()
 	if wal.fault != nil {
@@ -47,23 +83,29 @@ func (wal *File) Acknowledge(record Record) error {
 	if wal.handle == nil {
 		return ErrUnsafe
 	}
-	if record.Offset != wal.ackOffset || record.NextOffset <= record.Offset || record.NextOffset > wal.size {
-		return ErrCursor
+	offset := wal.ackOffset
+	var last Record
+	for _, record := range records {
+		if record.Offset != offset || record.NextOffset <= record.Offset || record.NextOffset > wal.size {
+			return ErrCursor
+		}
+		current, found, err := readRecordAt(wal.handle, offset, wal.size)
+		if err != nil {
+			wal.fault = err
+			return err
+		}
+		if !found || current.NextOffset != record.NextOffset || current.Event.EventID != record.Event.EventID ||
+			current.digest != record.digest || !bytes.Equal(current.Payload, record.Payload) {
+			return ErrCursor
+		}
+		last = current
+		offset = current.NextOffset
 	}
-	current, found, err := readRecordAt(wal.handle, wal.ackOffset, wal.size)
-	if err != nil {
-		wal.fault = err
-		return err
-	}
-	if !found || current.NextOffset != record.NextOffset || current.Event.EventID != record.Event.EventID ||
-		current.digest != record.digest || !bytes.Equal(current.Payload, record.Payload) {
-		return ErrCursor
-	}
-	value := checkpoint{Offset: current.NextOffset, EventID: current.Event.EventID, PayloadSHA256: current.digest}
+	value := checkpoint{Offset: last.NextOffset, EventID: last.Event.EventID, PayloadSHA256: last.digest}
 	if err := persistCheckpoint(wal.checkpointPath, wal.parentPath, value); err != nil {
 		return err
 	}
-	wal.ackOffset = current.NextOffset
+	wal.ackOffset = last.NextOffset
 	return nil
 }
 

@@ -129,6 +129,50 @@ func TestFileCheckpointReplaysOnlyUnacknowledgedRecordsAndCompacts(t *testing.T)
 	}
 }
 
+func TestFileBatchCheckpointIsAtomicAndReopensAtNextRecord(t *testing.T) {
+	t.Parallel()
+	directory := protectedTempDir(t)
+	path := filepath.Join(directory, "announce.wal")
+	log, err := OpenFile(path, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, randomByte := range []byte{0xa1, 0xa2, 0xa3} {
+		if err := log.Append(walTestEventAt(t, randomByte, time.Duration(index)*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	records, err := log.NextBatch(2)
+	if err != nil || len(records) != 2 {
+		t.Fatalf("NextBatch() records=%d error=%v", len(records), err)
+	}
+	tampered := append([]Record(nil), records...)
+	tampered[1].Payload = append([]byte(nil), tampered[1].Payload...)
+	tampered[1].Payload[0] ^= 0xff
+	if err := log.AcknowledgeBatch(tampered); !errors.Is(err, ErrCursor) {
+		t.Fatalf("tampered AcknowledgeBatch() error = %v, want ErrCursor", err)
+	}
+	if stats := log.Stats(); stats.AcknowledgedBytes != 0 {
+		t.Fatalf("failed batch advanced checkpoint: %+v", stats)
+	}
+	if err := log.AcknowledgeBatch(records); err != nil {
+		t.Fatal(err)
+	}
+	if err := log.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := OpenFile(path, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	remaining, err := reopened.NextBatch(2)
+	if err != nil || len(remaining) != 1 || remaining[0].Offset != records[1].NextOffset {
+		t.Fatalf("remaining batch = %+v, error=%v", remaining, err)
+	}
+}
+
 func TestFileCheckpointResetBeforeTruncateCanOnlyCauseReplay(t *testing.T) {
 	t.Parallel()
 	directory := protectedTempDir(t)

@@ -1,7 +1,6 @@
-// Package wal provides the first durable announce-event adapter. It fsyncs
-// each record before success is returned. This is correctness-first; a later
-// group-commit publisher can implement the same Appender boundary without
-// changing HTTP, admission or Swarm Engine code.
+// Package wal provides the durable announce-event adapter. It fsyncs each
+// appended record before success is returned, while the publisher may commit
+// an already storage-acknowledged record prefix with one durable checkpoint.
 package wal
 
 import (

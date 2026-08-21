@@ -17,9 +17,14 @@ import (
 
 var ErrConfig = errors.New("Tracker announce publisher configuration is invalid")
 
+// Publishing remains ordered and individually storage-acknowledged. Only the
+// local durable cursor is group-committed, avoiding one file and directory
+// fsync per announce while retaining at-least-once crash recovery.
+const publishBatchRecords = 256
+
 type EventLog interface {
-	Next() (wal.Record, bool, error)
-	Acknowledge(wal.Record) error
+	NextBatch(int) ([]wal.Record, error)
+	AcknowledgeBatch([]wal.Record) error
 	CompactAcknowledged(int64) (bool, error)
 	Wait(context.Context) error
 }
@@ -57,11 +62,11 @@ func New(log EventLog, sink Sink, config Config, logger *slog.Logger) (*Publishe
 func (publisher *Publisher) Run(ctx context.Context) error {
 	backoff := publisher.config.RetryMinimum
 	for {
-		record, found, err := publisher.log.Next()
+		records, err := publisher.log.NextBatch(publishBatchRecords)
 		if err != nil {
 			return fmt.Errorf("read Tracker announce WAL: %w", err)
 		}
-		if !found {
+		if len(records) == 0 {
 			if _, err := publisher.log.CompactAcknowledged(publisher.config.CompactAtBytes); err != nil {
 				publisher.logger.Warn("Tracker WAL compaction deferred", "error", err, "retry_in", backoff)
 				if !wait(ctx, backoff) {
@@ -80,31 +85,33 @@ func (publisher *Publisher) Run(ctx context.Context) error {
 			continue
 		}
 
-		for {
-			attemptCtx, cancel := context.WithTimeout(ctx, publisher.config.PublishTimeout)
-			err := publisher.sink.Publish(attemptCtx, record.Event.EventID, record.Payload)
-			cancel()
-			if err == nil {
-				backoff = publisher.config.RetryMinimum
-				break
+		for _, record := range records {
+			for {
+				attemptCtx, cancel := context.WithTimeout(ctx, publisher.config.PublishTimeout)
+				err := publisher.sink.Publish(attemptCtx, record.Event.EventID, record.Payload)
+				cancel()
+				if err == nil {
+					backoff = publisher.config.RetryMinimum
+					break
+				}
+				publisher.logger.Warn("Tracker announce event publish failed", "error", err, "retry_in", backoff)
+				if !wait(ctx, backoff) {
+					return nil
+				}
+				backoff = nextBackoff(backoff, publisher.config.RetryMaximum)
 			}
-			publisher.logger.Warn("Tracker announce event publish failed", "error", err, "retry_in", backoff)
-			if !wait(ctx, backoff) {
-				return nil
-			}
-			backoff = nextBackoff(backoff, publisher.config.RetryMaximum)
 		}
 
 		for {
-			if err := publisher.log.Acknowledge(record); err == nil {
+			if err := publisher.log.AcknowledgeBatch(records); err == nil {
 				backoff = publisher.config.RetryMinimum
 				break
 			} else if errors.Is(err, wal.ErrCursor) || errors.Is(err, wal.ErrCorrupt) || errors.Is(err, wal.ErrUnsafe) {
 				return fmt.Errorf("advance Tracker announce WAL checkpoint: %w", err)
 			} else {
-				// The JetStream ACK is already authoritative. Retrying only the
-				// checkpoint avoids unnecessary live duplicates; a crash before
-				// success still intentionally replays the same event ID.
+				// Every JetStream ACK is already authoritative. Retrying only the
+				// group checkpoint avoids unnecessary live duplicates; a crash
+				// before success still replays the same stable event IDs.
 				publisher.logger.Error("Tracker WAL checkpoint update failed", "error", err, "retry_in", backoff)
 				if !wait(ctx, backoff) {
 					return nil
