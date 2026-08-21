@@ -1,6 +1,7 @@
-// Package wal provides the durable announce-event adapter. It fsyncs each
-// appended record before success is returned, while the publisher may commit
-// an already storage-acknowledged record prefix with one durable checkpoint.
+// Package wal provides the durable announce-event adapter. Every appended
+// record waits for its group commit to fsync before success is returned, while
+// the publisher may commit an already storage-acknowledged record prefix with
+// one durable checkpoint.
 package wal
 
 import (
@@ -16,13 +17,16 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/peergo/peergo/services/tracker/internal/announceevent"
 )
 
 const (
-	recordHeaderBytes = 8
-	recordDigestBytes = sha256.Size
+	recordHeaderBytes   = 8
+	recordDigestBytes   = sha256.Size
+	appendBatchRecords  = 256
+	appendCoalesceDelay = 500 * time.Microsecond
 )
 
 var (
@@ -49,6 +53,17 @@ type File struct {
 	ackOffset      int64
 	wake           chan struct{}
 	fault          error
+
+	appendMu      sync.Mutex
+	appendQueue   []*appendRequest
+	appendRunning bool
+	appendClosed  bool
+	appendWG      sync.WaitGroup
+}
+
+type appendRequest struct {
+	record []byte
+	result chan error
 }
 
 type Stats struct {
@@ -130,7 +145,74 @@ func (wal *File) Append(event announceevent.Event) error {
 	if err != nil {
 		return err
 	}
-	recordSize := int64(recordHeaderBytes + len(encoded) + recordDigestBytes)
+	record := make([]byte, recordHeaderBytes+len(encoded)+recordDigestBytes)
+	copy(record[:4], magic[:])
+	binary.BigEndian.PutUint32(record[4:8], uint32(len(encoded)))
+	copy(record[8:], encoded)
+	digest := sha256.Sum256(encoded)
+	copy(record[8+len(encoded):], digest[:])
+
+	request := &appendRequest{record: record, result: make(chan error, 1)}
+	wal.appendMu.Lock()
+	if wal.appendClosed {
+		wal.appendMu.Unlock()
+		return ErrUnsafe
+	}
+	wal.appendQueue = append(wal.appendQueue, request)
+	if !wal.appendRunning {
+		wal.appendRunning = true
+		wal.appendWG.Add(1)
+		go wal.runAppendBatches()
+	}
+	wal.appendMu.Unlock()
+	return <-request.result
+}
+
+// runAppendBatches group-commits concurrent announces. Every caller still
+// waits for the shared file sync before receiving success, so batching changes
+// throughput only; it does not weaken the durable-response boundary.
+func (wal *File) runAppendBatches() {
+	defer wal.appendWG.Done()
+	for {
+		time.Sleep(appendCoalesceDelay)
+		wal.appendMu.Lock()
+		if len(wal.appendQueue) == 0 {
+			wal.appendRunning = false
+			wal.appendMu.Unlock()
+			return
+		}
+		count := min(len(wal.appendQueue), appendBatchRecords)
+		batch := append([]*appendRequest(nil), wal.appendQueue[:count]...)
+		clear(wal.appendQueue[:count])
+		wal.appendQueue = wal.appendQueue[count:]
+		if len(wal.appendQueue) == 0 {
+			wal.appendQueue = nil
+		}
+		wal.appendMu.Unlock()
+
+		err := wal.appendBatch(batch)
+		for _, request := range batch {
+			request.result <- err
+		}
+	}
+}
+
+func (wal *File) appendBatch(batch []*appendRequest) error {
+	if len(batch) == 0 {
+		return ErrConfig
+	}
+	totalBytes := 0
+	for _, request := range batch {
+		if request == nil || len(request.record) < recordHeaderBytes+recordDigestBytes {
+			return ErrConfig
+		}
+		totalBytes += len(request.record)
+	}
+	records := make([]byte, 0, totalBytes)
+	for _, request := range batch {
+		records = append(records, request.record...)
+	}
+
 	wal.mu.Lock()
 	defer wal.mu.Unlock()
 	if wal.fault != nil {
@@ -139,17 +221,11 @@ func (wal *File) Append(event announceevent.Event) error {
 	if wal.handle == nil {
 		return ErrUnsafe
 	}
-	if wal.size+recordSize > wal.maxBytes {
+	if wal.size+int64(len(records)) > wal.maxBytes {
 		wal.fault = ErrFull
 		return wal.fault
 	}
-	record := make([]byte, recordHeaderBytes+len(encoded)+recordDigestBytes)
-	copy(record[:4], magic[:])
-	binary.BigEndian.PutUint32(record[4:8], uint32(len(encoded)))
-	copy(record[8:], encoded)
-	digest := sha256.Sum256(encoded)
-	copy(record[8+len(encoded):], digest[:])
-	if err := writeAll(wal.handle, record); err != nil {
+	if err := writeAll(wal.handle, records); err != nil {
 		wal.fault = fmt.Errorf("append Tracker WAL: %w", err)
 		return wal.fault
 	}
@@ -157,7 +233,7 @@ func (wal *File) Append(event announceevent.Event) error {
 		wal.fault = fmt.Errorf("sync Tracker WAL: %w", err)
 		return wal.fault
 	}
-	wal.size += recordSize
+	wal.size += int64(len(records))
 	select {
 	case wal.wake <- struct{}{}:
 	default:
@@ -222,6 +298,11 @@ func (wal *File) Stats() Stats {
 }
 
 func (wal *File) Close() error {
+	wal.appendMu.Lock()
+	wal.appendClosed = true
+	wal.appendMu.Unlock()
+	wal.appendWG.Wait()
+
 	wal.mu.Lock()
 	defer wal.mu.Unlock()
 	if wal.handle == nil {

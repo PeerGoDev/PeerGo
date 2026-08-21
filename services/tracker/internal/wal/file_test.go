@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -295,6 +296,57 @@ func TestFileWaitObservesDurableAppend(t *testing.T) {
 	}
 	if err := <-result; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFileGroupCommitsConcurrentAppendsWithoutLosingRecords(t *testing.T) {
+	directory := protectedTempDir(t)
+	path := filepath.Join(directory, "announce.wal")
+	log, err := OpenFile(path, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const eventCount = 64
+	start := make(chan struct{})
+	results := make(chan error, eventCount)
+	var callers sync.WaitGroup
+	callers.Add(eventCount)
+	for index := 0; index < eventCount; index++ {
+		event := walTestEventAt(t, byte(index+1), time.Duration(index)*time.Second)
+		go func(candidate announceevent.Event) {
+			defer callers.Done()
+			<-start
+			results <- log.Append(candidate)
+		}(event)
+	}
+	close(start)
+	callers.Wait()
+	close(results)
+	for err := range results {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := log.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := OpenFile(path, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	records, err := reopened.NextBatch(eventCount + 1)
+	if err != nil || len(records) != eventCount {
+		t.Fatalf("reopened records=%d error=%v", len(records), err)
+	}
+	seen := make(map[string]struct{}, eventCount)
+	for _, record := range records {
+		seen[record.Event.EventID] = struct{}{}
+	}
+	if len(seen) != eventCount {
+		t.Fatalf("reopened unique event IDs=%d, want %d", len(seen), eventCount)
 	}
 }
 
