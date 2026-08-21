@@ -14,7 +14,7 @@ import (
 )
 
 type InvitationRepository interface {
-	Overview(context.Context, uuid.UUID, time.Time, int, int) (invitationIssuerSnapshot, []MemberInvitation, int, error)
+	Overview(context.Context, uuid.UUID, time.Time, int, int) (invitationIssuerSnapshot, []MemberInvitation, int, InvitationNetwork, error)
 	Issue(context.Context, IssueInvitationCommand) (MemberInvitation, error)
 	Revoke(context.Context, RevokeInvitationCommand) (MemberInvitation, error)
 }
@@ -68,7 +68,7 @@ func (service *InvitationService) Overview(ctx context.Context, cookieToken stri
 	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionInvitationReadSelf, now); err != nil {
 		return InvitationOverview{}, err
 	}
-	snapshot, items, total, err := service.repository.Overview(ctx, session.User.ID, now, limit, offset)
+	snapshot, items, total, network, err := service.repository.Overview(ctx, session.User.ID, now, limit, offset)
 	if err != nil {
 		return InvitationOverview{}, err
 	}
@@ -79,6 +79,7 @@ func (service *InvitationService) Overview(ctx context.Context, cookieToken stri
 	return InvitationOverview{
 		Eligibility: eligibility,
 		Items:       items,
+		Network:     network,
 		Total:       total,
 		Limit:       limit,
 		Offset:      offset,

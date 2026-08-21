@@ -16,6 +16,7 @@ import (
 
 	"github.com/peergo/peergo/services/core/internal/contracts/objectstorage"
 	"github.com/peergo/peergo/services/core/internal/legacymedia"
+	"github.com/peergo/peergo/services/core/internal/legacypersonalstate"
 	"github.com/peergo/peergo/services/core/internal/legacyseedboxes"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	"github.com/peergo/peergo/services/core/internal/modules/trackercontrol"
@@ -230,6 +231,21 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 	if err != nil || !seedboxRetry.Duplicate || seedboxRetry.PolicySequence != seedboxResult.PolicySequence {
 		t.Fatalf("retry legacy seedboxes = %+v, %v", seedboxRetry, err)
 	}
+	personalState, err := legacypersonalstate.Import(ctx, source, core, legacypersonalstate.Config{
+		RunID: runID, SnapshotSHA256: snapshot, MappingVersion: "ptyes-v1",
+		ImportedAt: now.Add(66 * time.Minute),
+	}, nil)
+	if err != nil || personalState.BookmarkSourceRows != 1 ||
+		personalState.BookmarkAppliedRows != 1 || personalState.InvitationSourceRows != 0 {
+		t.Fatalf("import legacy personal state = %+v, %v", personalState, err)
+	}
+	personalStateRetry, err := legacypersonalstate.Import(ctx, source, core, legacypersonalstate.Config{
+		RunID: runID, SnapshotSHA256: snapshot, MappingVersion: "ptyes-v1",
+		ImportedAt: now.Add(66 * time.Minute),
+	}, nil)
+	if err != nil || !personalStateRetry.Duplicate || personalStateRetry.BookmarkAppliedRows != 1 {
+		t.Fatalf("retry legacy personal state = %+v, %v", personalStateRetry, err)
+	}
 	status, err := InspectMigrationStatus(ctx, core, inventory)
 	if err != nil {
 		t.Fatal(err)
@@ -261,6 +277,9 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 
 	snapshotAt := now.Add(80 * time.Minute)
 	snapshotDirectory := t.TempDir()
+	if err := os.Chmod(snapshotDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	controlPath := filepath.Join(snapshotDirectory, "control.snapshot")
 	subjectPath := filepath.Join(snapshotDirectory, "subjects.snapshot")
 	runtimePolicyPath := filepath.Join(snapshotDirectory, "runtime-policy.snapshot")
@@ -469,6 +488,9 @@ func createSyntheticPtYesSource(
             uploaded_by bigint NOT NULL,
             anonymous boolean,
             status text,
+			promotion_type integer,
+			promotion_time_type integer,
+			promotion_until timestamptz,
             group_id bigint,
             media_info text,
             poster text,
@@ -513,6 +535,28 @@ func createSyntheticPtYesSource(
 			updated_at timestamptz NOT NULL
 		)`,
 		`CREATE TABLE site_settings (key text PRIMARY KEY, value text NOT NULL)`,
+		`CREATE TABLE bookmarks (
+			id bigint PRIMARY KEY,
+			user_id bigint NOT NULL,
+			torrent_id bigint NOT NULL,
+			created_at timestamptz NOT NULL
+		)`,
+		`CREATE TABLE invites (
+			id bigint PRIMARY KEY,
+			inviting_user bigint NOT NULL,
+			claimed boolean NOT NULL,
+			claimed_by_uid bigint,
+			claimed_at timestamptz,
+			created_at timestamptz NOT NULL
+		)`,
+		`CREATE TABLE points_logs (
+			id bigint PRIMARY KEY,
+			user_id bigint NOT NULL,
+			point_type text NOT NULL,
+			action text NOT NULL,
+			amount numeric NOT NULL,
+			created_at timestamptz NOT NULL
+		)`,
 	}
 	for _, statement := range statements {
 		if _, err := db.Exec(ctx, statement); err != nil {
@@ -520,6 +564,9 @@ func createSyntheticPtYesSource(
 		}
 	}
 	if _, err := db.Exec(ctx, `INSERT INTO users (id) VALUES (1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `INSERT INTO bookmarks (id, user_id, torrent_id, created_at) VALUES (1, 1, 1, $1)`, now); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `

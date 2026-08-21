@@ -75,7 +75,7 @@ write_or_verify_input_manifest() {
         assert_manifest_line "${manifest}" "dump_sha256=${dump_sha256}"
         assert_manifest_line "${manifest}" "torrent_sha256=${torrent_sha256}"
         assert_manifest_line "${manifest}" "image_sha256=${image_sha256}"
-        if [[ "${action:-}" != 'status' ]]; then
+        if [[ "${action:-}" != 'status' && "${action:-}" != 'personal-state' ]]; then
             assert_manifest_line "${manifest}" "backup_reference_sha256=${backup_reference_sha256}"
             assert_manifest_line "${manifest}" "writes_stopped_at=${PEERGO_CUTOVER_WRITES_STOPPED_AT}"
         fi
@@ -127,10 +127,21 @@ prepare_environment() {
     chmod 700 "${output_root}"
     umask 077
 
-    note "hashing the three immutable inputs inside the cutover container"
     dump_sha256="$(sha256_file "${PEERGO_LEGACY_DUMP_PATH}")"
-    torrent_sha256="$(sha256_file "${PEERGO_LEGACY_TORRENT_ROOT}")"
-    image_sha256="$(sha256_file "${PEERGO_LEGACY_IMAGE_ROOT}")"
+    if [[ "${action:-}" == 'personal-state' ]]; then
+        local existing_manifest="${output_root}/inputs.env"
+        [[ -f "${existing_manifest}" && ! -L "${existing_manifest}" ]] ||
+            fail "personal-state requires the original container input manifest"
+        torrent_sha256="$(awk -F= '$1 == "torrent_sha256" { print $2; exit }' "${existing_manifest}")"
+        image_sha256="$(awk -F= '$1 == "image_sha256" { print $2; exit }' "${existing_manifest}")"
+        [[ "${torrent_sha256}" =~ ^[0-9a-f]{64}$ && "${image_sha256}" =~ ^[0-9a-f]{64}$ ]] ||
+            fail "original container input manifest has invalid archive digests"
+        note "reusing the original archive evidence; only the SQL snapshot is rehashed"
+    else
+        note "hashing the three immutable inputs inside the cutover container"
+        torrent_sha256="$(sha256_file "${PEERGO_LEGACY_TORRENT_ROOT}")"
+        image_sha256="$(sha256_file "${PEERGO_LEGACY_IMAGE_ROOT}")"
+    fi
     [[ "${PEERGO_LEGACY_SNAPSHOT_SHA256:-${dump_sha256}}" == "${dump_sha256}" ]] ||
         fail "database dump digest differs from the host manifest"
     [[ "${PEERGO_LEGACY_RUN_ID}" == "$(run_id_from_snapshot "${dump_sha256}")" ]] ||
@@ -325,11 +336,13 @@ apply_cutover() {
     if [[ "${run_state}" == 'reconciled' ]]; then
         preflight_manifest="$(find "${output_root}" -maxdepth 1 -type f -name 'preflight-*.json' -print | sort | tail -n 1)"
         [[ -n "${preflight_manifest}" ]] || fail "reconciled resume has no preflight manifest"
-        note "run is already reconciled; replaying idempotent medal, seedbox and image verification"
+        note "run is already reconciled; replaying idempotent medal, seedbox, personal-state and image verification"
         "${binary_root}/legacy-medals" --action import | tee -a "${output_root}/migration.log"
         "${binary_root}/legacy-medals" --action import | tee -a "${output_root}/migration.log"
         "${binary_root}/legacy-seedboxes" --action import | tee -a "${output_root}/migration.log"
         "${binary_root}/legacy-seedboxes" --action import | tee -a "${output_root}/migration.log"
+        "${binary_root}/legacy-personal-state" --action import | tee -a "${output_root}/migration.log"
+        "${binary_root}/legacy-personal-state" --action import | tee -a "${output_root}/migration.log"
         "${migration_script}" image-derivatives | tee -a "${output_root}/migration.log"
     else
         preflight_manifest="${output_root}/preflight-${attempt_id}.json"
@@ -359,7 +372,7 @@ apply_cutover() {
     acceptance_sha256="$(sha256_file "${acceptance_output}")"
     {
         printf 'schema=peergo.rousi-production-ready.v2\n'
-        printf 'acceptance_schema=peergo.legacy-cutover-acceptance.v7\n'
+        printf 'acceptance_schema=peergo.legacy-cutover-acceptance.v8\n'
         printf 'run_id=%s\n' "${PEERGO_LEGACY_RUN_ID}"
         printf 'acceptance=%s\n' "$(basename "${acceptance_output}")"
         printf 'acceptance_sha256=%s\n' "${acceptance_sha256}"
@@ -379,13 +392,55 @@ show_status() {
     fi
 }
 
+reconcile_personal_state() {
+    [[ "$(current_run_state)" == 'reconciled' ]] ||
+        fail "personal-state requires an already reconciled Rousi migration run"
+    [[ -f "${output_root}/source-restored.env" ]] ||
+        fail "personal-state requires the prepared legacy source database evidence"
+
+    local attempt_id import_log status_log import_sha256 status_sha256
+    attempt_id="$(date -u '+%Y%m%dT%H%M%SZ')"
+    import_log="${output_root}/personal-state-${attempt_id}.log"
+    status_log="${output_root}/personal-state-status-${attempt_id}.log"
+
+    note "importing and replay-verifying bookmarks, invitation ancestry and reward evidence"
+    "${binary_root}/legacy-personal-state" --action import | tee "${import_log}"
+    "${binary_root}/legacy-personal-state" --action import | tee -a "${import_log}"
+    "${binary_root}/legacy-personal-state" --action verify | tee -a "${import_log}"
+
+    "${binary_root}/legacy-torrents" --action status | tee "${status_log}"
+    jq -e '
+        select(.msg == "legacy migration status") |
+        .state == "reconciled" and .checkpoints_complete == true and
+        .personal_state_receipts == 1 and
+        .bookmark_source_rows == .bookmark_evidence_rows and
+        .invitation_source_rows == .invitation_evidence_rows
+    ' "${status_log}" >/dev/null ||
+        fail "personal-state status did not satisfy the reconciled migration gate"
+
+    import_sha256="$(sha256_file "${import_log}")"
+    status_sha256="$(sha256_file "${status_log}")"
+    {
+        printf 'schema=peergo.rousi-personal-state-reconciliation.v1\n'
+        printf 'run_id=%s\n' "${PEERGO_LEGACY_RUN_ID}"
+        printf 'source_snapshot_sha256=%s\n' "${dump_sha256}"
+        printf 'import_log=%s\n' "$(basename "${import_log}")"
+        printf 'import_log_sha256=%s\n' "${import_sha256}"
+        printf 'status_log=%s\n' "$(basename "${status_log}")"
+        printf 'status_log_sha256=%s\n' "${status_sha256}"
+        printf 'verified_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    } >"${output_root}/personal-state-reconciled.env"
+    chmod 600 "${output_root}/personal-state-reconciled.env"
+    note "personal-state reconciliation completed"
+}
+
 action="${1:-}"
 case "${action}" in
-    prepare|apply|status)
+    prepare|apply|status|personal-state)
         prepare_environment
         ;;
     *)
-        fail "usage: rousi-cutover-container.sh prepare|apply|status"
+        fail "usage: rousi-cutover-container.sh prepare|apply|status|personal-state"
         ;;
 esac
 
@@ -393,4 +448,5 @@ case "${action}" in
     prepare) prepare_cutover ;;
     apply) apply_cutover ;;
     status) show_status ;;
+    personal-state) reconcile_personal_state ;;
 esac

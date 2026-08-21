@@ -741,6 +741,51 @@ WHERE id = sqlc.arg(invitation_id)
   AND claimed_by = sqlc.arg(registration_id)
   AND consumed_at IS NULL;
 
+-- name: RecordRegistrationInvitationRelationship :one
+WITH candidate AS (
+    SELECT
+        registration.user_id AS invitee_user_id,
+        invitation.issuer_user_id AS inviter_user_id,
+        invitation.id AS invitation_id,
+        invitation.source_kind,
+        registration.completed_at
+    FROM identity.registrations AS registration
+    JOIN identity.registration_invitations AS invitation
+      ON invitation.id = registration.invitation_id
+    WHERE registration.id = sqlc.arg(registration_id)
+      AND registration.state = 'completed'
+), inserted AS (
+    INSERT INTO identity.invitation_relationships (
+        invitee_user_id, inviter_user_id, invitation_id,
+        source_kind, source_reference, established_at, recorded_at
+    )
+    SELECT
+        candidate.invitee_user_id,
+        candidate.inviter_user_id,
+        candidate.invitation_id,
+        'registration',
+        'member-invitation:' || candidate.invitation_id::text,
+        candidate.completed_at,
+        candidate.completed_at
+    FROM candidate
+    WHERE candidate.source_kind = 'member'
+      AND candidate.inviter_user_id IS NOT NULL
+    ON CONFLICT (invitee_user_id) DO NOTHING
+    RETURNING invitee_user_id
+)
+SELECT (CASE
+    WHEN candidate.source_kind <> 'member' THEN true
+    ELSE EXISTS (
+        SELECT 1
+        FROM identity.invitation_relationships AS relationship
+        WHERE relationship.invitee_user_id = candidate.invitee_user_id
+          AND relationship.inviter_user_id = candidate.inviter_user_id
+          AND relationship.invitation_id = candidate.invitation_id
+          AND relationship.source_kind = 'registration'
+    )
+END)::boolean AS relationship_valid
+FROM candidate;
+
 -- name: GetActiveUserByUsernameForStaffBootstrap :one
 SELECT id, username, display_name
 FROM identity.users

@@ -304,6 +304,16 @@ func (repository *PostgresRegistrationRepository) CompleteRegistration(ctx conte
 		if rows != 1 {
 			return RegistrationRecord{}, ErrRegistrationStateConflict
 		}
+		// Invitation ancestry is committed with registration completion. The
+		// token row remains credential evidence; this separate immutable edge is
+		// what future invitation-tree and reward calculations consume.
+		relationshipValid, relationshipErr := queries.RecordRegistrationInvitationRelationship(ctx, registrationID)
+		if relationshipErr != nil {
+			return RegistrationRecord{}, fmt.Errorf("record registration invitation relationship: %w", relationshipErr)
+		}
+		if !relationshipValid {
+			return RegistrationRecord{}, ErrRegistrationStateConflict
+		}
 	}
 	event, err := repository.eventBuilder.BuildRegistrationCompletedEvent(RegistrationAuditInput{
 		RegistrationID: registrationID, UserID: record.UserID, Mode: record.Mode,

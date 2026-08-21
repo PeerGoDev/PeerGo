@@ -80,11 +80,12 @@ Apply 按固定顺序执行：
 4. 勋章定义/持有/佩戴/权益与工作组；
 5. 用户绑定的盒子 IP/CIDR 与不可变迁移凭证；
 6. 种子元数据、原始 `.torrent`、文件树、价格和已购买权益；
-7. 种子引用原图与三档 WebP；
-8. 全量 read-back reconciliation；
-9. 正常 1x Settlement 基线、保种组收益时间线与 Tracker allowlist 投影；
-10. 三份签名 Tracker 快照；
-11. acceptance 与 `ready_to_activate=true`。
+7. 收藏、已领取邀请关系以及后宫/邀请奖励历史合计凭证；
+8. 种子引用原图与三档 WebP；
+9. 全量 read-back reconciliation；
+10. 正常 1x Settlement 基线、保种组收益时间线与 Tracker allowlist 投影；
+11. 三份签名 Tracker 快照；
+12. acceptance 与 `ready_to_activate=true`。
 
 迁入的首版盒子政策固定为盒子不限速、优惠与 VIP 权益正常生效；优惠结算后上传按
 `0.5x` 计入、下载按 `2x` 计费。普通线路继续沿用旧站
@@ -108,12 +109,30 @@ make rousi-restore-production-status \
 
 ```text
 schema=peergo.rousi-production-ready.v2
-acceptance_schema=peergo.legacy-cutover-acceptance.v7
+acceptance_schema=peergo.legacy-cutover-acceptance.v8
 ready_to_activate=true
 ```
 
-才可进入非公开启动。旧版 `ready-to-activate.env` 不包含盒子规则验收，必须用当前代码续跑
+才可进入非公开启动。旧版 `ready-to-activate.env` 不包含盒子或个人状态验收，必须用当前代码续跑
 同一组三包，不能作为切流依据。
+
+### 3.1 已完成切换后的个人状态补录
+
+如果站点在收藏/邀请迁移工具发布前已经完成同一 run，可使用限定补录入口，避免重新扫描
+23 GiB 图片或重建衍生图：
+
+```bash
+make rousi-restore-production-personal-state \
+  CONFIRM_ROUSI_PRODUCTION=RECONCILE_ROUSI_PERSONAL_STATE \
+  ROUSI_DUMP='/opt/peergo/input/rousi_20260820220000.sql.gz' \
+  ROUSI_TORRENTS='/opt/peergo/input/torrents.zip' \
+  ROUSI_UPLOADS='/opt/peergo/input/uploads.zip'
+```
+
+该入口只允许已有 `reconciled` run，重哈希 SQL dump 并复用原始三包 manifest；随后连续执行
+两次幂等导入、一次只读验证和完整 migration status gate。成功凭证写入
+`personal-state-reconciled.env`。它不会恢复旧邀请码 token，也不会生成魔力值交易：后宫及
+一次性邀请奖励已包含在用户期初余额中，只保存精确历史合计，防止二次发放。
 
 ## 4. 启动、管理员和最终激活
 

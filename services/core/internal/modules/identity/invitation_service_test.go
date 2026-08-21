@@ -44,8 +44,8 @@ type invitationRepositoryStub struct {
 	command  IssueInvitationCommand
 }
 
-func (stub *invitationRepositoryStub) Overview(context.Context, uuid.UUID, time.Time, int, int) (invitationIssuerSnapshot, []MemberInvitation, int, error) {
-	return stub.snapshot, stub.items, stub.total, nil
+func (stub *invitationRepositoryStub) Overview(context.Context, uuid.UUID, time.Time, int, int) (invitationIssuerSnapshot, []MemberInvitation, int, InvitationNetwork, error) {
+	return stub.snapshot, stub.items, stub.total, InvitationNetwork{}, nil
 }
 
 func (stub *invitationRepositoryStub) Issue(_ context.Context, command IssueInvitationCommand) (MemberInvitation, error) {

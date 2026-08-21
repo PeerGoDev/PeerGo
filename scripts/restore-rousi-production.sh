@@ -44,6 +44,9 @@ Usage:
 
   scripts/restore-rousi-production.sh status <same three files>
 
+  PEERGO_PRODUCTION_RESTORE_CONFIRM=RECONCILE_ROUSI_PERSONAL_STATE \
+    scripts/restore-rousi-production.sh personal-state <same three files>
+
 prepare restores only the dedicated legacy source database, inspects all three
 immutable inputs and emits a snapshot-bound missing-torrent candidate when
 needed. It does not import PeerGo users, balances, torrents or images.
@@ -52,6 +55,12 @@ apply requires the exact candidate digest when any SQL-referenced .torrent is
 missing. It imports into already migrated empty PeerGo targets, drains typed
 benefit/Tracker projections, creates signed snapshots and succeeds only when
 acceptance writes ready_to_activate=true.
+
+personal-state is the bounded recovery path for a cutover that completed before
+bookmark and invitation migration existed. It reuses the prepared source
+database and immutable run manifest, applies only the current Core migration,
+then imports and verifies bookmarks, invitation ancestry and historical reward
+evidence. It does not scan or regenerate torrent/image objects.
 EOF
 }
 
@@ -144,7 +153,7 @@ compose() {
 
 action="$1"
 case "${action}" in
-    prepare|apply|status) ;;
+    prepare|apply|status|personal-state) ;;
     *) usage >&2; exit 2 ;;
 esac
 
@@ -163,12 +172,7 @@ image_path="$(absolute_regular_file "$4")"
 [[ "${torrent_path}" != "${image_path}" ]] || fail "three-package mode requires distinct ZIP files"
 
 gzip -t "${dump_path}"
-unzip -tq "${torrent_path}" >/dev/null
-unzip -tq "${image_path}" >/dev/null
-note "hashing the final immutable three-package snapshot"
 dump_sha256="$(sha256_file "${dump_path}")"
-torrent_sha256="$(sha256_file "${torrent_path}")"
-image_sha256="$(sha256_file "${image_path}")"
 run_id="$(run_id_from_snapshot "${dump_sha256}")"
 occurred_at="$(occurred_at_from_dump_name "${dump_path}")"
 
@@ -176,6 +180,22 @@ run_dir="${PEERGO_PRODUCTION_CUTOVER_RUN_DIR:-${default_run_root}/${run_id}}"
 [[ "${run_dir}" = /* && ! -L "${run_dir}" ]] || fail "cutover run directory must be absolute and not a symlink"
 mkdir -p "${run_dir}"
 chmod 700 "${run_dir}"
+if [[ "${action}" == 'personal-state' ]]; then
+    host_manifest="${run_dir}/host-inputs.env"
+    [[ -f "${host_manifest}" && ! -L "${host_manifest}" ]] ||
+        fail "personal-state requires the existing immutable cutover manifest: ${host_manifest}"
+    torrent_sha256="$(awk -F= '$1 == "torrent_sha256" { print $2; exit }' "${host_manifest}")"
+    image_sha256="$(awk -F= '$1 == "image_sha256" { print $2; exit }' "${host_manifest}")"
+    [[ "${torrent_sha256}" =~ ^[0-9a-f]{64}$ && "${image_sha256}" =~ ^[0-9a-f]{64}$ ]] ||
+        fail "existing cutover manifest has invalid archive digests"
+    note "reusing the immutable archive evidence; only the SQL snapshot is rehashed"
+else
+    unzip -tq "${torrent_path}" >/dev/null
+    unzip -tq "${image_path}" >/dev/null
+    note "hashing the final immutable three-package snapshot"
+    torrent_sha256="$(sha256_file "${torrent_path}")"
+    image_sha256="$(sha256_file "${image_path}")"
+fi
 write_or_verify_host_manifest
 
 case "${action}" in
@@ -189,8 +209,12 @@ case "${action}" in
         [[ -n "${PEERGO_CUTOVER_OPERATOR_REFERENCE:-}" ]] ||
             fail "PEERGO_CUTOVER_OPERATOR_REFERENCE is required for apply"
         ;;
+    personal-state)
+        [[ "${PEERGO_PRODUCTION_RESTORE_CONFIRM:-}" == 'RECONCILE_ROUSI_PERSONAL_STATE' ]] ||
+            fail "set PEERGO_PRODUCTION_RESTORE_CONFIRM=RECONCILE_ROUSI_PERSONAL_STATE"
+        ;;
 esac
-if [[ "${action}" != 'status' ]]; then
+if [[ "${action}" != 'status' && "${action}" != 'personal-state' ]]; then
     [[ -n "${PEERGO_CUTOVER_BACKUP_REFERENCE:-}" ]] ||
         fail "PEERGO_CUTOVER_BACKUP_REFERENCE is required"
     [[ "${PEERGO_CUTOVER_WRITES_STOPPED_AT:-}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]] ||
@@ -225,11 +249,14 @@ compose --profile cutover config --quiet
 note "building immutable runtime and cutover images"
 compose --profile cutover build core-migrate rousi-cutover
 
-if [[ "${action}" != 'status' ]]; then
+if [[ "${action}" == 'prepare' || "${action}" == 'apply' ]]; then
     note "applying idempotent Core, Vault and Tracker Ledger schema migrations"
     compose run --rm --no-deps core-migrate
     compose run --rm --no-deps vault-migrate
     compose run --rm --no-deps tracker-migrate
+elif [[ "${action}" == 'personal-state' ]]; then
+    note "applying the idempotent Core schema migration required by personal-state"
+    compose run --rm --no-deps core-migrate
 fi
 
 compose --profile cutover run --rm --no-deps rousi-cutover "${action}"
@@ -249,11 +276,21 @@ case "${action}" in
             fail "cutover container exited without ready-to-activate evidence"
         grep -Fqx 'schema=peergo.rousi-production-ready.v2' "${run_dir}/ready-to-activate.env" ||
             fail "ready-to-activate evidence uses an obsolete schema; rerun the current acceptance"
-        grep -Fqx 'acceptance_schema=peergo.legacy-cutover-acceptance.v7' "${run_dir}/ready-to-activate.env" ||
-            fail "ready-to-activate evidence does not include the current seedbox acceptance"
+        grep -Fqx 'acceptance_schema=peergo.legacy-cutover-acceptance.v8' "${run_dir}/ready-to-activate.env" ||
+            fail "ready-to-activate evidence does not include the current seedbox and personal-state acceptance"
         grep -Fqx 'ready_to_activate=true' "${run_dir}/ready-to-activate.env" ||
             fail "ready-to-activate evidence is invalid"
         note "migration acceptance passed: ${run_dir}/ready-to-activate.env"
         note "do not switch public traffic until production-up, admin review and production-activation-check also pass"
+        ;;
+    personal-state)
+        [[ -f "${run_dir}/personal-state-reconciled.env" ]] ||
+            fail "personal-state container exited without reconciliation evidence"
+        grep -Fqx 'schema=peergo.rousi-personal-state-reconciliation.v1' \
+            "${run_dir}/personal-state-reconciled.env" ||
+            fail "personal-state reconciliation evidence uses an unknown schema"
+        grep -Fqx "run_id=${run_id}" "${run_dir}/personal-state-reconciled.env" ||
+            fail "personal-state reconciliation evidence belongs to another run"
+        note "personal-state reconciliation passed: ${run_dir}/personal-state-reconciled.env"
         ;;
 esac

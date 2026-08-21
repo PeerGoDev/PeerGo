@@ -83,6 +83,7 @@ type Querier interface {
 	LockVIPState(ctx context.Context, userID uuid.UUID) (LockVIPStateRow, error)
 	MarkCoreUserEmailVerified(ctx context.Context, arg MarkCoreUserEmailVerifiedParams) (MarkCoreUserEmailVerifiedRow, error)
 	MarkCoreUserPasswordRecovered(ctx context.Context, arg MarkCoreUserPasswordRecoveredParams) (MarkCoreUserPasswordRecoveredRow, error)
+	RecordRegistrationInvitationRelationship(ctx context.Context, registrationID uuid.UUID) (bool, error)
 	RegistrationInvitationMatches(ctx context.Context, arg RegistrationInvitationMatchesParams) (bool, error)
 	RegistrationUsernameUnavailable(ctx context.Context, arg RegistrationUsernameUnavailableParams) (bool, error)
 	ReserveTwoFactorChange(ctx context.Context, arg ReserveTwoFactorChangeParams) (ReserveTwoFactorChangeRow, error)

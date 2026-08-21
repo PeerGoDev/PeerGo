@@ -48,6 +48,20 @@ type MigrationStatus struct {
 	SeedboxExpectedBindings   int64
 	SeedboxImportedBindings   int64
 	SeedboxPolicySequence     int64
+	PersonalStateReceipts     int64
+	BookmarkSourceRows        int64
+	BookmarkEvidenceRows      int64
+	BookmarkAppliedRows       int64
+	BookmarkUnresolvedRows    int64
+	InvitationSourceRows      int64
+	InvitationEvidenceRows    int64
+	InvitationRelationships   int64
+	InvitationUnresolvedRows  int64
+	HaremRewardSourceRows     int64
+	HaremRewardUsers          int64
+	InviteRewardSourceRows    int64
+	InviteRewardUsers         int64
+	InvitationRewardEvidence  int64
 	TrackerRunOutboxEvents    int64
 	TrackerPendingEvents      int64
 	TrackerProjectionSequence int64
@@ -78,7 +92,12 @@ func (status MigrationStatus) CheckpointsComplete() bool {
 		status.SeedboxSourceRows >= status.SeedboxEnabledRows &&
 		status.SeedboxExpectedBindings >= status.SeedboxEnabledRows &&
 		status.SeedboxImportedBindings == status.SeedboxExpectedBindings &&
-		status.SeedboxPolicySequence > 0
+		status.SeedboxPolicySequence > 0 &&
+		status.PersonalStateReceipts == 1 &&
+		status.BookmarkEvidenceRows == status.BookmarkSourceRows &&
+		status.InvitationEvidenceRows == status.InvitationSourceRows &&
+		status.InvitationRelationships+status.InvitationUnresolvedRows == status.InvitationSourceRows &&
+		status.InvitationRewardEvidence == status.HaremRewardUsers+status.InviteRewardUsers
 }
 
 // InspectMigrationStatus never locks or mutates migration/domain rows. It is
@@ -206,6 +225,24 @@ WITH checkpoints AS (
 		COALESCE(max(import.policy_sequence), 0)::bigint AS policy_sequence
 	FROM migration.legacy_seedbox_imports AS import
 	WHERE import.run_id = $1
+), personal_state AS (
+    SELECT
+        count(import.run_id)::bigint AS receipts,
+        COALESCE(max(import.bookmark_source_rows), 0)::bigint AS bookmark_source_rows,
+        (SELECT count(*)::bigint FROM migration.legacy_torrent_bookmark_openings WHERE first_run_id = $1) AS bookmark_evidence_rows,
+        COALESCE(max(import.bookmark_applied_rows), 0)::bigint AS bookmark_applied_rows,
+        COALESCE(max(import.bookmark_unresolved_rows), 0)::bigint AS bookmark_unresolved_rows,
+        COALESCE(max(import.invitation_source_rows), 0)::bigint AS invitation_source_rows,
+        (SELECT count(*)::bigint FROM migration.legacy_invitation_relationship_openings WHERE first_run_id = $1) AS invitation_evidence_rows,
+        COALESCE(max(import.invitation_relationships), 0)::bigint AS invitation_relationships,
+        COALESCE(max(import.invitation_unresolved_rows), 0)::bigint AS invitation_unresolved_rows,
+        COALESCE(max(import.harem_reward_source_rows), 0)::bigint AS harem_reward_source_rows,
+        COALESCE(max(import.harem_reward_users), 0)::bigint AS harem_reward_users,
+        COALESCE(max(import.invite_reward_source_rows), 0)::bigint AS invite_reward_source_rows,
+        COALESCE(max(import.invite_reward_users), 0)::bigint AS invite_reward_users,
+        (SELECT count(*)::bigint FROM migration.legacy_invitation_reward_openings WHERE first_run_id = $1) AS reward_evidence_rows
+    FROM migration.legacy_personal_state_imports AS import
+    WHERE import.run_id = $1
 ), tracker_state AS (
     SELECT
         projection.last_sequence AS projection_sequence,
@@ -250,6 +287,20 @@ SELECT
 	seedbox_state.expected_bindings,
 	seedbox_state.imported_bindings,
 	seedbox_state.policy_sequence,
+	personal_state.receipts,
+	personal_state.bookmark_source_rows,
+	personal_state.bookmark_evidence_rows,
+	personal_state.bookmark_applied_rows,
+	personal_state.bookmark_unresolved_rows,
+	personal_state.invitation_source_rows,
+	personal_state.invitation_evidence_rows,
+	personal_state.invitation_relationships,
+	personal_state.invitation_unresolved_rows,
+	personal_state.harem_reward_source_rows,
+	personal_state.harem_reward_users,
+	personal_state.invite_reward_source_rows,
+	personal_state.invite_reward_users,
+	personal_state.reward_evidence_rows,
 	tracker_run.outbox_events,
     tracker_state.pending_events,
     tracker_state.projection_sequence,
@@ -265,6 +316,7 @@ CROSS JOIN tracker_run
 CROSS JOIN purchase_state
 CROSS JOIN medal_state
 CROSS JOIN seedbox_state
+CROSS JOIN personal_state
 CROSS JOIN tracker_state
 WHERE run.id = $1`, config.RunID).Scan(
 		&snapshot,
@@ -299,6 +351,20 @@ WHERE run.id = $1`, config.RunID).Scan(
 		&result.SeedboxExpectedBindings,
 		&result.SeedboxImportedBindings,
 		&result.SeedboxPolicySequence,
+		&result.PersonalStateReceipts,
+		&result.BookmarkSourceRows,
+		&result.BookmarkEvidenceRows,
+		&result.BookmarkAppliedRows,
+		&result.BookmarkUnresolvedRows,
+		&result.InvitationSourceRows,
+		&result.InvitationEvidenceRows,
+		&result.InvitationRelationships,
+		&result.InvitationUnresolvedRows,
+		&result.HaremRewardSourceRows,
+		&result.HaremRewardUsers,
+		&result.InviteRewardSourceRows,
+		&result.InviteRewardUsers,
+		&result.InvitationRewardEvidence,
 		&result.TrackerRunOutboxEvents,
 		&result.TrackerPendingEvents,
 		&result.TrackerProjectionSequence,

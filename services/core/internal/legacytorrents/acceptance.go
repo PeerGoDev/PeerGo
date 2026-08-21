@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	CutoverAcceptanceSchema = "peergo.legacy-cutover-acceptance.v7"
+	CutoverAcceptanceSchema = "peergo.legacy-cutover-acceptance.v8"
 	maxCutoverManifestBytes = 1 << 20
 )
 
@@ -107,6 +107,16 @@ type CutoverAcceptanceReport struct {
 	TorrentPurchaseRows              int64     `json:"torrent_purchase_rows"`
 	TorrentPurchaseRights            int64     `json:"torrent_purchase_rights"`
 	TorrentPurchaseEvidenceOnly      int64     `json:"torrent_purchase_evidence_only"`
+	BookmarkSourceRows               int64     `json:"bookmark_source_rows"`
+	BookmarkAppliedRows              int64     `json:"bookmark_applied_rows"`
+	BookmarkUnresolvedRows           int64     `json:"bookmark_unresolved_rows"`
+	InvitationSourceRows             int64     `json:"invitation_source_rows"`
+	InvitationRelationships          int64     `json:"invitation_relationships"`
+	InvitationUnresolvedRows         int64     `json:"invitation_unresolved_rows"`
+	HaremRewardSourceRows            int64     `json:"harem_reward_source_rows"`
+	HaremRewardUsers                 int64     `json:"harem_reward_users"`
+	InviteRewardSourceRows           int64     `json:"invite_reward_source_rows"`
+	InviteRewardUsers                int64     `json:"invite_reward_users"`
 	TrackerControlSequence           int64     `json:"tracker_control_sequence"`
 	TrackerCompletionSequence        int64     `json:"tracker_completion_sequence"`
 	TrackerTorrentCount              int       `json:"tracker_torrent_count"`
@@ -434,6 +444,16 @@ WHERE id = $1 AND state = 'reconciled'`, config.Inventory.RunID).Scan(&reconcile
 		TorrentPurchaseRows:              purchases.SourceRows,
 		TorrentPurchaseRights:            purchases.Entitlements,
 		TorrentPurchaseEvidenceOnly:      purchases.EvidenceOnly,
+		BookmarkSourceRows:               status.BookmarkSourceRows,
+		BookmarkAppliedRows:              status.BookmarkAppliedRows,
+		BookmarkUnresolvedRows:           status.BookmarkUnresolvedRows,
+		InvitationSourceRows:             status.InvitationSourceRows,
+		InvitationRelationships:          status.InvitationRelationships,
+		InvitationUnresolvedRows:         status.InvitationUnresolvedRows,
+		HaremRewardSourceRows:            status.HaremRewardSourceRows,
+		HaremRewardUsers:                 status.HaremRewardUsers,
+		InviteRewardSourceRows:           status.InviteRewardSourceRows,
+		InviteRewardUsers:                status.InviteRewardUsers,
 		TrackerControlSequence:           controlSnapshot.Snapshot.ControlSequence,
 		TrackerCompletionSequence:        controlSnapshot.Snapshot.CompletionSequence,
 		TrackerTorrentCount:              len(controlSnapshot.Snapshot.Torrents),
@@ -1009,7 +1029,11 @@ func WriteCutoverAcceptanceManifest(path string, report CutoverAcceptanceReport)
 		report.SeedboxDownloadFactorBasisPoints != legacyseedboxes.DownloadFactorBasisPoints ||
 		report.SeedboxSpeedLimitBytesPerSecond != 0 ||
 		report.StandardSpeedLimitBytesPerSecond <= 0 ||
-		report.TorrentPurchaseRows != report.TorrentPurchaseRights+report.TorrentPurchaseEvidenceOnly {
+		report.TorrentPurchaseRows != report.TorrentPurchaseRights+report.TorrentPurchaseEvidenceOnly ||
+		report.BookmarkAppliedRows+report.BookmarkUnresolvedRows > report.BookmarkSourceRows ||
+		report.InvitationRelationships+report.InvitationUnresolvedRows != report.InvitationSourceRows ||
+		report.HaremRewardSourceRows < report.HaremRewardUsers ||
+		report.InviteRewardSourceRows < report.InviteRewardUsers {
 		return [sha256.Size]byte{}, errors.New("cutover acceptance manifest is invalid")
 	}
 	return writeExclusiveCutoverJSON(path, report)

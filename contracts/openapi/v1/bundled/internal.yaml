@@ -17012,12 +17012,88 @@ components:
         revoked_at:
           type: string
           format: date-time
+    InvitationRelationshipSource:
+      type: string
+      enum:
+        - registration
+        - legacy_import
+    InvitedMember:
+      type: object
+      additionalProperties: false
+      required:
+        - numeric_id
+        - username
+        - display_name
+        - source
+        - established_at
+      properties:
+        numeric_id:
+          type: integer
+          format: int64
+          minimum: 1
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        source:
+          $ref: '#/components/schemas/InvitationRelationshipSource'
+        established_at:
+          type: string
+          format: date-time
+    HistoricalInvitationReward:
+      type: object
+      additionalProperties: false
+      required:
+        - amount
+        - source_rows
+      properties:
+        amount:
+          type: string
+          pattern: ^(0|[1-9][0-9]{0,18})$
+          description: 已包含在用户期初魔力值中的历史整数合计，不会再次入账。
+        source_rows:
+          type: integer
+          format: int64
+          minimum: 0
+        last_rewarded_at:
+          type: string
+          format: date-time
+    InvitationNetwork:
+      type: object
+      additionalProperties: false
+      required:
+        - direct_members
+        - direct_count
+        - total_descendants
+        - harem_reward
+        - invitation_reward
+      properties:
+        direct_members:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/InvitedMember'
+        direct_count:
+          type: integer
+          minimum: 0
+        total_descendants:
+          type: integer
+          minimum: 0
+        harem_reward:
+          $ref: '#/components/schemas/HistoricalInvitationReward'
+        invitation_reward:
+          $ref: '#/components/schemas/HistoricalInvitationReward'
     InvitationOverview:
       type: object
       additionalProperties: false
       required:
         - eligibility
         - items
+        - network
         - total
         - limit
         - offset
@@ -17029,6 +17105,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MemberInvitation'
+        network:
+          $ref: '#/components/schemas/InvitationNetwork'
         total:
           type: integer
           minimum: 0

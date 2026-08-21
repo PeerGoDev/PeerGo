@@ -32,6 +32,8 @@ Commands:
   torrents-validate  Inventory and validate every SQL-referenced .torrent.
   torrents-import    Import verified torrent objects and parsed file trees.
   torrent-purchases  Import integer prices and existing permanent purchase rights.
+  personal-state     Import bookmarks, invitation ancestry, and historical
+                     harem/invitation reward evidence without crediting twice.
   media-validate     Validate every torrent gallery/poster image reference.
   media-import       Preserve and import validated torrent source images.
   media-reconcile    Fully read back every imported torrent image.
@@ -313,8 +315,8 @@ restore_source() {
         pg_restore --exit-on-error --no-owner --no-privileges --dbname="${PEERGO_LEGACY_RESTORE_DATABASE_URL}"
     local required_tables
     required_tables="$(psql "${PEERGO_LEGACY_RESTORE_DATABASE_URL}" -X -A -t -v ON_ERROR_STOP=1 -c \
-        "SELECT count(*) FROM (VALUES (to_regclass('public.users')), (to_regclass('public.user_attendance_stats')), (to_regclass('public.attendance_records')), (to_regclass('public.torrents')), (to_regclass('public.torrent_files')), (to_regclass('public.seed_boxes')), (to_regclass('public.site_settings'))) AS required(table_name) WHERE table_name IS NOT NULL")"
-    [[ "${required_tables}" == "7" ]] || fail "restored source is missing required PtYes user, attendance, torrent, seedbox, or site-settings tables"
+        "SELECT count(*) FROM (VALUES (to_regclass('public.users')), (to_regclass('public.user_attendance_stats')), (to_regclass('public.attendance_records')), (to_regclass('public.torrents')), (to_regclass('public.torrent_files')), (to_regclass('public.seed_boxes')), (to_regclass('public.site_settings')), (to_regclass('public.bookmarks')), (to_regclass('public.invites')), (to_regclass('public.points_logs'))) AS required(table_name) WHERE table_name IS NOT NULL")"
+    [[ "${required_tables}" == "10" ]] || fail "restored source is missing required PtYes user, attendance, torrent, personal-state, seedbox, or site-settings tables"
     note "source restore completed"
 }
 
@@ -390,6 +392,20 @@ run_torrent_purchases() {
     run_core_command legacy-torrents --action purchases
 }
 
+run_personal_state() {
+    ensure_cutover_preflight
+    note "importing PtYes bookmarks, invitation ancestry and historical invitation rewards"
+    run_core_command legacy-personal-state --action import
+    note "verifying an idempotent personal-state retry without recreating removed bookmarks"
+    run_core_command legacy-personal-state --action import
+}
+
+verify_personal_state() {
+    require_run_identity
+    note "verifying migrated bookmarks, invitation ancestry and historical reward evidence"
+    run_core_command legacy-personal-state --action verify
+}
+
 run_media_validation() {
     ensure_cutover_preflight
     note "validating PtYes torrent gallery and poster image references"
@@ -458,6 +474,7 @@ run_cutover_acceptance() {
         fail "formal cutover acceptance requires the immutable image ZIP"
     verify_medals
     verify_seedboxes
+    verify_personal_state
     note "running read-only post-reconciliation cutover acceptance"
     run_core_command legacy-torrents --action acceptance
 }
@@ -497,6 +514,9 @@ case "${command_name}" in
     torrent-purchases)
         run_torrent_purchases
         ;;
+    personal-state)
+        run_personal_state
+        ;;
     media-validate)
         run_media_validation
         ;;
@@ -522,6 +542,7 @@ case "${command_name}" in
         run_torrent_validation
         run_torrent_import
         run_torrent_purchases
+        run_personal_state
         run_media_validation
         run_media_import
         run_reconciliation

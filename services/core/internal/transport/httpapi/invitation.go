@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 
 	generated "github.com/peergo/peergo/services/core/internal/generated/api"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
@@ -104,6 +105,15 @@ func invitationOverviewDTO(overview identity.InvitationOverview) generated.Invit
 		items = append(items, memberInvitationDTO(item))
 	}
 	eligibility := overview.Eligibility
+	directMembers := make([]generated.InvitedMember, 0, len(overview.Network.DirectMembers))
+	for _, member := range overview.Network.DirectMembers {
+		directMembers = append(directMembers, generated.InvitedMember{
+			NumericId: member.NumericID, Username: member.Username,
+			DisplayName:   member.DisplayName,
+			Source:        generated.InvitationRelationshipSource(member.Source),
+			EstablishedAt: member.EstablishedAt,
+		})
+	}
 	return generated.InvitationOverview{
 		Eligibility: generated.InvitationEligibility{
 			Enabled: eligibility.Enabled, Eligible: eligibility.Eligible,
@@ -116,8 +126,23 @@ func invitationOverviewDTO(overview identity.InvitationOverview) generated.Invit
 			MinimumLevel:          eligibility.MinimumLevel, CurrentLevel: eligibility.CurrentLevel,
 			EmailVerified: eligibility.EmailVerified,
 		},
-		Items: items, Total: overview.Total, Limit: overview.Limit,
+		Items: items,
+		Network: generated.InvitationNetwork{
+			DirectMembers: directMembers, DirectCount: overview.Network.DirectCount,
+			TotalDescendants: overview.Network.TotalDescendants,
+			HaremReward:      historicalInvitationRewardDTO(overview.Network.HaremReward),
+			InvitationReward: historicalInvitationRewardDTO(overview.Network.InvitationReward),
+		},
+		Total: overview.Total, Limit: overview.Limit,
 		Offset: overview.Offset, ObservedAt: overview.ObservedAt,
+	}
+}
+
+func historicalInvitationRewardDTO(reward identity.HistoricalInvitationReward) generated.HistoricalInvitationReward {
+	return generated.HistoricalInvitationReward{
+		Amount:         strconv.FormatInt(reward.Amount, 10),
+		SourceRows:     reward.SourceRows,
+		LastRewardedAt: reward.LastRewardedAt,
 	}
 }
 

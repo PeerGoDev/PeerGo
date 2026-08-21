@@ -5980,9 +5980,36 @@ export interface components {
             /** Format: date-time */
             revoked_at?: string;
         };
+        /** @enum {string} */
+        InvitationRelationshipSource: "registration" | "legacy_import";
+        InvitedMember: {
+            /** Format: int64 */
+            numeric_id: number;
+            username: string;
+            display_name: string;
+            source: components["schemas"]["InvitationRelationshipSource"];
+            /** Format: date-time */
+            established_at: string;
+        };
+        HistoricalInvitationReward: {
+            /** @description 已包含在用户期初魔力值中的历史整数合计，不会再次入账。 */
+            amount: string;
+            /** Format: int64 */
+            source_rows: number;
+            /** Format: date-time */
+            last_rewarded_at?: string;
+        };
+        InvitationNetwork: {
+            direct_members: components["schemas"]["InvitedMember"][];
+            direct_count: number;
+            total_descendants: number;
+            harem_reward: components["schemas"]["HistoricalInvitationReward"];
+            invitation_reward: components["schemas"]["HistoricalInvitationReward"];
+        };
         InvitationOverview: {
             eligibility: components["schemas"]["InvitationEligibility"];
             items: components["schemas"]["MemberInvitation"][];
+            network: components["schemas"]["InvitationNetwork"];
             total: number;
             limit: number;
             offset: number;

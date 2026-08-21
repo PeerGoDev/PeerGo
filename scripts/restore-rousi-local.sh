@@ -565,10 +565,14 @@ if [[ "${run_state}" == 'reconciled' ]]; then
     else
         fail "reconciled resume has no preflight manifest"
     fi
-    note "migration run is already reconciled; repairing/verifying medals before image derivatives, Tracker snapshot and acceptance"
+    note "migration run is already reconciled; repairing/verifying medals and personal state before image derivatives, Tracker snapshot and acceptance"
     GOWORK=off go -C "${repo_root}/services/core" run ./cmd/legacy-medals --action import |
         tee -a "${run_dir}/migration.log"
     GOWORK=off go -C "${repo_root}/services/core" run ./cmd/legacy-medals --action import |
+        tee -a "${run_dir}/migration.log"
+    GOWORK=off go -C "${repo_root}/services/core" run ./cmd/legacy-personal-state --action import |
+        tee -a "${run_dir}/migration.log"
+    GOWORK=off go -C "${repo_root}/services/core" run ./cmd/legacy-personal-state --action import |
         tee -a "${run_dir}/migration.log"
     "${repo_root}/scripts/migrate-ptyes.sh" image-derivatives | tee -a "${run_dir}/migration.log"
 else

@@ -6,6 +6,8 @@ import {
   CircleAlertIcon,
   ClipboardIcon,
   Clock3Icon,
+  CoinsIcon,
+  GitForkIcon,
   KeyRoundIcon,
   LogInIcon,
   RefreshCwIcon,
@@ -13,6 +15,7 @@ import {
   TicketIcon,
   Trash2Icon,
   UserRoundCheckIcon,
+  UsersRoundIcon,
 } from "lucide-react"
 
 import {
@@ -80,6 +83,7 @@ import {
 import { requestErrorDescription } from "~/shared/api/problem"
 import { PageHeader, PageLayout } from "~/shared/components/page-layout"
 import { formatDateTime } from "~/shared/formatters/date-time"
+import { formatInteger } from "~/shared/formatters/integer"
 
 const pageSize = 20
 
@@ -219,6 +223,7 @@ export function InvitationsPage() {
             issueError={issue.error}
             onIssue={() => void handleIssue()}
           />
+          <InvitationNetwork network={overview.data.network} />
           <InvitationHistory
             items={overview.data.items}
             total={overview.data.total}
@@ -393,6 +398,140 @@ function InvitationSummary({
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function InvitationNetwork({
+  network,
+}: {
+  network: import("~/features/invitation/api/invitations.queries").InvitationOverview["network"]
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>后宫与邀请关系</CardTitle>
+          <CardDescription>
+            展示直属成员、邀请链规模和从 Rousi 继承的历史奖励。
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <NetworkMetric
+            icon={UsersRoundIcon}
+            label="直属成员"
+            value={formatInteger(network.direct_count)}
+          />
+          <NetworkMetric
+            icon={GitForkIcon}
+            label="后宫总人数"
+            value={formatInteger(network.total_descendants)}
+          />
+          <NetworkMetric
+            icon={CoinsIcon}
+            label="历史后宫奖励"
+            value={formatInteger(network.harem_reward.amount) + " 魔力值"}
+          />
+          <NetworkMetric
+            icon={TicketIcon}
+            label="历史邀请奖励"
+            value={formatInteger(network.invitation_reward.amount) + " 魔力值"}
+          />
+        </div>
+
+        {(network.harem_reward.source_rows > 0 ||
+          network.invitation_reward.source_rows > 0) && (
+          <Alert>
+            <CoinsIcon />
+            <AlertTitle>旧站奖励已计入期初魔力值</AlertTitle>
+            <AlertDescription>
+              这里保留的是 Rousi 历史记录，不会再次入账。后宫奖励共{" "}
+              {formatInteger(network.harem_reward.source_rows)} 笔
+              {network.harem_reward.last_rewarded_at
+                ? "，最后结算于 " +
+                  formatDateTime(network.harem_reward.last_rewarded_at)
+                : ""}
+              。
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {network.direct_members.length ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>直属成员</TableHead>
+                <TableHead>用户 ID</TableHead>
+                <TableHead>来源</TableHead>
+                <TableHead className="text-right">建立时间</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {network.direct_members.map((member) => (
+                <TableRow key={member.numeric_id}>
+                  <TableCell>
+                    <div className="flex flex-col gap-0.5">
+                      <span>{member.display_name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        @{member.username}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatInteger(member.numeric_id)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {member.source === "legacy_import"
+                        ? "Rousi 继承"
+                        : "PeerGo 邀请"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {formatDateTime(member.established_at)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Empty className="min-h-36">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UsersRoundIcon />
+              </EmptyMedia>
+              <EmptyTitle>还没有直属成员</EmptyTitle>
+              <EmptyDescription>
+                通过你的邀请码完成注册后，邀请关系会显示在这里。
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function NetworkMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof UsersRoundIcon
+  label: string
+  value: string
+}) {
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardDescription className="flex items-center gap-2">
+          <Icon />
+          {label}
+        </CardDescription>
+        <CardTitle className="text-lg tabular-nums">{value}</CardTitle>
+      </CardHeader>
+    </Card>
   )
 }
 

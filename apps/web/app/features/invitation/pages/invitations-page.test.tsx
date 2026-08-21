@@ -76,6 +76,43 @@ describe("InvitationsPage", () => {
     expect(request.method).toBe("POST")
     expect(request.headers.get("X-CSRF-Token")).toBe("c".repeat(43))
   })
+
+  it("shows migrated invitation relationships without crediting legacy rewards again", async () => {
+    const queryClient = invitationQueryClient({
+      ...eligibleOverview,
+      network: {
+        direct_count: 1,
+        total_descendants: 2,
+        direct_members: [
+          {
+            numeric_id: 1024,
+            username: "legacy-member",
+            display_name: "旧站成员",
+            source: "legacy_import",
+            established_at: "2026-06-01T08:00:00Z",
+          },
+        ],
+        harem_reward: {
+          amount: "12345",
+          source_rows: 88,
+          last_rewarded_at: "2026-08-20T08:00:00Z",
+        },
+        invitation_reward: {
+          amount: "5000",
+          source_rows: 1,
+          last_rewarded_at: "2026-06-01T08:00:00Z",
+        },
+      },
+    })
+
+    renderPage(queryClient)
+
+    expect(await screen.findByText("后宫与邀请关系")).toBeVisible()
+    expect(screen.getByText("12,345 魔力值")).toBeVisible()
+    expect(screen.getByText("旧站成员")).toBeVisible()
+    expect(screen.getByText("Rousi 继承")).toBeVisible()
+    expect(screen.getByText("旧站奖励已计入期初魔力值")).toBeVisible()
+  })
 })
 
 function renderPage(queryClient: QueryClient) {
@@ -133,6 +170,13 @@ const disabledOverview: InvitationOverview = {
     email_verified: true,
   },
   items: [],
+  network: {
+    direct_members: [],
+    direct_count: 0,
+    total_descendants: 0,
+    harem_reward: { amount: "0", source_rows: 0 },
+    invitation_reward: { amount: "0", source_rows: 0 },
+  },
   total: 0,
   limit: 20,
   offset: 0,

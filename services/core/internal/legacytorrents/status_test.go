@@ -11,6 +11,12 @@ func TestMigrationStatusCheckpointsComplete(t *testing.T) {
 		SeedboxSourceRows: 2, SeedboxEnabledRows: 2,
 		SeedboxExpectedBindings: 3, SeedboxImportedBindings: 3,
 		SeedboxPolicySequence: 4,
+		PersonalStateReceipts: 1,
+		BookmarkSourceRows:    10, BookmarkEvidenceRows: 10,
+		InvitationSourceRows: 4, InvitationEvidenceRows: 4,
+		InvitationRelationships: 3, InvitationUnresolvedRows: 1,
+		HaremRewardUsers: 2, InviteRewardUsers: 1,
+		InvitationRewardEvidence: 3,
 	}
 	if !complete.CheckpointsComplete() {
 		t.Fatal("complete migration status was reported incomplete")
@@ -31,6 +37,11 @@ func TestMigrationStatusCheckpointsComplete(t *testing.T) {
 		{name: "missing seedbox receipt", mutate: func(value *MigrationStatus) { value.SeedboxPolicySequence = 0 }},
 		{name: "missing seedbox binding", mutate: func(value *MigrationStatus) { value.SeedboxImportedBindings-- }},
 		{name: "invalid seedbox inventory", mutate: func(value *MigrationStatus) { value.SeedboxEnabledRows++ }},
+		{name: "missing personal state receipt", mutate: func(value *MigrationStatus) { value.PersonalStateReceipts = 0 }},
+		{name: "missing bookmark evidence", mutate: func(value *MigrationStatus) { value.BookmarkEvidenceRows-- }},
+		{name: "missing invitation evidence", mutate: func(value *MigrationStatus) { value.InvitationEvidenceRows-- }},
+		{name: "missing invitation disposition", mutate: func(value *MigrationStatus) { value.InvitationRelationships-- }},
+		{name: "missing reward evidence", mutate: func(value *MigrationStatus) { value.InvitationRewardEvidence-- }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

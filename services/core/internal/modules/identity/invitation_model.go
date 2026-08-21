@@ -80,10 +80,40 @@ type InvitationEligibility struct {
 type InvitationOverview struct {
 	Eligibility InvitationEligibility
 	Items       []MemberInvitation
+	Network     InvitationNetwork
 	Total       int
 	Limit       int
 	Offset      int
 	ObservedAt  time.Time
+}
+
+type InvitationRelationshipSource string
+
+const (
+	InvitationRelationshipRegistration InvitationRelationshipSource = "registration"
+	InvitationRelationshipLegacyImport InvitationRelationshipSource = "legacy_import"
+)
+
+type InvitedMember struct {
+	NumericID     int64
+	Username      string
+	DisplayName   string
+	Source        InvitationRelationshipSource
+	EstablishedAt time.Time
+}
+
+type HistoricalInvitationReward struct {
+	Amount         int64
+	SourceRows     int64
+	LastRewardedAt *time.Time
+}
+
+type InvitationNetwork struct {
+	DirectMembers    []InvitedMember
+	DirectCount      int
+	TotalDescendants int
+	HaremReward      HistoricalInvitationReward
+	InvitationReward HistoricalInvitationReward
 }
 
 type InvitationIssueResult struct {

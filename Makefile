@@ -163,6 +163,14 @@ rousi-restore-production-status:
 	./scripts/restore-rousi-production.sh status \
 		"$(ROUSI_DUMP)" "$(ROUSI_TORRENTS)" "$(ROUSI_UPLOADS)"
 
+# Reconciles user-owned state added after an already completed Rousi cutover.
+# It hashes only the SQL dump, reuses the original immutable run manifest, and
+# never reprocesses the large torrent/image archives.
+rousi-restore-production-personal-state:
+	PEERGO_PRODUCTION_RESTORE_CONFIRM="$(CONFIRM_ROUSI_PRODUCTION)" \
+		./scripts/restore-rousi-production.sh personal-state \
+		"$(ROUSI_DUMP)" "$(ROUSI_TORRENTS)" "$(ROUSI_UPLOADS)"
+
 # Idempotent first-host preparation. It creates dedicated PeerGo roles,
 # databases, paths, secrets and a private Docker network without deleting data.
 single-server-bootstrap:
