@@ -11,14 +11,17 @@ import (
 )
 
 type PostgresRepository struct {
-	pool *pgxpool.Pool
+	pool                    *pgxpool.Pool
+	seedingEvidenceStartsAt time.Time
 }
 
-func NewPostgresRepository(pool *pgxpool.Pool) (*PostgresRepository, error) {
-	if pool == nil {
+func NewPostgresRepository(pool *pgxpool.Pool, seedingEvidenceStartsAt time.Time) (*PostgresRepository, error) {
+	_, offset := seedingEvidenceStartsAt.Zone()
+	if pool == nil || seedingEvidenceStartsAt.IsZero() || offset != 0 ||
+		!seedingEvidenceStartsAt.Equal(seedingEvidenceStartsAt.Truncate(time.Hour)) {
 		return nil, ErrInput
 	}
-	return &PostgresRepository{pool: pool}, nil
+	return &PostgresRepository{pool: pool, seedingEvidenceStartsAt: seedingEvidenceStartsAt}, nil
 }
 
 func (repository *PostgresRepository) Tracker(ctx context.Context, now time.Time) (TrackerOverview, error) {
@@ -138,9 +141,10 @@ LEFT JOIN LATERAL (
 		result.Evidence.LatestReceived = latestReceived.Int32
 	}
 
-	result.Evidence.MonthStartsAt = time.Date(now.UTC().Year(), now.UTC().Month(), 1, 0, 0, 0, 0, time.UTC)
-	result.Evidence.ExpectedThrough = now.UTC().Truncate(time.Hour)
-	result.Evidence.ExpectedWindows = int64(result.Evidence.ExpectedThrough.Sub(result.Evidence.MonthStartsAt) / time.Hour)
+	result.Evidence.MonthStartsAt, result.Evidence.CoverageStartsAt,
+		result.Evidence.ExpectedThrough, result.Evidence.ExpectedWindows = evidenceCoveragePeriod(
+		now, repository.seedingEvidenceStartsAt,
+	)
 	var monthComplete, monthCollecting int64
 	var firstComplete, lastComplete, oldestIncomplete pgtype.Timestamptz
 	if err := tx.QueryRow(ctx, `
@@ -152,7 +156,7 @@ SELECT
     min(window_start) FILTER (WHERE status = 'collecting')
 FROM economy.seeding_reward_evidence_windows
 WHERE window_start >= $1 AND window_end <= $2`,
-		result.Evidence.MonthStartsAt, result.Evidence.ExpectedThrough,
+		result.Evidence.CoverageStartsAt, result.Evidence.ExpectedThrough,
 	).Scan(&monthComplete, &monthCollecting, &firstComplete, &lastComplete, &oldestIncomplete); err != nil {
 		return TrackerOverview{}, fmt.Errorf("read monthly reward evidence coverage: %w", err)
 	}
@@ -162,7 +166,7 @@ WHERE window_start >= $1 AND window_end <= $2`,
 	}
 	result.Evidence.OldestIncomplete = nullableTime(oldestIncomplete)
 	result.Evidence.Health = evidenceWindowHealth(
-		result.Evidence.MonthStartsAt, result.Evidence.ExpectedThrough,
+		result.Evidence.CoverageStartsAt, result.Evidence.ExpectedThrough,
 		result.Evidence.ExpectedWindows, monthComplete, monthCollecting,
 		nullableTime(firstComplete), nullableTime(lastComplete),
 	)
@@ -187,7 +191,20 @@ FROM traffic.hnr_projection_inbox`).Scan(&result.Consumers.HNREvents, &hnrApplie
 	return result, nil
 }
 
-func evidenceWindowHealth(monthStart, expectedThrough time.Time, expected, complete, collecting int64, firstComplete, lastComplete *time.Time) EvidenceHealth {
+func evidenceCoveragePeriod(now, configuredStart time.Time) (time.Time, time.Time, time.Time, int64) {
+	monthStart := time.Date(now.UTC().Year(), now.UTC().Month(), 1, 0, 0, 0, 0, time.UTC)
+	coverageStart := monthStart
+	if configuredStart.After(coverageStart) {
+		coverageStart = configuredStart
+	}
+	expectedThrough := now.UTC().Truncate(time.Hour)
+	if !expectedThrough.After(coverageStart) {
+		return monthStart, coverageStart, expectedThrough, 0
+	}
+	return monthStart, coverageStart, expectedThrough, int64(expectedThrough.Sub(coverageStart) / time.Hour)
+}
+
+func evidenceWindowHealth(coverageStart, expectedThrough time.Time, expected, complete, collecting int64, firstComplete, lastComplete *time.Time) EvidenceHealth {
 	if expected == 0 {
 		return EvidenceHealthHealthy
 	}
@@ -195,8 +212,8 @@ func evidenceWindowHealth(monthStart, expectedThrough time.Time, expected, compl
 		return EvidenceHealthUnavailable
 	}
 	continuous := firstComplete != nil && lastComplete != nil &&
-		firstComplete.Equal(monthStart) &&
-		complete == int64(lastComplete.Sub(monthStart)/time.Hour)
+		firstComplete.Equal(coverageStart) &&
+		complete == int64(lastComplete.Sub(coverageStart)/time.Hour)
 	if collecting > 0 || !continuous {
 		return EvidenceHealthBroken
 	}

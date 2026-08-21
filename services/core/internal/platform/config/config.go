@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Config is validated before Core opens its listener or connects adapters.
@@ -35,6 +36,7 @@ type Config struct {
 	TrackerServiceToken    string
 	SettlementControlURL   string
 	SettlementServiceToken string
+	SeedingEvidenceStartAt time.Time
 	TurnstileSecretKey     string
 }
 
@@ -227,6 +229,15 @@ func Load() (Config, error) {
 	if len(settlementServiceToken) < 32 {
 		return Config{}, errors.New("PEERGO_SETTLEMENT_CONTROL_SERVICE_TOKEN must contain at least 32 bytes")
 	}
+	seedingEvidenceStartRaw, err := required("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT")
+	if err != nil {
+		return Config{}, err
+	}
+	seedingEvidenceStartAt, err := time.Parse(time.RFC3339, seedingEvidenceStartRaw)
+	_, seedingEvidenceOffset := seedingEvidenceStartAt.Zone()
+	if err != nil || seedingEvidenceOffset != 0 || !seedingEvidenceStartAt.Equal(seedingEvidenceStartAt.Truncate(time.Hour)) {
+		return Config{}, errors.New("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT must be an exact UTC RFC3339 hour")
+	}
 	turnstileSecretKey := strings.TrimSpace(os.Getenv("PEERGO_TURNSTILE_SECRET_KEY"))
 	if len(turnstileSecretKey) > 256 || strings.ContainsAny(turnstileSecretKey, "\r\n") {
 		return Config{}, errors.New("PEERGO_TURNSTILE_SECRET_KEY must contain at most 256 characters without line breaks")
@@ -271,6 +282,7 @@ func Load() (Config, error) {
 		TrackerServiceToken:    trackerServiceToken,
 		SettlementControlURL:   settlementControlURL,
 		SettlementServiceToken: settlementServiceToken,
+		SeedingEvidenceStartAt: seedingEvidenceStartAt,
 		TurnstileSecretKey:     turnstileSecretKey,
 	}, nil
 }

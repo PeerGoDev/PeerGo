@@ -31,7 +31,7 @@ SwarmProjectionStatus:
 EvidenceWindowStatus:
   type: object
   additionalProperties: false
-  required: [collecting_windows, complete_windows, latest_window_start, latest_window_end, latest_status, latest_item_count, latest_chunks, latest_received, month_starts_at, expected_through, expected_windows, missing_windows, oldest_incomplete, health]
+  required: [collecting_windows, complete_windows, latest_window_start, latest_window_end, latest_status, latest_item_count, latest_chunks, latest_received, month_starts_at, coverage_starts_at, expected_through, expected_windows, missing_windows, oldest_incomplete, health]
   properties:
     collecting_windows: { $ref: "#/OperationsCount" }
     complete_windows: { $ref: "#/OperationsCount" }
@@ -42,6 +42,7 @@ EvidenceWindowStatus:
     latest_chunks: { type: integer, minimum: 0 }
     latest_received: { type: integer, minimum: 0 }
     month_starts_at: { type: string, format: date-time }
+    coverage_starts_at: { type: string, format: date-time }
     expected_through: { type: string, format: date-time }
     expected_windows: { $ref: "#/OperationsCount" }
     missing_windows: { $ref: "#/OperationsCount" }

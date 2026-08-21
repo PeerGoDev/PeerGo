@@ -22320,6 +22320,7 @@ components:
         - latest_chunks
         - latest_received
         - month_starts_at
+        - coverage_starts_at
         - expected_through
         - expected_windows
         - missing_windows
@@ -22353,6 +22354,9 @@ components:
           type: integer
           minimum: 0
         month_starts_at:
+          type: string
+          format: date-time
+        coverage_starts_at:
           type: string
           format: date-time
         expected_through:

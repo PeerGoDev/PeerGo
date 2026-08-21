@@ -747,6 +747,7 @@ func trackerOperationsDTO(overview operations.TrackerOverview) generated.Tracker
 			LatestItemCount: strconv.FormatInt(overview.Evidence.LatestItemCount, 10), LatestChunks: int(overview.Evidence.LatestChunks),
 			LatestReceived:   int(overview.Evidence.LatestReceived),
 			MonthStartsAt:    overview.Evidence.MonthStartsAt,
+			CoverageStartsAt: overview.Evidence.CoverageStartsAt,
 			ExpectedThrough:  overview.Evidence.ExpectedThrough,
 			ExpectedWindows:  strconv.FormatInt(overview.Evidence.ExpectedWindows, 10),
 			MissingWindows:   strconv.FormatInt(overview.Evidence.MissingWindows, 10),

@@ -7766,6 +7766,8 @@ export interface components {
             /** Format: date-time */
             month_starts_at: string;
             /** Format: date-time */
+            coverage_starts_at: string;
+            /** Format: date-time */
             expected_through: string;
             expected_windows: components["schemas"]["OperationsCount"];
             missing_windows: components["schemas"]["OperationsCount"];

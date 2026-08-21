@@ -49,3 +49,28 @@ func TestEvidenceWindowHealth(t *testing.T) {
 		})
 	}
 }
+
+func TestEvidenceCoveragePeriodStartsAtTrustedCutover(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 21, 6, 34, 0, 0, time.UTC)
+	cutover := time.Date(2026, time.August, 21, 5, 0, 0, 0, time.UTC)
+
+	monthStart, coverageStart, expectedThrough, expected := evidenceCoveragePeriod(now, cutover)
+	if want := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC); !monthStart.Equal(want) {
+		t.Fatalf("month start = %s, want %s", monthStart, want)
+	}
+	if !coverageStart.Equal(cutover) || !expectedThrough.Equal(now.Truncate(time.Hour)) || expected != 1 {
+		t.Fatalf("coverage = start:%s through:%s windows:%d", coverageStart, expectedThrough, expected)
+	}
+}
+
+func TestEvidenceCoveragePeriodDoesNotExpectFutureCutover(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 21, 4, 34, 0, 0, time.UTC)
+	cutover := time.Date(2026, time.August, 21, 5, 0, 0, 0, time.UTC)
+
+	_, coverageStart, expectedThrough, expected := evidenceCoveragePeriod(now, cutover)
+	if !coverageStart.Equal(cutover) || !expectedThrough.Equal(now.Truncate(time.Hour)) || expected != 0 {
+		t.Fatalf("coverage = start:%s through:%s windows:%d", coverageStart, expectedThrough, expected)
+	}
+}

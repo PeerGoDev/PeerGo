@@ -172,6 +172,7 @@ export function trackerOperationsFixture() {
       latest_chunks: 3,
       latest_received: 3,
       month_starts_at: "2026-08-01T00:00:00Z",
+      coverage_starts_at: "2026-08-01T00:00:00Z",
       expected_through: "2026-08-16T08:00:00Z",
       expected_windows: "368",
       missing_windows: "0",

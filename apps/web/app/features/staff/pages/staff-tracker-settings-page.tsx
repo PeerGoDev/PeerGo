@@ -119,9 +119,9 @@ function TrackerSettingsContent() {
           tone="default"
         />
         <MetricCard
-          title="本月证据缺口"
+          title="证据缺口"
           value={formatInteger(data.evidence.missing_windows)}
-          description={`${evidenceHealthLabel(data.evidence.health)} · 应有 ${formatInteger(data.evidence.expected_windows)}`}
+          description={`${evidenceHealthLabel(data.evidence.health)} · 可信区间应有 ${formatInteger(data.evidence.expected_windows)}`}
           icon={<DatabaseZapIcon />}
           tone={evidenceMissing > 0n ? "warning" : "positive"}
         />
@@ -215,6 +215,10 @@ function TrackerSettingsContent() {
               {
                 label: "本月覆盖状态",
                 value: evidenceHealthLabel(data.evidence.health),
+              },
+              {
+                label: "可信覆盖起点",
+                value: formatTime(data.evidence.coverage_starts_at),
               },
               {
                 label: "应覆盖至",

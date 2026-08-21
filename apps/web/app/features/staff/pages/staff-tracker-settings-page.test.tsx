@@ -32,6 +32,7 @@ describe("StaffTrackerSettingsPage", () => {
     expect(screen.getAllByText("8,722").length).toBeGreaterThan(0)
     expect(screen.getByText("tracker-primary")).toBeVisible()
     expect(screen.getByText("结算证据与用户投影")).toBeVisible()
+    expect(screen.getByText("可信覆盖起点")).toBeVisible()
     expect(screen.getByText("已完成")).toBeVisible()
   })
 })

@@ -49,6 +49,7 @@ type EvidenceWindowStatus struct {
 	LatestChunks      int32
 	LatestReceived    int32
 	MonthStartsAt     time.Time
+	CoverageStartsAt  time.Time
 	ExpectedThrough   time.Time
 	ExpectedWindows   int64
 	MissingWindows    int64

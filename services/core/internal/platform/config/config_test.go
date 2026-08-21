@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadIncludesSeparatedStaffWebAuthnRuntimeBoundary(t *testing.T) {
@@ -27,6 +28,19 @@ func TestLoadIncludesSeparatedStaffWebAuthnRuntimeBoundary(t *testing.T) {
 	}
 	if settings.TrackerCanonicalOrigin != "http://tracker.localhost:8083" {
 		t.Fatalf("Tracker canonical origin = %q", settings.TrackerCanonicalOrigin)
+	}
+	if want := time.Date(2026, time.August, 15, 0, 0, 0, 0, time.UTC); !settings.SeedingEvidenceStartAt.Equal(want) {
+		t.Fatalf("seeding evidence start = %s, want %s", settings.SeedingEvidenceStartAt, want)
+	}
+}
+
+func TestLoadRejectsNonHourlySeedingEvidenceStart(t *testing.T) {
+	setValidCoreEnvironment(t)
+	t.Setenv("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT", "2026-08-15T00:00:01Z")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "exact UTC RFC3339 hour") {
+		t.Fatalf("Load() error = %v, want exact UTC hour failure", err)
 	}
 }
 
@@ -125,6 +139,7 @@ func setValidCoreEnvironment(t *testing.T) {
 	t.Setenv("PEERGO_TRACKER_SERVICE_TOKEN", "peergo-test-tracker-service-token-2026")
 	t.Setenv("PEERGO_SETTLEMENT_CONTROL_URL", "https://settlement.example")
 	t.Setenv("PEERGO_SETTLEMENT_CONTROL_SERVICE_TOKEN", "peergo-test-settlement-control-token-2026")
+	t.Setenv("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT", "2026-08-15T00:00:00Z")
 	t.Setenv("PEERGO_SESSION_CSRF_KEY", "peergo-test-session-csrf-key-2026")
 	t.Setenv("PEERGO_AUDIT_PSEUDONYM_KEY", "peergo-test-audit-pseudonym-key-2026")
 	t.Setenv("PEERGO_AUDIT_PSEUDONYM_KEY_EPOCH", "test-2026-08")
