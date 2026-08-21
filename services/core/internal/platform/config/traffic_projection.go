@@ -26,6 +26,7 @@ type ProjectionProjectorConfig struct {
 	RetryDelay      time.Duration
 	StartupTimeout  time.Duration
 	ShutdownTimeout time.Duration
+	Concurrency     int
 }
 
 type TrafficProjectorConfig = ProjectionProjectorConfig
@@ -107,7 +108,16 @@ var seedingEvidenceProjectionSpec = projectionSpec{
 }
 
 func LoadTrafficProjector() (TrafficProjectorConfig, error) {
-	return loadProjectionProjector(trafficProjectionSpec)
+	settings, err := loadProjectionProjector(trafficProjectionSpec)
+	if err != nil {
+		return TrafficProjectorConfig{}, err
+	}
+	concurrency, err := trafficProjectionConcurrency()
+	if err != nil {
+		return TrafficProjectorConfig{}, err
+	}
+	settings.Concurrency = concurrency
+	return settings, nil
 }
 
 func LoadHNRProjector() (HNRProjectorConfig, error) {
@@ -127,7 +137,16 @@ func LoadSeedingEvidenceProjector() (SeedingEvidenceProjectorConfig, error) {
 }
 
 func LoadTrafficConsumerProvisioner() (TrafficConsumerProvisionerConfig, error) {
-	return loadProjectionConsumerProvisioner(trafficProjectionSpec)
+	settings, err := loadProjectionConsumerProvisioner(trafficProjectionSpec)
+	if err != nil {
+		return TrafficConsumerProvisionerConfig{}, err
+	}
+	concurrency, err := trafficProjectionConcurrency()
+	if err != nil {
+		return TrafficConsumerProvisionerConfig{}, err
+	}
+	settings.Consumer.MaxAckPending = concurrency
+	return settings, nil
 }
 
 func LoadHNRConsumerProvisioner() (HNRConsumerProvisionerConfig, error) {
@@ -184,7 +203,12 @@ func loadProjectionProjector(spec projectionSpec) (ProjectionProjectorConfig, er
 		Stream: common.stream, Subject: common.subject, Durable: common.durable,
 		FetchWait: fetchWait, ProcessTimeout: processTimeout, AckTimeout: ackTimeout,
 		RetryDelay: retryDelay, StartupTimeout: startupTimeout, ShutdownTimeout: shutdownTimeout,
+		Concurrency: 1,
 	}, nil
+}
+
+func trafficProjectionConcurrency() (int, error) {
+	return projectionInteger("PEERGO_CORE_TRAFFIC_CONCURRENCY", 1, 32)
 }
 
 func loadProjectionConsumerProvisioner(spec projectionSpec) (ProjectionConsumerProvisionerConfig, error) {

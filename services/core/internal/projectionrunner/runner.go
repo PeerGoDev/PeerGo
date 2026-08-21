@@ -38,6 +38,7 @@ type Config struct {
 	ProcessTimeout time.Duration
 	AckTimeout     time.Duration
 	RetryDelay     time.Duration
+	Concurrency    int
 }
 
 type Semantics[R any] struct {
@@ -60,11 +61,15 @@ type Runner[R any] struct {
 }
 
 func New[R any](source Source, apply ApplyFunc[R], config Config, semantics Semantics[R], now func() time.Time, logger *slog.Logger) (*Runner[R], error) {
+	if config.Concurrency == 0 {
+		config.Concurrency = 1
+	}
 	if source == nil || apply == nil || !contract.ValidStreamName(config.Stream) ||
 		!contract.ValidLiteralSubject(config.Subject) || !contract.ValidStreamName(config.Durable) ||
 		config.ProcessTimeout < 100*time.Millisecond || config.ProcessTimeout > 10*time.Minute ||
 		config.AckTimeout < 100*time.Millisecond || config.AckTimeout > time.Minute ||
 		config.RetryDelay < 10*time.Millisecond || config.RetryDelay > time.Minute ||
+		config.Concurrency < 1 || config.Concurrency > 32 ||
 		strings.TrimSpace(semantics.Name) == "" || semantics.EventID == nil || semantics.Duplicate == nil ||
 		semantics.IsPermanent == nil || semantics.Invariant == nil {
 		return nil, ErrConfig
@@ -79,6 +84,36 @@ func New[R any](source Source, apply ApplyFunc[R], config Config, semantics Sema
 }
 
 func (runner *Runner[R]) Run(ctx context.Context) error {
+	if runner.config.Concurrency == 1 {
+		return runner.runLane(ctx)
+	}
+
+	// JetStream distributes distinct explicit-ACK deliveries across these
+	// fixed lanes. The projection transaction and event inbox remain the
+	// exactly-once boundary; any permanent failure cancels every sibling lane
+	// without acknowledging the offending event.
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	results := make(chan error, runner.config.Concurrency)
+	for lane := 0; lane < runner.config.Concurrency; lane++ {
+		go func() {
+			err := runner.runLane(runCtx)
+			results <- err
+			if err != nil {
+				cancel()
+			}
+		}()
+	}
+	var firstErr error
+	for lane := 0; lane < runner.config.Concurrency; lane++ {
+		if err := <-results; firstErr == nil && err != nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func (runner *Runner[R]) runLane(ctx context.Context) error {
 	for {
 		message, err := runner.source.Next(ctx)
 		if err != nil {

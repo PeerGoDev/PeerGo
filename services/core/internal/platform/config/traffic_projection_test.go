@@ -16,7 +16,8 @@ func TestLoadTrafficProjectorBuildsNarrowRuntimeConfiguration(t *testing.T) {
 	if settings.DatabaseURL == "" || len(settings.NATS.URLs) != 1 ||
 		settings.Stream != "PEERGO_SETTLEMENT_TRAFFIC_V1" || settings.Subject != "peergo.settlement.traffic.v1" ||
 		settings.Durable != "PEERGO_CORE_TRAFFIC_V1" || settings.FetchWait != 2*time.Second ||
-		settings.ProcessTimeout != 10*time.Second || settings.AckTimeout != 5*time.Second || settings.RetryDelay != time.Second {
+		settings.ProcessTimeout != 10*time.Second || settings.AckTimeout != 5*time.Second || settings.RetryDelay != time.Second ||
+		settings.Concurrency != 4 {
 		t.Fatalf("settings = %+v", settings)
 	}
 }
@@ -29,9 +30,20 @@ func TestLoadTrafficConsumerProvisionerBuildsOrderedDurableConsumer(t *testing.T
 	}
 	consumer := settings.Consumer
 	if consumer.Name != consumer.Durable || consumer.FilterSubject != "peergo.settlement.traffic.v1" ||
-		consumer.MaxDeliver != -1 || consumer.MaxAckPending != 1 || consumer.MaxRequestBatch != 1 ||
+		consumer.MaxDeliver != -1 || consumer.MaxAckPending != 4 || consumer.MaxRequestBatch != 1 ||
 		consumer.Metadata["peergo.schema"] != "settlement.traffic.v1" {
 		t.Fatalf("consumer = %+v", consumer)
+	}
+}
+
+func TestTrafficProjectionRejectsConcurrencyOutsideBound(t *testing.T) {
+	setTrafficProjectorConfigValues(t, "development")
+	t.Setenv("PEERGO_CORE_TRAFFIC_CONCURRENCY", "33")
+	if _, err := LoadTrafficProjector(); err == nil || !strings.Contains(err.Error(), "between 1 and 32") {
+		t.Fatalf("LoadTrafficProjector() error = %v", err)
+	}
+	if _, err := LoadTrafficConsumerProvisioner(); err == nil || !strings.Contains(err.Error(), "between 1 and 32") {
+		t.Fatalf("LoadTrafficConsumerProvisioner() error = %v", err)
 	}
 }
 
@@ -120,6 +132,7 @@ func setTrafficProjectorConfigValues(t *testing.T, environment string) {
 		"PEERGO_SETTLEMENT_TRAFFIC_STREAM":                    "PEERGO_SETTLEMENT_TRAFFIC_V1",
 		"PEERGO_SETTLEMENT_TRAFFIC_SUBJECT":                   "peergo.settlement.traffic.v1",
 		"PEERGO_CORE_TRAFFIC_DURABLE":                         "PEERGO_CORE_TRAFFIC_V1",
+		"PEERGO_CORE_TRAFFIC_CONCURRENCY":                     "4",
 		"PEERGO_CORE_TRAFFIC_FETCH_WAIT":                      "2s",
 		"PEERGO_CORE_TRAFFIC_PROCESS_TIMEOUT":                 "10s",
 		"PEERGO_CORE_TRAFFIC_ACK_TIMEOUT":                     "5s",

@@ -60,12 +60,13 @@ func run(logger *slog.Logger) error {
 	}
 	dispatcher, err := trafficoutbox.NewDispatcher(repository, publisher, trafficoutbox.DispatcherConfig{
 		LeaseDuration: settings.LeaseDuration, IdleInterval: settings.IdleInterval, RetryBase: settings.RetryBase,
-		PublishTimeout: settings.PublishTimeout,
+		PublishTimeout: settings.PublishTimeout, Concurrency: settings.Concurrency,
 	}, time.Now, logger)
 	if err != nil {
 		return fmt.Errorf("compose Settlement traffic dispatcher: %w", err)
 	}
-	logger.Info("Settlement traffic outbox dispatcher started", "stream", settings.Stream, "subject", settings.Subject)
+	logger.Info("Settlement traffic outbox dispatcher started", "stream", settings.Stream, "subject", settings.Subject,
+		"concurrency", settings.Concurrency)
 	runtimeErr := dispatcher.Run(rootCtx)
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), settings.ShutdownTimeout)
 	defer cancelShutdown()

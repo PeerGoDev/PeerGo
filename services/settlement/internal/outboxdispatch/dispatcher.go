@@ -25,6 +25,7 @@ type Config struct {
 	IdleInterval   time.Duration
 	RetryBase      time.Duration
 	PublishTimeout time.Duration
+	Concurrency    int
 }
 
 type Repository[T any] interface {
@@ -70,10 +71,14 @@ func New[T any](repository Repository[T], publisher Publisher[T], config Config,
 	if config.PublishTimeout == 0 {
 		config.PublishTimeout = 10 * time.Second
 	}
+	if config.Concurrency == 0 {
+		config.Concurrency = 1
+	}
 	if config.LeaseDuration < time.Second || config.LeaseDuration > 10*time.Minute ||
 		config.IdleInterval < 50*time.Millisecond || config.IdleInterval > time.Minute ||
 		config.RetryBase < 100*time.Millisecond || config.RetryBase > time.Minute ||
-		config.PublishTimeout < 100*time.Millisecond || config.PublishTimeout > time.Minute {
+		config.PublishTimeout < 100*time.Millisecond || config.PublishTimeout > time.Minute ||
+		config.Concurrency < 1 || config.Concurrency > 32 {
 		return nil, ErrInput
 	}
 	if now == nil {
@@ -122,6 +127,35 @@ func (dispatcher *Dispatcher[T]) RunOnce(ctx context.Context) (bool, error) {
 }
 
 func (dispatcher *Dispatcher[T]) Run(ctx context.Context) error {
+	if dispatcher.config.Concurrency == 1 {
+		return dispatcher.runLane(ctx)
+	}
+
+	// Fixed lanes share the same lease-aware repository. ClaimNext must provide
+	// an atomic SKIP LOCKED-style claim, so every row still has one active
+	// publisher while unrelated rows may make progress in parallel.
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	results := make(chan error, dispatcher.config.Concurrency)
+	for lane := 0; lane < dispatcher.config.Concurrency; lane++ {
+		go func() {
+			err := dispatcher.runLane(runCtx)
+			results <- err
+			if err != nil {
+				cancel()
+			}
+		}()
+	}
+	var firstErr error
+	for lane := 0; lane < dispatcher.config.Concurrency; lane++ {
+		if err := <-results; firstErr == nil && err != nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func (dispatcher *Dispatcher[T]) runLane(ctx context.Context) error {
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 	for {

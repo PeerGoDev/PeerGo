@@ -22,6 +22,7 @@ type BindingConfig struct {
 	FetchWait             time.Duration
 	MaximumProcessingTime time.Duration
 	MaximumAckTime        time.Duration
+	MaxAckPending         int
 }
 
 type nextConsumer interface {
@@ -52,23 +53,32 @@ func OpenSource(ctx context.Context, js jetstream.JetStream, config BindingConfi
 }
 
 func validateBinding(config BindingConfig) error {
+	maxAckPending := config.MaxAckPending
+	if maxAckPending == 0 {
+		maxAckPending = 1
+	}
 	if !settlementtrafficv1.ValidStreamName(config.Stream) || !settlementtrafficv1.ValidLiteralSubject(config.Subject) ||
 		!settlementtrafficv1.ValidStreamName(config.Durable) || config.FetchWait < 100*time.Millisecond || config.FetchWait > time.Minute ||
 		config.MaximumProcessingTime < 100*time.Millisecond || config.MaximumProcessingTime > 10*time.Minute ||
-		config.MaximumAckTime < 100*time.Millisecond || config.MaximumAckTime > time.Minute {
+		config.MaximumAckTime < 100*time.Millisecond || config.MaximumAckTime > time.Minute ||
+		maxAckPending < 1 || maxAckPending > 32 {
 		return ErrConfig
 	}
 	return nil
 }
 
 func validateConsumerBinding(info *jetstream.ConsumerInfo, config BindingConfig) error {
+	maxAckPending := config.MaxAckPending
+	if maxAckPending == 0 {
+		maxAckPending = 1
+	}
 	if info == nil || info.Stream != config.Stream || info.Name != config.Durable ||
 		info.Config.Name != config.Durable || info.Config.Durable != config.Durable ||
 		info.Config.DeliverPolicy != jetstream.DeliverAllPolicy || info.Config.AckPolicy != jetstream.AckExplicitPolicy ||
 		info.Config.AckWait <= config.MaximumProcessingTime+config.MaximumAckTime || info.Config.MaxDeliver != -1 ||
 		info.Config.FilterSubject != config.Subject || len(info.Config.FilterSubjects) != 0 ||
 		info.Config.ReplayPolicy != jetstream.ReplayInstantPolicy || info.Config.DeliverSubject != "" || info.Config.DeliverGroup != "" ||
-		info.Config.MaxAckPending != 1 || info.Config.MaxRequestBatch != 1 ||
+		info.Config.MaxAckPending != maxAckPending || info.Config.MaxRequestBatch != 1 ||
 		(info.Config.MaxRequestExpires > 0 && config.FetchWait > info.Config.MaxRequestExpires) {
 		return ErrConsumerDrift
 	}

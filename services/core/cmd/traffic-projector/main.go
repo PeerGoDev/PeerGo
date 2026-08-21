@@ -53,6 +53,7 @@ func run(logger *slog.Logger) error {
 	source, err := trafficconsumer.OpenSource(startupCtx, js, trafficconsumer.BindingConfig{
 		Stream: settings.Stream, Subject: settings.Subject, Durable: settings.Durable,
 		FetchWait: settings.FetchWait, MaximumProcessingTime: settings.ProcessTimeout, MaximumAckTime: settings.AckTimeout,
+		MaxAckPending: settings.Concurrency,
 	})
 	if err != nil {
 		return fmt.Errorf("open Core traffic JetStream source: %w", err)
@@ -64,11 +65,13 @@ func run(logger *slog.Logger) error {
 	runner, err := trafficconsumer.NewRunner(source, projector, trafficconsumer.RunnerConfig{
 		Stream: settings.Stream, Subject: settings.Subject, Durable: settings.Durable,
 		ProcessTimeout: settings.ProcessTimeout, AckTimeout: settings.AckTimeout, RetryDelay: settings.RetryDelay,
+		Concurrency: settings.Concurrency,
 	}, time.Now, logger)
 	if err != nil {
 		return fmt.Errorf("compose Core traffic projector: %w", err)
 	}
-	logger.Info("Core traffic projector started", "stream", settings.Stream, "subject", settings.Subject, "durable", settings.Durable)
+	logger.Info("Core traffic projector started", "stream", settings.Stream, "subject", settings.Subject,
+		"durable", settings.Durable, "concurrency", settings.Concurrency)
 	runtimeErr := runner.Run(rootCtx)
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), settings.ShutdownTimeout)
 	defer cancelShutdown()

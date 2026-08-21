@@ -21,15 +21,25 @@ type TrafficDispatcherConfig struct {
 	PublishTimeout  time.Duration
 	StartupTimeout  time.Duration
 	ShutdownTimeout time.Duration
+	Concurrency     int
 }
 
 type HNRDispatcherConfig = TrafficDispatcherConfig
 type SeedingEvidenceDispatcherConfig = TrafficDispatcherConfig
 
 func LoadTrafficDispatcher() (TrafficDispatcherConfig, error) {
-	return loadResultDispatcher(
+	settings, err := loadResultDispatcher(
 		"PEERGO_SETTLEMENT_TRAFFIC", "PEERGO_SETTLEMENT_NATS_PUBLISH_CREDENTIALS_FILE", trafficStreamIdentity,
 	)
+	if err != nil {
+		return TrafficDispatcherConfig{}, err
+	}
+	concurrency, err := integer("PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY", 1, 32)
+	if err != nil {
+		return TrafficDispatcherConfig{}, err
+	}
+	settings.Concurrency = concurrency
+	return settings, nil
 }
 
 func LoadHNRDispatcher() (HNRDispatcherConfig, error) {
@@ -85,6 +95,7 @@ func loadResultDispatcher(prefix, credentialName string, identity func() (string
 		TrackerLedgerProcessConfig: database, NATS: connection, Stream: stream, Subject: subject,
 		LeaseDuration: leaseDuration, IdleInterval: idleInterval, RetryBase: retryBase, PublishTimeout: publishTimeout,
 		StartupTimeout: startupTimeout, ShutdownTimeout: shutdownTimeout,
+		Concurrency: 1,
 	}, nil
 }
 

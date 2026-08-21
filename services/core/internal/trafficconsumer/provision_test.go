@@ -10,7 +10,7 @@ import (
 	"github.com/peergo/peergo/contracts/go/settlementtrafficv1"
 )
 
-func TestEnsureConsumerCreatesAndRejectsDrift(t *testing.T) {
+func TestEnsureConsumerCreatesUpdatesConcurrencyAndRejectsUnsafeDrift(t *testing.T) {
 	t.Parallel()
 	desired := testConsumerConfig()
 	manager := &fakeConsumerManager{getErr: jetstream.ErrConsumerNotFound}
@@ -25,6 +25,10 @@ func TestEnsureConsumerCreatesAndRejectsDrift(t *testing.T) {
 		t.Fatalf("EnsureConsumer(existing) = %v, %v", created, err)
 	}
 	manager.current.MaxAckPending = 2
+	if _, err := EnsureConsumer(context.Background(), manager, settlementtrafficv1.DefaultStream, desired); err != nil || manager.updated.MaxAckPending != 1 {
+		t.Fatalf("EnsureConsumer(concurrency update) updated=%+v error=%v", manager.updated, err)
+	}
+	manager.current.Description = "unsafe drift"
 	if _, err := EnsureConsumer(context.Background(), manager, settlementtrafficv1.DefaultStream, desired); !errors.Is(err, ErrProvisionDrift) {
 		t.Fatalf("EnsureConsumer(drift) error = %v", err)
 	}
@@ -33,6 +37,7 @@ func TestEnsureConsumerCreatesAndRejectsDrift(t *testing.T) {
 type fakeConsumerManager struct {
 	current jetstream.ConsumerConfig
 	created jetstream.ConsumerConfig
+	updated jetstream.ConsumerConfig
 	getErr  error
 }
 
@@ -41,6 +46,11 @@ func (manager *fakeConsumerManager) Get(context.Context, string, string) (jetstr
 }
 func (manager *fakeConsumerManager) Create(_ context.Context, _ string, config jetstream.ConsumerConfig) error {
 	manager.created = config
+	return nil
+}
+func (manager *fakeConsumerManager) Update(_ context.Context, _ string, config jetstream.ConsumerConfig) error {
+	manager.updated = config
+	manager.current = config
 	return nil
 }
 

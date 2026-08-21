@@ -16,6 +16,7 @@ var ErrProvisionDrift = errors.New("existing Core JetStream consumer has unsafe 
 type ConsumerManager interface {
 	Get(context.Context, string, string) (jetstream.ConsumerConfig, error)
 	Create(context.Context, string, jetstream.ConsumerConfig) error
+	Update(context.Context, string, jetstream.ConsumerConfig) error
 }
 
 type NATSConsumerManager struct{ js jetstream.JetStream }
@@ -44,13 +45,36 @@ func (manager *NATSConsumerManager) Create(ctx context.Context, stream string, c
 	return err
 }
 
+func (manager *NATSConsumerManager) Update(ctx context.Context, stream string, config jetstream.ConsumerConfig) error {
+	_, err := manager.js.UpdateConsumer(ctx, stream, config)
+	return err
+}
+
 func EnsureConsumer(ctx context.Context, manager ConsumerManager, stream string, desired jetstream.ConsumerConfig) (bool, error) {
 	if manager == nil || !settlementtrafficv1.ValidStreamName(stream) || validateConsumerConfig(desired) != nil {
 		return false, ErrConfig
 	}
 	current, err := manager.Get(ctx, stream, desired.Durable)
 	if err == nil {
-		if !equivalentConsumerConfig(current, desired) {
+		if equivalentConsumerConfig(current, desired) {
+			return false, nil
+		}
+		// MaxAckPending is the only mutable drift this provisioner repairs. It
+		// changes bounded delivery capacity without replacing the durable or
+		// altering its acknowledgement/delivery position. Every other mismatch
+		// remains a fail-closed operator error.
+		if current.MaxAckPending < 1 || current.MaxAckPending > 32 ||
+			!equivalentConsumerConfigExceptMaxAckPending(current, desired) {
+			return false, ErrProvisionDrift
+		}
+		if err := manager.Update(ctx, stream, desired); err != nil {
+			return false, fmt.Errorf("update Core JetStream consumer concurrency: %w", err)
+		}
+		updated, err := manager.Get(ctx, stream, desired.Durable)
+		if err != nil {
+			return false, fmt.Errorf("verify updated Core JetStream consumer: %w", err)
+		}
+		if !equivalentConsumerConfig(updated, desired) {
 			return false, ErrProvisionDrift
 		}
 		return false, nil
@@ -69,7 +93,8 @@ func validateConsumerConfig(config jetstream.ConsumerConfig) error {
 		config.DeliverPolicy != jetstream.DeliverAllPolicy || config.AckPolicy != jetstream.AckExplicitPolicy ||
 		config.AckWait <= 0 || config.MaxDeliver != -1 || !settlementtrafficv1.ValidLiteralSubject(config.FilterSubject) ||
 		len(config.FilterSubjects) != 0 || config.ReplayPolicy != jetstream.ReplayInstantPolicy || config.DeliverSubject != "" ||
-		config.DeliverGroup != "" || config.MaxAckPending != 1 || config.MaxRequestBatch != 1 || config.MaxRequestExpires <= 0 || config.MaxWaiting < 1 {
+		config.DeliverGroup != "" || config.MaxAckPending < 1 || config.MaxAckPending > 32 ||
+		config.MaxRequestBatch != 1 || config.MaxRequestExpires <= 0 || config.MaxWaiting < 1 {
 		return ErrConfig
 	}
 	for key := range config.Metadata {
@@ -78,6 +103,11 @@ func validateConsumerConfig(config jetstream.ConsumerConfig) error {
 		}
 	}
 	return nil
+}
+
+func equivalentConsumerConfigExceptMaxAckPending(current, desired jetstream.ConsumerConfig) bool {
+	current.MaxAckPending = desired.MaxAckPending
+	return equivalentConsumerConfig(current, desired)
 }
 
 func equivalentConsumerConfig(current, desired jetstream.ConsumerConfig) bool {

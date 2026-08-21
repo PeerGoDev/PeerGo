@@ -52,6 +52,16 @@ settlement_policy_concurrency="$(env_get PEERGO_SETTLEMENT_POLICY_CONCURRENCY)"
     ((10#${settlement_policy_concurrency} <= 32)) ||
     fail "PEERGO_SETTLEMENT_POLICY_CONCURRENCY must be an integer between 1 and 32"
 
+settlement_traffic_outbox_concurrency="$(env_get PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY)"
+[[ "${settlement_traffic_outbox_concurrency}" =~ ^[1-9][0-9]?$ ]] &&
+    ((10#${settlement_traffic_outbox_concurrency} <= 32)) ||
+    fail "PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY must be an integer between 1 and 32"
+
+core_traffic_concurrency="$(env_get PEERGO_CORE_TRAFFIC_CONCURRENCY)"
+[[ "${core_traffic_concurrency}" =~ ^[1-9][0-9]?$ ]] &&
+    ((10#${core_traffic_concurrency} <= 32)) ||
+    fail "PEERGO_CORE_TRAFFIC_CONCURRENCY must be an integer between 1 and 32"
+
 deployment_mode="$(env_get PEERGO_DEPLOYMENT_MODE)"
 deployment_mode="${deployment_mode:-cluster}"
 case "${deployment_mode}" in

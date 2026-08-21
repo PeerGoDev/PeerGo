@@ -154,6 +154,12 @@ make production-build
 每次调整后只重建该 worker，并同时观察待结算数量、数据库连接与不可变账本一致性，不能靠
 清队列、跳过事件或手工补余额来缩短水位。
 
+流量 outbox 与 Core 流量投影默认也各自在单进程内使用 4 条固定通道。对应参数为
+`PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY` 和 `PEERGO_CORE_TRAFFIC_CONCURRENCY`，支持范围
+均为 1–32。Core durable 只允许把 `MaxAckPending` 原位同步为后一参数；不会删除或重建
+消费者，其他配置漂移仍会阻止启动。调高后必须同时确认策略积压、outbox 积压和 Core
+投影水位都在下降，并复核事件计数与流量账本不变量。
+
 ## 4. 非公开启动
 
 迁移验收通过后启动全套服务；此时 Web/Tracker 仍只绑定宿主机 loopback，公网入口尚未切换：
