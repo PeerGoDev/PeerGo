@@ -141,6 +141,29 @@ func TestRegistrationPolicyAdministrationRejectsTurnstileWithoutRuntimeSecret(t 
 	}
 }
 
+func TestRegistrationPolicyAdministrationReasonUsesFiveRuneMinimum(t *testing.T) {
+	t.Parallel()
+
+	input := UpdateRegistrationPolicyInput{
+		Mode: RegistrationModeInvite, InviteValidDays: 7, MaxInvitesPerMember: 5,
+		MinimumInviteAccountAgeDays: 30, MinimumInviteLevel: 2,
+		UsernameMinCharacters: 3, UsernameMaxCharacters: 20,
+		EmailDomainMode:   EmailDomainModeAny,
+		SessionValidHours: 168, RememberSessionValidHours: 720,
+		HumanVerificationProvider: HumanVerificationProviderDisabled,
+		ExpectedVersion:           1,
+		Reason:                    "调整注册制",
+	}
+	if _, err := normalizeRegistrationPolicyInput(input); err != nil {
+		t.Fatalf("normalizeRegistrationPolicyInput() five-rune reason error = %v", err)
+	}
+
+	input.Reason = "调整注册"
+	if _, err := normalizeRegistrationPolicyInput(input); !errors.Is(err, ErrRegistrationPolicyInput) {
+		t.Fatalf("normalizeRegistrationPolicyInput() four-rune reason error = %v, want ErrRegistrationPolicyInput", err)
+	}
+}
+
 func TestRegistrationPolicyAdministrationRejectsInvalidInputBeforeAuthorization(t *testing.T) {
 	t.Parallel()
 

@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	minRegistrationPolicyReasonRunes = 10
+	minRegistrationPolicyReasonRunes = 5
 	maxRegistrationPolicyReasonRunes = 500
 	maxReservedUsernames             = 200
 	maxEmailDomains                  = 100

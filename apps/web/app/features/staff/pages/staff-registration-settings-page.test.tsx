@@ -45,10 +45,7 @@ describe("StaffRegistrationSettingsPage", () => {
     expect(save).toBeDisabled()
 
     await user.click(screen.getByRole("button", { name: "关闭注册" }))
-    await user.type(
-      screen.getByLabelText("变更理由"),
-      "维护期间暂时停止创建新账户。"
-    )
+    await user.type(screen.getByLabelText("变更理由"), "调整注册制")
     expect(save).toBeEnabled()
 
     await user.click(save)

@@ -210,7 +210,7 @@ UpdateRegistrationPolicySettingsRequest:
       maximum: 9007199254740991
     reason:
       type: string
-      minLength: 10
+      minLength: 5
       maxLength: 500
 
 InvitationStatus:

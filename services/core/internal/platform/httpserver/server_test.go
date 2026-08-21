@@ -3011,7 +3011,7 @@ func TestProductionRegistrationPolicyUpdatePassesOpenAPIValidation(t *testing.T)
 		"human_verification_login_enabled":false,
 		"human_verification_password_recovery_enabled":false,
 		"expected_version":1,
-		"reason":"生产上线前启用邀请注册准入策略。"
+		"reason":"调整注册制"
 	}`
 	request := httptest.NewRequest(
 		http.MethodPut,

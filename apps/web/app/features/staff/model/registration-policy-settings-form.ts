@@ -4,6 +4,11 @@ const usernamePattern = /^[a-z0-9][a-z0-9_-]{2,31}$/
 const emailDomainPattern =
   /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/
 
+export const registrationPolicyReasonLimits = {
+  minimum: 5,
+  maximum: 500,
+} as const
+
 function policyEntryList(
   itemSchema: z.ZodString,
   maximum: number,
@@ -57,12 +62,14 @@ export const registrationPolicySettingsFormSchema = z
       .string()
       .trim()
       .refine(
-        (value) => Array.from(value).length >= 10,
-        "请填写至少 10 个字符的变更理由"
+        (value) =>
+          Array.from(value).length >= registrationPolicyReasonLimits.minimum,
+        `请填写至少 ${registrationPolicyReasonLimits.minimum} 个字符的变更理由`
       )
       .refine(
-        (value) => Array.from(value).length <= 500,
-        "变更理由不能超过 500 个字符"
+        (value) =>
+          Array.from(value).length <= registrationPolicyReasonLimits.maximum,
+        `变更理由不能超过 ${registrationPolicyReasonLimits.maximum} 个字符`
       ),
   })
   .superRefine((value, context) => {

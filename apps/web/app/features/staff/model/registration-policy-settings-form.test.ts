@@ -52,6 +52,21 @@ describe("registrationPolicySettingsFormSchema", () => {
     ).toBe(false)
   })
 
+  it("accepts a five-character reason and rejects a shorter one", () => {
+    expect(
+      registrationPolicySettingsFormSchema.safeParse({
+        ...validInput,
+        reason: "调整注册制",
+      }).success
+    ).toBe(true)
+    expect(
+      registrationPolicySettingsFormSchema.safeParse({
+        ...validInput,
+        reason: "调整注册",
+      }).success
+    ).toBe(false)
+  })
+
   it("requires a deployed secret, public site key, and at least one protected flow", () => {
     expect(
       registrationPolicySettingsFormSchema.safeParse({
