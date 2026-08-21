@@ -741,6 +741,7 @@ dev-settlement-policy:
 	PEERGO_SETTLEMENT_POLICY_IDLE_INTERVAL="500ms" \
 	PEERGO_SETTLEMENT_POLICY_RETRY_BASE="1s" \
 	PEERGO_SETTLEMENT_POLICY_STARTUP_TIMEOUT="10s" \
+	PEERGO_SETTLEMENT_POLICY_CONCURRENCY="4" \
 	go run ./services/settlement/cmd/policy-worker
 
 # Write-only loopback control API for immutable promotion commands from Core.

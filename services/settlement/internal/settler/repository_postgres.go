@@ -55,8 +55,9 @@ func (repository *PostgresRepository) ClaimNext(ctx context.Context, now time.Ti
 }
 
 // Settle resolves policy and commits every final ledger row plus the Core
-// outbox event in one transaction. LockPolicyTimeline serializes this with a
-// policy append, so a late historical revision cannot race past this result.
+// outbox event in one transaction. The shared timeline lock allows unrelated
+// leased intervals to settle concurrently but blocks every policy append, so a
+// late historical revision cannot race past any in-flight result.
 func (repository *PostgresRepository) Settle(ctx context.Context, pending PendingWork, settledAt time.Time) error {
 	if pending.IntervalEventID == uuid.Nil || pending.LeaseToken == uuid.Nil || pending.Attempts < 1 || settledAt.IsZero() {
 		return ErrInput
@@ -67,7 +68,7 @@ func (repository *PostgresRepository) Settle(ctx context.Context, pending Pendin
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := ledgerdb.New(tx)
-	if err := queries.LockPolicyTimeline(ctx); err != nil {
+	if err := queries.LockPolicyTimelineForSettlement(ctx); err != nil {
 		return classifyDatabaseError("lock policy timeline", err)
 	}
 	row, err := queries.GetClaimedPolicyWorkForUpdate(ctx, ledgerdb.GetClaimedPolicyWorkForUpdateParams{

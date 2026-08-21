@@ -13,6 +13,7 @@ type WorkerConfig struct {
 	LeaseDuration time.Duration
 	IdleInterval  time.Duration
 	RetryBase     time.Duration
+	Concurrency   int
 }
 
 type Worker struct {
@@ -35,9 +36,13 @@ func NewWorker(repository WorkRepository, config WorkerConfig, now func() time.T
 	if config.RetryBase == 0 {
 		config.RetryBase = 2 * time.Second
 	}
+	if config.Concurrency == 0 {
+		config.Concurrency = 1
+	}
 	if config.LeaseDuration < time.Second || config.LeaseDuration > 10*time.Minute ||
 		config.IdleInterval < 50*time.Millisecond || config.IdleInterval > time.Minute ||
-		config.RetryBase < 100*time.Millisecond || config.RetryBase > time.Minute {
+		config.RetryBase < 100*time.Millisecond || config.RetryBase > time.Minute ||
+		config.Concurrency < 1 || config.Concurrency > 32 {
 		return nil, ErrInput
 	}
 	if now == nil {
@@ -82,6 +87,33 @@ func (worker *Worker) RunOnce(ctx context.Context) (bool, error) {
 }
 
 func (worker *Worker) Run(ctx context.Context) error {
+	if worker.config.Concurrency == 1 {
+		return worker.runLane(ctx)
+	}
+
+	// ClaimNext uses a transactional FOR UPDATE SKIP LOCKED lease, so lanes can
+	// raise throughput without allowing two lanes to settle the same immutable
+	// interval. A permanent failure cancels every sibling and is returned rather
+	// than letting later accounting continue past ambiguous evidence.
+	laneCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	results := make(chan error, worker.config.Concurrency)
+	for lane := 0; lane < worker.config.Concurrency; lane++ {
+		go func() {
+			results <- worker.runLane(laneCtx)
+		}()
+	}
+	var firstErr error
+	for lane := 0; lane < worker.config.Concurrency; lane++ {
+		if err := <-results; err != nil && firstErr == nil {
+			firstErr = err
+			cancel()
+		}
+	}
+	return firstErr
+}
+
+func (worker *Worker) runLane(ctx context.Context) error {
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 	for {

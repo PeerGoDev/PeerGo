@@ -247,6 +247,14 @@ hnr_stream_max_bytes="$(bootstrap_or_existing \
     10737418240 \
     53687091200)"
 
+settlement_policy_concurrency="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_POLICY_CONCURRENCY \
+    PEERGO_BOOTSTRAP_SETTLEMENT_POLICY_CONCURRENCY \
+    4)"
+[[ "${settlement_policy_concurrency}" =~ ^[1-9][0-9]?$ ]] &&
+    ((10#${settlement_policy_concurrency} <= 32)) ||
+    fail "PEERGO_SETTLEMENT_POLICY_CONCURRENCY must be an integer between 1 and 32"
+
 nats_username=peergo
 if [[ -f "${nats_credentials_file}" ]]; then
     [[ "$(head -n 1 "${nats_credentials_file}" | tr -d '\r')" == "peergo-single-server-user-password-v1" ]] ||
@@ -370,6 +378,7 @@ set_env PEERGO_TORRENT_STORAGE_DRIVER filesystem
 set_env PEERGO_TORRENT_STORAGE_FILESYSTEM_ROOT /var/lib/peergo/objects
 set_env PEERGO_IMAGE_DERIVATIVE_TEMP_DIR /var/lib/peergo/image-derivative-tmp
 set_env PEERGO_SETTLEMENT_HNR_STREAM_MAX_BYTES "${hnr_stream_max_bytes}"
+set_env PEERGO_SETTLEMENT_POLICY_CONCURRENCY "${settlement_policy_concurrency}"
 
 nats_url_names=(
     PEERGO_TRACKER_NATS_URLS

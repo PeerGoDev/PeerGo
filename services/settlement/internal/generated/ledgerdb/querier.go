@@ -74,10 +74,14 @@ type Querier interface {
 	ListWorkgroupBenefitTransitionsForInterval(ctx context.Context, arg ListWorkgroupBenefitTransitionsForIntervalParams) ([]ListWorkgroupBenefitTransitionsForIntervalRow, error)
 	LockHNRAggregate(ctx context.Context, arg LockHNRAggregateParams) error
 	LockHNRPolicyTimeline(ctx context.Context) error
-	// Policy writes and final settlement share one transaction-scoped lock. This
-	// prevents a newly appended historical revision from racing a worker that has
-	// already resolved the same raw interval but has not committed it yet.
+	// Policy writes take the exclusive side of the same lock. This waits for every
+	// in-flight settlement resolver before appending history, then prevents new
+	// resolvers until the immutable policy transaction commits.
 	LockPolicyTimeline(ctx context.Context) error
+	// Settlements take the shared side of the transaction-scoped lock. They may
+	// resolve different leased intervals concurrently, while every policy write
+	// still requires the exclusive side and therefore cannot race any resolver.
+	LockPolicyTimelineForSettlement(ctx context.Context) error
 	LockSeedingEvidenceWindow(ctx context.Context, windowStart pgtype.Timestamptz) error
 	LockSeedingSnapshotTimeline(ctx context.Context) error
 	// A transaction-scoped hash lock closes the empty-row race when two service

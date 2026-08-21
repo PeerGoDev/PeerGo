@@ -1,7 +1,13 @@
+-- name: LockPolicyTimelineForSettlement :exec
+-- Settlements take the shared side of the transaction-scoped lock. They may
+-- resolve different leased intervals concurrently, while every policy write
+-- still requires the exclusive side and therefore cannot race any resolver.
+SELECT pg_advisory_xact_lock_shared(hashtextextended('peergo-settlement-policy-timeline-v1', 0));
+
 -- name: LockPolicyTimeline :exec
--- Policy writes and final settlement share one transaction-scoped lock. This
--- prevents a newly appended historical revision from racing a worker that has
--- already resolved the same raw interval but has not committed it yet.
+-- Policy writes take the exclusive side of the same lock. This waits for every
+-- in-flight settlement resolver before appending history, then prevents new
+-- resolvers until the immutable policy transaction commits.
 SELECT pg_advisory_xact_lock(hashtextextended('peergo-settlement-policy-timeline-v1', 0));
 
 -- name: AppendPolicyTimelineRevision :execrows

@@ -47,6 +47,11 @@ seeding_start="$(env_get PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT)"
 [[ "${seeding_start}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:00:00Z$ ]] ||
     fail "PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT must be the exact UTC Tracker cutover hour"
 
+settlement_policy_concurrency="$(env_get PEERGO_SETTLEMENT_POLICY_CONCURRENCY)"
+[[ "${settlement_policy_concurrency}" =~ ^[1-9][0-9]?$ ]] &&
+    ((10#${settlement_policy_concurrency} <= 32)) ||
+    fail "PEERGO_SETTLEMENT_POLICY_CONCURRENCY must be an integer between 1 and 32"
+
 deployment_mode="$(env_get PEERGO_DEPLOYMENT_MODE)"
 deployment_mode="${deployment_mode:-cluster}"
 case "${deployment_mode}" in

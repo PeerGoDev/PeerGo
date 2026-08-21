@@ -148,6 +148,12 @@ make production-build
 `PEERGO_IMAGE_DERIVATIVE_CONCURRENCY=8`。支持范围为 1–16，调高不会并行化需要保持顺序的
 数据库账本与验收阶段。
 
+策略结算默认在一个 `settlement-policy-worker` 进程内使用 4 条固定执行通道；每条原始区间
+仍通过 PostgreSQL 租约和 `FOR UPDATE SKIP LOCKED` 唯一领取，不会通过增加容器复制账目。
+上线追赶积压时可把 `PEERGO_SETTLEMENT_POLICY_CONCURRENCY` 调为 4–8，支持范围为 1–32；
+每次调整后只重建该 worker，并同时观察待结算数量、数据库连接与不可变账本一致性，不能靠
+清队列、跳过事件或手工补余额来缩短水位。
+
 ## 4. 非公开启动
 
 迁移验收通过后启动全套服务；此时 Web/Tracker 仍只绑定宿主机 loopback，公网入口尚未切换：

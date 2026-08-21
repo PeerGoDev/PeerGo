@@ -17,6 +17,7 @@ type PolicyWorkerConfig struct {
 	IdleInterval   time.Duration
 	RetryBase      time.Duration
 	StartupTimeout time.Duration
+	Concurrency    int
 }
 
 // HNRWorkerConfig reuses the same bounded database-worker contract. Separate
@@ -40,11 +41,27 @@ func LoadTrackerLedgerProcess() (TrackerLedgerProcessConfig, error) {
 }
 
 func LoadPolicyWorker() (PolicyWorkerConfig, error) {
-	return loadLedgerWorker("PEERGO_SETTLEMENT_POLICY")
+	settings, err := loadLedgerWorker("PEERGO_SETTLEMENT_POLICY")
+	if err != nil {
+		return PolicyWorkerConfig{}, err
+	}
+	concurrency, err := integer("PEERGO_SETTLEMENT_POLICY_CONCURRENCY", 1, 32)
+	if err != nil {
+		return PolicyWorkerConfig{}, err
+	}
+	settings.Concurrency = concurrency
+	return settings, nil
 }
 
 func LoadHNRWorker() (HNRWorkerConfig, error) {
-	return loadLedgerWorker("PEERGO_SETTLEMENT_HNR")
+	settings, err := loadLedgerWorker("PEERGO_SETTLEMENT_HNR")
+	if err != nil {
+		return HNRWorkerConfig{}, err
+	}
+	// H&R remains a single-lane worker. It has a much smaller workload and its
+	// scheduling contract should not inherit the traffic-settlement tuning knob.
+	settings.Concurrency = 1
+	return settings, nil
 }
 
 func loadLedgerWorker(prefix string) (PolicyWorkerConfig, error) {

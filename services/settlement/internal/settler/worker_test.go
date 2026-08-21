@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -56,6 +57,46 @@ func TestWorkerStopsForPermanentPolicyInvariant(t *testing.T) {
 	}
 }
 
+func TestWorkerRunsOnlyConfiguredNumberOfLanes(t *testing.T) {
+	repository := newConcurrencyProbeRepository()
+	worker, err := NewWorker(repository, WorkerConfig{Concurrency: 4}, time.Now, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- worker.Run(ctx) }()
+
+	for lane := 0; lane < 4; lane++ {
+		select {
+		case <-repository.entered:
+		case <-time.After(time.Second):
+			cancel()
+			t.Fatalf("only %d of 4 configured lanes entered ClaimNext", lane)
+		}
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run() error=%v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Run() did not stop all lanes after cancellation")
+	}
+	if maximum := repository.maximum(); maximum != 4 {
+		t.Fatalf("maximum concurrent claims=%d, want 4", maximum)
+	}
+}
+
+func TestWorkerRejectsConcurrencyOutsideBound(t *testing.T) {
+	for _, concurrency := range []int{-1, 33} {
+		if _, err := NewWorker(&recordingWorkRepository{}, WorkerConfig{Concurrency: concurrency}, time.Now, nil); !errors.Is(err, ErrInput) {
+			t.Fatalf("NewWorker() concurrency=%d error=%v, want ErrInput", concurrency, err)
+		}
+	}
+}
+
 type recordingWorkRepository struct {
 	pending     PendingWork
 	found       bool
@@ -80,4 +121,46 @@ func (repository *recordingWorkRepository) Release(_ context.Context, _ PendingW
 	repository.availableAt = at
 	repository.releaseCode = code
 	return nil
+}
+
+type concurrencyProbeRepository struct {
+	entered chan struct{}
+
+	mu        sync.Mutex
+	active    int
+	maxActive int
+}
+
+func newConcurrencyProbeRepository() *concurrencyProbeRepository {
+	return &concurrencyProbeRepository{entered: make(chan struct{}, 32)}
+}
+
+func (repository *concurrencyProbeRepository) ClaimNext(ctx context.Context, _ time.Time, _ time.Duration) (PendingWork, bool, error) {
+	repository.mu.Lock()
+	repository.active++
+	if repository.active > repository.maxActive {
+		repository.maxActive = repository.active
+	}
+	repository.mu.Unlock()
+	repository.entered <- struct{}{}
+
+	<-ctx.Done()
+	repository.mu.Lock()
+	repository.active--
+	repository.mu.Unlock()
+	return PendingWork{}, false, nil
+}
+
+func (*concurrencyProbeRepository) Settle(context.Context, PendingWork, time.Time) error {
+	return nil
+}
+
+func (*concurrencyProbeRepository) Release(context.Context, PendingWork, time.Time, string) error {
+	return nil
+}
+
+func (repository *concurrencyProbeRepository) maximum() int {
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	return repository.maxActive
 }

@@ -49,10 +49,11 @@ func run(logger *slog.Logger) error {
 	}
 	worker, err := settler.NewWorker(repository, settler.WorkerConfig{
 		LeaseDuration: settings.LeaseDuration, IdleInterval: settings.IdleInterval, RetryBase: settings.RetryBase,
+		Concurrency: settings.Concurrency,
 	}, time.Now, logger)
 	if err != nil {
 		return fmt.Errorf("compose Settlement policy worker: %w", err)
 	}
-	logger.Info("Settlement immutable policy worker started")
+	logger.Info("Settlement immutable policy worker started", "concurrency", settings.Concurrency)
 	return worker.Run(rootCtx)
 }
