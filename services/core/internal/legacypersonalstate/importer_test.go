@@ -42,6 +42,16 @@ func TestValidateRelationshipGraphRejectsCycleAndConflictingParent(t *testing.T)
 	}
 }
 
+func TestValidateRelationshipGraphAllowsSystemInvitationRoot(t *testing.T) {
+	t.Parallel()
+	if err := validateRelationshipGraph([]relationshipRow{
+		{ID: 1, LegacyInviterID: 0, LegacyInviteeID: 2},
+		{ID: 2, LegacyInviterID: 2, LegacyInviteeID: 3},
+	}); err != nil {
+		t.Fatalf("system invitation root rejected: %v", err)
+	}
+}
+
 func TestSourceResultSeparatesHistoricalRewardKinds(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 8, 20, 8, 0, 0, 0, time.UTC)

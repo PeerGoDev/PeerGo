@@ -236,7 +236,8 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 		ImportedAt: now.Add(66 * time.Minute),
 	}, nil)
 	if err != nil || personalState.BookmarkSourceRows != 1 ||
-		personalState.BookmarkAppliedRows != 1 || personalState.InvitationSourceRows != 0 {
+		personalState.BookmarkAppliedRows != 1 || personalState.InvitationSourceRows != 1 ||
+		personalState.InvitationRelationships != 0 || personalState.InvitationUnresolvedRows != 1 {
 		t.Fatalf("import legacy personal state = %+v, %v", personalState, err)
 	}
 	personalStateRetry, err := legacypersonalstate.Import(ctx, source, core, legacypersonalstate.Config{
@@ -567,6 +568,14 @@ func createSyntheticPtYesSource(
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `INSERT INTO bookmarks (id, user_id, torrent_id, created_at) VALUES (1, 1, 1, $1)`, now); err != nil {
+		t.Fatal(err)
+	}
+	// PtYes records system-issued invitations with inviting_user=0. They must
+	// retain immutable evidence without creating a synthetic inviter account.
+	if _, err := db.Exec(ctx, `
+INSERT INTO invites (
+    id, inviting_user, claimed, claimed_by_uid, claimed_at, created_at
+) VALUES (1, 0, true, 1, $1, $2)`, now.Add(time.Minute), now); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `

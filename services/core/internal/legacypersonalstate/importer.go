@@ -412,7 +412,10 @@ ORDER BY id`)
 		}
 		row.ClaimedAt = row.ClaimedAt.UTC().Truncate(time.Microsecond)
 		row.CreatedAt = row.CreatedAt.UTC().Truncate(time.Microsecond)
-		if row.ID < 1 || row.LegacyInviterID < 1 || row.LegacyInviteeID < 1 ||
+		// PtYes uses inviter 0 for system-issued invitations. Preserve those
+		// source rows as unresolved ancestry evidence instead of inventing an
+		// inviter or rejecting an otherwise valid claimed invitation.
+		if row.ID < 1 || row.LegacyInviterID < 0 || row.LegacyInviteeID < 1 ||
 			row.LegacyInviterID == row.LegacyInviteeID || row.ClaimedAt.IsZero() ||
 			row.CreatedAt.IsZero() || row.ClaimedAt.Before(row.CreatedAt) {
 			return nil, fmt.Errorf("PtYes claimed invitation %d is invalid", row.ID)
