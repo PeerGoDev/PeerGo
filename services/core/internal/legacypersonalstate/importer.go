@@ -458,7 +458,7 @@ ORDER BY action, user_id`)
 		row.FirstAt = row.FirstAt.UTC().Truncate(time.Microsecond)
 		row.LastAt = row.LastAt.UTC().Truncate(time.Microsecond)
 		if row.LegacyUserID < 1 || (row.Kind != "harem" && row.Kind != "invite_reward") ||
-			row.SourceRows < 1 || row.RoundedAmount < 1 || row.FirstAt.IsZero() ||
+			row.SourceRows < 1 || row.RoundedAmount < 0 || row.FirstAt.IsZero() ||
 			row.LastAt.Before(row.FirstAt) {
 			return nil, fmt.Errorf("PtYes invitation reward %d/%s is invalid", row.LegacyUserID, row.Kind)
 		}

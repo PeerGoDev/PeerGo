@@ -237,7 +237,8 @@ func TestLegacyTorrentMigrationEndToEnd(t *testing.T) {
 	}, nil)
 	if err != nil || personalState.BookmarkSourceRows != 1 ||
 		personalState.BookmarkAppliedRows != 1 || personalState.InvitationSourceRows != 1 ||
-		personalState.InvitationRelationships != 0 || personalState.InvitationUnresolvedRows != 1 {
+		personalState.InvitationRelationships != 0 || personalState.InvitationUnresolvedRows != 1 ||
+		personalState.HaremRewardSourceRows != 1 || personalState.HaremRewardUsers != 1 {
 		t.Fatalf("import legacy personal state = %+v, %v", personalState, err)
 	}
 	personalStateRetry, err := legacypersonalstate.Import(ctx, source, core, legacypersonalstate.Config{
@@ -576,6 +577,14 @@ func createSyntheticPtYesSource(
 INSERT INTO invites (
     id, inviting_user, claimed, claimed_by_uid, claimed_at, created_at
 ) VALUES (1, 0, true, 1, $1, $2)`, now.Add(time.Minute), now); err != nil {
+		t.Fatal(err)
+	}
+	// Small legacy fractional rewards remain exact evidence even when PeerGo's
+	// integer presentation rounds the per-user aggregate to zero.
+	if _, err := db.Exec(ctx, `
+INSERT INTO points_logs (
+    id, user_id, point_type, action, amount, created_at
+) VALUES (1, 1, 'karma', 'harem', 0.2, $1)`, now); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `
