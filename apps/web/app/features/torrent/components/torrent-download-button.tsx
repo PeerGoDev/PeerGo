@@ -112,6 +112,14 @@ export function TorrentDownloadButton({
     []
   )
 
+  React.useEffect(() => {
+    // React Router can reuse this component while only the route parameter
+    // changes. A request identifier belongs to one exact torrent purchase and
+    // must never follow the component instance to another torrent.
+    purchaseRequestId.current = undefined
+    setPurchaseOpen(false)
+  }, [torrentId])
+
   async function copyDownloadAddress() {
     if (!available || !accessReady || purchaseRequired || !navigator.clipboard)
       return
@@ -149,9 +157,18 @@ export function TorrentDownloadButton({
       purchaseRequestId.current = undefined
       setPurchaseOpen(false)
       download.mutate()
-    } catch {
+    } catch (error) {
       // Keep the same idempotency key so a transport-level retry cannot charge
       // the member twice after Core has already committed the first request.
+      // A confirmed key conflict is different: Core rejected this request, so
+      // refresh the durable status and create a fresh key on the next attempt.
+      if (
+        error instanceof ApiProblemError &&
+        error.code === "torrent_purchase_idempotency_conflict"
+      ) {
+        purchaseRequestId.current = undefined
+        void purchaseStatus.refetch()
+      }
     }
   }
 

@@ -120,6 +120,7 @@ WHERE user_id = $1 AND torrent_id = $2`, command.UserID, command.TorrentID).Scan
 		return Receipt{}, fmt.Errorf("marshal torrent purchase payload: %w", err)
 	}
 	payloadSHA := sha256.Sum256(canonicalPayload)
+	sourceReference := torrentTransactionSourceReference("purchase", command.TorrentID, command.RequestID)
 	postings := []economy.PostingInput{{AccountID: command.UserID, Amount: -status.Price}}
 	if status.SellerIncome > 0 {
 		postings = append(postings, economy.PostingInput{AccountID: status.SellerID, Amount: status.SellerIncome})
@@ -130,8 +131,11 @@ WHERE user_id = $1 AND torrent_id = $2`, command.UserID, command.TorrentID).Scan
 	transactionID := uuid.NewSHA1(transactionNamespace, []byte(command.RequestID.String()))
 	ledger, err := repository.economy.RecordInTransaction(ctx, tx, economy.RecordCommand{
 		TransactionID: transactionID, TransactionType: economy.TransactionTorrentBuy,
-		IdempotencyKey:  "torrent-purchase:" + strings.ReplaceAll(command.RequestID.String(), "-", ""),
-		SourceReference: "torrent:" + strconv.FormatInt(command.TorrentID, 10),
+		IdempotencyKey: "torrent-purchase:" + strings.ReplaceAll(command.RequestID.String(), "-", ""),
+		// A torrent can be sold to many members. The source reference identifies
+		// this sale, not only the shared torrent, so every seller-income statement
+		// remains unique while the request UUID still provides replay safety.
+		SourceReference: sourceReference,
 		PolicyRevision:  status.PolicyRevision, PayloadSHA256: payloadSHA,
 		OccurredAt: command.Now, RecordedAt: command.Now, Postings: postings,
 	})
@@ -148,7 +152,7 @@ INSERT INTO economy.torrent_purchase_entitlements (
     purchased_at, recorded_at, purchase_sequence
 ) VALUES ($1, $2, $3, $4, $5, 'live_purchase', $6, $7, $8, $9, $10, $11, $12, $13, $13, $14)`,
 		entitlementID, command.RequestID, command.UserID, command.TorrentID, status.SellerID,
-		"torrent:"+strconv.FormatInt(command.TorrentID, 10), status.Price, status.Tax,
+		sourceReference, status.Price, status.Tax,
 		status.SellerIncome, status.PolicyRevision, payloadSHA[:], transactionID, command.Now, purchaseSequence,
 	); err != nil {
 		return Receipt{}, classifyError("insert torrent purchase entitlement", err)
@@ -595,10 +599,11 @@ SELECT EXISTS (
 	var balanceAfter int64
 	if refundAmount > 0 {
 		value := uuid.NewSHA1(refundTransactionNamespace, []byte(command.RequestID.String()))
+		sourceReference := torrentTransactionSourceReference("refund", command.TorrentID, command.RequestID)
 		ledger, ledgerErr := repository.economy.RecordInTransaction(ctx, tx, economy.RecordCommand{
 			TransactionID: value, TransactionType: economy.TransactionRefund,
 			IdempotencyKey:  "torrent-refund:" + strings.ReplaceAll(command.RequestID.String(), "-", ""),
-			SourceReference: "torrent-refund:" + strconv.FormatInt(command.TorrentID, 10),
+			SourceReference: sourceReference,
 			PolicyRevision:  policyRevision, PayloadSHA256: payloadSHA,
 			OccurredAt: command.OccurredAt, RecordedAt: command.OccurredAt,
 			Postings: []economy.PostingInput{
@@ -626,7 +631,7 @@ INSERT INTO economy.torrent_purchase_refunds (
     refunded_at, recorded_at, refunded_by, authorization_decision_id,
     refund_amount, buyer_balance_after, payload_sha256, magic_transaction_id
 ) VALUES ($1, $2, 'live_refund', $3, $4, $5, $5, $6, $7, $8, $9, $10, $11)`,
-		command.RequestID, entitlementID, "torrent-refund:"+strconv.FormatInt(command.TorrentID, 10),
+		command.RequestID, entitlementID, torrentTransactionSourceReference("refund", command.TorrentID, command.RequestID),
 		command.Reason, command.OccurredAt, command.ActorID, command.AuthorizationID,
 		refundAmount, balanceAfter, payloadSHA[:], transactionID,
 	); err != nil {
@@ -914,6 +919,25 @@ func memberBalanceAfter(transaction economy.Transaction, userID uuid.UUID) (int6
 	return 0, false
 }
 
+func torrentTransactionSourceReference(kind string, torrentID int64, requestID uuid.UUID) string {
+	return "torrent:" + strconv.FormatInt(torrentID, 10) + ":" + kind + ":" + strings.ReplaceAll(requestID.String(), "-", "")
+}
+
+func isTorrentPurchaseIdempotencyConstraint(constraint string) bool {
+	switch constraint {
+	case "magic_transactions_pkey",
+		"magic_transactions_idempotency_key_key",
+		"torrent_purchase_entitlements_pkey",
+		"torrent_purchase_entitlements_request_id_key",
+		"torrent_purchase_entitlements_magic_transaction_id_key",
+		"torrent_purchase_refunds_pkey",
+		"torrent_purchase_refunds_magic_transaction_id_key":
+		return true
+	default:
+		return false
+	}
+}
+
 func classifyError(operation string, err error) error {
 	if errors.Is(err, economy.ErrInsufficientBalance) || errors.Is(err, economy.ErrIdempotencyConflict) ||
 		errors.Is(err, economy.ErrInvariant) || errors.Is(err, economy.ErrAccountNotFound) {
@@ -923,7 +947,13 @@ func classifyError(operation string, err error) error {
 	if errors.As(err, &postgresError) {
 		switch postgresError.Code {
 		case "23505":
-			return ErrIdempotencyConflict
+			// A unique violation is not automatically an idempotency conflict.
+			// Mapping unrelated statement constraints to a client retry error hid
+			// the repeated-seller-income defect that this boundary now prevents.
+			if isTorrentPurchaseIdempotencyConstraint(postgresError.ConstraintName) {
+				return ErrIdempotencyConflict
+			}
+			return fmt.Errorf("%s: %w", operation, err)
 		case "23503", "23514", "P0001":
 			return fmt.Errorf("%w: %s", ErrInvariant, operation)
 		}
