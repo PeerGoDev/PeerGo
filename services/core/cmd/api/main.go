@@ -343,7 +343,7 @@ func main() {
 		logger.Error("compose operations repository", "error", err)
 		os.Exit(1)
 	}
-	trackerOperationsClient, err := trackeroperations.NewClient(settings.TrackerCanonicalOrigin, settings.TrackerServiceToken, 3*time.Second)
+	trackerOperationsClient, err := trackeroperations.NewClient(settings.TrackerOperationsOrigin, settings.TrackerServiceToken, 3*time.Second)
 	if err != nil {
 		logger.Error("compose Tracker operations client", "error", err)
 		os.Exit(1)

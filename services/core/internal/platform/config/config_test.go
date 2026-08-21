@@ -29,6 +29,9 @@ func TestLoadIncludesSeparatedStaffWebAuthnRuntimeBoundary(t *testing.T) {
 	if settings.TrackerCanonicalOrigin != "http://tracker.localhost:8083" {
 		t.Fatalf("Tracker canonical origin = %q", settings.TrackerCanonicalOrigin)
 	}
+	if settings.TrackerOperationsOrigin != "http://tracker.localhost:8083" {
+		t.Fatalf("Tracker operations origin = %q", settings.TrackerOperationsOrigin)
+	}
 	if want := time.Date(2026, time.August, 15, 0, 0, 0, 0, time.UTC); !settings.SeedingEvidenceStartAt.Equal(want) {
 		t.Fatalf("seeding evidence start = %s, want %s", settings.SeedingEvidenceStartAt, want)
 	}
@@ -119,13 +122,23 @@ func TestLoadAllowsOnlyFixedSingleServerServiceOrigins(t *testing.T) {
 	t.Setenv("PEERGO_WEBAUTHN_RP_ID", "rousi.pro")
 	t.Setenv("PEERGO_WEBAUTHN_ORIGINS", "https://rousi.pro")
 	t.Setenv("PEERGO_TRACKER_CANONICAL_ORIGIN", "https://rousi.pro")
+	t.Setenv("PEERGO_TRACKER_OPERATIONS_ORIGIN", "http://tracker:8083")
 	t.Setenv("PEERGO_COOKIE_SECURE", "true")
-	if _, err := Load(); err != nil {
+	settings, err := Load()
+	if err != nil {
 		t.Fatalf("single-server service origins rejected: %v", err)
+	}
+	if settings.TrackerCanonicalOrigin != "https://rousi.pro" || settings.TrackerOperationsOrigin != "http://tracker:8083" {
+		t.Fatalf("single-server Tracker origins = public:%q operations:%q", settings.TrackerCanonicalOrigin, settings.TrackerOperationsOrigin)
 	}
 	t.Setenv("PEERGO_VAULT_URL", "http://vault-api.evil:8081")
 	if _, err := Load(); err == nil {
 		t.Fatal("single-server accepted a non-fixed Vault host")
+	}
+	t.Setenv("PEERGO_VAULT_URL", "http://vault-api:8081")
+	t.Setenv("PEERGO_TRACKER_OPERATIONS_ORIGIN", "http://tracker.evil:8083")
+	if _, err := Load(); err == nil {
+		t.Fatal("single-server accepted a non-fixed Tracker operations host")
 	}
 }
 
@@ -155,4 +168,5 @@ func setValidCoreEnvironment(t *testing.T) {
 	t.Setenv("PEERGO_TORRENT_STORAGE_FILESYSTEM_ROOT", filepath.Join(t.TempDir(), "torrent-objects"))
 	t.Setenv("PEERGO_TORRENT_UPLOAD_MAX_BYTES", "")
 	t.Setenv("PEERGO_TRACKER_CANONICAL_ORIGIN", "http://tracker.localhost:8083")
+	t.Setenv("PEERGO_TRACKER_OPERATIONS_ORIGIN", "")
 }

@@ -13,31 +13,32 @@ import (
 
 // Config is validated before Core opens its listener or connects adapters.
 type Config struct {
-	Environment            string
-	Address                string
-	DatabaseURL            string
-	VaultURL               string
-	VaultServiceToken      string
-	SessionCSRFKey         []byte
-	AuditPseudonymKey      []byte
-	AuditKeyEpoch          string
-	CookieName             string
-	StaffCookieName        string
-	CookieSecure           bool
-	AllowedOrigins         []string
-	PublicOrigin           string
-	WebAuthnRPID           string
-	WebAuthnOrigins        []string
-	WebAuthnRecordKey      []byte
-	WebAuthnKeyEpoch       string
-	TorrentObjectStore     ObjectStoreConfig
-	TorrentUploadMaxBytes  int
-	TrackerCanonicalOrigin string
-	TrackerServiceToken    string
-	SettlementControlURL   string
-	SettlementServiceToken string
-	SeedingEvidenceStartAt time.Time
-	TurnstileSecretKey     string
+	Environment             string
+	Address                 string
+	DatabaseURL             string
+	VaultURL                string
+	VaultServiceToken       string
+	SessionCSRFKey          []byte
+	AuditPseudonymKey       []byte
+	AuditKeyEpoch           string
+	CookieName              string
+	StaffCookieName         string
+	CookieSecure            bool
+	AllowedOrigins          []string
+	PublicOrigin            string
+	WebAuthnRPID            string
+	WebAuthnOrigins         []string
+	WebAuthnRecordKey       []byte
+	WebAuthnKeyEpoch        string
+	TorrentObjectStore      ObjectStoreConfig
+	TorrentUploadMaxBytes   int
+	TrackerCanonicalOrigin  string
+	TrackerOperationsOrigin string
+	TrackerServiceToken     string
+	SettlementControlURL    string
+	SettlementServiceToken  string
+	SeedingEvidenceStartAt  time.Time
+	TurnstileSecretKey      string
 }
 
 // Load reads explicit runtime configuration. Database and cryptographic
@@ -192,6 +193,30 @@ func Load() (Config, error) {
 		return Config{}, errors.New("PEERGO_TRACKER_CANONICAL_ORIGIN must use https in production")
 	}
 	trackerCanonicalOrigin = parsedTrackerOrigin.Scheme + "://" + parsedTrackerOrigin.Host
+	trackerOperationsOrigin := strings.TrimSpace(os.Getenv("PEERGO_TRACKER_OPERATIONS_ORIGIN"))
+	if trackerOperationsOrigin == "" {
+		trackerOperationsOrigin = trackerCanonicalOrigin
+	}
+	parsedTrackerOperationsOrigin, err := url.Parse(trackerOperationsOrigin)
+	if err != nil || parsedTrackerOperationsOrigin.Scheme == "" || parsedTrackerOperationsOrigin.Host == "" ||
+		parsedTrackerOperationsOrigin.User != nil || parsedTrackerOperationsOrigin.RawQuery != "" ||
+		parsedTrackerOperationsOrigin.Fragment != "" ||
+		(parsedTrackerOperationsOrigin.Path != "" && parsedTrackerOperationsOrigin.Path != "/") {
+		return Config{}, errors.New("PEERGO_TRACKER_OPERATIONS_ORIGIN must be an absolute origin without user info, path, query or fragment")
+	}
+	if parsedTrackerOperationsOrigin.Scheme != "http" && parsedTrackerOperationsOrigin.Scheme != "https" {
+		return Config{}, errors.New("PEERGO_TRACKER_OPERATIONS_ORIGIN must use http or https")
+	}
+	if environment == "production" && parsedTrackerOperationsOrigin.Scheme != "https" {
+		singleServer, modeErr := isSingleServerDeployment()
+		if modeErr != nil {
+			return Config{}, modeErr
+		}
+		if !singleServer || parsedTrackerOperationsOrigin.Scheme != "http" || parsedTrackerOperationsOrigin.Host != "tracker:8083" {
+			return Config{}, errors.New("PEERGO_TRACKER_OPERATIONS_ORIGIN must use https, except http://tracker:8083 in single-server production")
+		}
+	}
+	trackerOperationsOrigin = parsedTrackerOperationsOrigin.Scheme + "://" + parsedTrackerOperationsOrigin.Host
 	trackerServiceToken, err := required("PEERGO_TRACKER_SERVICE_TOKEN")
 	if err != nil {
 		return Config{}, err
@@ -259,31 +284,32 @@ func Load() (Config, error) {
 		staffCookieName = "__Secure-peergo_staff_session"
 	}
 	return Config{
-		Environment:            environment,
-		Address:                address,
-		DatabaseURL:            databaseURL,
-		VaultURL:               vaultURL,
-		VaultServiceToken:      vaultServiceToken,
-		SessionCSRFKey:         []byte(csrfKey),
-		AuditPseudonymKey:      []byte(auditPseudonymKey),
-		AuditKeyEpoch:          auditKeyEpoch,
-		CookieName:             cookieName,
-		StaffCookieName:        staffCookieName,
-		CookieSecure:           cookieSecure,
-		AllowedOrigins:         allowedOrigins,
-		PublicOrigin:           publicOrigin,
-		WebAuthnRPID:           webAuthnRPID,
-		WebAuthnOrigins:        webAuthnOrigins,
-		WebAuthnRecordKey:      []byte(webAuthnRecordKey),
-		WebAuthnKeyEpoch:       webAuthnKeyEpoch,
-		TorrentObjectStore:     torrentObjectStore,
-		TorrentUploadMaxBytes:  torrentUploadMaxBytes,
-		TrackerCanonicalOrigin: trackerCanonicalOrigin,
-		TrackerServiceToken:    trackerServiceToken,
-		SettlementControlURL:   settlementControlURL,
-		SettlementServiceToken: settlementServiceToken,
-		SeedingEvidenceStartAt: seedingEvidenceStartAt,
-		TurnstileSecretKey:     turnstileSecretKey,
+		Environment:             environment,
+		Address:                 address,
+		DatabaseURL:             databaseURL,
+		VaultURL:                vaultURL,
+		VaultServiceToken:       vaultServiceToken,
+		SessionCSRFKey:          []byte(csrfKey),
+		AuditPseudonymKey:       []byte(auditPseudonymKey),
+		AuditKeyEpoch:           auditKeyEpoch,
+		CookieName:              cookieName,
+		StaffCookieName:         staffCookieName,
+		CookieSecure:            cookieSecure,
+		AllowedOrigins:          allowedOrigins,
+		PublicOrigin:            publicOrigin,
+		WebAuthnRPID:            webAuthnRPID,
+		WebAuthnOrigins:         webAuthnOrigins,
+		WebAuthnRecordKey:       []byte(webAuthnRecordKey),
+		WebAuthnKeyEpoch:        webAuthnKeyEpoch,
+		TorrentObjectStore:      torrentObjectStore,
+		TorrentUploadMaxBytes:   torrentUploadMaxBytes,
+		TrackerCanonicalOrigin:  trackerCanonicalOrigin,
+		TrackerOperationsOrigin: trackerOperationsOrigin,
+		TrackerServiceToken:     trackerServiceToken,
+		SettlementControlURL:    settlementControlURL,
+		SettlementServiceToken:  settlementServiceToken,
+		SeedingEvidenceStartAt:  seedingEvidenceStartAt,
+		TurnstileSecretKey:      turnstileSecretKey,
 	}, nil
 }
 

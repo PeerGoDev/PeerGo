@@ -327,6 +327,7 @@ set_env PEERGO_WEB_ORIGINS "${public_origin}"
 set_env PEERGO_WEBAUTHN_RP_ID "${rp_id}"
 set_env PEERGO_WEBAUTHN_ORIGINS "${public_origin}"
 set_env PEERGO_TRACKER_CANONICAL_ORIGIN "${public_origin}"
+set_env PEERGO_TRACKER_OPERATIONS_ORIGIN http://tracker:8083
 set_env PEERGO_WEB_HOST_PORT "${web_host_port}"
 set_env PEERGO_VAULT_HOST_PORT "${vault_host_port}"
 set_env PEERGO_AUDIT_HOST_PORT "${audit_host_port}"
