@@ -19,7 +19,8 @@ import (
 
 const (
 	FormatVersion         = signedsnapshotv1.FormatVersion
-	SnapshotSchemaVersion = "3.0.0"
+	SnapshotSchemaVersion = "3.1.0"
+	legacySchemaVersion   = "3.0.0"
 	SignatureAlgorithm    = signedsnapshotv1.SignatureAlgorithm
 	MaxArtifactBytes      = signedsnapshotv1.MaxArtifactBytes
 	MaxSnapshotPayload    = signedsnapshotv1.MaxPayloadBytes
@@ -50,11 +51,12 @@ type Torrent struct {
 }
 
 type Snapshot struct {
-	SchemaVersion   string    `json:"schema_version"`
-	GeneratedAt     time.Time `json:"generated_at"`
-	ControlSequence int64     `json:"control_sequence"`
-	StateSHA256     string    `json:"state_sha256"`
-	Torrents        []Torrent `json:"torrents"`
+	SchemaVersion      string    `json:"schema_version"`
+	GeneratedAt        time.Time `json:"generated_at"`
+	ControlSequence    int64     `json:"control_sequence"`
+	CompletionSequence int64     `json:"completion_sequence,omitempty"`
+	StateSHA256        string    `json:"state_sha256"`
+	Torrents           []Torrent `json:"torrents"`
 }
 
 type envelope = signedsnapshotv1.Envelope
@@ -172,14 +174,19 @@ func normalizeAndValidate(snapshot Snapshot, preparing bool) (Snapshot, error) {
 		if snapshot.SchemaVersion == "" {
 			snapshot.SchemaVersion = SnapshotSchemaVersion
 		}
+		if snapshot.SchemaVersion != SnapshotSchemaVersion {
+			return Snapshot{}, ErrInvalid
+		}
 		snapshot.GeneratedAt = snapshot.GeneratedAt.UTC().Round(0)
 		snapshot.Torrents = append([]Torrent(nil), snapshot.Torrents...)
 		sort.Slice(snapshot.Torrents, func(left, right int) bool {
 			return snapshot.Torrents[left].InfoHashV1 < snapshot.Torrents[right].InfoHashV1
 		})
 	}
-	if snapshot.SchemaVersion != SnapshotSchemaVersion || snapshot.GeneratedAt.IsZero() ||
-		snapshot.ControlSequence < 0 || len(snapshot.Torrents) > MaxTorrentEntries {
+	validSchema := snapshot.SchemaVersion == SnapshotSchemaVersion ||
+		(snapshot.SchemaVersion == legacySchemaVersion && snapshot.CompletionSequence == 0)
+	if !validSchema || snapshot.GeneratedAt.IsZero() ||
+		snapshot.ControlSequence < 0 || snapshot.CompletionSequence < 0 || len(snapshot.Torrents) > MaxTorrentEntries {
 		return Snapshot{}, ErrInvalid
 	}
 	_, offset := snapshot.GeneratedAt.Zone()
@@ -203,7 +210,7 @@ func normalizeAndValidate(snapshot Snapshot, preparing bool) (Snapshot, error) {
 	if snapshot.ControlSequence == 0 && len(snapshot.Torrents) != 0 {
 		return Snapshot{}, ErrInvalid
 	}
-	stateDigest, err := calculateStateDigest(snapshot.ControlSequence, snapshot.Torrents)
+	stateDigest, err := calculateStateDigest(snapshot.ControlSequence, snapshot.CompletionSequence, snapshot.Torrents)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -217,12 +224,20 @@ func normalizeAndValidate(snapshot Snapshot, preparing bool) (Snapshot, error) {
 	return snapshot, nil
 }
 
-func calculateStateDigest(sequence int64, torrents []Torrent) ([sha256.Size]byte, error) {
+func calculateStateDigest(sequence, completionSequence int64, torrents []Torrent) ([sha256.Size]byte, error) {
 	hasher := sha256.New()
 	_, _ = hasher.Write([]byte(stateHashDomain))
 	var integer [8]byte
 	binary.BigEndian.PutUint64(integer[:], uint64(sequence))
 	_, _ = hasher.Write(integer[:])
+	// CompletionSequence is an optional, backwards-compatible extension of
+	// schema v3. A zero value preserves the exact digest of existing signed
+	// artifacts; positive values order cumulative completion-stat refreshes
+	// independently from torrent eligibility changes.
+	if completionSequence > 0 {
+		binary.BigEndian.PutUint64(integer[:], uint64(completionSequence))
+		_, _ = hasher.Write(integer[:])
+	}
 	binary.BigEndian.PutUint64(integer[:], uint64(len(torrents)))
 	_, _ = hasher.Write(integer[:])
 	for _, torrent := range torrents {

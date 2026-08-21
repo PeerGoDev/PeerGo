@@ -285,7 +285,8 @@ func reloadSnapshots(ctx context.Context, logger *slog.Logger, interval time.Dur
 			if result, err := torrentLoader.LoadOnce(now); err != nil {
 				logger.Warn("Tracker torrent snapshot reload failed", "error", err)
 			} else if result.Activated {
-				logger.Info("Tracker torrent snapshot activated", "control_sequence", result.Status.ControlSequence, "torrent_count", result.Status.TorrentCount)
+				logger.Info("Tracker torrent snapshot activated", "control_sequence", result.Status.ControlSequence,
+					"completion_sequence", result.Status.CompletionSequence, "torrent_count", result.Status.TorrentCount)
 			}
 			if result, err := subjectLoader.LoadOnce(now); err != nil {
 				logger.Warn("Tracker subject snapshot reload failed", "error", err)

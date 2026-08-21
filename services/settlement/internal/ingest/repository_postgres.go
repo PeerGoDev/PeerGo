@@ -70,7 +70,7 @@ func (repository *PostgresRepository) Process(ctx context.Context, delivery Deli
 		return ProcessResult{}, ErrInvalidInput
 	}
 	payloadDigest := sha256.Sum256(delivery.Payload)
-	processedAt := repository.now().UTC().Round(0)
+	processedAt := canonicalIngestTime(repository.now())
 	if processedAt.IsZero() {
 		return ProcessResult{}, ErrInvalidInput
 	}
@@ -318,7 +318,7 @@ func insertInterval(
 }
 
 func timestamp(value time.Time) pgtype.Timestamptz {
-	return pgtype.Timestamptz{Time: value.UTC().Round(0), Valid: true}
+	return pgtype.Timestamptz{Time: canonicalIngestTime(value), Valid: true}
 }
 
 // Constraint and data exceptions mean the canonical event or repository code

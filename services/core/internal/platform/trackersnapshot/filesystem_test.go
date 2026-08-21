@@ -70,6 +70,36 @@ func TestFilesystemPublisherRejectsRollbackAndSameSequenceDivergence(t *testing.
 	}
 }
 
+func TestFilesystemPublisherOrdersCompletionStatisticsIndependently(t *testing.T) {
+	t.Parallel()
+	directory := t.TempDir()
+	if err := os.Chmod(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	publisher, err := NewFilesystemPublisher(filepath.Join(directory, "control.snapshot"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
+	initial := signedSnapshotWithCompletion(t, 5, 0, 0, now, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	if _, err := publisher.Publish(context.Background(), initial); err != nil {
+		t.Fatal(err)
+	}
+	refresh := signedSnapshotWithCompletion(t, 5, 1, 1, now.Add(time.Minute), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	result, err := publisher.Publish(context.Background(), refresh)
+	if err != nil || !result.Published || result.PreviousCompletionSequence != 0 {
+		t.Fatalf("completion refresh = %+v, %v", result, err)
+	}
+	rollback := signedSnapshotWithCompletion(t, 6, 0, 0, now.Add(2*time.Minute), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	if _, err := publisher.Publish(context.Background(), rollback); !errors.Is(err, ErrPublicationStale) {
+		t.Fatalf("completion rollback error = %v", err)
+	}
+	divergent := signedSnapshotWithCompletion(t, 5, 1, 1, now.Add(2*time.Minute), "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	if _, err := publisher.Publish(context.Background(), divergent); !errors.Is(err, ErrPublicationConflict) {
+		t.Fatalf("same completion sequence divergence error = %v", err)
+	}
+}
+
 func TestFilesystemPublisherRejectsSymlinkTarget(t *testing.T) {
 	t.Parallel()
 	directory := t.TempDir()
@@ -101,16 +131,21 @@ func TestFilesystemPublisherRejectsWorldReadableParent(t *testing.T) {
 }
 
 func signedSnapshot(t *testing.T, sequence int64, generatedAt time.Time, infoHash string) trackercontrolv1.SignedArtifact {
+	return signedSnapshotWithCompletion(t, sequence, 0, 0, generatedAt, infoHash)
+}
+
+func signedSnapshotWithCompletion(t *testing.T, sequence, completionSequence, completedDownloads int64, generatedAt time.Time, infoHash string) trackercontrolv1.SignedArtifact {
 	t.Helper()
 	seed := make([]byte, ed25519.SeedSize)
 	for index := range seed {
 		seed[index] = 0x61
 	}
 	artifact, err := trackercontrolv1.Sign(trackercontrolv1.Snapshot{
-		GeneratedAt: generatedAt, ControlSequence: sequence,
+		GeneratedAt: generatedAt, ControlSequence: sequence, CompletionSequence: completionSequence,
 		Torrents: []trackercontrolv1.Torrent{{
 			TorrentID:  1,
-			InfoHashV1: infoHash, TotalSizeBytes: 42, TorrentVersion: 2, ControlSequence: sequence,
+			InfoHashV1: infoHash, TotalSizeBytes: 42, CompletedDownloads: completedDownloads,
+			TorrentVersion: 2, ControlSequence: sequence,
 		}},
 	}, "active", ed25519.NewKeyFromSeed(seed))
 	if err != nil {

@@ -12,8 +12,9 @@ import (
 var ErrSnapshotBuilderInput = errors.New("Tracker snapshot builder input is invalid")
 
 type SnapshotPublication struct {
-	Published               bool
-	PreviousControlSequence int64
+	Published                  bool
+	PreviousControlSequence    int64
+	PreviousCompletionSequence int64
 }
 
 type SnapshotPublisher interface {
@@ -21,12 +22,13 @@ type SnapshotPublisher interface {
 }
 
 type SnapshotBuildResult struct {
-	ControlSequence int64
-	TorrentCount    int
-	GeneratedAt     time.Time
-	StateSHA256     string
-	ArtifactSHA256  [32]byte
-	Published       bool
+	ControlSequence    int64
+	CompletionSequence int64
+	TorrentCount       int
+	GeneratedAt        time.Time
+	StateSHA256        string
+	ArtifactSHA256     [32]byte
+	Published          bool
 }
 
 type SnapshotBuilder struct {
@@ -68,7 +70,8 @@ func (builder *SnapshotBuilder) BuildAndPublish(ctx context.Context) (SnapshotBu
 		})
 	}
 	artifact, err := trackercontrolv1.Sign(trackercontrolv1.Snapshot{
-		GeneratedAt: builder.now(), ControlSequence: projection.ControlSequence, Torrents: torrents,
+		GeneratedAt: builder.now(), ControlSequence: projection.ControlSequence,
+		CompletionSequence: projection.CompletionSequence, Torrents: torrents,
 	}, builder.keyID, builder.privateKey)
 	if err != nil {
 		return SnapshotBuildResult{}, err
@@ -78,7 +81,8 @@ func (builder *SnapshotBuilder) BuildAndPublish(ctx context.Context) (SnapshotBu
 		return SnapshotBuildResult{}, err
 	}
 	return SnapshotBuildResult{
-		ControlSequence: artifact.Snapshot.ControlSequence, TorrentCount: len(artifact.Snapshot.Torrents),
+		ControlSequence:    artifact.Snapshot.ControlSequence,
+		CompletionSequence: artifact.Snapshot.CompletionSequence, TorrentCount: len(artifact.Snapshot.Torrents),
 		GeneratedAt: artifact.Snapshot.GeneratedAt, StateSHA256: artifact.Snapshot.StateSHA256,
 		ArtifactSHA256: artifact.ArtifactSHA256, Published: publication.Published,
 	}, nil

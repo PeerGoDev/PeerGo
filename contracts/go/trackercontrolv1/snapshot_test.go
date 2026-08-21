@@ -16,7 +16,7 @@ func TestSignVerifyProducesSortedImmutableSnapshot(t *testing.T) {
 	privateKey := testPrivateKey(0x11)
 	generatedAt := time.Date(2026, time.August, 8, 10, 30, 0, 123, time.FixedZone("UTC+8", 8*60*60))
 	snapshot := Snapshot{
-		GeneratedAt: generatedAt, ControlSequence: 9,
+		GeneratedAt: generatedAt, ControlSequence: 9, CompletionSequence: 12,
 		Torrents: []Torrent{
 			{TorrentID: 2, InfoHashV1: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", TotalSizeBytes: 20, TorrentVersion: 3, ControlSequence: 9},
 			{TorrentID: 1, InfoHashV1: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", TotalSizeBytes: 10, TorrentVersion: 2, ControlSequence: 4},
@@ -34,7 +34,7 @@ func TestSignVerifyProducesSortedImmutableSnapshot(t *testing.T) {
 		t.Fatalf("Verify() error = %v", err)
 	}
 	if verified.Snapshot.GeneratedAt.Location() != time.UTC || !verified.Snapshot.GeneratedAt.Equal(generatedAt) ||
-		verified.Snapshot.SchemaVersion != SnapshotSchemaVersion || verified.Snapshot.StateSHA256 == "" ||
+		verified.Snapshot.SchemaVersion != SnapshotSchemaVersion || verified.Snapshot.CompletionSequence != 12 || verified.Snapshot.StateSHA256 == "" ||
 		verified.Snapshot.Torrents[0].TorrentID != 1 || verified.Snapshot.Torrents[1].TorrentID != 2 {
 		t.Fatalf("verified snapshot = %+v", verified.Snapshot)
 	}
@@ -158,6 +158,34 @@ func TestInspectUnverifiedChecksPayloadButNotSignature(t *testing.T) {
 	inspection, err := InspectUnverified(encoded)
 	if err != nil || inspection.Snapshot.ControlSequence != 4 || inspection.KeyID != "active" {
 		t.Fatalf("InspectUnverified() = %+v, %v", inspection, err)
+	}
+}
+
+func TestDecodeSnapshotAcceptsLegacySchemaWithoutCompletionCursor(t *testing.T) {
+	t.Parallel()
+	snapshot := testSnapshot()
+	snapshot.SchemaVersion = legacySchemaVersion
+	digest, err := calculateStateDigest(snapshot.ControlSequence, 0, snapshot.Torrents)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot.StateSHA256 = hex.EncodeToString(digest[:])
+	payload, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := decodeSnapshot(payload)
+	if err != nil || decoded.SchemaVersion != legacySchemaVersion || decoded.CompletionSequence != 0 {
+		t.Fatalf("legacy snapshot = %+v, %v", decoded, err)
+	}
+
+	snapshot.CompletionSequence = 1
+	payload, err = json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := decodeSnapshot(payload); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("legacy completion cursor error = %v", err)
 	}
 }
 

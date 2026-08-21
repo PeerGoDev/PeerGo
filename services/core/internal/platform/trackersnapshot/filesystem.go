@@ -47,21 +47,23 @@ type RuntimePolicyFilesystemPublisher struct {
 }
 
 type artifactMetadata struct {
-	Bytes           []byte
-	KeyID           string
-	PayloadSHA256   [sha256.Size]byte
-	ArtifactSHA256  [sha256.Size]byte
-	ControlSequence int64
-	GeneratedAt     time.Time
-	StateSHA256     string
+	Bytes              []byte
+	KeyID              string
+	PayloadSHA256      [sha256.Size]byte
+	ArtifactSHA256     [sha256.Size]byte
+	ControlSequence    int64
+	CompletionSequence int64
+	GeneratedAt        time.Time
+	StateSHA256        string
 }
 
 type artifactInspection struct {
-	KeyID           string
-	PayloadSHA256   [sha256.Size]byte
-	ControlSequence int64
-	GeneratedAt     time.Time
-	StateSHA256     string
+	KeyID              string
+	PayloadSHA256      [sha256.Size]byte
+	ControlSequence    int64
+	CompletionSequence int64
+	GeneratedAt        time.Time
+	StateSHA256        string
 }
 
 type artifactInspector func([]byte) (artifactInspection, error)
@@ -121,7 +123,8 @@ func (publisher *FilesystemPublisher) Publish(ctx context.Context, artifact trac
 	return publisher.publish(ctx, artifactMetadata{
 		Bytes: artifact.Bytes, KeyID: artifact.KeyID, PayloadSHA256: artifact.PayloadSHA256,
 		ArtifactSHA256: artifact.ArtifactSHA256, ControlSequence: artifact.Snapshot.ControlSequence,
-		GeneratedAt: artifact.Snapshot.GeneratedAt, StateSHA256: artifact.Snapshot.StateSHA256,
+		CompletionSequence: artifact.Snapshot.CompletionSequence,
+		GeneratedAt:        artifact.Snapshot.GeneratedAt, StateSHA256: artifact.Snapshot.StateSHA256,
 	}, inspectTorrentArtifact)
 }
 
@@ -149,7 +152,7 @@ func (publisher *FilesystemPublisher) publish(ctx context.Context, artifact arti
 	inspection, err := inspect(artifact.Bytes)
 	if err != nil || observedArtifactDigest != artifact.ArtifactSHA256 ||
 		inspection.PayloadSHA256 != artifact.PayloadSHA256 || inspection.KeyID != artifact.KeyID ||
-		inspection.ControlSequence != artifact.ControlSequence ||
+		inspection.ControlSequence != artifact.ControlSequence || inspection.CompletionSequence != artifact.CompletionSequence ||
 		!inspection.GeneratedAt.Equal(artifact.GeneratedAt) || inspection.StateSHA256 != artifact.StateSHA256 {
 		return trackercontrol.SnapshotPublication{}, ErrPublicationInput
 	}
@@ -168,13 +171,18 @@ func (publisher *FilesystemPublisher) publish(ctx context.Context, artifact arti
 	result := trackercontrol.SnapshotPublication{}
 	if found {
 		result.PreviousControlSequence = current.ControlSequence
+		result.PreviousCompletionSequence = current.CompletionSequence
 		switch {
 		case current.ControlSequence > inspection.ControlSequence:
 			return trackercontrol.SnapshotPublication{}, ErrPublicationStale
+		case current.CompletionSequence > inspection.CompletionSequence:
+			return trackercontrol.SnapshotPublication{}, ErrPublicationStale
 		case current.ControlSequence == inspection.ControlSequence &&
+			current.CompletionSequence == inspection.CompletionSequence &&
 			current.StateSHA256 != inspection.StateSHA256:
 			return trackercontrol.SnapshotPublication{}, ErrPublicationConflict
 		case current.ControlSequence == inspection.ControlSequence &&
+			current.CompletionSequence == inspection.CompletionSequence &&
 			!current.GeneratedAt.Before(inspection.GeneratedAt):
 			return result, nil
 		}
@@ -296,7 +304,8 @@ func inspectTorrentArtifact(encoded []byte) (artifactInspection, error) {
 	return artifactInspection{
 		KeyID: inspection.KeyID, PayloadSHA256: inspection.PayloadSHA256,
 		ControlSequence: inspection.Snapshot.ControlSequence, GeneratedAt: inspection.Snapshot.GeneratedAt,
-		StateSHA256: inspection.Snapshot.StateSHA256,
+		CompletionSequence: inspection.Snapshot.CompletionSequence,
+		StateSHA256:        inspection.Snapshot.StateSHA256,
 	}, nil
 }
 

@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	AdvanceSwarmProjectionState(ctx context.Context, arg AdvanceSwarmProjectionStateParams) (int64, error)
+	AdvanceTrackerCompletionSequence(ctx context.Context) (int64, error)
 	// A catalog-only legacy/demo row has no authoritative info hash mapping. Leave
 	// its existing fixture/import state untouched rather than falsely refreshing
 	// it to zero; migration must first create the published aggregate mapping.

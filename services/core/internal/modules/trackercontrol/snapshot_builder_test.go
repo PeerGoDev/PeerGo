@@ -39,7 +39,7 @@ func TestSnapshotBuilderSignsProjectionAndPublishesIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := &fixedSnapshotSource{snapshot: ProjectionSnapshot{
-		ControlSequence: 7,
+		ControlSequence: 7, CompletionSequence: 9,
 		Torrents: []AllowlistEntry{{
 			TorrentID: 4, InfoHashV1: hash, TotalSizeBytes: 42,
 			TorrentVersion: 3, ControlSequence: 7, UpdatedAt: now,
@@ -61,7 +61,7 @@ func TestSnapshotBuilderSignsProjectionAndPublishesIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.ControlSequence != 7 || result.TorrentCount != 1 || !result.Published ||
+	if result.ControlSequence != 7 || result.CompletionSequence != 9 || verified.Snapshot.CompletionSequence != 9 || result.TorrentCount != 1 || !result.Published ||
 		!result.GeneratedAt.Equal(now) || verified.Snapshot.Torrents[0].TorrentID != 4 {
 		t.Fatalf("result=%+v snapshot=%+v", result, verified.Snapshot)
 	}

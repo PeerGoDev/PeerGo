@@ -77,6 +77,26 @@ func TestStoreRefreshesSameStateAndRetainsStaleLookup(t *testing.T) {
 	}
 }
 
+func TestStoreActivatesMonotonicCompletionStatisticsRefresh(t *testing.T) {
+	t.Parallel()
+	privateKey := controlTestPrivateKey()
+	store := controlTestStore(t, privateKey)
+	now := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
+	initial := controlTestArtifactWithCompletion(t, privateKey, 4, 0, 0, now, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	if _, err := store.LoadArtifact(initial.Bytes, now); err != nil {
+		t.Fatal(err)
+	}
+	refresh := controlTestArtifactWithCompletion(t, privateKey, 4, 1, 1, now.Add(time.Minute), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	result, err := store.LoadArtifact(refresh.Bytes, now.Add(time.Minute))
+	if err != nil || !result.Activated || result.Status.CompletionSequence != 1 {
+		t.Fatalf("completion refresh = %+v, %v", result, err)
+	}
+	rollback := controlTestArtifactWithCompletion(t, privateKey, 5, 0, 0, now.Add(2*time.Minute), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	if _, err := store.LoadArtifact(rollback.Bytes, now.Add(2*time.Minute)); !errors.Is(err, ErrSnapshotRollback) {
+		t.Fatalf("completion rollback error = %v", err)
+	}
+}
+
 func TestStoreReadersObserveOnlyCompleteSnapshots(t *testing.T) {
 	privateKey := controlTestPrivateKey()
 	store := controlTestStore(t, privateKey)
@@ -135,12 +155,17 @@ func controlTestPrivateKey() ed25519.PrivateKey {
 }
 
 func controlTestArtifact(t *testing.T, privateKey ed25519.PrivateKey, sequence int64, generatedAt time.Time, infoHash string) trackercontrolv1.SignedArtifact {
+	return controlTestArtifactWithCompletion(t, privateKey, sequence, 0, 0, generatedAt, infoHash)
+}
+
+func controlTestArtifactWithCompletion(t *testing.T, privateKey ed25519.PrivateKey, sequence, completionSequence, completedDownloads int64, generatedAt time.Time, infoHash string) trackercontrolv1.SignedArtifact {
 	t.Helper()
 	artifact, err := trackercontrolv1.Sign(trackercontrolv1.Snapshot{
-		GeneratedAt: generatedAt, ControlSequence: sequence,
+		GeneratedAt: generatedAt, ControlSequence: sequence, CompletionSequence: completionSequence,
 		Torrents: []trackercontrolv1.Torrent{{
 			TorrentID:  1,
-			InfoHashV1: infoHash, TotalSizeBytes: 42, TorrentVersion: sequence, ControlSequence: sequence,
+			InfoHashV1: infoHash, TotalSizeBytes: 42, CompletedDownloads: completedDownloads,
+			TorrentVersion: sequence, ControlSequence: sequence,
 		}},
 	}, "active", privateKey)
 	if err != nil {

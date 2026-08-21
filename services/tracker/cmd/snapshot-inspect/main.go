@@ -36,11 +36,13 @@ func main() {
 	}
 	if err := store.Ready(now, settings.MaxAge); err != nil {
 		logger.Error("Tracker control snapshot is not ready", "error", err,
-			"control_sequence", result.Status.ControlSequence, "generated_at", result.Status.GeneratedAt)
+			"control_sequence", result.Status.ControlSequence, "completion_sequence", result.Status.CompletionSequence,
+			"generated_at", result.Status.GeneratedAt)
 		os.Exit(1)
 	}
 	logger.Info("Tracker control snapshot verified",
-		"control_sequence", result.Status.ControlSequence, "torrent_count", result.Status.TorrentCount,
+		"control_sequence", result.Status.ControlSequence, "completion_sequence", result.Status.CompletionSequence,
+		"torrent_count", result.Status.TorrentCount,
 		"generated_at", result.Status.GeneratedAt, "key_id", result.Status.KeyID,
 		"state_sha256", result.Status.StateSHA256,
 	)

@@ -105,6 +105,25 @@ func TestEvaluateKeepsOutOfOrderEvidenceWithoutMovingSession(t *testing.T) {
 	}
 }
 
+func TestEvaluateTreatsSubMicrosecondReorderingAsOutOfOrder(t *testing.T) {
+	t.Parallel()
+	firstEvent := ingestTestEvent(350*time.Nanosecond, 0, 0, 0, "")
+	first, err := Evaluate(nil, firstEvent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondEvent := ingestTestEvent(319*time.Nanosecond, 0, 0, 0, "")
+	secondEvent.EventID = "0198f20a-6da8-7e51-9c64-444444444444"
+	result, err := Evaluate(&first.State, secondEvent)
+	if err != nil || result.Outcome != OutcomeOutOfOrder || result.Update || result.Interval != nil {
+		t.Fatalf("sub-microsecond reorder = %+v, %v", result, err)
+	}
+	want := firstEvent.ReceivedAt.UTC().Truncate(time.Microsecond)
+	if !first.State.LastReceivedAt.Equal(want) || !result.State.LastReceivedAt.Equal(want) {
+		t.Fatalf("canonical timestamps = %v and %v, want %v", first.State.LastReceivedAt, result.State.LastReceivedAt, want)
+	}
+}
+
 func TestEvaluateRejectsSessionIdentityMutation(t *testing.T) {
 	t.Parallel()
 	first, err := Evaluate(nil, ingestTestEvent(0, 10, 20, 30, ""))

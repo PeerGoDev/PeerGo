@@ -136,7 +136,8 @@ func (builders snapshotBuilders) publish(ctx context.Context) error {
 		return fmt.Errorf("build Tracker control snapshot: %w", err)
 	}
 	builders.logger.Info("Tracker control snapshot ready",
-		"control_sequence", controlResult.ControlSequence, "torrent_count", controlResult.TorrentCount,
+		"control_sequence", controlResult.ControlSequence, "completion_sequence", controlResult.CompletionSequence,
+		"torrent_count", controlResult.TorrentCount,
 		"generated_at", controlResult.GeneratedAt, "state_sha256", controlResult.StateSHA256,
 		"artifact_sha256", hex.EncodeToString(controlResult.ArtifactSHA256[:]), "published", controlResult.Published,
 	)

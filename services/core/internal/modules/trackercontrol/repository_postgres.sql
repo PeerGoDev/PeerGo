@@ -153,12 +153,13 @@ GROUP BY state.last_sequence, state.updated_at;
 -- name: GetTrackerSnapshotProjectionState :one
 SELECT
     state.last_sequence,
+	state.completion_sequence,
     state.updated_at,
     count(event.sequence) FILTER (WHERE event.projected_at IS NULL)::bigint AS pending_events
 FROM tracker_control.projection_state AS state
 LEFT JOIN tracker_control.outbox AS event ON true
 WHERE state.singleton = true
-GROUP BY state.last_sequence, state.updated_at;
+GROUP BY state.last_sequence, state.completion_sequence, state.updated_at;
 
 -- name: ListEnabledTorrentAllowlist :many
 SELECT

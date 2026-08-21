@@ -48,6 +48,7 @@ type ProjectionStatus struct {
 // not combine a cursor and rows read in separate PostgreSQL snapshots.
 type ProjectionSnapshot struct {
 	ControlSequence     int64
+	CompletionSequence  int64
 	ProjectionUpdatedAt *time.Time
 	PendingEvents       int64
 	Torrents            []AllowlistEntry

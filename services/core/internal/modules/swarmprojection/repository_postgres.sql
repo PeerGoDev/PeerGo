@@ -247,3 +247,9 @@ RETURNING completed;
 UPDATE catalog.torrent_swarm_stats
 SET completed = sqlc.arg(completed)::integer
 WHERE torrent_id = sqlc.arg(torrent_id)::bigint;
+
+-- name: AdvanceTrackerCompletionSequence :one
+UPDATE tracker_control.projection_state
+SET completion_sequence = completion_sequence + 1
+WHERE singleton = true
+RETURNING completion_sequence;

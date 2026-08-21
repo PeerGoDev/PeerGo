@@ -264,24 +264,31 @@ func (q *Queries) GetTrackerProjectionStatus(ctx context.Context) (GetTrackerPro
 const getTrackerSnapshotProjectionState = `-- name: GetTrackerSnapshotProjectionState :one
 SELECT
     state.last_sequence,
+	state.completion_sequence,
     state.updated_at,
     count(event.sequence) FILTER (WHERE event.projected_at IS NULL)::bigint AS pending_events
 FROM tracker_control.projection_state AS state
 LEFT JOIN tracker_control.outbox AS event ON true
 WHERE state.singleton = true
-GROUP BY state.last_sequence, state.updated_at
+GROUP BY state.last_sequence, state.completion_sequence, state.updated_at
 `
 
 type GetTrackerSnapshotProjectionStateRow struct {
-	LastSequence  int64
-	UpdatedAt     pgtype.Timestamptz
-	PendingEvents int64
+	LastSequence       int64
+	CompletionSequence int64
+	UpdatedAt          pgtype.Timestamptz
+	PendingEvents      int64
 }
 
 func (q *Queries) GetTrackerSnapshotProjectionState(ctx context.Context) (GetTrackerSnapshotProjectionStateRow, error) {
 	row := q.db.QueryRow(ctx, getTrackerSnapshotProjectionState)
 	var i GetTrackerSnapshotProjectionStateRow
-	err := row.Scan(&i.LastSequence, &i.UpdatedAt, &i.PendingEvents)
+	err := row.Scan(
+		&i.LastSequence,
+		&i.CompletionSequence,
+		&i.UpdatedAt,
+		&i.PendingEvents,
+	)
 	return i, err
 }
 

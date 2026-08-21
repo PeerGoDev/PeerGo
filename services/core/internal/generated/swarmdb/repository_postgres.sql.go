@@ -48,6 +48,20 @@ func (q *Queries) AdvanceSwarmProjectionState(ctx context.Context, arg AdvanceSw
 	return result.RowsAffected(), nil
 }
 
+const advanceTrackerCompletionSequence = `-- name: AdvanceTrackerCompletionSequence :one
+UPDATE tracker_control.projection_state
+SET completion_sequence = completion_sequence + 1
+WHERE singleton = true
+RETURNING completion_sequence
+`
+
+func (q *Queries) AdvanceTrackerCompletionSequence(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, advanceTrackerCompletionSequence)
+	var completion_sequence int64
+	err := row.Scan(&completion_sequence)
+	return completion_sequence, err
+}
+
 const applyCompleteSwarmSnapshot = `-- name: ApplyCompleteSwarmSnapshot :exec
 INSERT INTO catalog.torrent_swarm_stats (
     torrent_id,

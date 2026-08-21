@@ -108,6 +108,7 @@ type CutoverAcceptanceReport struct {
 	TorrentPurchaseRights            int64     `json:"torrent_purchase_rights"`
 	TorrentPurchaseEvidenceOnly      int64     `json:"torrent_purchase_evidence_only"`
 	TrackerControlSequence           int64     `json:"tracker_control_sequence"`
+	TrackerCompletionSequence        int64     `json:"tracker_completion_sequence"`
 	TrackerTorrentCount              int       `json:"tracker_torrent_count"`
 	TrackerSnapshotGeneratedAt       time.Time `json:"tracker_snapshot_generated_at"`
 	TrackerSnapshotSHA256            string    `json:"tracker_snapshot_sha256"`
@@ -157,6 +158,7 @@ type acceptedTargetCounts struct {
 	PendingOutbox            int64
 	Allowlisted              int64
 	ProjectionSequence       int64
+	CompletionSequence       int64
 	OutboxSequence           int64
 	SiteProfiles             int64
 	RegistrationPolicies     int64
@@ -433,6 +435,7 @@ WHERE id = $1 AND state = 'reconciled'`, config.Inventory.RunID).Scan(&reconcile
 		TorrentPurchaseRights:            purchases.Entitlements,
 		TorrentPurchaseEvidenceOnly:      purchases.EvidenceOnly,
 		TrackerControlSequence:           controlSnapshot.Snapshot.ControlSequence,
+		TrackerCompletionSequence:        controlSnapshot.Snapshot.CompletionSequence,
 		TrackerTorrentCount:              len(controlSnapshot.Snapshot.Torrents),
 		TrackerSnapshotGeneratedAt:       controlSnapshot.Snapshot.GeneratedAt,
 		TrackerSnapshotSHA256:            hex.EncodeToString(controlSnapshot.ArtifactSHA256[:]),
@@ -629,6 +632,7 @@ SELECT
     (SELECT count(*)::bigint FROM tracker_control.outbox WHERE projected_at IS NULL),
     (SELECT count(*)::bigint FROM tracker_control.torrent_allowlist_projection WHERE enabled),
     (SELECT last_sequence FROM tracker_control.projection_state WHERE singleton),
+	(SELECT completion_sequence FROM tracker_control.projection_state WHERE singleton),
     (SELECT COALESCE(max(sequence), 0)::bigint FROM tracker_control.outbox),
     (SELECT count(*)::bigint FROM catalog.site_profile WHERE singleton),
     (SELECT count(*)::bigint FROM identity.registration_policy WHERE singleton)
@@ -647,7 +651,7 @@ WHERE mapping.first_run_id = $1`, runID, backendID).Scan(
 		&result.FacetValues, &result.ExternalIdentifiers, &result.Groups,
 		&result.GroupMappings, &result.GroupExternalIdentifiers, &result.Published,
 		&result.CatalogRows, &result.OutboxRows, &result.PendingOutbox,
-		&result.Allowlisted, &result.ProjectionSequence, &result.OutboxSequence,
+		&result.Allowlisted, &result.ProjectionSequence, &result.CompletionSequence, &result.OutboxSequence,
 		&result.SiteProfiles, &result.RegistrationPolicies,
 	)
 	if err != nil {
@@ -790,15 +794,21 @@ func verifyAcceptedTrackerSnapshot(
 		return trackercontrolv1.VerifiedSnapshot{}, err
 	}
 	if verified.Snapshot.ControlSequence != target.ProjectionSequence ||
+		verified.Snapshot.CompletionSequence != target.CompletionSequence ||
 		int64(len(verified.Snapshot.Torrents)) != target.Allowlisted {
 		return trackercontrolv1.VerifiedSnapshot{}, errors.New("Tracker control snapshot does not match the Core projection")
 	}
 	rows, err := core.Query(ctx, `
-SELECT torrent_id, info_hash_v1, total_size_bytes,
-       torrent_version, control_sequence
-FROM tracker_control.torrent_allowlist_projection
-WHERE enabled
-ORDER BY info_hash_v1`)
+SELECT allowlist.torrent_id, allowlist.info_hash_v1, allowlist.total_size_bytes,
+	   coalesce(completion.completed, swarm.completed, 0)::bigint AS completed_downloads,
+	   allowlist.torrent_version, allowlist.control_sequence
+FROM tracker_control.torrent_allowlist_projection AS allowlist
+LEFT JOIN catalog.torrent_completion_stats AS completion
+	ON completion.torrent_id = allowlist.torrent_id
+LEFT JOIN catalog.torrent_swarm_stats AS swarm
+	ON swarm.torrent_id = allowlist.torrent_id
+WHERE allowlist.enabled
+ORDER BY allowlist.info_hash_v1`)
 	if err != nil {
 		return trackercontrolv1.VerifiedSnapshot{}, fmt.Errorf("query Tracker allowlist acceptance: %w", err)
 	}
@@ -808,13 +818,14 @@ ORDER BY info_hash_v1`)
 		if index >= len(verified.Snapshot.Torrents) {
 			return trackercontrolv1.VerifiedSnapshot{}, errors.New("Tracker control snapshot is missing an allowlist row")
 		}
-		var id, size, version, sequence int64
+		var id, size, completed, version, sequence int64
 		var infoHash []byte
-		if err := rows.Scan(&id, &infoHash, &size, &version, &sequence); err != nil {
+		if err := rows.Scan(&id, &infoHash, &size, &completed, &version, &sequence); err != nil {
 			return trackercontrolv1.VerifiedSnapshot{}, fmt.Errorf("scan Tracker allowlist acceptance: %w", err)
 		}
 		entry := verified.Snapshot.Torrents[index]
 		if entry.TorrentID != id || entry.InfoHashV1 != hex.EncodeToString(infoHash) || entry.TotalSizeBytes != size ||
+			entry.CompletedDownloads != completed ||
 			entry.TorrentVersion != version || entry.ControlSequence != sequence {
 			return trackercontrolv1.VerifiedSnapshot{}, errors.New("Tracker control snapshot entry does not match Core")
 		}

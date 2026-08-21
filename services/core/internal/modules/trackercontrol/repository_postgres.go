@@ -223,7 +223,7 @@ func (repository *PostgresRepository) ReadSnapshot(ctx context.Context) (Project
 	if err != nil {
 		return ProjectionSnapshot{}, err
 	}
-	if state.LastSequence < 0 || state.PendingEvents < 0 || (state.LastSequence == 0 && state.UpdatedAt.Valid) ||
+	if state.LastSequence < 0 || state.CompletionSequence < 0 || state.PendingEvents < 0 || (state.LastSequence == 0 && state.UpdatedAt.Valid) ||
 		(state.LastSequence > 0 && !state.UpdatedAt.Valid) {
 		return ProjectionSnapshot{}, ErrSnapshotProjection
 	}
@@ -233,7 +233,8 @@ func (repository *PostgresRepository) ReadSnapshot(ctx context.Context) (Project
 		}
 	}
 	result := ProjectionSnapshot{
-		ControlSequence: state.LastSequence, PendingEvents: state.PendingEvents, Torrents: entries,
+		ControlSequence: state.LastSequence, CompletionSequence: state.CompletionSequence,
+		PendingEvents: state.PendingEvents, Torrents: entries,
 	}
 	if state.UpdatedAt.Valid {
 		updatedAt := state.UpdatedAt.Time.UTC()

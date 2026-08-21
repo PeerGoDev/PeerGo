@@ -98,12 +98,20 @@ func TestIntegrationAppliesOnlyCompleteSnapshotsAndDeduplicatesCompletions(t *te
 		t.Fatalf("ApplySnapshot(obsolete) = %+v, %v", obsolete, err)
 	}
 
+	var completionSequenceBefore int64
+	if err := pool.QueryRow(ctx, `
+SELECT completion_sequence
+FROM tracker_control.projection_state
+WHERE singleton`).Scan(&completionSequenceBefore); err != nil {
+		t.Fatalf("read Tracker completion sequence: %v", err)
+	}
 	completion, completionPayload := completionEvent(t, first, mustUUIDV7(t), now.Add(-20*time.Second), "")
 	result, err := repository.ApplyCompletion(ctx, completionPayload, now)
 	if err != nil || !result.Applied || result.Duplicate {
 		t.Fatalf("ApplyCompletion() = %+v, %v", result, err)
 	}
 	assertSwarmStats(t, ctx, pool, first.publicID, 21, 3, 5)
+	assertTrackerCompletionSequence(t, ctx, pool, completionSequenceBefore+1)
 
 	retryEventID := mustUUIDV7(t)
 	retry := completion
@@ -117,6 +125,7 @@ func TestIntegrationAppliesOnlyCompleteSnapshotsAndDeduplicatesCompletions(t *te
 		t.Fatalf("ApplyCompletion(retry) = %+v, %v", retried, err)
 	}
 	assertSwarmStats(t, ctx, pool, first.publicID, 21, 3, 5)
+	assertTrackerCompletionSequence(t, ctx, pool, completionSequenceBefore+1)
 
 	// A later active-count snapshot must not overwrite the independently
 	// settled lifetime completion count.
@@ -265,6 +274,20 @@ WHERE torrent_id = $1`, publicID.String()).Scan(&seeders, &leechers, &completed)
 	}
 	if seeders != wantSeeders || leechers != wantLeechers || completed != wantCompleted {
 		t.Fatalf("swarm stats for %s = %d/%d/%d; want %d/%d/%d", publicID, seeders, leechers, completed, wantSeeders, wantLeechers, wantCompleted)
+	}
+}
+
+func assertTrackerCompletionSequence(t *testing.T, ctx context.Context, pool *pgxpool.Pool, want int64) {
+	t.Helper()
+	var got int64
+	if err := pool.QueryRow(ctx, `
+SELECT completion_sequence
+FROM tracker_control.projection_state
+WHERE singleton`).Scan(&got); err != nil {
+		t.Fatalf("read Tracker completion sequence: %v", err)
+	}
+	if got != want {
+		t.Fatalf("Tracker completion sequence = %d, want %d", got, want)
 	}
 }
 

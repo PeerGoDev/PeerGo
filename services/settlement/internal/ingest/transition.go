@@ -90,10 +90,18 @@ func Evaluate(previous *Session, event trackerannouncev1.Event) (Transition, err
 	if trackerannouncev1.Validate(event) != nil {
 		return Transition{}, ErrInvalidInput
 	}
+	// PostgreSQL timestamptz stores microseconds. Compare and persist the exact
+	// same canonical precision so two announces inside one microsecond cannot
+	// look ordered in Go and then collapse to an equal timestamp in the
+	// database, where the monotonic-session trigger must reject them.
+	event.ReceivedAt = canonicalIngestTime(event.ReceivedAt)
 	if previous == nil {
 		state := baseline(event, 1, 1)
 		return Transition{Outcome: OutcomeBaseline, Epoch: state.Epoch, Update: true, State: state}, nil
 	}
+	canonicalPrevious := *previous
+	canonicalPrevious.LastReceivedAt = canonicalIngestTime(canonicalPrevious.LastReceivedAt)
+	previous = &canonicalPrevious
 	if err := validateSession(*previous); err != nil {
 		return Transition{}, err
 	}
@@ -142,6 +150,10 @@ func Evaluate(previous *Session, event trackerannouncev1.Event) (Transition, err
 		interval.CompletionID = event.CompletionID
 	}
 	return Transition{Outcome: OutcomeInterval, Epoch: state.Epoch, Update: true, State: state, Interval: interval}, nil
+}
+
+func canonicalIngestTime(value time.Time) time.Time {
+	return value.UTC().Truncate(time.Microsecond)
 }
 
 func cloneNetworkEvidence(evidence *trackerannouncev1.NetworkEvidence) *trackerannouncev1.NetworkEvidence {

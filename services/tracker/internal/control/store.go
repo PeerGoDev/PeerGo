@@ -22,12 +22,13 @@ var (
 )
 
 type Status struct {
-	Loaded          bool
-	ControlSequence int64
-	GeneratedAt     time.Time
-	TorrentCount    int
-	KeyID           string
-	StateSHA256     string
+	Loaded             bool
+	ControlSequence    int64
+	CompletionSequence int64
+	GeneratedAt        time.Time
+	TorrentCount       int
+	KeyID              string
+	StateSHA256        string
 }
 
 type LoadResult struct {
@@ -90,7 +91,8 @@ func (store *Store) LoadArtifact(encoded []byte, now time.Time) (LoadResult, err
 	next := &immutableView{
 		status: Status{
 			Loaded: true, ControlSequence: verified.Snapshot.ControlSequence,
-			GeneratedAt: verified.Snapshot.GeneratedAt, TorrentCount: len(torrents),
+			CompletionSequence: verified.Snapshot.CompletionSequence,
+			GeneratedAt:        verified.Snapshot.GeneratedAt, TorrentCount: len(torrents),
 			KeyID: verified.KeyID, StateSHA256: verified.Snapshot.StateSHA256,
 		},
 		torrents: torrents,
@@ -101,10 +103,14 @@ func (store *Store) LoadArtifact(encoded []byte, now time.Time) (LoadResult, err
 			switch {
 			case current.status.ControlSequence > next.status.ControlSequence:
 				return LoadResult{}, ErrSnapshotRollback
+			case current.status.CompletionSequence > next.status.CompletionSequence:
+				return LoadResult{}, ErrSnapshotRollback
 			case current.status.ControlSequence == next.status.ControlSequence &&
+				current.status.CompletionSequence == next.status.CompletionSequence &&
 				current.status.StateSHA256 != next.status.StateSHA256:
 				return LoadResult{}, ErrSnapshotDivergence
 			case current.status.ControlSequence == next.status.ControlSequence &&
+				current.status.CompletionSequence == next.status.CompletionSequence &&
 				!current.status.GeneratedAt.Before(next.status.GeneratedAt):
 				return LoadResult{Status: current.status}, nil
 			}

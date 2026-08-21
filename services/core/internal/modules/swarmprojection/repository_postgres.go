@@ -303,6 +303,13 @@ func (repository *PostgresRepository) ApplyCompletion(ctx context.Context, paylo
 	}); err != nil {
 		return ApplyResult{}, classifyDatabaseError("synchronize Core public swarm completion count", err)
 	}
+	completionSequence, err := queries.AdvanceTrackerCompletionSequence(ctx)
+	if err != nil || completionSequence < 1 {
+		if err == nil {
+			err = ErrInvariant
+		}
+		return ApplyResult{}, classifyDatabaseError("advance Tracker completion sequence", err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return ApplyResult{}, classifyDatabaseError("commit Core swarm completion projection", err)
 	}
