@@ -81,7 +81,7 @@ func TestRuntimePolicyServiceUsesDedicatedPermissionsAndCanonicalRevision(t *tes
 	inputPolicy.Revision = "" // Revision is server-owned and absent from the API DTO.
 	issued, err := service.Issue(context.Background(), actor, IssueRuntimePolicyInput{
 		RequestID: requestID, ExpectedSequence: 1, Policy: inputPolicy,
-		Reason: "  调整 Tracker 请求策略基线。  ",
+		Reason: "  调整限频。  ",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -91,8 +91,16 @@ func TestRuntimePolicyServiceUsesDedicatedPermissionsAndCanonicalRevision(t *tes
 		t.Fatalf("authorization requests = %+v", authorizer.requests)
 	}
 	if issued.Sequence != 2 || issued.Policy.Revision != "tracker-runtime-01990f6ffd8070008000000000000001" ||
-		issued.Reason != "调整 Tracker 请求策略基线。" || repository.command.ActorID != actor.Subject.ID {
+		issued.Reason != "调整限频。" || repository.command.ActorID != actor.Subject.ID {
 		t.Fatalf("issued=%+v command=%+v", issued, repository.command)
+	}
+
+	inputPolicy = testRuntimePolicy()
+	inputPolicy.Revision = ""
+	if _, err := service.Issue(context.Background(), actor, IssueRuntimePolicyInput{
+		RequestID: uuid.New(), ExpectedSequence: 2, Policy: inputPolicy, Reason: "调整限频",
+	}); !errors.Is(err, ErrRuntimePolicyInput) {
+		t.Fatalf("four-rune reason error = %v, want ErrRuntimePolicyInput", err)
 	}
 }
 

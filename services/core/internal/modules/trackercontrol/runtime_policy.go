@@ -29,6 +29,11 @@ var (
 	ErrRuntimePolicyIdempotency     = errors.New("Tracker runtime policy idempotency conflict")
 )
 
+const (
+	minRuntimePolicyReasonRunes = 5
+	maxRuntimePolicyReasonRunes = 1000
+)
+
 type RuntimePolicyRevision struct {
 	Sequence  int64
 	Policy    trackerruntimepolicyv1.Policy
@@ -83,7 +88,8 @@ func (service *RuntimePolicyService) Current(ctx context.Context, actor authz.St
 func (service *RuntimePolicyService) Issue(ctx context.Context, actor authz.StaffActor, input IssueRuntimePolicyInput) (RuntimePolicyRevision, error) {
 	input.Reason = strings.TrimSpace(input.Reason)
 	if input.RequestID == uuid.Nil || input.ExpectedSequence < 1 || !utf8.ValidString(input.Reason) ||
-		utf8.RuneCountInString(input.Reason) < 10 || utf8.RuneCountInString(input.Reason) > 1000 {
+		utf8.RuneCountInString(input.Reason) < minRuntimePolicyReasonRunes ||
+		utf8.RuneCountInString(input.Reason) > maxRuntimePolicyReasonRunes {
 		return RuntimePolicyRevision{}, ErrRuntimePolicyInput
 	}
 	// Revision is a server-owned idempotency identity derived from the write

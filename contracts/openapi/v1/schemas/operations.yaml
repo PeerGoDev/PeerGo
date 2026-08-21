@@ -156,7 +156,7 @@ TrackerPolicyRevision:
     sequence: { $ref: "#/OperationsCount" }
     revision: { type: string, maxLength: 64 }
     settings: { $ref: "#/TrackerPolicySettings" }
-    reason: { type: string, minLength: 10, maxLength: 1000 }
+    reason: { type: string, minLength: 5, maxLength: 1000 }
     created_at: { type: string, format: date-time }
     issued_by: { type: string, format: uuid, nullable: true }
 
@@ -187,7 +187,7 @@ IssueTrackerPolicyRequest:
   properties:
     expected_sequence: { $ref: "#/OperationsCount" }
     settings: { $ref: "#/TrackerPolicySettings" }
-    reason: { type: string, minLength: 10, maxLength: 1000 }
+    reason: { type: string, minLength: 5, maxLength: 1000 }
 
 TorrentUploadRules:
   type: object

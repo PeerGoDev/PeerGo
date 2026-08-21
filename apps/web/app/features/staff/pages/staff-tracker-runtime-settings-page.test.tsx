@@ -30,6 +30,11 @@ describe("StaffTrackerRuntimeSettingsPage", () => {
     expect(screen.getByText("Scrape")).toBeVisible()
     expect(screen.getByText("进程容量（只读）")).toBeVisible()
     expect(screen.getByText("已配置政策与 Tracker 实际状态一致")).toBeVisible()
+    expect(screen.getByLabelText("修改原因")).toHaveAttribute("minlength", "5")
+    expect(screen.getByLabelText("修改原因")).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("至少 5 个字符")
+    )
     expect(screen.queryByText(/WAL|JetStream|service-token/)).toBeNull()
   })
 })

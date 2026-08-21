@@ -205,7 +205,7 @@ func (h *Handler) IssueTrackerPolicy(ctx context.Context, request generated.Issu
 }
 
 func trackerPolicyBadRequest(ctx context.Context) generated.IssueTrackerPolicy400ApplicationProblemPlusJSONResponse {
-	problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_tracker_policy", "Tracker 设置无效", "请检查 announce、scrape、客户端、请求频率和至少 10 个字符的修改说明。")
+	problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_tracker_policy", "Tracker 设置无效", "请检查 announce、scrape、客户端、请求频率和至少 5 个字符的修改说明。")
 	return generated.IssueTrackerPolicy400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}
 }
 

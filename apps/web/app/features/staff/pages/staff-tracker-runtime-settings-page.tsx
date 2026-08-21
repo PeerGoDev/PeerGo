@@ -579,9 +579,9 @@ function TrackerPolicyForm({
               <Textarea
                 id="tracker-policy-reason"
                 value={reason}
-                minLength={10}
+                minLength={5}
                 maxLength={1000}
-                placeholder="至少 10 个字符，例如：启用认证 Scrape 并按当前用户规模调整请求频率。"
+                placeholder="至少 5 个字符，例如：调整 Scrape 请求频率。"
                 disabled={mutation.isPending}
                 onChange={(event) => setReason(event.target.value)}
               />
@@ -679,7 +679,7 @@ function validatePolicy(
   changed: boolean
 ) {
   if (!changed) return "设置没有变化，无需创建空版本。"
-  if (reason.trim().length < 10) return "修改原因至少需要 10 个字符。"
+  if (Array.from(reason.trim()).length < 5) return "修改原因至少需要 5 个字符。"
   if (
     settings.announce_interval_seconds < 60 ||
     settings.announce_interval_seconds > 86400 ||

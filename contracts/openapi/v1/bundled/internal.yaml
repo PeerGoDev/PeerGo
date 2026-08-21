@@ -22565,7 +22565,7 @@ components:
           $ref: '#/components/schemas/TrackerPolicySettings'
         reason:
           type: string
-          minLength: 10
+          minLength: 5
           maxLength: 1000
         created_at:
           type: string
@@ -22648,7 +22648,7 @@ components:
           $ref: '#/components/schemas/TrackerPolicySettings'
         reason:
           type: string
-          minLength: 10
+          minLength: 5
           maxLength: 1000
     TorrentUploadRules:
       type: object
