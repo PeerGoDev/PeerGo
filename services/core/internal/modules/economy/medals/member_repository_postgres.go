@@ -499,6 +499,9 @@ WHERE id IN ($1, $2)`, ordered[index].ID, ordered[neighbor].ID,
 }
 
 func appendUserBenefitRevision(ctx context.Context, tx pgx.Tx, userID uuid.UUID, medalID, holdingVersion int64, occurredAt time.Time) error {
+	// Keep the audit reference a Go string. PostgreSQL otherwise infers a text
+	// parameter through concatenation, which pgx cannot encode from an int64.
+	sourceReference := fmt.Sprintf("medal-wear:%d:v%d", medalID, holdingVersion)
 	_, err := tx.Exec(ctx, `
 WITH latest AS MATERIALIZED (
     SELECT revision, effective_from, vip_enabled, vip_until, medal_bonus_bps
@@ -511,7 +514,7 @@ WITH latest AS MATERIALIZED (
         settings.maximum_magic_bonus_bps,
         COALESCE(sum(definition.magic_bonus_bps) FILTER (
             WHERE holding.id IS NOT NULL
-              AND (holding.expires_at IS NULL OR holding.expires_at > $4)
+              AND (holding.expires_at IS NULL OR holding.expires_at > $3)
               AND (definition.is_workgroup OR holding.state = 'wearing')
         ), 0)
     )::bigint AS next_bonus
@@ -526,11 +529,11 @@ INSERT INTO identity.user_reward_benefit_revisions (
     medal_bonus_bps, source_kind, source_reference, created_at
 )
 SELECT $1, latest.revision + 1,
-       GREATEST($4::timestamptz, latest.effective_from + interval '1 microsecond'),
+       GREATEST($3::timestamptz, latest.effective_from + interval '1 microsecond'),
        latest.vip_enabled, latest.vip_until, recalculated.next_bonus,
-       'runtime', 'medal-wear:' || $2::text || ':v' || $3::text, $4
+       'runtime', $2, $3
 FROM latest CROSS JOIN recalculated
-WHERE recalculated.next_bonus <> latest.medal_bonus_bps`, userID, medalID, holdingVersion, occurredAt)
+WHERE recalculated.next_bonus <> latest.medal_bonus_bps`, userID, sourceReference, occurredAt)
 	if err != nil {
 		return fmt.Errorf("append member medal benefit revision: %w", err)
 	}

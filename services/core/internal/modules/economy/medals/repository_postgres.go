@@ -423,6 +423,9 @@ ORDER BY user_id`, version, occurredAt)
 // reward inputs. We lock every affected user's entitlement timeline in UUID
 // order, recompute the current medal total, and append only changed values.
 func appendAffectedBenefitRevisions(ctx context.Context, tx pgx.Tx, medalID, version int64, occurredAt time.Time) error {
+	// Keep the audit reference a Go string. PostgreSQL otherwise infers a text
+	// parameter through concatenation, which pgx cannot encode from an int64.
+	sourceReference := fmt.Sprintf("medal-definition:%d:v%d", medalID, version)
 	_, err := tx.Exec(ctx, `
 WITH affected AS MATERIALIZED (
     SELECT DISTINCT user_id
@@ -468,10 +471,10 @@ INSERT INTO identity.user_reward_benefit_revisions (
     medal_bonus_bps, source_kind, source_reference, created_at
 )
 SELECT user_id, revision + 1, $3, vip_enabled, vip_until,
-       next_bonus, 'runtime', 'medal-definition:' || $1::text || ':v' || $2::text, $3
+       next_bonus, 'runtime', $2, $3
 FROM recalculated
 WHERE next_bonus <> medal_bonus_bps
-ORDER BY user_id`, medalID, version, occurredAt)
+ORDER BY user_id`, medalID, sourceReference, occurredAt)
 	if err != nil {
 		return fmt.Errorf("append affected medal benefit revisions: %w", err)
 	}
