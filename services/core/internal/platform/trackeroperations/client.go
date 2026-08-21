@@ -3,6 +3,7 @@
 package trackeroperations
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,7 +17,10 @@ import (
 	"github.com/peergo/peergo/contracts/go/trackeroperationsv1"
 )
 
-const responseLimit = 4 << 10
+// The signed Tracker runtime policy may contain up to 4,096 reviewed seedbox
+// rules. Keep this response bounded, but large enough to represent the full
+// cross-service contract instead of truncating a legitimate migrated registry.
+const responseLimit = 1 << 20
 
 type Client struct {
 	endpoint     string
@@ -62,8 +66,12 @@ func (client *Client) Runtime(ctx context.Context) (trackeroperationsv1.Runtime,
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, responseLimit))
 		return trackeroperationsv1.Runtime{}, fmt.Errorf("Tracker runtime returned status %d", response.StatusCode)
 	}
+	payload, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
+	if err != nil || len(payload) > responseLimit {
+		return trackeroperationsv1.Runtime{}, errors.New("Tracker returned an invalid runtime response")
+	}
 	var runtime trackeroperationsv1.Runtime
-	decoder := json.NewDecoder(io.LimitReader(response.Body, responseLimit))
+	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&runtime); err != nil || !runtime.Valid() {
 		return trackeroperationsv1.Runtime{}, errors.New("Tracker returned an invalid runtime response")

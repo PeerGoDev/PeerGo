@@ -2,11 +2,16 @@ package trackeroperations
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/peergo/peergo/contracts/go/trackeroperationsv1"
+	"github.com/peergo/peergo/contracts/go/trackerruntimepolicyv1"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -35,5 +40,67 @@ func TestClientReadsAuthenticatedRuntime(t *testing.T) {
 	runtime, err := client.Runtime(context.Background())
 	if err != nil || runtime.AnnounceIntervalSeconds != 1800 {
 		t.Fatalf("runtime = %+v, err = %v", runtime, err)
+	}
+}
+
+func TestClientReadsRuntimeWithMaximumSeedboxRegistry(t *testing.T) {
+	runtime := validRuntime()
+	runtime.Seedbox = trackerruntimepolicyv1.SeedboxPolicy{
+		Enabled: true, UploadFactorBasisPoints: 5_000, DownloadFactorBasisPoints: 20_000,
+		Rules: make([]trackerruntimepolicyv1.SeedboxRule, 0, trackerruntimepolicyv1.MaxSeedboxRules),
+	}
+	for index := 0; index < trackerruntimepolicyv1.MaxSeedboxRules; index++ {
+		runtime.Seedbox.Rules = append(runtime.Seedbox.Rules, trackerruntimepolicyv1.SeedboxRule{
+			ID: fmt.Sprintf("seedbox-%04d", index), CIDR: fmt.Sprintf("2001:db8:%x::/48", index),
+			UserNumericID: int64(index + 1),
+		})
+	}
+	payload, err := json.Marshal(runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(payload) <= 4<<10 || len(payload) > responseLimit {
+		t.Fatalf("runtime payload bytes = %d, want within (%d, %d]", len(payload), 4<<10, responseLimit)
+	}
+
+	client := testClient(t, payload)
+	loaded, err := client.Runtime(context.Background())
+	if err != nil || len(loaded.Seedbox.Rules) != trackerruntimepolicyv1.MaxSeedboxRules {
+		t.Fatalf("runtime rules = %d, err = %v", len(loaded.Seedbox.Rules), err)
+	}
+}
+
+func TestClientRejectsOversizedRuntimeResponse(t *testing.T) {
+	client := testClient(t, []byte(strings.Repeat(" ", responseLimit+1)))
+	if _, err := client.Runtime(context.Background()); err == nil {
+		t.Fatal("Runtime() accepted an oversized response")
+	}
+}
+
+func testClient(t *testing.T, payload []byte) *Client {
+	t.Helper()
+	const token = "peergo-test-tracker-service-token-2026"
+	client, err := NewClient("https://tracker.example", token, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.httpClient.Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(string(payload))), Request: request,
+		}, nil
+	})
+	return client
+}
+
+func validRuntime() trackeroperationsv1.Runtime {
+	generatedAt := time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)
+	return trackeroperationsv1.Runtime{
+		GeneratedAt: generatedAt, PolicyGeneratedAt: generatedAt, PolicyControlSequence: 2,
+		PolicyRevision: "tracker-runtime-test-v2", AnnounceIntervalSeconds: 1_800,
+		MinAnnounceIntervalSeconds: 900, DefaultNumWant: 50, MaxNumWant: 100,
+		MaxScrapeHashes: 50, ClientMode: string(trackerruntimepolicyv1.ClientModeAllowAll),
+		AllowedClients: []trackerruntimepolicyv1.ClientRule{}, UserRequestsPerMinute: 600, UserBurst: 1_200,
+		AddressRequestsPerMinute: 5_000, AddressBurst: 10_000, PeerTTLSeconds: 2_100,
+		MaxSwarms: 100_000, MaxPeers: 1_000_000, MaxPeersPerSwarm: 100_000,
 	}
 }
