@@ -137,7 +137,7 @@ func TestEvaluateRejectsSessionIdentityMutation(t *testing.T) {
 	}
 }
 
-func TestEvaluateRejectsCompletionTransitionWithoutStableIdentity(t *testing.T) {
+func TestEvaluateKeepsUntrustedCompletionCandidateAsTrafficInterval(t *testing.T) {
 	t.Parallel()
 	baseline, err := Evaluate(nil, ingestTestEvent(0, 100, 200, 300, "started"))
 	if err != nil {
@@ -145,8 +145,13 @@ func TestEvaluateRejectsCompletionTransitionWithoutStableIdentity(t *testing.T) 
 	}
 	completed := ingestTestEvent(time.Minute, 150, 240, 0, "completed")
 	completed.CompletionID = ""
-	if _, err := Evaluate(&baseline.State, completed); !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("missing completion identity error = %v", err)
+	transition, err := Evaluate(&baseline.State, completed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transition.Interval == nil || transition.Interval.RawUploaded != 50 || transition.Interval.RawDownloaded != 40 ||
+		transition.Interval.CompletedTransition || transition.Interval.CompletionID != "" || transition.State.LastLeft != 0 {
+		t.Fatalf("untrusted completion transition = %+v", transition)
 	}
 }
 

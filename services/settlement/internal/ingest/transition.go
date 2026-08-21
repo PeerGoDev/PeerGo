@@ -135,18 +135,20 @@ func Evaluate(previous *Session, event trackerannouncev1.Event) (Transition, err
 		PreviousUploaded:       previous.LastUploaded, CurrentUploaded: event.Uploaded,
 		PreviousDownloaded: previous.LastDownloaded, CurrentDownloaded: event.Downloaded,
 		PreviousLeft: previous.LastLeft, CurrentLeft: event.Left,
-		RawUploaded:         event.Uploaded - previous.LastUploaded,
-		RawDownloaded:       event.Downloaded - previous.LastDownloaded,
-		CompletedTransition: previous.LastLeft > 0 && event.Left == 0,
+		RawUploaded:   event.Uploaded - previous.LastUploaded,
+		RawDownloaded: event.Downloaded - previous.LastDownloaded,
+		// A left > 0 -> 0 counter change is a trustworthy completion only
+		// when the Swarm Engine also supplied its stable identity. The engine
+		// deliberately omits that identity after peer expiry or process restart,
+		// so those intervals must still enter the traffic ledger without creating
+		// a completion count or H&R obligation.
+		CompletedTransition: previous.LastLeft > 0 && event.Left == 0 && event.CompletionID != "",
 		NetworkEvidence:     cloneNetworkEvidence(event.NetworkEvidence),
 	}
 	if interval.CompletedTransition {
-		// The Swarm Engine issues this identity only for the trusted transition.
 		// Repeated completed announces may carry a client retry identity but do
-		// not become another H&R completion fact here.
-		if event.CompletionID == "" {
-			return Transition{}, fmt.Errorf("%w: trustworthy completion is missing completion identity", ErrInvalidInput)
-		}
+		// not become another H&R completion fact once the persisted session is
+		// already at left == 0.
 		interval.CompletionID = event.CompletionID
 	}
 	return Transition{Outcome: OutcomeInterval, Epoch: state.Epoch, Update: true, State: state, Interval: interval}, nil
