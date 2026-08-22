@@ -13,32 +13,33 @@ import (
 
 // Config is validated before Core opens its listener or connects adapters.
 type Config struct {
-	Environment             string
-	Address                 string
-	DatabaseURL             string
-	VaultURL                string
-	VaultServiceToken       string
-	SessionCSRFKey          []byte
-	AuditPseudonymKey       []byte
-	AuditKeyEpoch           string
-	CookieName              string
-	StaffCookieName         string
-	CookieSecure            bool
-	AllowedOrigins          []string
-	PublicOrigin            string
-	WebAuthnRPID            string
-	WebAuthnOrigins         []string
-	WebAuthnRecordKey       []byte
-	WebAuthnKeyEpoch        string
-	TorrentObjectStore      ObjectStoreConfig
-	TorrentUploadMaxBytes   int
-	TrackerCanonicalOrigin  string
-	TrackerOperationsOrigin string
-	TrackerServiceToken     string
-	SettlementControlURL    string
-	SettlementServiceToken  string
-	SeedingEvidenceStartAt  time.Time
-	TurnstileSecretKey      string
+	Environment                 string
+	Address                     string
+	DatabaseURL                 string
+	VaultURL                    string
+	VaultServiceToken           string
+	SessionCSRFKey              []byte
+	AuditPseudonymKey           []byte
+	AuditKeyEpoch               string
+	CookieName                  string
+	StaffCookieName             string
+	CookieSecure                bool
+	AllowedOrigins              []string
+	PublicOrigin                string
+	WebAuthnRPID                string
+	WebAuthnOrigins             []string
+	WebAuthnRecordKey           []byte
+	WebAuthnKeyEpoch            string
+	TorrentObjectStore          ObjectStoreConfig
+	TorrentUploadMaxBytes       int
+	TrackerCanonicalOrigin      string
+	TrackerOperationsOrigin     string
+	TrackerServiceToken         string
+	SettlementControlURL        string
+	SettlementServiceToken      string
+	SeedingEvidenceStartAt      time.Time
+	SeedingEvidenceClosureDelay time.Duration
+	TurnstileSecretKey          string
 }
 
 // Load reads explicit runtime configuration. Database and cryptographic
@@ -263,6 +264,17 @@ func Load() (Config, error) {
 	if err != nil || seedingEvidenceOffset != 0 || !seedingEvidenceStartAt.Equal(seedingEvidenceStartAt.Truncate(time.Hour)) {
 		return Config{}, errors.New("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT must be an exact UTC RFC3339 hour")
 	}
+	seedingEvidenceClosureDelay, err := projectionDuration(
+		"PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY",
+		time.Minute,
+		time.Hour,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+	if seedingEvidenceClosureDelay%time.Second != 0 {
+		return Config{}, errors.New("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY must use whole seconds")
+	}
 	turnstileSecretKey := strings.TrimSpace(os.Getenv("PEERGO_TURNSTILE_SECRET_KEY"))
 	if len(turnstileSecretKey) > 256 || strings.ContainsAny(turnstileSecretKey, "\r\n") {
 		return Config{}, errors.New("PEERGO_TURNSTILE_SECRET_KEY must contain at most 256 characters without line breaks")
@@ -284,32 +296,33 @@ func Load() (Config, error) {
 		staffCookieName = "__Secure-peergo_staff_session"
 	}
 	return Config{
-		Environment:             environment,
-		Address:                 address,
-		DatabaseURL:             databaseURL,
-		VaultURL:                vaultURL,
-		VaultServiceToken:       vaultServiceToken,
-		SessionCSRFKey:          []byte(csrfKey),
-		AuditPseudonymKey:       []byte(auditPseudonymKey),
-		AuditKeyEpoch:           auditKeyEpoch,
-		CookieName:              cookieName,
-		StaffCookieName:         staffCookieName,
-		CookieSecure:            cookieSecure,
-		AllowedOrigins:          allowedOrigins,
-		PublicOrigin:            publicOrigin,
-		WebAuthnRPID:            webAuthnRPID,
-		WebAuthnOrigins:         webAuthnOrigins,
-		WebAuthnRecordKey:       []byte(webAuthnRecordKey),
-		WebAuthnKeyEpoch:        webAuthnKeyEpoch,
-		TorrentObjectStore:      torrentObjectStore,
-		TorrentUploadMaxBytes:   torrentUploadMaxBytes,
-		TrackerCanonicalOrigin:  trackerCanonicalOrigin,
-		TrackerOperationsOrigin: trackerOperationsOrigin,
-		TrackerServiceToken:     trackerServiceToken,
-		SettlementControlURL:    settlementControlURL,
-		SettlementServiceToken:  settlementServiceToken,
-		SeedingEvidenceStartAt:  seedingEvidenceStartAt,
-		TurnstileSecretKey:      turnstileSecretKey,
+		Environment:                 environment,
+		Address:                     address,
+		DatabaseURL:                 databaseURL,
+		VaultURL:                    vaultURL,
+		VaultServiceToken:           vaultServiceToken,
+		SessionCSRFKey:              []byte(csrfKey),
+		AuditPseudonymKey:           []byte(auditPseudonymKey),
+		AuditKeyEpoch:               auditKeyEpoch,
+		CookieName:                  cookieName,
+		StaffCookieName:             staffCookieName,
+		CookieSecure:                cookieSecure,
+		AllowedOrigins:              allowedOrigins,
+		PublicOrigin:                publicOrigin,
+		WebAuthnRPID:                webAuthnRPID,
+		WebAuthnOrigins:             webAuthnOrigins,
+		WebAuthnRecordKey:           []byte(webAuthnRecordKey),
+		WebAuthnKeyEpoch:            webAuthnKeyEpoch,
+		TorrentObjectStore:          torrentObjectStore,
+		TorrentUploadMaxBytes:       torrentUploadMaxBytes,
+		TrackerCanonicalOrigin:      trackerCanonicalOrigin,
+		TrackerOperationsOrigin:     trackerOperationsOrigin,
+		TrackerServiceToken:         trackerServiceToken,
+		SettlementControlURL:        settlementControlURL,
+		SettlementServiceToken:      settlementServiceToken,
+		SeedingEvidenceStartAt:      seedingEvidenceStartAt,
+		SeedingEvidenceClosureDelay: seedingEvidenceClosureDelay,
+		TurnstileSecretKey:          turnstileSecretKey,
 	}, nil
 }
 

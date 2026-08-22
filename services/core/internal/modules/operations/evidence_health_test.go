@@ -52,14 +52,26 @@ func TestEvidenceWindowHealth(t *testing.T) {
 
 func TestEvidenceCoveragePeriodStartsAtTrustedCutover(t *testing.T) {
 	t.Parallel()
-	now := time.Date(2026, time.August, 21, 6, 34, 0, 0, time.UTC)
+	now := time.Date(2026, time.August, 21, 6, 50, 0, 0, time.UTC)
 	cutover := time.Date(2026, time.August, 21, 5, 0, 0, 0, time.UTC)
+	closureDelay := 45 * time.Minute
 
-	monthStart, coverageStart, expectedThrough, expected := evidenceCoveragePeriod(now, cutover)
+	monthStart, coverageStart, expectedThrough, expected := evidenceCoveragePeriod(now, cutover, closureDelay)
 	if want := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC); !monthStart.Equal(want) {
 		t.Fatalf("month start = %s, want %s", monthStart, want)
 	}
-	if !coverageStart.Equal(cutover) || !expectedThrough.Equal(now.Truncate(time.Hour)) || expected != 1 {
+	if !coverageStart.Equal(cutover) || !expectedThrough.Equal(time.Date(2026, time.August, 21, 6, 0, 0, 0, time.UTC)) || expected != 1 {
+		t.Fatalf("coverage = start:%s through:%s windows:%d", coverageStart, expectedThrough, expected)
+	}
+}
+
+func TestEvidenceCoveragePeriodWaitsForClosureDelay(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 21, 6, 34, 0, 0, time.UTC)
+	cutover := time.Date(2026, time.August, 21, 5, 0, 0, 0, time.UTC)
+
+	_, coverageStart, expectedThrough, expected := evidenceCoveragePeriod(now, cutover, 45*time.Minute)
+	if !coverageStart.Equal(cutover) || !expectedThrough.Equal(cutover) || expected != 0 {
 		t.Fatalf("coverage = start:%s through:%s windows:%d", coverageStart, expectedThrough, expected)
 	}
 }
@@ -69,8 +81,8 @@ func TestEvidenceCoveragePeriodDoesNotExpectFutureCutover(t *testing.T) {
 	now := time.Date(2026, time.August, 21, 4, 34, 0, 0, time.UTC)
 	cutover := time.Date(2026, time.August, 21, 5, 0, 0, 0, time.UTC)
 
-	_, coverageStart, expectedThrough, expected := evidenceCoveragePeriod(now, cutover)
-	if !coverageStart.Equal(cutover) || !expectedThrough.Equal(now.Truncate(time.Hour)) || expected != 0 {
+	_, coverageStart, expectedThrough, expected := evidenceCoveragePeriod(now, cutover, 45*time.Minute)
+	if !coverageStart.Equal(cutover) || !expectedThrough.Equal(time.Date(2026, time.August, 21, 3, 0, 0, 0, time.UTC)) || expected != 0 {
 		t.Fatalf("coverage = start:%s through:%s windows:%d", coverageStart, expectedThrough, expected)
 	}
 }

@@ -35,6 +35,9 @@ func TestLoadIncludesSeparatedStaffWebAuthnRuntimeBoundary(t *testing.T) {
 	if want := time.Date(2026, time.August, 15, 0, 0, 0, 0, time.UTC); !settings.SeedingEvidenceStartAt.Equal(want) {
 		t.Fatalf("seeding evidence start = %s, want %s", settings.SeedingEvidenceStartAt, want)
 	}
+	if settings.SeedingEvidenceClosureDelay != 45*time.Minute {
+		t.Fatalf("seeding evidence closure delay = %s, want 45m", settings.SeedingEvidenceClosureDelay)
+	}
 }
 
 func TestLoadRejectsNonHourlySeedingEvidenceStart(t *testing.T) {
@@ -44,6 +47,26 @@ func TestLoadRejectsNonHourlySeedingEvidenceStart(t *testing.T) {
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "exact UTC RFC3339 hour") {
 		t.Fatalf("Load() error = %v, want exact UTC hour failure", err)
+	}
+}
+
+func TestLoadRejectsUnsafeSeedingEvidenceClosureDelay(t *testing.T) {
+	setValidCoreEnvironment(t)
+	t.Setenv("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY", "30s")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "between 1m0s and 1h0m0s") {
+		t.Fatalf("Load() error = %v, want closure-delay range failure", err)
+	}
+}
+
+func TestLoadRejectsSubsecondSeedingEvidenceClosureDelay(t *testing.T) {
+	setValidCoreEnvironment(t)
+	t.Setenv("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY", "45m0.5s")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "whole seconds") {
+		t.Fatalf("Load() error = %v, want whole-second closure-delay failure", err)
 	}
 }
 
@@ -153,6 +176,7 @@ func setValidCoreEnvironment(t *testing.T) {
 	t.Setenv("PEERGO_SETTLEMENT_CONTROL_URL", "https://settlement.example")
 	t.Setenv("PEERGO_SETTLEMENT_CONTROL_SERVICE_TOKEN", "peergo-test-settlement-control-token-2026")
 	t.Setenv("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT", "2026-08-15T00:00:00Z")
+	t.Setenv("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY", "45m")
 	t.Setenv("PEERGO_SESSION_CSRF_KEY", "peergo-test-session-csrf-key-2026")
 	t.Setenv("PEERGO_AUDIT_PSEUDONYM_KEY", "peergo-test-audit-pseudonym-key-2026")
 	t.Setenv("PEERGO_AUDIT_PSEUDONYM_KEY_EPOCH", "test-2026-08")

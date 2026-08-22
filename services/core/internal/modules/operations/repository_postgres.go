@@ -11,17 +11,28 @@ import (
 )
 
 type PostgresRepository struct {
-	pool                    *pgxpool.Pool
-	seedingEvidenceStartsAt time.Time
+	pool                        *pgxpool.Pool
+	seedingEvidenceStartsAt     time.Time
+	seedingEvidenceClosureDelay time.Duration
 }
 
-func NewPostgresRepository(pool *pgxpool.Pool, seedingEvidenceStartsAt time.Time) (*PostgresRepository, error) {
+func NewPostgresRepository(
+	pool *pgxpool.Pool,
+	seedingEvidenceStartsAt time.Time,
+	seedingEvidenceClosureDelay time.Duration,
+) (*PostgresRepository, error) {
 	_, offset := seedingEvidenceStartsAt.Zone()
 	if pool == nil || seedingEvidenceStartsAt.IsZero() || offset != 0 ||
-		!seedingEvidenceStartsAt.Equal(seedingEvidenceStartsAt.Truncate(time.Hour)) {
+		!seedingEvidenceStartsAt.Equal(seedingEvidenceStartsAt.Truncate(time.Hour)) ||
+		seedingEvidenceClosureDelay < time.Minute || seedingEvidenceClosureDelay > time.Hour ||
+		seedingEvidenceClosureDelay%time.Second != 0 {
 		return nil, ErrInput
 	}
-	return &PostgresRepository{pool: pool, seedingEvidenceStartsAt: seedingEvidenceStartsAt}, nil
+	return &PostgresRepository{
+		pool:                        pool,
+		seedingEvidenceStartsAt:     seedingEvidenceStartsAt,
+		seedingEvidenceClosureDelay: seedingEvidenceClosureDelay,
+	}, nil
 }
 
 func (repository *PostgresRepository) Tracker(ctx context.Context, now time.Time) (TrackerOverview, error) {
@@ -143,7 +154,7 @@ LEFT JOIN LATERAL (
 
 	result.Evidence.MonthStartsAt, result.Evidence.CoverageStartsAt,
 		result.Evidence.ExpectedThrough, result.Evidence.ExpectedWindows = evidenceCoveragePeriod(
-		now, repository.seedingEvidenceStartsAt,
+		now, repository.seedingEvidenceStartsAt, repository.seedingEvidenceClosureDelay,
 	)
 	var monthComplete, monthCollecting int64
 	var firstComplete, lastComplete, oldestIncomplete pgtype.Timestamptz
@@ -191,13 +202,17 @@ FROM traffic.hnr_projection_inbox`).Scan(&result.Consumers.HNREvents, &hnrApplie
 	return result, nil
 }
 
-func evidenceCoveragePeriod(now, configuredStart time.Time) (time.Time, time.Time, time.Time, int64) {
+func evidenceCoveragePeriod(now, configuredStart time.Time, closureDelay time.Duration) (time.Time, time.Time, time.Time, int64) {
 	monthStart := time.Date(now.UTC().Year(), now.UTC().Month(), 1, 0, 0, 0, 0, time.UTC)
 	coverageStart := monthStart
 	if configuredStart.After(coverageStart) {
 		coverageStart = configuredStart
 	}
-	expectedThrough := now.UTC().Truncate(time.Hour)
+	// A completed hour is not expected until the ordered announce watermark has
+	// crossed that hour's end plus the same safety delay used by Settlement.
+	// Keeping this calculation aligned prevents the operations page from
+	// reporting a healthy, still-open window as missing.
+	expectedThrough := now.UTC().Add(-closureDelay).Truncate(time.Hour)
 	if !expectedThrough.After(coverageStart) {
 		return monthStart, coverageStart, expectedThrough, 0
 	}

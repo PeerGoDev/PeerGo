@@ -338,7 +338,11 @@ func main() {
 		logger.Error("compose member medal service", "error", err)
 		os.Exit(1)
 	}
-	operationsRepository, err := operations.NewPostgresRepository(pool, settings.SeedingEvidenceStartAt)
+	operationsRepository, err := operations.NewPostgresRepository(
+		pool,
+		settings.SeedingEvidenceStartAt,
+		settings.SeedingEvidenceClosureDelay,
+	)
 	if err != nil {
 		logger.Error("compose operations repository", "error", err)
 		os.Exit(1)
