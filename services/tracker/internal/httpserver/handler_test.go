@@ -240,12 +240,14 @@ func TestHandlerObservesOnlyBoundedProtocolDimensions(t *testing.T) {
 	}
 	first := observer.observations[0]
 	if first.Action != "announce" || first.Result != "ok" || first.AddressFamily != "ipv4" ||
-		first.ClientFamily != "qbittorrent" || first.Event != "started" || first.Duration <= 0 {
+		first.ClientFamily != "qbittorrent" || first.Event != "started" ||
+		first.RateLimitScope != "not_applicable" || first.Duration <= 0 {
 		t.Fatalf("accepted observation = %+v", first)
 	}
 	second := observer.observations[1]
 	if second.Action != "announce" || second.Result != "access_denied" || second.AddressFamily != "ipv6" ||
-		second.ClientFamily != "unknown" || second.Event != "not_applicable" || second.Duration <= 0 {
+		second.ClientFamily != "unknown" || second.Event != "not_applicable" ||
+		second.RateLimitScope != "not_applicable" || second.Duration <= 0 {
 		t.Fatalf("denied observation = %+v", second)
 	}
 }
@@ -420,6 +422,8 @@ func TestHandlerAppliesRuntimeUserRateLimit(t *testing.T) {
 	var hash [20]byte
 	copy(hash[:], "aaaaaaaaaaaaaaaaaaaa")
 	handler, _ := testHandler(t, hash, passkey, true)
+	observer := &requestObserverFixture{}
+	handler.observer = observer
 	policy := handler.policy.(*staticRuntimePolicy)
 	policy.policy.UserRequestsPerMinute = 1
 	policy.policy.UserBurst = 1
@@ -435,6 +439,32 @@ func TestHandlerAppliesRuntimeUserRateLimit(t *testing.T) {
 		if index == 1 && !bytes.Contains(response.Body.Bytes(), []byte("request rate exceeded")) {
 			t.Fatalf("second request was not rate limited: %q", response.Body.Bytes())
 		}
+	}
+	if len(observer.observations) != 2 || observer.observations[1].RateLimitScope != "user" {
+		t.Fatalf("rate limit observations = %+v", observer.observations)
+	}
+}
+
+func TestHandlerIdentifiesRuntimeAddressRateLimit(t *testing.T) {
+	t.Parallel()
+	passkey := "00112233445566778899aabbccddeeff"
+	var hash [20]byte
+	copy(hash[:], "aaaaaaaaaaaaaaaaaaaa")
+	handler, _ := testHandler(t, hash, passkey, true)
+	observer := &requestObserverFixture{}
+	handler.observer = observer
+	policy := handler.policy.(*staticRuntimePolicy)
+	policy.policy.AddressRequestsPerMinute = 1
+	policy.policy.AddressBurst = 1
+
+	for index := 0; index < 2; index++ {
+		request := httptest.NewRequest(http.MethodGet, "/tracker/"+passkey+"/announce?"+announceQuery("aaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbb", 100), nil)
+		request.RemoteAddr = "192.0.2.10:50000"
+		handler.ServeHTTP(httptest.NewRecorder(), request)
+	}
+	if len(observer.observations) != 2 || observer.observations[1].Result != "rate_limited" ||
+		observer.observations[1].RateLimitScope != "address" {
+		t.Fatalf("rate limit observations = %+v", observer.observations)
 	}
 }
 

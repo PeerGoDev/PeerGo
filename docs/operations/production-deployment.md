@@ -225,6 +225,16 @@ make production-tracker-rate-policy \
 现有快照发布器生成签名版本，Tracker 热加载完成后应在后台核对“已配置版本”和“实际加载
 版本”一致。
 
+不要只根据总 `rate_limited` 比例猜测该放宽哪一级。Tracker 另提供不含用户、地址或种子
+标识的低基数指标 `peergo_tracker_rate_limited_total`，用下面的 PromQL 分开观察用户预算和
+共享出口地址预算；只有连续窗口明确集中于同一 `scope` 时，才审阅对应参数：
+
+```promql
+sum by (scope, address_family) (
+  rate(peergo_tracker_rate_limited_total{action="announce"}[5m])
+)
+```
+
 如果不建立临时公网预览入口，可通过 loopback Web API 签发上线所需的首版策略：
 
 ```bash

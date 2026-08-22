@@ -29,7 +29,13 @@ func TestMetricsExposeOnlyBoundedTrackerDimensions(t *testing.T) {
 	}
 	metrics.ObserveRequest(httpserver.RequestObservation{
 		Action: "announce", Result: "ok", AddressFamily: "ipv4",
-		ClientFamily: "qbittorrent", Event: "started", Duration: 25 * time.Millisecond,
+		ClientFamily: "qbittorrent", Event: "started", RateLimitScope: "not_applicable",
+		Duration: 25 * time.Millisecond,
+	})
+	metrics.ObserveRequest(httpserver.RequestObservation{
+		Action: "announce", Result: "rate_limited", AddressFamily: "ipv6",
+		ClientFamily: "unknown", Event: "not_applicable", RateLimitScope: "user",
+		Duration: time.Millisecond,
 	})
 
 	families, err := registry.Gather()
@@ -38,13 +44,14 @@ func TestMetricsExposeOnlyBoundedTrackerDimensions(t *testing.T) {
 	}
 	wanted := map[string]bool{
 		"peergo_tracker_requests_total": false, "peergo_tracker_request_duration_seconds": false,
-		"peergo_tracker_active_swarms": false, "peergo_tracker_active_peers": false,
+		"peergo_tracker_rate_limited_total": false,
+		"peergo_tracker_active_swarms":      false, "peergo_tracker_active_peers": false,
 		"peergo_tracker_wal_bytes": false, "peergo_tracker_wal_unacknowledged_bytes": false,
 		"peergo_tracker_wal_capacity_bytes": false,
 	}
 	allowedLabels := map[string]bool{
 		"action": true, "result": true, "address_family": true, "client_family": true,
-		"event": true, "le": true,
+		"event": true, "scope": true, "le": true,
 	}
 	for _, family := range families {
 		name := family.GetName()

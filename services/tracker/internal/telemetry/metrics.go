@@ -20,8 +20,9 @@ type WALStats interface {
 }
 
 type Metrics struct {
-	requests *prometheus.CounterVec
-	duration *prometheus.HistogramVec
+	requests    *prometheus.CounterVec
+	duration    *prometheus.HistogramVec
+	rateLimited *prometheus.CounterVec
 }
 
 func New(registerer prometheus.Registerer, swarms SwarmCounts, eventWAL WALStats) (*Metrics, error) {
@@ -38,10 +39,15 @@ func New(registerer prometheus.Registerer, swarms SwarmCounts, eventWAL WALStats
 			Help:    "Tracker protocol request duration by action and bounded result.",
 			Buckets: []float64{0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		}, []string{"action", "result"}),
+		rateLimited: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "peergo", Subsystem: "tracker", Name: "rate_limited_total",
+			Help: "Tracker requests rejected by the bounded address or user limiter.",
+		}, []string{"action", "scope", "address_family"}),
 	}
 	collectors := []prometheus.Collector{
 		metrics.requests,
 		metrics.duration,
+		metrics.rateLimited,
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Namespace: "peergo", Subsystem: "tracker", Name: "active_swarms",
 			Help: "Current in-memory swarm count.",
@@ -86,4 +92,10 @@ func (metrics *Metrics) ObserveRequest(observation httpserver.RequestObservation
 		observation.ClientFamily, observation.Event,
 	).Inc()
 	metrics.duration.WithLabelValues(observation.Action, observation.Result).Observe(observation.Duration.Seconds())
+	if observation.Result == "rate_limited" &&
+		(observation.RateLimitScope == "address" || observation.RateLimitScope == "user") {
+		metrics.rateLimited.WithLabelValues(
+			observation.Action, observation.RateLimitScope, observation.AddressFamily,
+		).Inc()
+	}
 }

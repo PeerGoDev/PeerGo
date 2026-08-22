@@ -90,12 +90,13 @@ type Config struct {
 // peer IDs and raw query strings so production telemetry cannot become a
 // second Tracker activity log.
 type RequestObservation struct {
-	Action        string
-	Result        string
-	AddressFamily string
-	ClientFamily  string
-	Event         string
-	Duration      time.Duration
+	Action         string
+	Result         string
+	AddressFamily  string
+	ClientFamily   string
+	Event          string
+	RateLimitScope string
+	Duration       time.Duration
 }
 
 type RequestObserver interface {
@@ -184,7 +185,7 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	startedAt := time.Now()
 	observation := RequestObservation{
 		Action: "unknown", Result: "failure_other", AddressFamily: "unknown",
-		ClientFamily: "unknown", Event: "not_applicable",
+		ClientFamily: "unknown", Event: "not_applicable", RateLimitScope: "not_applicable",
 	}
 	capture := &trackerResponseCapture{ResponseWriter: response}
 	handler.serveTracker(capture, request, &observation)
@@ -245,6 +246,7 @@ func (handler *Handler) serveTracker(response http.ResponseWriter, request *http
 		observation.AddressFamily = "ipv6"
 	}
 	if !handler.limiter.AllowAddress(address.String(), policy.AddressRequestsPerMinute, policy.AddressBurst, now) {
+		observation.RateLimitScope = "address"
 		handler.writeTracker(response, protocol.EncodeFailure("request rate exceeded"))
 		return
 	}
@@ -254,6 +256,7 @@ func (handler *Handler) serveTracker(response http.ResponseWriter, request *http
 		return
 	}
 	if !handler.limiter.AllowUser(subjectAdmission.Subject.UserID, policy.UserRequestsPerMinute, policy.UserBurst, now) {
+		observation.RateLimitScope = "user"
 		handler.writeTracker(response, protocol.EncodeFailure("request rate exceeded"))
 		return
 	}
