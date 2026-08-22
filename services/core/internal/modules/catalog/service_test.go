@@ -7,6 +7,31 @@ import (
 	"time"
 )
 
+type recordingSiteInfoRepository struct {
+	Repository
+	result SiteInfo
+	asOf   time.Time
+}
+
+func (repository *recordingSiteInfoRepository) SiteInfo(_ context.Context, asOf time.Time) (SiteInfo, error) {
+	repository.asOf = asOf
+	return repository.result, nil
+}
+
+func TestGetSiteInfoUsesServiceClock(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 22, 12, 0, 0, 0, time.UTC)
+	want := SiteInfo{Name: "PeerGo", OnlineUsers: 7}
+	repository := &recordingSiteInfoRepository{result: want}
+	service := NewService(repository, func() time.Time { return now })
+
+	got, err := service.GetSiteInfo(context.Background())
+	if err != nil || got != want || !repository.asOf.Equal(now) {
+		t.Fatalf("GetSiteInfo() = %+v, error=%v, as_of=%s", got, err, repository.asOf)
+	}
+}
+
 func TestListTorrentsFiltersAndMarksStaleStats(t *testing.T) {
 	t.Parallel()
 

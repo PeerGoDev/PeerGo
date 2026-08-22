@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/peergo/peergo/services/core/internal/generated/catalogdb"
 )
@@ -15,7 +17,7 @@ import (
 var errCatalogProjectionInvalid = errors.New("catalog projection contains invalid data")
 
 type catalogQueries interface {
-	GetSiteInfo(context.Context) (catalogdb.GetSiteInfoRow, error)
+	GetSiteInfo(context.Context, pgtype.Timestamptz) (catalogdb.GetSiteInfoRow, error)
 	GetLatestAnnouncement(context.Context) (catalogdb.GetLatestAnnouncementRow, error)
 	CountPublishedAnnouncements(context.Context) (int64, error)
 	ListPublishedAnnouncements(context.Context, catalogdb.ListPublishedAnnouncementsParams) ([]catalogdb.ListPublishedAnnouncementsRow, error)
@@ -70,8 +72,8 @@ func NewPostgresRepository(db catalogdb.DBTX) *PostgresRepository {
 }
 
 // SiteInfo implements Repository.
-func (r *PostgresRepository) SiteInfo(ctx context.Context) (SiteInfo, error) {
-	row, err := r.queries.GetSiteInfo(ctx)
+func (r *PostgresRepository) SiteInfo(ctx context.Context, asOf time.Time) (SiteInfo, error) {
+	row, err := r.queries.GetSiteInfo(ctx, pgtype.Timestamptz{Time: asOf.UTC(), Valid: true})
 	if err != nil {
 		return SiteInfo{}, fmt.Errorf("get site profile: %w", err)
 	}

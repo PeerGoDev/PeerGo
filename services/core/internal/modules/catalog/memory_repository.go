@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strings"
+	"time"
 )
 
 // MemoryData is an explicit fixture boundary for local development and tests.
@@ -55,7 +56,7 @@ func cloneCategoryFacets(values map[string][]CategoryFacet) map[string][]Categor
 }
 
 // SiteInfo implements Repository.
-func (r *MemoryRepository) SiteInfo(context.Context) (SiteInfo, error) {
+func (r *MemoryRepository) SiteInfo(context.Context, time.Time) (SiteInfo, error) {
 	return r.data.Site, nil
 }
 

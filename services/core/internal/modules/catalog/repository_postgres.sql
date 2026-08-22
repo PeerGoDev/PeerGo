@@ -1,12 +1,30 @@
 -- name: GetSiteInfo :one
 SELECT
-    name,
-    description,
-    online_users,
-    default_torrent_view,
-    show_latest_announcement
-FROM catalog.site_profile
-WHERE singleton = true;
+    site.name,
+    site.description,
+    (
+        SELECT count(DISTINCT session.user_id)::integer
+        FROM identity.sessions AS session
+        INNER JOIN identity.users AS users ON users.id = session.user_id
+        WHERE session.audience = 'web'
+          AND session.revoked_at IS NULL
+          AND session.expires_at > sqlc.arg(as_of)::timestamptz
+          AND session.last_seen_at >= sqlc.arg(as_of)::timestamptz - interval '15 minutes'
+          AND users.status = 'active'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM identity.account_restrictions AS restriction
+              WHERE restriction.user_id = users.id
+                AND restriction.kind = 'account_access'
+                AND restriction.revoked_at IS NULL
+                AND restriction.starts_at <= sqlc.arg(as_of)::timestamptz
+                AND restriction.expires_at > sqlc.arg(as_of)::timestamptz
+          )
+    ) AS online_users,
+    site.default_torrent_view,
+    site.show_latest_announcement
+FROM catalog.site_profile AS site
+WHERE site.singleton = true;
 
 -- name: GetLatestAnnouncement :one
 SELECT

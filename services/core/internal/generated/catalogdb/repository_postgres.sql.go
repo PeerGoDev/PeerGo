@@ -623,13 +623,31 @@ func (q *Queries) GetSiteDisplaySettingsForUpdate(ctx context.Context) (GetSiteD
 
 const getSiteInfo = `-- name: GetSiteInfo :one
 SELECT
-    name,
-    description,
-    online_users,
-    default_torrent_view,
-    show_latest_announcement
-FROM catalog.site_profile
-WHERE singleton = true
+    site.name,
+    site.description,
+    (
+        SELECT count(DISTINCT session.user_id)::integer
+        FROM identity.sessions AS session
+        INNER JOIN identity.users AS users ON users.id = session.user_id
+        WHERE session.audience = 'web'
+          AND session.revoked_at IS NULL
+          AND session.expires_at > $1::timestamptz
+          AND session.last_seen_at >= $1::timestamptz - interval '15 minutes'
+          AND users.status = 'active'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM identity.account_restrictions AS restriction
+              WHERE restriction.user_id = users.id
+                AND restriction.kind = 'account_access'
+                AND restriction.revoked_at IS NULL
+                AND restriction.starts_at <= $1::timestamptz
+                AND restriction.expires_at > $1::timestamptz
+          )
+    ) AS online_users,
+    site.default_torrent_view,
+    site.show_latest_announcement
+FROM catalog.site_profile AS site
+WHERE site.singleton = true
 `
 
 type GetSiteInfoRow struct {
@@ -640,8 +658,8 @@ type GetSiteInfoRow struct {
 	ShowLatestAnnouncement bool
 }
 
-func (q *Queries) GetSiteInfo(ctx context.Context) (GetSiteInfoRow, error) {
-	row := q.db.QueryRow(ctx, getSiteInfo)
+func (q *Queries) GetSiteInfo(ctx context.Context, asOf pgtype.Timestamptz) (GetSiteInfoRow, error) {
+	row := q.db.QueryRow(ctx, getSiteInfo, asOf)
 	var i GetSiteInfoRow
 	err := row.Scan(
 		&i.Name,

@@ -32,7 +32,7 @@ type Querier interface {
 	GetPublishedTorrentSwarm(ctx context.Context, torrentID int64) (GetPublishedTorrentSwarmRow, error)
 	GetSiteDisplaySettings(ctx context.Context) (GetSiteDisplaySettingsRow, error)
 	GetSiteDisplaySettingsForUpdate(ctx context.Context) (GetSiteDisplaySettingsForUpdateRow, error)
-	GetSiteInfo(ctx context.Context) (GetSiteInfoRow, error)
+	GetSiteInfo(ctx context.Context, asOf pgtype.Timestamptz) (GetSiteInfoRow, error)
 	InsertAnnouncementRevision(ctx context.Context, arg InsertAnnouncementRevisionParams) (int64, error)
 	ListAnnouncementRevisions(ctx context.Context, arg ListAnnouncementRevisionsParams) ([]ListAnnouncementRevisionsRow, error)
 	// Public counts follow the write-side aggregate, not an orphaned read-model

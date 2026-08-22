@@ -54,7 +54,7 @@ func ValidAnnouncementID(value string) bool {
 // Repository is the catalog persistence boundary. Implementations must return
 // torrents newest-first and must not perform calls into the Tracker data plane.
 type Repository interface {
-	SiteInfo(ctx context.Context) (SiteInfo, error)
+	SiteInfo(ctx context.Context, asOf time.Time) (SiteInfo, error)
 	LatestAnnouncement(ctx context.Context) (*AnnouncementSummary, error)
 	ListAnnouncements(ctx context.Context, limit, offset int) ([]AnnouncementSummary, int, error)
 	Announcement(ctx context.Context, announcementID string) (Announcement, error)
@@ -111,7 +111,7 @@ func NewService(repository Repository, now func() time.Time) *Service {
 
 // GetSiteInfo returns non-sensitive shell metadata.
 func (s *Service) GetSiteInfo(ctx context.Context) (SiteInfo, error) {
-	return s.repository.SiteInfo(ctx)
+	return s.repository.SiteInfo(ctx, s.now())
 }
 
 // GetLatestAnnouncement returns nil when nothing has been published.
