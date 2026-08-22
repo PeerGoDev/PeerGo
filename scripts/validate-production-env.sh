@@ -47,6 +47,32 @@ seeding_start="$(env_get PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT)"
 [[ "${seeding_start}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:00:00Z$ ]] ||
     fail "PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT must be the exact UTC Tracker cutover hour"
 
+duration_seconds() {
+    local value="$1"
+    if [[ "${value}" =~ ^([0-9]+)(s|m|h)$ ]]; then
+        case "${BASH_REMATCH[2]}" in
+            s) printf '%s' "$((10#${BASH_REMATCH[1]}))" ;;
+            m) printf '%s' "$((10#${BASH_REMATCH[1]} * 60))" ;;
+            h) printf '%s' "$((10#${BASH_REMATCH[1]} * 3600))" ;;
+        esac
+        return 0
+    fi
+    return 1
+}
+
+seeding_closure_raw="$(env_get PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY)"
+seeding_credit_raw="$(env_get PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT)"
+seeding_closure_seconds="$(duration_seconds "${seeding_closure_raw}")" ||
+    fail "PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY must use one whole s, m or h unit"
+seeding_credit_seconds="$(duration_seconds "${seeding_credit_raw}")" ||
+    fail "PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT must use one whole s, m or h unit"
+((seeding_closure_seconds >= 60 && seeding_closure_seconds <= 3600)) ||
+    fail "seeding evidence closure delay must be between 1m and 1h"
+((seeding_credit_seconds >= 60 && seeding_credit_seconds <= 3600)) ||
+    fail "seeding evidence maximum interval credit must be between 1m and 1h"
+((seeding_closure_seconds >= seeding_credit_seconds)) ||
+    fail "seeding evidence closure delay must be at least its maximum interval credit"
+
 settlement_policy_concurrency="$(env_get PEERGO_SETTLEMENT_POLICY_CONCURRENCY)"
 [[ "${settlement_policy_concurrency}" =~ ^[1-9][0-9]?$ ]] &&
     ((10#${settlement_policy_concurrency} <= 32)) ||

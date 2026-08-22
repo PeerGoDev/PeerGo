@@ -32,6 +32,8 @@ type PostgresRepositoryConfig struct {
 	SnapshotSubject             string
 	MaxFutureSkew               time.Duration
 	MaximumSnapshotClosureDelay time.Duration
+	ClosureDelay                time.Duration
+	MaxIntervalCredit           time.Duration
 }
 
 type PostgresRepository struct {
@@ -45,13 +47,27 @@ func NewPostgresRepository(pool *pgxpool.Pool, config PostgresRepositoryConfig, 
 		!trackerswarmv1.ValidStreamName(config.SnapshotStream) ||
 		!trackerswarmv1.ValidLiteralSubject(config.SnapshotSubject) ||
 		config.MaxFutureSkew < 0 || config.MaxFutureSkew > 10*time.Minute ||
-		config.MaximumSnapshotClosureDelay < time.Second || config.MaximumSnapshotClosureDelay > time.Hour {
+		config.MaximumSnapshotClosureDelay < time.Second || config.MaximumSnapshotClosureDelay > time.Hour ||
+		!validEvidenceTimingConfig(config.ClosureDelay, config.MaxIntervalCredit) {
 		return nil, ErrInput
 	}
 	if now == nil {
 		now = time.Now
 	}
 	return &PostgresRepository{pool: pool, config: config, now: now}, nil
+}
+
+// The snapshot projector uses this repository only for ApplySnapshot and does
+// not load hourly evidence settings. A zero pair is therefore valid at
+// construction time, while BuildHour explicitly requires the complete pair.
+func validEvidenceTimingConfig(closureDelay, maxIntervalCredit time.Duration) bool {
+	if closureDelay == 0 && maxIntervalCredit == 0 {
+		return true
+	}
+	return closureDelay >= time.Minute && closureDelay <= time.Hour &&
+		maxIntervalCredit >= time.Minute && maxIntervalCredit <= time.Hour &&
+		closureDelay >= maxIntervalCredit &&
+		closureDelay%time.Second == 0 && maxIntervalCredit%time.Second == 0
 }
 
 // ApplySnapshot stores one canonical full-snapshot chunk. It shares the
@@ -223,13 +239,15 @@ func (repository *PostgresRepository) NextWindowStart(ctx context.Context, initi
 // window end. The chosen counts come from the latest complete snapshot at or
 // before the boundary on that same route.
 func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart, builtAt time.Time) (BuildResult, error) {
-	if !validWindowStart(windowStart) || builtAt.IsZero() {
+	if !validWindowStart(windowStart) || builtAt.IsZero() ||
+		repository.config.ClosureDelay == 0 || repository.config.MaxIntervalCredit == 0 {
 		return BuildResult{}, ErrInput
 	}
 	windowStart = windowStart.UTC().Round(0)
 	windowEnd := windowStart.Add(time.Hour)
 	builtAt = builtAt.UTC().Round(0)
-	if builtAt.Before(windowEnd) {
+	fenceNotBefore := windowEnd.Add(repository.config.ClosureDelay)
+	if builtAt.Before(fenceNotBefore) {
 		return BuildResult{}, ErrCoveragePending
 	}
 	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
@@ -268,13 +286,16 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 	}
 
 	announceFence, err := queries.GetSeedingAnnounceFence(ctx, ledgerdb.GetSeedingAnnounceFenceParams{
-		SourceStream: repository.config.AnnounceStream, WindowEnd: timestamp(windowEnd),
+		SourceStream: repository.config.AnnounceStream, FenceNotBefore: timestamp(fenceNotBefore),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return BuildResult{}, ErrCoveragePending
 	}
 	if err != nil || !announceFence.ReceivedAt.Valid {
 		return BuildResult{}, databaseError("read seeding announce fence", err)
+	}
+	if announceFence.ReceivedAt.Time.Before(fenceNotBefore) {
+		return BuildResult{}, ErrCoveragePending
 	}
 	snapshotFence, err := queries.GetSeedingSnapshotFence(ctx, ledgerdb.GetSeedingSnapshotFenceParams{
 		WindowEnd: timestamp(windowEnd), SourceStream: repository.config.SnapshotStream,
@@ -301,6 +322,7 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 	rows, err := queries.ListSeedingIntervalsForWindow(ctx, ledgerdb.ListSeedingIntervalsForWindowParams{
 		WindowStart: timestamp(windowStart), WindowEnd: timestamp(windowEnd),
 		SourceStream: repository.config.AnnounceStream, AnnounceFenceSequence: announceFence.SourceSequence,
+		MaxIntervalCreditSeconds: int64(repository.config.MaxIntervalCredit / time.Second),
 	})
 	if err != nil {
 		return BuildResult{}, databaseError("list seeding intervals", err)
@@ -330,10 +352,12 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 	}
 	document := windowDigestDocument{
 		SchemaVersion: SchemaVersion, WindowStart: windowStart, WindowEnd: windowEnd,
-		AnnounceSourceStream:    repository.config.AnnounceStream,
-		AnnounceFenceSequence:   announceFence.SourceSequence,
-		AnnounceFenceReceivedAt: announceFence.ReceivedAt.Time.UTC().Round(0),
-		SelectedSnapshotID:      selected.SnapshotID.String(), SelectedSnapshotSequence: selected.SnapshotSequence,
+		ClosureDelaySeconds:      int32(repository.config.ClosureDelay / time.Second),
+		MaxIntervalCreditSeconds: int32(repository.config.MaxIntervalCredit / time.Second),
+		AnnounceSourceStream:     repository.config.AnnounceStream,
+		AnnounceFenceSequence:    announceFence.SourceSequence,
+		AnnounceFenceReceivedAt:  announceFence.ReceivedAt.Time.UTC().Round(0),
+		SelectedSnapshotID:       selected.SnapshotID.String(), SelectedSnapshotSequence: selected.SnapshotSequence,
 		SelectedSnapshotObservedAt: selected.ObservedAt.Time.UTC().Round(0),
 		SnapshotFenceID:            snapshotFence.SnapshotID.String(), SnapshotFenceSequence: snapshotFence.SnapshotSequence,
 		SnapshotFenceObservedAt: snapshotFence.ObservedAt.Time.UTC().Round(0), Items: digestItems,
@@ -344,8 +368,10 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 	}
 	if err := queries.InsertSeedingEvidenceWindow(ctx, ledgerdb.InsertSeedingEvidenceWindowParams{
 		WindowStart: timestamp(windowStart), WindowEnd: timestamp(windowEnd),
-		AnnounceSourceStream:  repository.config.AnnounceStream,
-		AnnounceFenceSequence: announceFence.SourceSequence, AnnounceFenceReceivedAt: announceFence.ReceivedAt,
+		ClosureDelaySeconds:      int32(repository.config.ClosureDelay / time.Second),
+		MaxIntervalCreditSeconds: int32(repository.config.MaxIntervalCredit / time.Second),
+		AnnounceSourceStream:     repository.config.AnnounceStream,
+		AnnounceFenceSequence:    announceFence.SourceSequence, AnnounceFenceReceivedAt: announceFence.ReceivedAt,
 		SelectedSnapshotID: selected.SnapshotID, SelectedSnapshotSequence: selected.SnapshotSequence,
 		SelectedSnapshotObservedAt: selected.ObservedAt,
 		SnapshotFenceID:            snapshotFence.SnapshotID, SnapshotFenceSequence: snapshotFence.SnapshotSequence,
@@ -360,9 +386,12 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 		}
 	}
 	result := BuildResult{
-		WindowStart: windowStart, WindowEnd: windowEnd,
-		AnnounceFenceSequence: announceFence.SourceSequence,
-		SelectedSnapshotID:    selected.SnapshotID, SelectedSnapshotSequence: selected.SnapshotSequence,
+		SchemaVersion: SchemaVersion,
+		WindowStart:   windowStart, WindowEnd: windowEnd,
+		ClosureDelaySeconds:      int32(repository.config.ClosureDelay / time.Second),
+		MaxIntervalCreditSeconds: int32(repository.config.MaxIntervalCredit / time.Second),
+		AnnounceFenceSequence:    announceFence.SourceSequence,
+		SelectedSnapshotID:       selected.SnapshotID, SelectedSnapshotSequence: selected.SnapshotSequence,
 		SnapshotFenceID: snapshotFence.SnapshotID, SnapshotFenceSequence: snapshotFence.SnapshotSequence,
 		ItemCount: int32(len(items)), EvidenceSHA256: windowDigest, BuiltAt: builtAt,
 	}
@@ -537,10 +566,28 @@ func existingWindowResult(row ledgerdb.GetSeedingEvidenceWindowRow) (BuildResult
 	if !row.WindowStart.Valid || !row.WindowEnd.Valid || !row.BuiltAt.Valid || len(row.EvidenceSha256) != sha256.Size {
 		return BuildResult{}, ErrInvariant
 	}
+	switch row.SchemaVersion {
+	case SchemaVersionV1:
+		if row.ClosureDelaySeconds.Valid || row.MaxIntervalCreditSeconds.Valid {
+			return BuildResult{}, ErrInvariant
+		}
+	case SchemaVersion:
+		if !row.ClosureDelaySeconds.Valid || !row.MaxIntervalCreditSeconds.Valid ||
+			row.ClosureDelaySeconds.Int32 < 60 || row.ClosureDelaySeconds.Int32 > 3600 ||
+			row.MaxIntervalCreditSeconds.Int32 < 60 || row.MaxIntervalCreditSeconds.Int32 > 3600 ||
+			row.ClosureDelaySeconds.Int32 < row.MaxIntervalCreditSeconds.Int32 {
+			return BuildResult{}, ErrInvariant
+		}
+	default:
+		return BuildResult{}, ErrInvariant
+	}
 	result := BuildResult{
-		WindowStart: row.WindowStart.Time.UTC().Round(0), WindowEnd: row.WindowEnd.Time.UTC().Round(0),
-		AnnounceFenceSequence: row.AnnounceFenceSequence,
-		SelectedSnapshotID:    row.SelectedSnapshotID, SelectedSnapshotSequence: row.SelectedSnapshotSequence,
+		SchemaVersion: row.SchemaVersion,
+		WindowStart:   row.WindowStart.Time.UTC().Round(0), WindowEnd: row.WindowEnd.Time.UTC().Round(0),
+		ClosureDelaySeconds:      row.ClosureDelaySeconds.Int32,
+		MaxIntervalCreditSeconds: row.MaxIntervalCreditSeconds.Int32,
+		AnnounceFenceSequence:    row.AnnounceFenceSequence,
+		SelectedSnapshotID:       row.SelectedSnapshotID, SelectedSnapshotSequence: row.SelectedSnapshotSequence,
 		SnapshotFenceID: row.SnapshotFenceID, SnapshotFenceSequence: row.SnapshotFenceSequence,
 		ItemCount: row.ItemCount, BuiltAt: row.BuiltAt.Time.UTC().Round(0),
 	}

@@ -271,6 +271,18 @@ core_traffic_concurrency="$(bootstrap_or_existing \
     ((10#${core_traffic_concurrency} <= 32)) ||
     fail "PEERGO_CORE_TRAFFIC_CONCURRENCY must be an integer between 1 and 32"
 
+# Replace the former unsafe 5-minute example while preserving an explicitly
+# customized value. The readiness check below still proves closure >= credit.
+seeding_evidence_closure_delay="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY \
+    PEERGO_BOOTSTRAP_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY \
+    45m \
+    5m)"
+seeding_evidence_max_interval_credit="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT \
+    PEERGO_BOOTSTRAP_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT \
+    35m)"
+
 nats_username=peergo
 if [[ -f "${nats_credentials_file}" ]]; then
     [[ "$(head -n 1 "${nats_credentials_file}" | tr -d '\r')" == "peergo-single-server-user-password-v1" ]] ||
@@ -397,6 +409,8 @@ set_env PEERGO_SETTLEMENT_HNR_STREAM_MAX_BYTES "${hnr_stream_max_bytes}"
 set_env PEERGO_SETTLEMENT_POLICY_CONCURRENCY "${settlement_policy_concurrency}"
 set_env PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY "${settlement_traffic_outbox_concurrency}"
 set_env PEERGO_CORE_TRAFFIC_CONCURRENCY "${core_traffic_concurrency}"
+set_env PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY "${seeding_evidence_closure_delay}"
+set_env PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT "${seeding_evidence_max_interval_credit}"
 
 nats_url_names=(
     PEERGO_TRACKER_NATS_URLS

@@ -153,7 +153,9 @@ make production-policy-bootstrap \
 
 登录后台核对政策和邮件，并设置
 `PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT` 为实际 Tracker 切换 UTC 整点。重启受影响
-服务后执行：
+服务前同时确认 `PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY=45m` 与
+`PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT=35m`，避免消费者积压时提前封账，
+然后执行：
 
 ```bash
 make production-activation-check

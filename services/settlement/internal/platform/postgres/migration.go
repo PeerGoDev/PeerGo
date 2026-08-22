@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const ExpectedMigrationVersion int64 = 202608210001
+const ExpectedMigrationVersion int64 = 202608220001
 
 type rowQuerier interface {
 	QueryRow(context.Context, string, ...any) pgx.Row

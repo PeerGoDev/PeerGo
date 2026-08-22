@@ -41,7 +41,7 @@ func TestIntegrationClosesUnionedHourAndDetectsLateInterval(t *testing.T) {
 
 	windowStart := time.Now().UTC().Add(-3 * time.Hour).Truncate(time.Hour)
 	windowEnd := windowStart.Add(time.Hour)
-	clock := windowEnd.Add(2 * time.Minute)
+	clock := windowEnd.Add(46 * time.Minute)
 	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 	announceStream := "PEERGO_SEEDING_IT_" + strings.ToUpper(suffix)
 	announceSubject := "peergo.seeding.it." + suffix
@@ -57,6 +57,9 @@ func TestIntegrationClosesUnionedHourAndDetectsLateInterval(t *testing.T) {
 	sequence := uint64(1)
 	sessionA := strings.Repeat("11", 32)
 	sessionB := strings.Repeat("22", 32)
+	staleSession := strings.Repeat("66", 32)
+	ingestSeedingEvent(t, ctx, ingestRepository, announceStream, announceSubject, sequence, seedingEvent(t, userID, torrentID, infoHash, staleSession, windowStart.Add(2*time.Minute), 0, 0))
+	sequence++
 	ingestSeedingEvent(t, ctx, ingestRepository, announceStream, announceSubject, sequence, seedingEvent(t, userID, torrentID, infoHash, sessionA, windowStart.Add(5*time.Minute), 0, 0))
 	sequence++
 	ingestSeedingEvent(t, ctx, ingestRepository, announceStream, announceSubject, sequence, seedingEvent(t, userID, torrentID, infoHash, sessionB, windowStart.Add(10*time.Minute), 0, 0))
@@ -65,11 +68,16 @@ func TestIntegrationClosesUnionedHourAndDetectsLateInterval(t *testing.T) {
 	sequence++
 	ingestSeedingEvent(t, ctx, ingestRepository, announceStream, announceSubject, sequence, seedingEvent(t, userID, torrentID, infoHash, sessionB, windowStart.Add(30*time.Minute), 200, 0))
 	sequence++
-	ingestSeedingEvent(t, ctx, ingestRepository, announceStream, announceSubject, sequence, seedingEvent(t, uuid.New(), torrentID+1, strings.Repeat("cd", 20), strings.Repeat("33", 32), windowEnd.Add(time.Minute), 0, 0))
+	// A 38-minute adjacent announce gap exceeds the 35-minute Tracker peer
+	// lifetime. The entire interval is stale and must earn no seed time.
+	ingestSeedingEvent(t, ctx, ingestRepository, announceStream, announceSubject, sequence, seedingEvent(t, userID, torrentID, infoHash, staleSession, windowStart.Add(40*time.Minute), 500, 0))
+	sequence++
+	ingestSeedingEvent(t, ctx, ingestRepository, announceStream, announceSubject, sequence, seedingEvent(t, uuid.New(), torrentID+1, strings.Repeat("cd", 20), strings.Repeat("33", 32), windowEnd.Add(46*time.Minute), 0, 0))
 
 	repository, err := seedingevidence.NewPostgresRepository(pool, seedingevidence.PostgresRepositoryConfig{
 		AnnounceStream: announceStream, SnapshotStream: snapshotStream, SnapshotSubject: snapshotSubject,
 		MaxFutureSkew: 2 * time.Minute, MaximumSnapshotClosureDelay: 15 * time.Minute,
+		ClosureDelay: 45 * time.Minute, MaxIntervalCredit: 35 * time.Minute,
 	}, func() time.Time { return clock })
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +115,17 @@ WHERE window_start = $1 AND user_id = $2 AND torrent_id = $3`, windowStart, user
 	}
 	if activeSeconds != 25*60 || rawUploaded != 300 || seeders != 3 || leechers != 1 || sourceCount != 2 {
 		t.Fatalf("item active=%d uploaded=%d swarm=%d/%d sources=%d", activeSeconds, rawUploaded, seeders, leechers, sourceCount)
+	}
+	var schemaVersion string
+	var closureSeconds, maxIntervalSeconds int
+	if err := pool.QueryRow(ctx, `
+SELECT schema_version, closure_delay_seconds, max_interval_credit_seconds
+FROM ledger.seeding_evidence_windows
+WHERE window_start = $1`, windowStart).Scan(&schemaVersion, &closureSeconds, &maxIntervalSeconds); err != nil {
+		t.Fatal(err)
+	}
+	if schemaVersion != seedingevidence.SchemaVersion || closureSeconds != 2700 || maxIntervalSeconds != 2100 {
+		t.Fatalf("window schema=%s closure=%d credit=%d", schemaVersion, closureSeconds, maxIntervalSeconds)
 	}
 	var outboxPayload string
 	if err := pool.QueryRow(ctx, `

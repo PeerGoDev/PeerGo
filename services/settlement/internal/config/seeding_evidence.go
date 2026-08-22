@@ -37,18 +37,19 @@ type SeedingSnapshotProvisionerConfig struct {
 }
 
 type SeedingEvidenceWorkerConfig struct {
-	Environment      string
-	DatabaseURL      string
-	AnnounceStream   string
-	SnapshotStream   string
-	SnapshotSubject  string
-	InitialWindow    time.Time
-	ClosureDelay     time.Duration
-	SnapshotMaxDelay time.Duration
-	MaxFutureSkew    time.Duration
-	IdleInterval     time.Duration
-	StartupTimeout   time.Duration
-	ShutdownTimeout  time.Duration
+	Environment       string
+	DatabaseURL       string
+	AnnounceStream    string
+	SnapshotStream    string
+	SnapshotSubject   string
+	InitialWindow     time.Time
+	ClosureDelay      time.Duration
+	MaxIntervalCredit time.Duration
+	SnapshotMaxDelay  time.Duration
+	MaxFutureSkew     time.Duration
+	IdleInterval      time.Duration
+	StartupTimeout    time.Duration
+	ShutdownTimeout   time.Duration
 }
 
 func LoadSeedingSnapshotRuntime() (SeedingSnapshotRuntimeConfig, error) {
@@ -170,9 +171,19 @@ func LoadSeedingEvidenceWorker() (SeedingEvidenceWorkerConfig, error) {
 	if err != nil || offset != 0 || !initial.Equal(initial.Truncate(time.Hour)) {
 		return SeedingEvidenceWorkerConfig{}, errors.New("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT must be an exact UTC RFC3339 hour")
 	}
-	closureDelay, err := duration("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY", 0, time.Hour)
+	closureDelay, err := duration("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY", time.Minute, time.Hour)
 	if err != nil {
 		return SeedingEvidenceWorkerConfig{}, err
+	}
+	maxIntervalCredit, err := duration("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT", time.Minute, time.Hour)
+	if err != nil {
+		return SeedingEvidenceWorkerConfig{}, err
+	}
+	if closureDelay < maxIntervalCredit {
+		return SeedingEvidenceWorkerConfig{}, errors.New("PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY must be at least PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT")
+	}
+	if closureDelay%time.Second != 0 || maxIntervalCredit%time.Second != 0 {
+		return SeedingEvidenceWorkerConfig{}, errors.New("seeding evidence closure and interval limits must use whole seconds")
 	}
 	snapshotMaxDelay, err := duration("PEERGO_SETTLEMENT_SEEDING_SNAPSHOT_MAX_CLOSURE_DELAY", time.Second, time.Hour)
 	if err != nil {
@@ -197,8 +208,9 @@ func LoadSeedingEvidenceWorker() (SeedingEvidenceWorkerConfig, error) {
 	return SeedingEvidenceWorkerConfig{
 		Environment: environment, DatabaseURL: databaseURL, AnnounceStream: announceStream,
 		SnapshotStream: snapshotStream, SnapshotSubject: snapshotSubject,
-		InitialWindow: initial.UTC(), ClosureDelay: closureDelay, SnapshotMaxDelay: snapshotMaxDelay,
-		MaxFutureSkew: maxFutureSkew, IdleInterval: idleInterval,
+		InitialWindow: initial.UTC(), ClosureDelay: closureDelay, MaxIntervalCredit: maxIntervalCredit,
+		SnapshotMaxDelay: snapshotMaxDelay,
+		MaxFutureSkew:    maxFutureSkew, IdleInterval: idleInterval,
 		StartupTimeout: startupTimeout, ShutdownTimeout: shutdownTimeout,
 	}, nil
 }

@@ -46,7 +46,8 @@ func run(logger *slog.Logger) error {
 	repository, err := seedingevidence.NewPostgresRepository(pool, seedingevidence.PostgresRepositoryConfig{
 		AnnounceStream: settings.AnnounceStream, SnapshotStream: settings.SnapshotStream,
 		SnapshotSubject: settings.SnapshotSubject, MaxFutureSkew: settings.MaxFutureSkew,
-		MaximumSnapshotClosureDelay: settings.SnapshotMaxDelay,
+		MaximumSnapshotClosureDelay: settings.SnapshotMaxDelay, ClosureDelay: settings.ClosureDelay,
+		MaxIntervalCredit: settings.MaxIntervalCredit,
 	}, time.Now)
 	if err != nil {
 		return fmt.Errorf("compose seeding evidence repository: %w", err)
@@ -59,6 +60,7 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("compose seeding evidence worker: %w", err)
 	}
 	logger.Info("Settlement seeding evidence worker started",
-		"initial_window_start", settings.InitialWindow, "closure_delay", settings.ClosureDelay)
+		"initial_window_start", settings.InitialWindow, "closure_delay", settings.ClosureDelay,
+		"max_interval_credit", settings.MaxIntervalCredit)
 	return worker.Run(rootCtx)
 }

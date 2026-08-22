@@ -149,6 +149,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(
 SELECT
     window_start,
     window_end,
+    schema_version,
+    closure_delay_seconds,
+    max_interval_credit_seconds,
     announce_fence_sequence,
     selected_snapshot_id,
     selected_snapshot_sequence,
@@ -172,13 +175,17 @@ SELECT coalesce(max(window_end), sqlc.arg(initial_window_start)::timestamptz)::t
 FROM ledger.seeding_evidence_windows;
 
 -- name: GetSeedingAnnounceFence :one
+WITH terminal_head AS (
+    SELECT source_sequence, received_at
+    FROM settlement.event_inbox
+    WHERE source_stream = sqlc.arg(source_stream)::text
+      AND outcome <> 'processing'
+    ORDER BY source_sequence DESC
+    LIMIT 1
+)
 SELECT source_sequence, received_at
-FROM settlement.event_inbox
-WHERE source_stream = sqlc.arg(source_stream)::text
-  AND received_at >= sqlc.arg(window_end)::timestamptz
-  AND outcome <> 'processing'
-ORDER BY source_sequence
-LIMIT 1;
+FROM terminal_head
+WHERE received_at >= sqlc.arg(fence_not_before)::timestamptz;
 
 -- name: GetSeedingSnapshotFence :one
 SELECT
@@ -228,6 +235,11 @@ WHERE inbox.source_stream = sqlc.arg(source_stream)::text
   AND raw.ends_at > sqlc.arg(window_start)::timestamptz
   AND raw.previous_left = 0
   AND raw.current_left = 0
+  -- An interval proves activity only while adjacent Tracker updates remain
+  -- within the configured credible gap. Do not cap a stale multi-hour gap:
+  -- excluding it entirely matches UNIT3D's conservative seed-time rule.
+  AND raw.ends_at <= raw.starts_at
+      + (sqlc.arg(max_interval_credit_seconds)::bigint * interval '1 second')
 ORDER BY raw.user_id, raw.torrent_id, clipped_starts_at, clipped_ends_at, raw.event_id;
 
 -- name: ListSeedingSnapshotEntries :many
@@ -241,6 +253,8 @@ INSERT INTO ledger.seeding_evidence_windows (
     window_start,
     window_end,
     schema_version,
+    closure_delay_seconds,
+    max_interval_credit_seconds,
     announce_source_stream,
     announce_fence_sequence,
     announce_fence_received_at,
@@ -256,7 +270,9 @@ INSERT INTO ledger.seeding_evidence_windows (
 ) VALUES (
     sqlc.arg(window_start)::timestamptz,
     sqlc.arg(window_end)::timestamptz,
-    'seeding.evidence.v1',
+    'seeding.evidence.v2',
+    sqlc.arg(closure_delay_seconds)::integer,
+    sqlc.arg(max_interval_credit_seconds)::integer,
     sqlc.arg(announce_source_stream)::text,
     sqlc.arg(announce_fence_sequence)::bigint,
     sqlc.arg(announce_fence_received_at)::timestamptz,

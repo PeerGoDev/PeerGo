@@ -70,6 +70,8 @@ type windowDigestDocument struct {
 	SchemaVersion              string             `json:"schema_version"`
 	WindowStart                time.Time          `json:"window_start"`
 	WindowEnd                  time.Time          `json:"window_end"`
+	ClosureDelaySeconds        int32              `json:"closure_delay_seconds"`
+	MaxIntervalCreditSeconds   int32              `json:"max_interval_credit_seconds"`
 	AnnounceSourceStream       string             `json:"announce_source_stream"`
 	AnnounceFenceSequence      int64              `json:"announce_fence_sequence"`
 	AnnounceFenceReceivedAt    time.Time          `json:"announce_fence_received_at"`

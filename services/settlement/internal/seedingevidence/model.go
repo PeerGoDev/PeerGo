@@ -11,7 +11,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const SchemaVersion = "seeding.evidence.v1"
+const (
+	SchemaVersionV1 = "seeding.evidence.v1"
+	SchemaVersion   = "seeding.evidence.v2"
+)
 
 var (
 	ErrInput           = errors.New("seeding evidence input is invalid")
@@ -37,8 +40,11 @@ type SnapshotApplyResult struct {
 }
 
 type BuildResult struct {
+	SchemaVersion            string
 	WindowStart              time.Time
 	WindowEnd                time.Time
+	ClosureDelaySeconds      int32
+	MaxIntervalCreditSeconds int32
 	AnnounceFenceSequence    int64
 	SelectedSnapshotID       uuid.UUID
 	SelectedSnapshotSequence int64

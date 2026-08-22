@@ -119,6 +119,10 @@ chmod 600 .env.production
 - SMTP/Relay；
 - `PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT`：正式 Tracker 记账切换所在的 UTC
   整点，不能填写旧站历史时间。
+- `PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY=45m` 与
+  `PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT=35m`：前者等待有序
+  announce 水位越过小时边界，后者拒绝把超过 Tracker peer 生命周期的断档推定为连续做种；
+  closure 必须大于等于 credit。
 
 `PEERGO_SECRET_DIR` 必须是宿主机绝对路径，目录和文件只允许运维账户读取。
 

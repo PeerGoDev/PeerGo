@@ -1174,18 +1174,22 @@ func (q *Queries) GetPromotionRule(ctx context.Context, id uuid.UUID) (Settlemen
 }
 
 const getSeedingAnnounceFence = `-- name: GetSeedingAnnounceFence :one
+WITH terminal_head AS (
+    SELECT source_sequence, received_at
+    FROM settlement.event_inbox
+    WHERE source_stream = $2::text
+      AND outcome <> 'processing'
+    ORDER BY source_sequence DESC
+    LIMIT 1
+)
 SELECT source_sequence, received_at
-FROM settlement.event_inbox
-WHERE source_stream = $1::text
-  AND received_at >= $2::timestamptz
-  AND outcome <> 'processing'
-ORDER BY source_sequence
-LIMIT 1
+FROM terminal_head
+WHERE received_at >= $1::timestamptz
 `
 
 type GetSeedingAnnounceFenceParams struct {
-	SourceStream string
-	WindowEnd    pgtype.Timestamptz
+	FenceNotBefore pgtype.Timestamptz
+	SourceStream   string
 }
 
 type GetSeedingAnnounceFenceRow struct {
@@ -1194,7 +1198,7 @@ type GetSeedingAnnounceFenceRow struct {
 }
 
 func (q *Queries) GetSeedingAnnounceFence(ctx context.Context, arg GetSeedingAnnounceFenceParams) (GetSeedingAnnounceFenceRow, error) {
-	row := q.db.QueryRow(ctx, getSeedingAnnounceFence, arg.SourceStream, arg.WindowEnd)
+	row := q.db.QueryRow(ctx, getSeedingAnnounceFence, arg.FenceNotBefore, arg.SourceStream)
 	var i GetSeedingAnnounceFenceRow
 	err := row.Scan(&i.SourceSequence, &i.ReceivedAt)
 	return i, err
@@ -1204,6 +1208,9 @@ const getSeedingEvidenceWindow = `-- name: GetSeedingEvidenceWindow :one
 SELECT
     window_start,
     window_end,
+    schema_version,
+    closure_delay_seconds,
+    max_interval_credit_seconds,
     announce_fence_sequence,
     selected_snapshot_id,
     selected_snapshot_sequence,
@@ -1221,6 +1228,9 @@ WHERE window_start = $1::timestamptz
 type GetSeedingEvidenceWindowRow struct {
 	WindowStart                pgtype.Timestamptz
 	WindowEnd                  pgtype.Timestamptz
+	SchemaVersion              string
+	ClosureDelaySeconds        pgtype.Int4
+	MaxIntervalCreditSeconds   pgtype.Int4
 	AnnounceFenceSequence      int64
 	SelectedSnapshotID         uuid.UUID
 	SelectedSnapshotSequence   int64
@@ -1239,6 +1249,9 @@ func (q *Queries) GetSeedingEvidenceWindow(ctx context.Context, windowStart pgty
 	err := row.Scan(
 		&i.WindowStart,
 		&i.WindowEnd,
+		&i.SchemaVersion,
+		&i.ClosureDelaySeconds,
+		&i.MaxIntervalCreditSeconds,
 		&i.AnnounceFenceSequence,
 		&i.SelectedSnapshotID,
 		&i.SelectedSnapshotSequence,
@@ -2027,6 +2040,8 @@ INSERT INTO ledger.seeding_evidence_windows (
     window_start,
     window_end,
     schema_version,
+    closure_delay_seconds,
+    max_interval_credit_seconds,
     announce_source_stream,
     announce_fence_sequence,
     announce_fence_received_at,
@@ -2042,25 +2057,29 @@ INSERT INTO ledger.seeding_evidence_windows (
 ) VALUES (
     $1::timestamptz,
     $2::timestamptz,
-    'seeding.evidence.v1',
-    $3::text,
-    $4::bigint,
-    $5::timestamptz,
-    $6::uuid,
-    $7::bigint,
-    $8::timestamptz,
-    $9::uuid,
-    $10::bigint,
-    $11::timestamptz,
-    $12::integer,
-    $13::bytea,
-    $14::timestamptz
+    'seeding.evidence.v2',
+    $3::integer,
+    $4::integer,
+    $5::text,
+    $6::bigint,
+    $7::timestamptz,
+    $8::uuid,
+    $9::bigint,
+    $10::timestamptz,
+    $11::uuid,
+    $12::bigint,
+    $13::timestamptz,
+    $14::integer,
+    $15::bytea,
+    $16::timestamptz
 )
 `
 
 type InsertSeedingEvidenceWindowParams struct {
 	WindowStart                pgtype.Timestamptz
 	WindowEnd                  pgtype.Timestamptz
+	ClosureDelaySeconds        int32
+	MaxIntervalCreditSeconds   int32
 	AnnounceSourceStream       string
 	AnnounceFenceSequence      int64
 	AnnounceFenceReceivedAt    pgtype.Timestamptz
@@ -2079,6 +2098,8 @@ func (q *Queries) InsertSeedingEvidenceWindow(ctx context.Context, arg InsertSee
 	_, err := q.db.Exec(ctx, insertSeedingEvidenceWindow,
 		arg.WindowStart,
 		arg.WindowEnd,
+		arg.ClosureDelaySeconds,
+		arg.MaxIntervalCreditSeconds,
 		arg.AnnounceSourceStream,
 		arg.AnnounceFenceSequence,
 		arg.AnnounceFenceReceivedAt,
@@ -2861,14 +2882,20 @@ WHERE inbox.source_stream = $3::text
   AND raw.ends_at > $1::timestamptz
   AND raw.previous_left = 0
   AND raw.current_left = 0
+  -- An interval proves activity only while adjacent Tracker updates remain
+  -- within the configured credible gap. Do not cap a stale multi-hour gap:
+  -- excluding it entirely matches UNIT3D's conservative seed-time rule.
+  AND raw.ends_at <= raw.starts_at
+      + ($5::bigint * interval '1 second')
 ORDER BY raw.user_id, raw.torrent_id, clipped_starts_at, clipped_ends_at, raw.event_id
 `
 
 type ListSeedingIntervalsForWindowParams struct {
-	WindowStart           pgtype.Timestamptz
-	WindowEnd             pgtype.Timestamptz
-	SourceStream          string
-	AnnounceFenceSequence int64
+	WindowStart              pgtype.Timestamptz
+	WindowEnd                pgtype.Timestamptz
+	SourceStream             string
+	AnnounceFenceSequence    int64
+	MaxIntervalCreditSeconds int64
 }
 
 type ListSeedingIntervalsForWindowRow struct {
@@ -2888,6 +2915,7 @@ func (q *Queries) ListSeedingIntervalsForWindow(ctx context.Context, arg ListSee
 		arg.WindowEnd,
 		arg.SourceStream,
 		arg.AnnounceFenceSequence,
+		arg.MaxIntervalCreditSeconds,
 	)
 	if err != nil {
 		return nil, err
