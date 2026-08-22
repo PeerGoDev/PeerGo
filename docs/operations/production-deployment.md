@@ -312,6 +312,8 @@ make production-seeding-reward-compensation-preview
 
 命令在 Core 与 Tracker 上分别使用 `REPEATABLE READ READ ONLY`，复用历史时刻的不可变
 奖励政策、VIP/勋章/等级权益、种子元数据和 swarm 快照，再调用正式结算使用的同一计算器。
+它保留 v1 关闭时已经采用的全部来源区间，只并入关闭水位之后到达且不超过 35 分钟的区间；
+不会拿当前 v2 规则重解释或追回已经结算的历史奖励。
 它只写 `/opt/peergo/compensations/` 下权限为 `0600` 的 JSONL，不修改证据、魔力值、经验或
 outbox。JSONL 含内部用户标识，不得复制到工单、聊天或公开日志；日常输出只保留聚合数量、
 总差额、文件路径与 SHA-256。

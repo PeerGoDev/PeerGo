@@ -196,7 +196,9 @@ LIMIT 1`, window.Start)
 		}
 		trackerItems, err := correctedTrackerItems(ctx, trackerTx, window.Start, fence)
 		if err != nil {
-			return CompensationPreviewSummary{}, err
+			return CompensationPreviewSummary{}, fmt.Errorf(
+				"rebuild compensation Tracker items for %s: %w", window.Start.Format(time.RFC3339), err,
+			)
 		}
 		if len(trackerItems) == 0 {
 			return CompensationPreviewSummary{}, ErrInvariant
@@ -207,7 +209,9 @@ LIMIT 1`, window.Start)
 		}
 		metadata, err := compensationMetadata(ctx, coreTx, window.Start, trackerItems)
 		if err != nil {
-			return CompensationPreviewSummary{}, err
+			return CompensationPreviewSummary{}, fmt.Errorf(
+				"read compensation metadata for %s: %w", window.Start.Format(time.RFC3339), err,
+			)
 		}
 		grouped := groupCorrectedItems(trackerItems, metadata)
 		userIDs := make([]uuid.UUID, 0, len(grouped))
@@ -217,7 +221,9 @@ LIMIT 1`, window.Start)
 		slices.SortFunc(userIDs, func(left, right uuid.UUID) int { return slices.Compare(left[:], right[:]) })
 		benefits, err := repository.compensationBenefits(ctx, coreTx, window.Start, userIDs)
 		if err != nil {
-			return CompensationPreviewSummary{}, err
+			return CompensationPreviewSummary{}, fmt.Errorf(
+				"read compensation benefits for %s: %w", window.Start.Format(time.RFC3339), err,
+			)
 		}
 		original, err := compensationOriginalCalculations(ctx, coreTx, window.Start)
 		if err != nil {
@@ -391,6 +397,10 @@ WHERE window_start = $1`, start).Scan(&result.Start, &result.End, &evidence, &re
 }
 
 func correctedTrackerItems(ctx context.Context, tx pgx.Tx, windowStart time.Time, fence int64) ([]correctedTrackerItem, error) {
+	// Preserve every source range that formed the immutable v1 item, including
+	// the credibility semantics in force when it closed. Compensation adds only
+	// credible post-fence anomalies; it must not retroactively apply v2's gap
+	// filter to facts for which a member has already been credited.
 	rows, err := tx.Query(ctx, `
 WITH affected_users AS MATERIALIZED (
     SELECT DISTINCT raw.user_id
@@ -401,7 +411,20 @@ WITH affected_users AS MATERIALIZED (
       AND raw.previous_left = 0
       AND raw.current_left = 0
       AND raw.ends_at <= raw.starts_at + ($3 * interval '1 second')
-), facts AS MATERIALIZED (
+), original_facts AS MATERIALIZED (
+    SELECT
+        source.user_id,
+        source.torrent_id,
+        raw.info_hash_v1,
+        source.clipped_starts_at AS starts_at,
+        source.clipped_ends_at AS ends_at,
+        raw.raw_uploaded,
+        source.source_sequence
+    FROM ledger.seeding_evidence_sources AS source
+    JOIN affected_users ON affected_users.user_id = source.user_id
+    JOIN ledger.raw_session_intervals AS raw ON raw.event_id = source.interval_event_id
+    WHERE source.window_start = $1
+), late_facts AS MATERIALIZED (
     SELECT
         raw.user_id,
         raw.torrent_id,
@@ -409,38 +432,45 @@ WITH affected_users AS MATERIALIZED (
         greatest(raw.starts_at, evidence_window.window_start) AS starts_at,
         least(raw.ends_at, evidence_window.window_end) AS ends_at,
         raw.raw_uploaded,
-        inbox.source_sequence,
-        coalesce(snapshot.seeders, 0) AS snapshot_seeders
-    FROM ledger.seeding_evidence_windows AS evidence_window
-    JOIN ledger.raw_session_intervals AS raw
-      ON raw.starts_at < evidence_window.window_end
-     AND raw.ends_at > evidence_window.window_start
+        anomaly.source_sequence
+    FROM ledger.seeding_evidence_anomalies AS anomaly
+    JOIN ledger.seeding_evidence_windows AS evidence_window USING (window_start)
+    JOIN ledger.raw_session_intervals AS raw ON raw.event_id = anomaly.interval_event_id
     JOIN affected_users ON affected_users.user_id = raw.user_id
-    JOIN settlement.event_inbox AS inbox ON inbox.event_id = raw.event_id
-    LEFT JOIN ledger.seeding_swarm_snapshot_entries AS snapshot
-      ON snapshot.snapshot_id = evidence_window.selected_snapshot_id
-     AND snapshot.info_hash_v1 = raw.info_hash_v1
-    WHERE evidence_window.window_start = $1
-      AND inbox.source_stream = evidence_window.announce_source_stream
-      AND inbox.source_sequence <= $2
-      AND inbox.outcome <> 'processing'
+    WHERE anomaly.window_start = $1
+      AND anomaly.source_sequence <= $2
       AND raw.previous_left = 0
       AND raw.current_left = 0
       AND raw.ends_at <= raw.starts_at + ($3 * interval '1 second')
+), facts AS MATERIALIZED (
+    SELECT * FROM original_facts
+    UNION ALL
+    SELECT * FROM late_facts
 ), grouped AS (
     SELECT
-        user_id,
-        torrent_id,
-        info_hash_v1,
-        sum(raw_uploaded)::bigint AS raw_uploaded,
-        max(snapshot_seeders)::integer AS snapshot_seeders,
+        facts.user_id,
+        facts.torrent_id,
+        facts.info_hash_v1,
+        sum(facts.raw_uploaded)::bigint AS raw_uploaded,
+        coalesce(max(snapshot.seeders), 0)::integer AS snapshot_seeders,
         count(*)::bigint AS source_count,
-        min(source_sequence)::bigint AS first_sequence,
-        max(source_sequence)::bigint AS last_sequence,
-        range_agg(tstzrange(starts_at, ends_at, '[)')) AS active_ranges
+        min(facts.source_sequence)::bigint AS first_sequence,
+        max(facts.source_sequence)::bigint AS last_sequence,
+        range_agg(tstzrange(facts.starts_at, facts.ends_at, '[)')) AS active_ranges,
+        coalesce(max(original.active_seconds), 0)::bigint AS original_active_seconds,
+        coalesce(max(original.raw_uploaded), 0)::bigint AS original_raw_uploaded
     FROM facts
-    WHERE ends_at > starts_at
-    GROUP BY user_id, torrent_id, info_hash_v1
+    JOIN ledger.seeding_evidence_windows AS evidence_window
+      ON evidence_window.window_start = $1
+    LEFT JOIN ledger.seeding_swarm_snapshot_entries AS snapshot
+      ON snapshot.snapshot_id = evidence_window.selected_snapshot_id
+     AND snapshot.info_hash_v1 = facts.info_hash_v1
+    LEFT JOIN ledger.seeding_evidence_items AS original
+      ON original.window_start = evidence_window.window_start
+     AND original.user_id = facts.user_id
+     AND original.torrent_id = facts.torrent_id
+    WHERE facts.ends_at > facts.starts_at
+    GROUP BY facts.user_id, facts.torrent_id, facts.info_hash_v1
 )
 SELECT
     grouped.user_id,
@@ -454,7 +484,9 @@ SELECT
     grouped.snapshot_seeders,
     grouped.source_count,
     grouped.first_sequence,
-    grouped.last_sequence
+    grouped.last_sequence,
+    grouped.original_active_seconds,
+    grouped.original_raw_uploaded
 FROM grouped
 ORDER BY grouped.user_id, grouped.torrent_id, grouped.info_hash_v1`,
 		windowStart, fence, int64(compensationMaxIntervalCredit/time.Second))
@@ -466,17 +498,19 @@ ORDER BY grouped.user_id, grouped.torrent_id, grouped.info_hash_v1`,
 	for rows.Next() {
 		var item correctedTrackerItem
 		var infoHash []byte
+		var originalActiveSeconds, originalRawUploaded int64
 		if err := rows.Scan(
 			&item.UserID, &item.TorrentID, &infoHash, &item.ActiveSeconds,
 			&item.RawUploaded, &item.SnapshotSeeders, &item.SourceCount,
-			&item.FirstSequence, &item.LastSequence,
+			&item.FirstSequence, &item.LastSequence, &originalActiveSeconds, &originalRawUploaded,
 		); err != nil {
 			return nil, fmt.Errorf("scan corrected Tracker item: %w", err)
 		}
 		if item.UserID == uuid.Nil || item.TorrentID < 1 || len(infoHash) != len(item.InfoHashV1) ||
 			item.ActiveSeconds < 1 || item.ActiveSeconds > 3600 || item.RawUploaded < 0 ||
 			item.SnapshotSeeders < 0 || item.SourceCount < 1 || item.FirstSequence < 1 ||
-			item.LastSequence < item.FirstSequence || item.LastSequence > fence {
+			item.LastSequence < item.FirstSequence || item.LastSequence > fence ||
+			item.ActiveSeconds < originalActiveSeconds || item.RawUploaded < originalRawUploaded {
 			return nil, ErrInvariant
 		}
 		copy(item.InfoHashV1[:], infoHash)
