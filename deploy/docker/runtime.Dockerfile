@@ -14,6 +14,7 @@ COPY tools/traffic-corpus ./tools/traffic-corpus
 RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-api ./services/core/cmd/api && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-admin ./services/core/cmd/admin && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-tracker-rate-policy ./services/core/cmd/tracker-rate-policy && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-audit-worker ./services/core/cmd/worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-control-projector ./services/core/cmd/projector && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-snapshot-publisher ./services/core/cmd/snapshot-builder && \

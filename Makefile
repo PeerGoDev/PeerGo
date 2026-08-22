@@ -1,5 +1,5 @@
 .PHONY: generate format test check test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
-.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-hnr-work-reconcile
+.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-hnr-work-reconcile
 
 # These values are synthetic and limited to the loopback-only local Compose
 # environment. Production processes require explicit secret-backed variables.
@@ -1026,6 +1026,23 @@ production-admin-revoke: production-config
 	test -n "$(USERNAME)"
 	./scripts/production-compose.sh \
 		run --rm --no-deps --entrypoint core-admin core-api --username "$(USERNAME)" --revoke
+
+# Emergency-safe request-budget correction. This clones the latest immutable
+# Tracker policy, changes only its two token buckets, and still goes through a
+# real active administrator grant plus the normal authorization audit path.
+production-tracker-rate-policy: production-config
+	test -n "$(USERNAME)"
+	test -n "$(REASON)"
+	test "$(CONFIRM_PEERGO_TRACKER_RATE_POLICY)" = "APPLY_TRACKER_RATE_POLICY"
+	./scripts/production-compose.sh run --rm --no-deps \
+		--entrypoint core-tracker-rate-policy core-api \
+		--username "$(USERNAME)" \
+		--reason "$(REASON)" \
+		--confirm "$(CONFIRM_PEERGO_TRACKER_RATE_POLICY)" \
+		--user-requests-per-minute "$${PEERGO_TRACKER_RATE_USER_RPM:-600}" \
+		--user-burst "$${PEERGO_TRACKER_RATE_USER_BURST:-1200}" \
+		--address-requests-per-minute "$${PEERGO_TRACKER_RATE_ADDRESS_RPM:-5000}" \
+		--address-burst "$${PEERGO_TRACKER_RATE_ADDRESS_BURST:-10000}"
 
 # One-shot, resumable cleanup for the v1 H&R queue fan-out. It only marks
 # non-completion rows terminal when no live obligation or pending completion

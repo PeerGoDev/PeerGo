@@ -201,6 +201,21 @@ make production-admin USERNAME=admin
 make production-admin-revoke USERNAME=admin
 ```
 
+若真实运行数据证明默认请求预算阻断大量正常保种客户端，可由主机操作员克隆最新不可变
+Tracker 政策并只调整两级请求预算。该命令保留 announce、客户端、盒子规则和流量倍率，
+仍校验指定管理员的有效授权并写入审计记录；重复执行相同目标不会新增版本。
+
+```bash
+make production-tracker-rate-policy \
+  USERNAME=admin \
+  REASON='依据线上限流样本恢复正常保种重连' \
+  CONFIRM_PEERGO_TRACKER_RATE_POLICY=APPLY_TRACKER_RATE_POLICY
+```
+
+默认目标为每用户 `600/分钟、突发 1200`，每来源地址 `5000/分钟、突发 10000`。签发后由
+现有快照发布器生成签名版本，Tracker 热加载完成后应在后台核对“已配置版本”和“实际加载
+版本”一致。
+
 如果不建立临时公网预览入口，可通过 loopback Web API 签发上线所需的首版策略：
 
 ```bash
