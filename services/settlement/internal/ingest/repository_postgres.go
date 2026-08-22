@@ -39,11 +39,58 @@ func NewPostgresRepository(pool *pgxpool.Pool, stream, subject string, now func(
 	return &PostgresRepository{pool: pool, expectedStream: stream, expectedSubject: subject, now: now}, nil
 }
 
-// Process commits the inbox idempotency fence, serialized session transition,
-// and optional raw ledger interval atomically. The JetStream consumer may ACK
-// only after this method returns success; a lost ACK simply takes the duplicate
-// branch on redelivery without applying the interval again.
+// Process preserves the single-event API for tests and repair tooling while
+// delegating to the same ordered transaction used by the production batch path.
 func (repository *PostgresRepository) Process(ctx context.Context, delivery Delivery) (ProcessResult, error) {
+	results, err := repository.ProcessBatch(ctx, []Delivery{delivery})
+	if err != nil {
+		return ProcessResult{}, err
+	}
+	if len(results) != 1 {
+		return ProcessResult{}, ErrSessionInvariant
+	}
+	return results[0], nil
+}
+
+// ProcessBatch commits an ordered group of inbox fences, serialized session
+// transitions and raw intervals in one PostgreSQL transaction. Amortizing the
+// WAL flush removes commit latency from Tracker's hot path without relaxing the
+// original invariant: JetStream ACKs happen only after the entire ordered batch
+// is durable, and a failed batch exposes none of its later counters.
+func (repository *PostgresRepository) ProcessBatch(ctx context.Context, deliveries []Delivery) ([]ProcessResult, error) {
+	if len(deliveries) == 0 || len(deliveries) > 512 {
+		return nil, ErrSourceInvariant
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin Settlement ingest batch: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := ledgerdb.New(tx)
+	results := make([]ProcessResult, len(deliveries))
+	var previousSequence uint64
+	for index, delivery := range deliveries {
+		if previousSequence != 0 && delivery.Sequence <= previousSequence {
+			return nil, ErrSourceInvariant
+		}
+		previousSequence = delivery.Sequence
+		result, err := repository.processInTransaction(ctx, queries, delivery)
+		if err != nil {
+			return nil, err
+		}
+		results[index] = result
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, repositoryOperationError("commit Settlement ingest batch", err)
+	}
+	return results, nil
+}
+
+func (repository *PostgresRepository) processInTransaction(
+	ctx context.Context,
+	queries *ledgerdb.Queries,
+	delivery Delivery,
+) (ProcessResult, error) {
 	if delivery.Stream != repository.expectedStream || delivery.Subject != repository.expectedSubject ||
 		delivery.Sequence == 0 || delivery.Sequence > math.MaxInt64 ||
 		delivery.DeliveryCount == 0 || delivery.DeliveryCount > math.MaxInt64 {
@@ -75,12 +122,6 @@ func (repository *PostgresRepository) Process(ctx context.Context, delivery Deli
 		return ProcessResult{}, ErrInvalidInput
 	}
 
-	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return ProcessResult{}, fmt.Errorf("begin Settlement ingest: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	queries := ledgerdb.New(tx)
 	_, err = queries.ClaimInboxEvent(ctx, ledgerdb.ClaimInboxEventParams{
 		EventID: eventID, PayloadSha256: payloadDigest[:], PayloadJson: string(delivery.Payload),
 		SourceStream: delivery.Stream, SourceSubject: delivery.Subject,
@@ -154,9 +195,6 @@ func (repository *PostgresRepository) Process(ctx context.Context, delivery Deli
 		if rows != 1 {
 			return ProcessResult{}, fmt.Errorf("%w: finalized %d inbox rows", ErrSessionInvariant, rows)
 		}
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return ProcessResult{}, repositoryOperationError("commit Settlement ingest", err)
 	}
 	return ProcessResult{EventID: event.EventID, Outcome: transition.Outcome}, nil
 }
@@ -333,3 +371,6 @@ func repositoryOperationError(operation string, err error) error {
 	}
 	return fmt.Errorf("%s: %w", operation, err)
 }
+
+var _ Processor = (*PostgresRepository)(nil)
+var _ BatchProcessor = (*PostgresRepository)(nil)

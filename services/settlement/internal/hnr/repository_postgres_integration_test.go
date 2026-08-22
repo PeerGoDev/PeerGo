@@ -104,6 +104,89 @@ func TestIntegrationHNRCompletionProgressAndImmutablePolicy(t *testing.T) {
 	}
 }
 
+// H&R work routing belongs on the immutable interval boundary, not in a worker
+// that later has to scan every announce. Ordinary intervals without a live
+// obligation must stay out of the queue; the bounded reconciler terminalizes
+// equivalent legacy v1 rows without deleting their accounting evidence.
+func TestIntegrationHNRRoutesOnlyRelevantWorkAndReconcilesLegacyRows(t *testing.T) {
+	databaseURL := strings.TrimSpace(os.Getenv("PEERGO_TEST_TRACKER_DATABASE_URL"))
+	if databaseURL == "" {
+		t.Skip("PEERGO_TEST_TRACKER_DATABASE_URL is required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	if err := platformpostgres.RequireCurrentMigration(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
+
+	baseTime := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	userID := uuid.New()
+	torrentID := positiveRandomInt64(t)
+	stream := "PEERGO_HNR_ROUTE_IT_" + strings.ToUpper(strings.ReplaceAll(uuid.NewString()[:8], "-", ""))
+	subject := "peergo.hnr.route.it." + strings.ToLower(strings.ReplaceAll(uuid.NewString()[:8], "-", ""))
+	repository, err := ingest.NewPostgresRepository(pool, stream, subject, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	baseline, ordinary := hnrOrdinaryIntervalEvents(t, baseTime, userID, torrentID)
+	ingestEvent(t, ctx, repository, stream, subject, 1, baseline)
+	ingestEvent(t, ctx, repository, stream, subject, 2, ordinary)
+	intervalEventID := uuid.MustParse(ordinary.EventID)
+
+	var queued int64
+	if err := pool.QueryRow(ctx, `
+SELECT count(*)
+FROM settlement.hnr_work
+WHERE interval_event_id = $1`, intervalEventID).Scan(&queued); err != nil {
+		t.Fatal(err)
+	}
+	if queued != 0 {
+		t.Fatalf("ordinary interval queued without an obligation: %d", queued)
+	}
+
+	// Simulate a row produced by the v1 all-interval trigger before the routing
+	// migration. Reconciliation must retain the row and record why it is final.
+	if _, err := pool.Exec(ctx, `
+INSERT INTO settlement.hnr_work (interval_event_id, available_at, created_at)
+VALUES ($1, $2, $2)`, intervalEventID, baseTime.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	hnrRepository, err := hnr.NewPostgresRepository(pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reconciledAt := baseTime.Add(2 * time.Hour)
+	count, err := hnrRepository.ReconcileIrrelevant(ctx, reconciledAt, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("ReconcileIrrelevant() count=%d, want 1", count)
+	}
+
+	var processedAt time.Time
+	var disposition string
+	if err := pool.QueryRow(ctx, `
+SELECT processed_at, processing_disposition
+FROM settlement.hnr_work
+WHERE interval_event_id = $1`, intervalEventID).Scan(&processedAt, &disposition); err != nil {
+		t.Fatal(err)
+	}
+	if !processedAt.Equal(reconciledAt) || disposition != "irrelevant_no_obligation" {
+		t.Fatalf("reconciled row processed_at=%s disposition=%q", processedAt, disposition)
+	}
+	count, err = hnrRepository.ReconcileIrrelevant(ctx, reconciledAt.Add(time.Second), 100)
+	if err != nil || count != 0 {
+		t.Fatalf("second ReconcileIrrelevant() count=%d error=%v", count, err)
+	}
+}
+
 func hnrIntegrationEvents(t *testing.T, baseTime time.Time, userID uuid.UUID, torrentID int64) (trackerannouncev1.Event, trackerannouncev1.Event, trackerannouncev1.Event, trackerannouncev1.Event, string) {
 	t.Helper()
 	infoHash := randomHex(t, 20)
@@ -130,6 +213,22 @@ func hnrIntegrationEvents(t *testing.T, baseTime time.Time, userID uuid.UUID, to
 	seedTwo.EventID = newV7(t).String()
 	seedTwo.ReceivedAt = seedOne.ReceivedAt.Add(time.Hour)
 	return baseline, completion, seedOne, seedTwo, completionID
+}
+
+func hnrOrdinaryIntervalEvents(t *testing.T, baseTime time.Time, userID uuid.UUID, torrentID int64) (trackerannouncev1.Event, trackerannouncev1.Event) {
+	t.Helper()
+	baseline := trackerannouncev1.Event{
+		SchemaVersion: trackerannouncev1.SchemaVersion, EventID: newV7(t).String(), ReceivedAt: baseTime,
+		UserID: userID.String(), TorrentID: torrentID, InfoHashV1: randomHex(t, 20), SessionToken: randomHex(t, 32),
+		AddressFamily: 4, Event: "started", Uploaded: 0, Downloaded: 0, Left: 1000,
+		CredentialVersion: 1, TorrentControlSequence: 11, SubjectControlSequence: 13,
+	}
+	ordinary := baseline
+	ordinary.EventID = newV7(t).String()
+	ordinary.ReceivedAt = baseTime.Add(time.Minute)
+	ordinary.Event = ""
+	ordinary.Uploaded = 100
+	return baseline, ordinary
 }
 
 func ingestEvent(t *testing.T, ctx context.Context, repository *ingest.PostgresRepository, stream, subject string, sequence uint64, event trackerannouncev1.Event) {

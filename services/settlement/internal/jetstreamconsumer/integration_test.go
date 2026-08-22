@@ -80,7 +80,7 @@ func TestIntegrationConsumesOrderedCountersAndAcknowledgesAfterCommit(t *testing
 		DeliverPolicy: jetstream.DeliverAllPolicy, AckPolicy: jetstream.AckExplicitPolicy,
 		AckWait: 10 * time.Second, MaxDeliver: -1, FilterSubject: subject,
 		ReplayPolicy: jetstream.ReplayInstantPolicy, MaxWaiting: 4,
-		MaxAckPending: 1, MaxRequestBatch: 1, MaxRequestExpires: time.Second,
+		MaxAckPending: 64, MaxRequestBatch: 64, MaxRequestExpires: time.Second,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestIntegrationConsumesOrderedCountersAndAcknowledgesAfterCommit(t *testing
 	source, err := jetstreamconsumer.OpenSource(operationCtx, js, jetstreamconsumer.BindingConfig{
 		Stream: streamName, Subject: subject, Durable: durable,
 		FetchWait: 500 * time.Millisecond, MaximumProcessingTime: 2 * time.Second,
-		MaximumAckTime: time.Second,
+		MaximumAckTime: time.Second, BatchSize: 64,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +117,8 @@ func TestIntegrationConsumesOrderedCountersAndAcknowledgesAfterCommit(t *testing
 	}
 	runner, err := jetstreamconsumer.NewRunner(source, repository, jetstreamconsumer.RunnerConfig{
 		Stream: streamName, Subject: subject, Durable: durable,
-		ProcessTimeout: 2 * time.Second, AckTimeout: time.Second, RetryDelay: 20 * time.Millisecond,
+		ProcessTimeout: 2 * time.Second, AckTimeout: time.Second,
+		RetryDelay: 20 * time.Millisecond, BatchSize: 64,
 	}, nil)
 	if err != nil {
 		t.Fatal(err)

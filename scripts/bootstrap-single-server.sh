@@ -255,6 +255,14 @@ settlement_policy_concurrency="$(bootstrap_or_existing \
     ((10#${settlement_policy_concurrency} <= 32)) ||
     fail "PEERGO_SETTLEMENT_POLICY_CONCURRENCY must be an integer between 1 and 32"
 
+settlement_batch_size="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_BATCH_SIZE \
+    PEERGO_BOOTSTRAP_SETTLEMENT_BATCH_SIZE \
+    64)"
+[[ "${settlement_batch_size}" =~ ^[1-9][0-9]{0,2}$ ]] &&
+    ((10#${settlement_batch_size} <= 512)) ||
+    fail "PEERGO_SETTLEMENT_BATCH_SIZE must be an integer between 1 and 512"
+
 settlement_traffic_outbox_concurrency="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY \
     PEERGO_BOOTSTRAP_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY \
@@ -407,6 +415,7 @@ set_env PEERGO_TORRENT_STORAGE_FILESYSTEM_ROOT /var/lib/peergo/objects
 set_env PEERGO_IMAGE_DERIVATIVE_TEMP_DIR /var/lib/peergo/image-derivative-tmp
 set_env PEERGO_SETTLEMENT_HNR_STREAM_MAX_BYTES "${hnr_stream_max_bytes}"
 set_env PEERGO_SETTLEMENT_POLICY_CONCURRENCY "${settlement_policy_concurrency}"
+set_env PEERGO_SETTLEMENT_BATCH_SIZE "${settlement_batch_size}"
 set_env PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY "${settlement_traffic_outbox_concurrency}"
 set_env PEERGO_CORE_TRAFFIC_CONCURRENCY "${core_traffic_concurrency}"
 set_env PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY "${seeding_evidence_closure_delay}"

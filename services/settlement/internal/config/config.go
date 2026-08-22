@@ -25,6 +25,7 @@ type RuntimeConfig struct {
 	Stream          string
 	Subject         string
 	Durable         string
+	BatchSize       int
 	FetchWait       time.Duration
 	ProcessTimeout  time.Duration
 	AckTimeout      time.Duration
@@ -65,6 +66,10 @@ func LoadRuntime() (RuntimeConfig, error) {
 	if err != nil {
 		return RuntimeConfig{}, err
 	}
+	batchSize, err := integer("PEERGO_SETTLEMENT_BATCH_SIZE", 1, 512)
+	if err != nil {
+		return RuntimeConfig{}, err
+	}
 	fetchWait, err := duration("PEERGO_SETTLEMENT_FETCH_WAIT", 100*time.Millisecond, time.Minute)
 	if err != nil {
 		return RuntimeConfig{}, err
@@ -95,7 +100,7 @@ func LoadRuntime() (RuntimeConfig, error) {
 			URLs: common.natsURLs, CredentialsFile: credentials, RootCAFile: common.natsRootCAFile,
 			ConnectTimeout: common.connectTimeout, ReconnectWait: common.reconnectWait,
 		},
-		Stream: common.stream, Subject: common.subject, Durable: common.durable,
+		Stream: common.stream, Subject: common.subject, Durable: common.durable, BatchSize: batchSize,
 		FetchWait: fetchWait, ProcessTimeout: processTimeout, AckTimeout: ackTimeout,
 		RetryDelay: retryDelay, StartupTimeout: startupTimeout, ShutdownTimeout: shutdownTimeout,
 	}, nil
@@ -133,6 +138,10 @@ func LoadConsumerProvisioner() (ConsumerProvisionerConfig, error) {
 	if err != nil {
 		return ConsumerProvisionerConfig{}, err
 	}
+	batchSize, err := integer("PEERGO_SETTLEMENT_BATCH_SIZE", 1, 512)
+	if err != nil {
+		return ConsumerProvisionerConfig{}, err
+	}
 	maxRequestExpires, err := duration("PEERGO_SETTLEMENT_CONSUMER_MAX_REQUEST_EXPIRES", 100*time.Millisecond, time.Minute)
 	if err != nil {
 		return ConsumerProvisionerConfig{}, err
@@ -157,9 +166,9 @@ func LoadConsumerProvisioner() (ConsumerProvisionerConfig, error) {
 			DeliverPolicy: jetstream.DeliverAllPolicy, AckPolicy: jetstream.AckExplicitPolicy,
 			AckWait: ackWait, MaxDeliver: -1, FilterSubject: common.subject,
 			ReplayPolicy: jetstream.ReplayInstantPolicy, MaxWaiting: maxWaiting,
-			// One global in-flight event preserves absolute-counter order until
-			// a later design introduces explicit session-key partitioning.
-			MaxAckPending: 1, MaxRequestBatch: 1, MaxRequestExpires: maxRequestExpires,
+			// One ordered batch is committed in a single PostgreSQL transaction.
+			// This preserves absolute-counter order while amortizing WAL flushes.
+			MaxAckPending: batchSize, MaxRequestBatch: batchSize, MaxRequestExpires: maxRequestExpires,
 			Metadata: map[string]string{
 				"peergo.owner": "settlement", "peergo.schema": trackerannouncev1.SchemaVersion,
 			},

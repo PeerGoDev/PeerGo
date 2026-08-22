@@ -3354,6 +3354,7 @@ const markHNRWorkProcessed = `-- name: MarkHNRWorkProcessed :execrows
 UPDATE settlement.hnr_work
 SET
     processed_at = $1::timestamptz,
+    processing_disposition = 'evaluated',
     lease_token = NULL,
     lease_until = NULL,
     last_error_code = NULL
@@ -3485,6 +3486,66 @@ func (q *Queries) PromotionRuleScopeOverlaps(ctx context.Context, arg PromotionR
 	var overlaps bool
 	err := row.Scan(&overlaps)
 	return overlaps, err
+}
+
+const reconcileIrrelevantHNRWork = `-- name: ReconcileIrrelevantHNRWork :one
+WITH candidate AS MATERIALIZED (
+    SELECT work.interval_event_id
+    FROM settlement.hnr_work AS work
+    INNER JOIN ledger.raw_session_intervals AS raw
+        ON raw.event_id = work.interval_event_id
+    WHERE work.processed_at IS NULL
+      AND (work.lease_until IS NULL OR work.lease_until <= $1::timestamptz)
+      AND NOT raw.completed_transition
+      AND NOT EXISTS (
+          SELECT 1
+          FROM ledger.hnr_obligations AS obligation
+          INNER JOIN ledger.hnr_completion_assessments AS assessment
+              ON assessment.id = obligation.assessment_id
+          WHERE obligation.state = 'tracking'
+            AND assessment.user_id = raw.user_id
+            AND assessment.torrent_id = raw.torrent_id
+      )
+      AND NOT EXISTS (
+          SELECT 1
+          FROM settlement.hnr_work AS completion_work
+          INNER JOIN ledger.raw_session_intervals AS completion
+              ON completion.event_id = completion_work.interval_event_id
+          WHERE completion_work.processed_at IS NULL
+            AND completion.completed_transition
+            AND completion.user_id = raw.user_id
+            AND completion.torrent_id = raw.torrent_id
+      )
+    ORDER BY work.available_at, work.interval_event_id
+    LIMIT $2::integer
+    FOR UPDATE OF work SKIP LOCKED
+), updated AS (
+    UPDATE settlement.hnr_work AS work
+    SET
+        processed_at = $1::timestamptz,
+        processing_disposition = 'irrelevant_no_obligation',
+        lease_token = NULL,
+        lease_until = NULL,
+        last_error_code = NULL
+    FROM candidate
+    WHERE work.interval_event_id = candidate.interval_event_id
+      AND work.processed_at IS NULL
+    RETURNING 1
+)
+SELECT count(*)::bigint
+FROM updated
+`
+
+type ReconcileIrrelevantHNRWorkParams struct {
+	ReconciledAt pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) ReconcileIrrelevantHNRWork(ctx context.Context, arg ReconcileIrrelevantHNRWorkParams) (int64, error) {
+	row := q.db.QueryRow(ctx, reconcileIrrelevantHNRWork, arg.ReconciledAt, arg.BatchSize)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const releaseHNROutboxEvent = `-- name: ReleaseHNROutboxEvent :execrows

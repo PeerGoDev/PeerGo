@@ -78,6 +78,11 @@ settlement_policy_concurrency="$(env_get PEERGO_SETTLEMENT_POLICY_CONCURRENCY)"
     ((10#${settlement_policy_concurrency} <= 32)) ||
     fail "PEERGO_SETTLEMENT_POLICY_CONCURRENCY must be an integer between 1 and 32"
 
+settlement_batch_size="$(env_get PEERGO_SETTLEMENT_BATCH_SIZE)"
+[[ "${settlement_batch_size}" =~ ^[1-9][0-9]{0,2}$ ]] &&
+    ((10#${settlement_batch_size} <= 512)) ||
+    fail "PEERGO_SETTLEMENT_BATCH_SIZE must be an integer between 1 and 512"
+
 settlement_traffic_outbox_concurrency="$(env_get PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY)"
 [[ "${settlement_traffic_outbox_concurrency}" =~ ^[1-9][0-9]?$ ]] &&
     ((10#${settlement_traffic_outbox_concurrency} <= 32)) ||

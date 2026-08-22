@@ -289,12 +289,60 @@ INSERT INTO settlement.hnr_outbox (
 UPDATE settlement.hnr_work
 SET
     processed_at = sqlc.arg(processed_at)::timestamptz,
+    processing_disposition = 'evaluated',
     lease_token = NULL,
     lease_until = NULL,
     last_error_code = NULL
 WHERE interval_event_id = sqlc.arg(interval_event_id)::uuid
   AND lease_token = sqlc.arg(lease_token)::uuid
   AND processed_at IS NULL;
+
+-- name: ReconcileIrrelevantHNRWork :one
+WITH candidate AS MATERIALIZED (
+    SELECT work.interval_event_id
+    FROM settlement.hnr_work AS work
+    INNER JOIN ledger.raw_session_intervals AS raw
+        ON raw.event_id = work.interval_event_id
+    WHERE work.processed_at IS NULL
+      AND (work.lease_until IS NULL OR work.lease_until <= sqlc.arg(reconciled_at)::timestamptz)
+      AND NOT raw.completed_transition
+      AND NOT EXISTS (
+          SELECT 1
+          FROM ledger.hnr_obligations AS obligation
+          INNER JOIN ledger.hnr_completion_assessments AS assessment
+              ON assessment.id = obligation.assessment_id
+          WHERE obligation.state = 'tracking'
+            AND assessment.user_id = raw.user_id
+            AND assessment.torrent_id = raw.torrent_id
+      )
+      AND NOT EXISTS (
+          SELECT 1
+          FROM settlement.hnr_work AS completion_work
+          INNER JOIN ledger.raw_session_intervals AS completion
+              ON completion.event_id = completion_work.interval_event_id
+          WHERE completion_work.processed_at IS NULL
+            AND completion.completed_transition
+            AND completion.user_id = raw.user_id
+            AND completion.torrent_id = raw.torrent_id
+      )
+    ORDER BY work.available_at, work.interval_event_id
+    LIMIT sqlc.arg(batch_size)::integer
+    FOR UPDATE OF work SKIP LOCKED
+), updated AS (
+    UPDATE settlement.hnr_work AS work
+    SET
+        processed_at = sqlc.arg(reconciled_at)::timestamptz,
+        processing_disposition = 'irrelevant_no_obligation',
+        lease_token = NULL,
+        lease_until = NULL,
+        last_error_code = NULL
+    FROM candidate
+    WHERE work.interval_event_id = candidate.interval_event_id
+      AND work.processed_at IS NULL
+    RETURNING 1
+)
+SELECT count(*)::bigint
+FROM updated;
 
 -- name: ReleaseHNRWork :execrows
 UPDATE settlement.hnr_work

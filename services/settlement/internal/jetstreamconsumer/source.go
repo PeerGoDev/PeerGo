@@ -21,6 +21,7 @@ type Message interface {
 
 type Source interface {
 	Next(context.Context) (Message, error)
+	NextBatch(context.Context, int) ([]Message, error)
 }
 
 type BindingConfig struct {
@@ -30,14 +31,15 @@ type BindingConfig struct {
 	FetchWait             time.Duration
 	MaximumProcessingTime time.Duration
 	MaximumAckTime        time.Duration
+	BatchSize             int
 }
 
-type nextConsumer interface {
-	Next(...jetstream.FetchOpt) (jetstream.Msg, error)
+type fetchConsumer interface {
+	Fetch(int, ...jetstream.FetchOpt) (jetstream.MessageBatch, error)
 }
 
 type natsSource struct {
-	consumer  nextConsumer
+	consumer  fetchConsumer
 	fetchWait time.Duration
 }
 
@@ -70,30 +72,46 @@ func validateConsumerBinding(info *jetstream.ConsumerInfo, config BindingConfig)
 		info.Config.AckWait <= config.MaximumProcessingTime+config.MaximumAckTime ||
 		info.Config.MaxDeliver != -1 || info.Config.FilterSubject != config.Subject ||
 		len(info.Config.FilterSubjects) != 0 || info.Config.ReplayPolicy != jetstream.ReplayInstantPolicy ||
-		info.Config.DeliverSubject != "" || info.Config.DeliverGroup != "" || info.Config.MaxAckPending != 1 ||
-		info.Config.MaxRequestBatch != 1 ||
+		info.Config.DeliverSubject != "" || info.Config.DeliverGroup != "" ||
+		info.Config.MaxAckPending != config.BatchSize || info.Config.MaxRequestBatch != config.BatchSize ||
 		(info.Config.MaxRequestExpires > 0 && config.FetchWait > info.Config.MaxRequestExpires) {
 		return ErrConsumerDrift
 	}
 	return nil
 }
 
-func newSource(consumer nextConsumer, fetchWait time.Duration) (Source, error) {
+func newSource(consumer fetchConsumer, fetchWait time.Duration) (Source, error) {
 	if consumer == nil || fetchWait < 100*time.Millisecond || fetchWait > time.Minute {
 		return nil, ErrConfig
 	}
 	return &natsSource{consumer: consumer, fetchWait: fetchWait}, nil
 }
 
-func (source *natsSource) Next(ctx context.Context) (Message, error) {
+func (source *natsSource) NextBatch(ctx context.Context, limit int) ([]Message, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if limit < 1 || limit > 512 {
+		return nil, ErrConfig
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, source.fetchWait)
 	defer cancel()
-	message, err := source.consumer.Next(jetstream.FetchContext(requestCtx))
+	batch, err := source.consumer.Fetch(limit, jetstream.FetchContext(requestCtx))
 	if err == nil {
-		return message, nil
+		messages := make([]Message, 0, limit)
+		for message := range batch.Messages() {
+			messages = append(messages, message)
+		}
+		if len(messages) > 0 {
+			// A terminal fetch error after partial delivery does not invalidate
+			// those messages. They remain ordered and are committed before the
+			// next pull; an unreceived tail stays pending in JetStream.
+			return messages, nil
+		}
+		err = batch.Error()
+		if err == nil {
+			return nil, nil
+		}
 	}
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -101,7 +119,15 @@ func (source *natsSource) Next(ctx context.Context) (Message, error) {
 	if errors.Is(err, nats.ErrTimeout) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return nil, nil
 	}
-	return nil, fmt.Errorf("fetch Settlement announce event: %w", err)
+	return nil, fmt.Errorf("fetch Settlement announce batch: %w", err)
+}
+
+func (source *natsSource) Next(ctx context.Context) (Message, error) {
+	messages, err := source.NextBatch(ctx, 1)
+	if err != nil || len(messages) == 0 {
+		return nil, err
+	}
+	return messages[0], nil
 }
 
 func validateBinding(config BindingConfig) error {
@@ -110,7 +136,8 @@ func validateBinding(config BindingConfig) error {
 		!trackerannouncev1.ValidStreamName(config.Durable) ||
 		config.FetchWait < 100*time.Millisecond || config.FetchWait > time.Minute ||
 		config.MaximumProcessingTime < 100*time.Millisecond || config.MaximumProcessingTime > 10*time.Minute ||
-		config.MaximumAckTime < 100*time.Millisecond || config.MaximumAckTime > time.Minute {
+		config.MaximumAckTime < 100*time.Millisecond || config.MaximumAckTime > time.Minute ||
+		config.BatchSize < 1 || config.BatchSize > 512 {
 		return ErrConfig
 	}
 	return nil

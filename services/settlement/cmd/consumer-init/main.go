@@ -35,11 +35,11 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), settings.Timeout)
 	defer cancel()
-	created, err := jetstreamprovision.Ensure(ctx, manager, settings.Stream, settings.Consumer)
+	change, err := jetstreamprovision.Ensure(ctx, manager, settings.Stream, settings.Consumer)
 	if err != nil {
 		return err
 	}
 	logger.Info("Settlement durable consumer configuration verified",
-		"stream", settings.Stream, "consumer", settings.Consumer.Name, "created", created)
+		"stream", settings.Stream, "consumer", settings.Consumer.Name, "change", change)
 	return nil
 }

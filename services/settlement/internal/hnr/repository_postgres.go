@@ -147,6 +147,26 @@ func (repository *PostgresRepository) Release(ctx context.Context, pending Pendi
 	return nil
 }
 
+// ReconcileIrrelevant terminalizes a bounded batch of legacy v1 work rows that
+// cannot affect an H&R obligation. It never deletes raw evidence, completion
+// work, work for a tracking obligation, or work behind a pending completion.
+// Repeating the operation is safe and makes the production cleanup resumable.
+func (repository *PostgresRepository) ReconcileIrrelevant(ctx context.Context, reconciledAt time.Time, batchSize int32) (int64, error) {
+	if reconciledAt.IsZero() || batchSize < 1 || batchSize > 10_000 {
+		return 0, ErrInput
+	}
+	count, err := ledgerdb.New(repository.pool).ReconcileIrrelevantHNRWork(ctx, ledgerdb.ReconcileIrrelevantHNRWorkParams{
+		ReconciledAt: hnrTimestamp(reconciledAt), BatchSize: batchSize,
+	})
+	if err != nil {
+		return 0, classifyHNRError("reconcile irrelevant H&R work", err)
+	}
+	if count < 0 || count > int64(batchSize) {
+		return 0, ErrInvariant
+	}
+	return count, nil
+}
+
 func (repository *PostgresRepository) AppendRevision(ctx context.Context, revision hnrpolicy.Revision, recordedAt time.Time) (bool, error) {
 	if recordedAt.IsZero() || hnrpolicy.ValidateRevision(revision) != nil {
 		return false, ErrInput
@@ -400,3 +420,4 @@ func normalizeHNRTime(value time.Time) time.Time {
 
 var _ TimelineRepository = (*PostgresRepository)(nil)
 var _ WorkRepository = (*PostgresRepository)(nil)
+var _ WorkReconciler = (*PostgresRepository)(nil)

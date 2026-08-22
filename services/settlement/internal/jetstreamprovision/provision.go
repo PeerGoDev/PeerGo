@@ -23,6 +23,7 @@ var (
 type Manager interface {
 	Get(context.Context, string, string) (jetstream.ConsumerConfig, error)
 	Create(context.Context, string, jetstream.ConsumerConfig) error
+	Update(context.Context, string, jetstream.ConsumerConfig) error
 }
 
 type NATSManager struct {
@@ -53,27 +54,46 @@ func (manager *NATSManager) Create(ctx context.Context, stream string, config je
 	return err
 }
 
-// Ensure creates a missing consumer but never mutates an existing one. ACK
-// policy, delivery start or filter drift can silently lose or duplicate
-// accounting evidence, so those changes require an explicit reviewed action.
-func Ensure(ctx context.Context, manager Manager, stream string, desired jetstream.ConsumerConfig) (bool, error) {
+func (manager *NATSManager) Update(ctx context.Context, stream string, config jetstream.ConsumerConfig) error {
+	_, err := manager.jetStream.UpdateConsumer(ctx, stream, config)
+	return err
+}
+
+type Change string
+
+const (
+	ChangeNone    Change = "none"
+	ChangeCreated Change = "created"
+	ChangeUpdated Change = "updated"
+)
+
+// Ensure creates a missing consumer and permits only an in-place ordered-batch
+// limit change. ACK policy, delivery start or filter drift can silently lose
+// or duplicate accounting evidence, so every other change remains rejected.
+func Ensure(ctx context.Context, manager Manager, stream string, desired jetstream.ConsumerConfig) (Change, error) {
 	if manager == nil || !trackerannouncev1.ValidStreamName(stream) || validate(desired) != nil {
-		return false, ErrConfig
+		return ChangeNone, ErrConfig
 	}
 	current, err := manager.Get(ctx, stream, desired.Name)
 	if err == nil {
 		if !equivalent(current, desired) {
-			return false, ErrDrift
+			if !orderedBatchOnlyDrift(current, desired) {
+				return ChangeNone, ErrDrift
+			}
+			if err := manager.Update(ctx, stream, desired); err != nil {
+				return ChangeNone, fmt.Errorf("update Settlement durable consumer ordered batch limits: %w", err)
+			}
+			return ChangeUpdated, nil
 		}
-		return false, nil
+		return ChangeNone, nil
 	}
 	if !errors.Is(err, jetstream.ErrConsumerNotFound) && !errors.Is(err, jetstream.ErrConsumerDoesNotExist) {
-		return false, fmt.Errorf("inspect Settlement durable consumer: %w", err)
+		return ChangeNone, fmt.Errorf("inspect Settlement durable consumer: %w", err)
 	}
 	if err := manager.Create(ctx, stream, desired); err != nil {
-		return false, fmt.Errorf("create Settlement durable consumer: %w", err)
+		return ChangeNone, fmt.Errorf("create Settlement durable consumer: %w", err)
 	}
-	return true, nil
+	return ChangeCreated, nil
 }
 
 func validate(config jetstream.ConsumerConfig) error {
@@ -83,7 +103,8 @@ func validate(config jetstream.ConsumerConfig) error {
 		config.MaxDeliver != -1 || len(config.BackOff) != 0 ||
 		!trackerannouncev1.ValidLiteralSubject(config.FilterSubject) || len(config.FilterSubjects) != 0 ||
 		config.ReplayPolicy != jetstream.ReplayInstantPolicy || config.RateLimit != 0 || config.HeadersOnly ||
-		config.MaxWaiting < 1 || config.MaxAckPending != 1 || config.MaxRequestBatch != 1 ||
+		config.MaxWaiting < 1 || config.MaxAckPending < 1 || config.MaxAckPending > 512 ||
+		config.MaxRequestBatch != config.MaxAckPending ||
 		config.MaxRequestExpires < 100*time.Millisecond || config.MaxRequestExpires > time.Minute ||
 		config.MaxRequestMaxBytes != 0 || config.InactiveThreshold != 0 || config.Replicas != 0 || config.MemoryStorage ||
 		config.DeliverSubject != "" || config.DeliverGroup != "" || config.FlowControl || config.IdleHeartbeat != 0 ||
@@ -101,6 +122,16 @@ func validate(config jetstream.ConsumerConfig) error {
 
 func equivalent(current, desired jetstream.ConsumerConfig) bool {
 	current.Metadata = applicationMetadata(current.Metadata)
+	return reflect.DeepEqual(current, desired)
+}
+
+// orderedBatchOnlyDrift permits the reviewed v1 single-message -> ordered
+// transactional-batch transition without allowing a provisioner to alter the
+// delivery start, filter, ACK policy, retry semantics, or application metadata.
+func orderedBatchOnlyDrift(current, desired jetstream.ConsumerConfig) bool {
+	current.Metadata = applicationMetadata(current.Metadata)
+	current.MaxAckPending = desired.MaxAckPending
+	current.MaxRequestBatch = desired.MaxRequestBatch
 	return reflect.DeepEqual(current, desired)
 }
 

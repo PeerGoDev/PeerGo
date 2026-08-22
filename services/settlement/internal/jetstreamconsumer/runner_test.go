@@ -22,6 +22,24 @@ func TestProcessMessageDoubleAcksOnlyAfterCommit(t *testing.T) {
 	}
 }
 
+func TestProcessBatchPreservesOrderAndAcknowledgesEveryCommittedMessage(t *testing.T) {
+	processor := &testProcessor{results: []testProcessResult{
+		{result: ingest.ProcessResult{EventID: "event-1", Outcome: ingest.OutcomeBaseline}},
+		{result: ingest.ProcessResult{EventID: "event-2", Outcome: ingest.OutcomeInterval}},
+	}}
+	first := validTestMessage()
+	second := validTestMessage()
+	second.metadata.Sequence.Stream = first.metadata.Sequence.Stream + 1
+	second.metadata.Sequence.Consumer = first.metadata.Sequence.Consumer + 1
+	runner := testRunner(t, processor)
+	if err := runner.processBatch(context.Background(), []Message{first, second}); err != nil {
+		t.Fatal(err)
+	}
+	if processor.calls != 2 || first.doubleAcks != 1 || second.doubleAcks != 1 {
+		t.Fatalf("batch calls=%d acknowledgements=%d/%d", processor.calls, first.doubleAcks, second.doubleAcks)
+	}
+}
+
 func TestProcessMessageRetriesSameDeliveryOnTransientFailure(t *testing.T) {
 	processor := &testProcessor{results: []testProcessResult{
 		{err: errors.New("database temporarily unavailable")},
@@ -74,12 +92,12 @@ func TestProcessMessageDoesNotTreatLostDoubleAckAsDatabaseFailure(t *testing.T) 
 	}
 }
 
-func testRunner(t *testing.T, processor ingest.Processor) *Runner {
+func testRunner(t *testing.T, processor ingest.BatchProcessor) *Runner {
 	t.Helper()
 	runner, err := NewRunner(&testSource{}, processor, RunnerConfig{
 		Stream: "PEERGO_TRACKER_ANNOUNCE_V1", Subject: "peergo.tracker.announce.v1",
 		Durable: "PEERGO_SETTLEMENT_V1", ProcessTimeout: time.Second,
-		AckTimeout: time.Second, RetryDelay: 10 * time.Millisecond,
+		AckTimeout: time.Second, RetryDelay: 10 * time.Millisecond, BatchSize: 64,
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -97,18 +115,26 @@ type testProcessor struct {
 	calls   int
 }
 
-func (processor *testProcessor) Process(context.Context, ingest.Delivery) (ingest.ProcessResult, error) {
-	index := processor.calls
-	processor.calls++
-	if index >= len(processor.results) {
-		return ingest.ProcessResult{}, errors.New("unexpected processor call")
+func (processor *testProcessor) ProcessBatch(_ context.Context, deliveries []ingest.Delivery) ([]ingest.ProcessResult, error) {
+	results := make([]ingest.ProcessResult, len(deliveries))
+	for index := range deliveries {
+		resultIndex := processor.calls
+		processor.calls++
+		if resultIndex >= len(processor.results) {
+			return nil, errors.New("unexpected processor call")
+		}
+		if processor.results[resultIndex].err != nil {
+			return nil, processor.results[resultIndex].err
+		}
+		results[index] = processor.results[resultIndex].result
 	}
-	return processor.results[index].result, processor.results[index].err
+	return results, nil
 }
 
 type testSource struct{}
 
-func (*testSource) Next(context.Context) (Message, error) { return nil, nil }
+func (*testSource) Next(context.Context) (Message, error)             { return nil, nil }
+func (*testSource) NextBatch(context.Context, int) ([]Message, error) { return nil, nil }
 
 type testMessage struct {
 	metadata       jetstream.MsgMetadata

@@ -15,6 +15,7 @@ func TestLoadRuntimeBuildsNarrowConsumerConfiguration(t *testing.T) {
 	}
 	if settings.DatabaseURL == "" || len(settings.NATS.URLs) != 1 ||
 		settings.Stream != "PEERGO_TRACKER_ANNOUNCE_V1" || settings.Durable != "PEERGO_SETTLEMENT_V1" ||
+		settings.BatchSize != 64 ||
 		settings.FetchWait != 2*time.Second || settings.ProcessTimeout != 10*time.Second ||
 		settings.AckTimeout != 5*time.Second || settings.RetryDelay != time.Second {
 		t.Fatalf("settings = %+v", settings)
@@ -29,7 +30,7 @@ func TestLoadConsumerProvisionerBuildsOrderedDurableConsumer(t *testing.T) {
 	}
 	consumer := settings.Consumer
 	if consumer.Name != consumer.Durable || consumer.FilterSubject != "peergo.tracker.announce.v1" ||
-		consumer.MaxDeliver != -1 || consumer.MaxAckPending != 1 || consumer.MaxRequestBatch != 1 ||
+		consumer.MaxDeliver != -1 || consumer.MaxAckPending != 64 || consumer.MaxRequestBatch != 64 ||
 		consumer.Metadata["peergo.schema"] != "tracker.announce.v1" {
 		t.Fatalf("consumer = %+v", consumer)
 	}
@@ -90,6 +91,7 @@ func setConfigValues(t *testing.T, environment string) {
 		"PEERGO_TRACKER_ANNOUNCE_STREAM":                    "PEERGO_TRACKER_ANNOUNCE_V1",
 		"PEERGO_TRACKER_ANNOUNCE_SUBJECT":                   "peergo.tracker.announce.v1",
 		"PEERGO_SETTLEMENT_ANNOUNCE_DURABLE":                "PEERGO_SETTLEMENT_V1",
+		"PEERGO_SETTLEMENT_BATCH_SIZE":                      "64",
 		"PEERGO_SETTLEMENT_FETCH_WAIT":                      "2s",
 		"PEERGO_SETTLEMENT_PROCESS_TIMEOUT":                 "10s",
 		"PEERGO_SETTLEMENT_ACK_TIMEOUT":                     "5s",

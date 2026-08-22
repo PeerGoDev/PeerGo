@@ -50,6 +50,7 @@ RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-seeding-evidence-stream-init ./services/settlement/cmd/seeding-evidence-stream-init && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-seeding-evidence-dispatcher ./services/settlement/cmd/seeding-evidence-dispatcher && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-hnr-worker ./services/settlement/cmd/hnr-worker && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-hnr-work-reconcile ./services/settlement/cmd/hnr-work-reconcile && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-hnr-stream-init ./services/settlement/cmd/hnr-stream-init && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-hnr-dispatcher ./services/settlement/cmd/hnr-dispatcher && \
     GOWORK=off CGO_ENABLED=0 go -C tools/migrator build -trimpath -ldflags='-s -w' -o /out/goose github.com/pressly/goose/v3/cmd/goose

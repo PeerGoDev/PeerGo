@@ -158,6 +158,22 @@ make production-build
 每次调整后只重建该 worker，并同时观察待结算数量、数据库连接与不可变账本一致性，不能靠
 清队列、跳过事件或手工补余额来缩短水位。
 
+Tracker 原始流量入口使用单个有序 Settlement 消费实例；`PEERGO_SETTLEMENT_BATCH_SIZE=64`
+表示最多 64 条连续 stream sequence 在一个 PostgreSQL 事务内顺序落账，不代表 64 个并行
+counter 处理器。变更该值时先停止 `settlement-ingest`，再运行 `tracker-migrate` 和
+`settlement-announce-consumer-init` 原位同步 durable 的 `MaxAckPending/MaxRequestBatch`，最后只
+重建 `settlement-ingest`。Provisioner 只允许这两个批量上限改变，过滤条件、起点、ACK 策略
+或重试语义发生漂移仍会拒绝启动。
+
+旧 v1 H&R 曾为每个普通 announce 区间创建工作行；新路由只保留完成评估、待评估完成后的
+短暂竞态行和已有义务的后续区间。升级后保持 `settlement-hnr-worker` 停止，执行下面的可续跑
+清理，再恢复 worker；命令只把能够证明不存在义务的旧工作标记为终态，不删除原始证据：
+
+```bash
+make production-hnr-work-reconcile \
+  CONFIRM_PEERGO_HNR_RECONCILE=RECONCILE_IRRELEVANT_HNR_WORK
+```
+
 流量 outbox 与 Core 流量投影默认也各自在单进程内使用 4 条固定通道。对应参数为
 `PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY` 和 `PEERGO_CORE_TRAFFIC_CONCURRENCY`，支持范围
 均为 1–32。Core durable 只允许把 `MaxAckPending` 原位同步为后一参数；不会删除或重建

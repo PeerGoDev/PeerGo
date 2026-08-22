@@ -25,6 +25,10 @@ type Processor interface {
 	Process(context.Context, Delivery) (ProcessResult, error)
 }
 
+type BatchProcessor interface {
+	ProcessBatch(context.Context, []Delivery) ([]ProcessResult, error)
+}
+
 func IsPermanent(err error) bool {
 	return errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrSessionInvariant) ||
 		errors.Is(err, ErrEventConflict) || errors.Is(err, ErrSourceInvariant)

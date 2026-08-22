@@ -44,3 +44,7 @@ type WorkRepository interface {
 type TimelineRepository interface {
 	AppendRevision(context.Context, hnrpolicy.Revision, time.Time) (created bool, err error)
 }
+
+type WorkReconciler interface {
+	ReconcileIrrelevant(context.Context, time.Time, int32) (int64, error)
+}

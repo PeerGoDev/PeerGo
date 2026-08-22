@@ -28,22 +28,24 @@ type RunnerConfig struct {
 	ProcessTimeout time.Duration
 	AckTimeout     time.Duration
 	RetryDelay     time.Duration
+	BatchSize      int
 }
 
 type Runner struct {
 	source    Source
-	processor ingest.Processor
+	processor ingest.BatchProcessor
 	config    RunnerConfig
 	logger    *slog.Logger
 }
 
-func NewRunner(source Source, processor ingest.Processor, config RunnerConfig, logger *slog.Logger) (*Runner, error) {
+func NewRunner(source Source, processor ingest.BatchProcessor, config RunnerConfig, logger *slog.Logger) (*Runner, error) {
 	if source == nil || processor == nil || !trackerannouncev1.ValidStreamName(config.Stream) ||
 		!trackerannouncev1.ValidLiteralSubject(config.Subject) ||
 		!trackerannouncev1.ValidStreamName(config.Durable) ||
 		config.ProcessTimeout < 100*time.Millisecond || config.ProcessTimeout > 10*time.Minute ||
 		config.AckTimeout < 100*time.Millisecond || config.AckTimeout > time.Minute ||
-		config.RetryDelay < 10*time.Millisecond || config.RetryDelay > time.Minute {
+		config.RetryDelay < 10*time.Millisecond || config.RetryDelay > time.Minute ||
+		config.BatchSize < 1 || config.BatchSize > 512 {
 		return nil, ErrConfig
 	}
 	if logger == nil {
@@ -54,7 +56,7 @@ func NewRunner(source Source, processor ingest.Processor, config RunnerConfig, l
 
 func (runner *Runner) Run(ctx context.Context) error {
 	for {
-		message, err := runner.source.Next(ctx)
+		messages, err := runner.source.NextBatch(ctx, runner.config.BatchSize)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
@@ -65,52 +67,66 @@ func (runner *Runner) Run(ctx context.Context) error {
 			}
 			continue
 		}
-		if message == nil {
+		if len(messages) == 0 {
 			if ctx.Err() != nil {
 				return nil
 			}
 			continue
 		}
-		if err := runner.processMessage(ctx, message); err != nil {
+		if err := runner.processBatch(ctx, messages); err != nil {
 			return err
 		}
 	}
 }
 
 func (runner *Runner) processMessage(ctx context.Context, message Message) error {
-	metadata, err := message.Metadata()
-	if err != nil || metadata == nil || metadata.Stream != runner.config.Stream ||
-		metadata.Consumer != runner.config.Durable || metadata.Sequence.Stream == 0 || metadata.NumDelivered == 0 ||
-		message.Subject() != runner.config.Subject {
-		return fmt.Errorf("%w: unexpected JetStream delivery metadata", ingest.ErrSourceInvariant)
+	return runner.processBatch(ctx, []Message{message})
+}
+
+func (runner *Runner) processBatch(ctx context.Context, messages []Message) error {
+	if len(messages) == 0 || len(messages) > runner.config.BatchSize {
+		return fmt.Errorf("%w: unexpected JetStream batch size", ingest.ErrSourceInvariant)
 	}
-	delivery := ingest.Delivery{
-		Stream: metadata.Stream, Subject: message.Subject(), Sequence: metadata.Sequence.Stream,
-		DeliveryCount: metadata.NumDelivered, Payload: bytes.Clone(message.Data()),
+	deliveries := make([]ingest.Delivery, len(messages))
+	var previousSequence uint64
+	for index, message := range messages {
+		metadata, err := message.Metadata()
+		if err != nil || metadata == nil || metadata.Stream != runner.config.Stream ||
+			metadata.Consumer != runner.config.Durable || metadata.Sequence.Stream == 0 || metadata.NumDelivered == 0 ||
+			message.Subject() != runner.config.Subject ||
+			(previousSequence != 0 && metadata.Sequence.Stream <= previousSequence) {
+			return fmt.Errorf("%w: unexpected JetStream delivery metadata", ingest.ErrSourceInvariant)
+		}
+		previousSequence = metadata.Sequence.Stream
+		deliveries[index] = ingest.Delivery{
+			Stream: metadata.Stream, Subject: message.Subject(), Sequence: metadata.Sequence.Stream,
+			DeliveryCount: metadata.NumDelivered, Payload: bytes.Clone(message.Data()),
+		}
 	}
 
-	// Retrying the same in-flight message preserves absolute-counter order.
-	// Delayed NAK followed by another pull could let a later session sample
-	// overtake this one and permanently turn the earlier sample out-of-order.
+	// Retrying the same ordered in-flight batch preserves absolute-counter order.
+	// PostgreSQL commits the whole batch or none of it, so a delayed retry can
+	// never expose a later absolute counter without its predecessor.
 	for {
 		processCtx, cancel := context.WithTimeout(ctx, runner.config.ProcessTimeout)
-		result, processErr := runner.processor.Process(processCtx, delivery)
+		results, processErr := runner.processor.ProcessBatch(processCtx, deliveries)
 		cancel()
 		if processErr == nil {
-			ackCtx, ackCancel := context.WithTimeout(ctx, runner.config.AckTimeout)
-			ackErr := message.DoubleAck(ackCtx)
-			ackCancel()
-			if ackErr != nil {
-				if ctx.Err() != nil {
-					return nil
-				}
-				// PostgreSQL already committed. If the server did not process this
-				// ACK it will redeliver, and the inbox fence returns a duplicate.
-				runner.logger.Warn("Settlement JetStream ACK confirmation failed", "event_id", result.EventID, "error", ackErr)
-				return nil
+			if len(results) != len(messages) {
+				return fmt.Errorf("%w: Settlement batch result cardinality changed", ingest.ErrSourceInvariant)
 			}
-			runner.logger.Debug("Settlement announce event committed and acknowledged",
-				"event_id", result.EventID, "outcome", result.Outcome, "duplicate", result.Duplicate)
+			for index, message := range messages {
+				ackCtx, ackCancel := context.WithTimeout(ctx, runner.config.AckTimeout)
+				ackErr := message.DoubleAck(ackCtx)
+				ackCancel()
+				if ackErr != nil && ctx.Err() == nil {
+					// PostgreSQL already committed. Any unconfirmed ACK is safely
+					// redelivered and resolved by the inbox idempotency fence.
+					runner.logger.Warn("Settlement JetStream ACK confirmation failed", "event_id", results[index].EventID, "error", ackErr)
+				}
+				runner.logger.Debug("Settlement announce event committed and acknowledged",
+					"event_id", results[index].EventID, "outcome", results[index].Outcome, "duplicate", results[index].Duplicate)
+			}
 			return nil
 		}
 		if ingest.IsPermanent(processErr) {
@@ -122,11 +138,15 @@ func (runner *Runner) processMessage(ctx context.Context, message Message) error
 		if ctx.Err() != nil {
 			return nil
 		}
-		runner.logger.Warn("Settlement ingest failed; retrying the same delivery",
-			"stream_sequence", delivery.Sequence, "delivery_count", delivery.DeliveryCount, "error", processErr)
-		if progressErr := message.InProgress(); progressErr != nil {
-			runner.logger.Warn("Settlement JetStream in-progress acknowledgement failed",
-				"stream_sequence", delivery.Sequence, "error", progressErr)
+		runner.logger.Warn("Settlement ingest failed; retrying the same ordered batch",
+			"first_stream_sequence", deliveries[0].Sequence,
+			"last_stream_sequence", deliveries[len(deliveries)-1].Sequence,
+			"batch_size", len(deliveries), "error", processErr)
+		for index, message := range messages {
+			if progressErr := message.InProgress(); progressErr != nil {
+				runner.logger.Warn("Settlement JetStream in-progress acknowledgement failed",
+					"stream_sequence", deliveries[index].Sequence, "error", progressErr)
+			}
 		}
 		if !wait(ctx, runner.config.RetryDelay) {
 			return nil

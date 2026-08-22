@@ -56,7 +56,7 @@ func run(logger *slog.Logger) error {
 	source, err := jetstreamconsumer.OpenSource(startupCtx, js, jetstreamconsumer.BindingConfig{
 		Stream: settings.Stream, Subject: settings.Subject, Durable: settings.Durable,
 		FetchWait: settings.FetchWait, MaximumProcessingTime: settings.ProcessTimeout,
-		MaximumAckTime: settings.AckTimeout,
+		MaximumAckTime: settings.AckTimeout, BatchSize: settings.BatchSize,
 	})
 	if err != nil {
 		return err
@@ -67,14 +67,16 @@ func run(logger *slog.Logger) error {
 	}
 	runner, err := jetstreamconsumer.NewRunner(source, repository, jetstreamconsumer.RunnerConfig{
 		Stream: settings.Stream, Subject: settings.Subject, Durable: settings.Durable,
-		ProcessTimeout: settings.ProcessTimeout, AckTimeout: settings.AckTimeout, RetryDelay: settings.RetryDelay,
+		ProcessTimeout: settings.ProcessTimeout, AckTimeout: settings.AckTimeout,
+		RetryDelay: settings.RetryDelay, BatchSize: settings.BatchSize,
 	}, logger)
 	if err != nil {
 		return fmt.Errorf("compose Settlement consumer: %w", err)
 	}
 
 	logger.Info("Settlement raw Tracker ledger consumer started",
-		"stream", settings.Stream, "subject", settings.Subject, "consumer", settings.Durable)
+		"stream", settings.Stream, "subject", settings.Subject,
+		"consumer", settings.Durable, "batch_size", settings.BatchSize)
 	runtimeErr := runner.Run(rootCtx)
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), settings.ShutdownTimeout)
 	defer cancelShutdown()

@@ -94,6 +94,7 @@ type Querier interface {
 	MarkSeedingEvidenceOutboxEventPublished(ctx context.Context, arg MarkSeedingEvidenceOutboxEventPublishedParams) (int64, error)
 	MarkTrafficOutboxEventPublished(ctx context.Context, arg MarkTrafficOutboxEventPublishedParams) (int64, error)
 	PromotionRuleScopeOverlaps(ctx context.Context, arg PromotionRuleScopeOverlapsParams) (bool, error)
+	ReconcileIrrelevantHNRWork(ctx context.Context, arg ReconcileIrrelevantHNRWorkParams) (int64, error)
 	ReleaseHNROutboxEvent(ctx context.Context, arg ReleaseHNROutboxEventParams) (int64, error)
 	ReleaseHNRWork(ctx context.Context, arg ReleaseHNRWorkParams) (int64, error)
 	ReleasePolicyWork(ctx context.Context, arg ReleasePolicyWorkParams) (int64, error)

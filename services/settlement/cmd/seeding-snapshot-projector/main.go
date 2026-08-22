@@ -53,7 +53,7 @@ func run(logger *slog.Logger) error {
 	binding := jetstreamconsumer.BindingConfig{
 		Stream: settings.Stream, Subject: settings.Subject, Durable: settings.Durable,
 		FetchWait: settings.FetchWait, MaximumProcessingTime: settings.ProcessTimeout,
-		MaximumAckTime: settings.AckTimeout,
+		MaximumAckTime: settings.AckTimeout, BatchSize: 1,
 	}
 	source, err := jetstreamconsumer.OpenSource(startupCtx, js, binding)
 	if err != nil {
