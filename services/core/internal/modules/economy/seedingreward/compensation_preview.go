@@ -506,11 +506,7 @@ ORDER BY grouped.user_id, grouped.torrent_id, grouped.info_hash_v1`,
 		); err != nil {
 			return nil, fmt.Errorf("scan corrected Tracker item: %w", err)
 		}
-		if item.UserID == uuid.Nil || item.TorrentID < 1 || len(infoHash) != len(item.InfoHashV1) ||
-			item.ActiveSeconds < 1 || item.ActiveSeconds > 3600 || item.RawUploaded < 0 ||
-			item.SnapshotSeeders < 0 || item.SourceCount < 1 || item.FirstSequence < 1 ||
-			item.LastSequence < item.FirstSequence || item.LastSequence > fence ||
-			item.ActiveSeconds < originalActiveSeconds || item.RawUploaded < originalRawUploaded {
+		if !validCorrectedTrackerItem(item, len(infoHash), originalActiveSeconds, originalRawUploaded, fence) {
 			return nil, ErrInvariant
 		}
 		copy(item.InfoHashV1[:], infoHash)
@@ -532,6 +528,23 @@ ORDER BY grouped.user_id, grouped.torrent_id, grouped.info_hash_v1`,
 		return nil, fmt.Errorf("finish corrected Tracker items: %w", err)
 	}
 	return items, nil
+}
+
+func validCorrectedTrackerItem(
+	item correctedTrackerItem,
+	infoHashLength int,
+	originalActiveSeconds int64,
+	originalRawUploaded int64,
+	fence int64,
+) bool {
+	// The immutable evidence schema allows zero active seconds. Sub-second
+	// intervals are intentionally truncated to whole seconds by the original
+	// assembler and must remain valid when an old settled window is replayed.
+	return item.UserID != uuid.Nil && item.TorrentID > 0 && infoHashLength == len(item.InfoHashV1) &&
+		item.ActiveSeconds >= 0 && item.ActiveSeconds <= 3600 && item.RawUploaded >= 0 &&
+		item.SnapshotSeeders >= 0 && item.SourceCount > 0 && item.FirstSequence > 0 &&
+		item.LastSequence >= item.FirstSequence && item.LastSequence <= fence &&
+		item.ActiveSeconds >= originalActiveSeconds && item.RawUploaded >= originalRawUploaded
 }
 
 func correctedWindowSHA256(window rewardWindow, fence int64, items []correctedTrackerItem) ([sha256.Size]byte, error) {

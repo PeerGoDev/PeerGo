@@ -52,3 +52,18 @@ func TestCompensationManifestBindsTrackerStream(t *testing.T) {
 		t.Fatal("compensation manifest did not retain its Tracker watermark")
 	}
 }
+
+func TestCorrectedTrackerItemAllowsLegacySubSecondInterval(t *testing.T) {
+	item := correctedTrackerItem{
+		UserID:    uuid.MustParse("0198f20a-6da8-7e51-9c64-111111111111"),
+		TorrentID: 1, ActiveSeconds: 0, RawUploaded: 0,
+		SourceCount: 1, FirstSequence: 1, LastSequence: 1,
+	}
+	if !validCorrectedTrackerItem(item, len(item.InfoHashV1), 0, 0, 1) {
+		t.Fatal("a legacy sub-second interval should remain valid after whole-second truncation")
+	}
+	item.ActiveSeconds = -1
+	if validCorrectedTrackerItem(item, len(item.InfoHashV1), 0, 0, 1) {
+		t.Fatal("negative active time must remain invalid")
+	}
+}
