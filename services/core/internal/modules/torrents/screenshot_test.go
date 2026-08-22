@@ -50,6 +50,26 @@ func TestPrepareTorrentScreenshotsRejectsSourceAboveTwoMiB(t *testing.T) {
 	}
 }
 
+func TestStoredScreenshotMetadataKeepsLegacyEnvelopeSeparateFromLiveAdmission(t *testing.T) {
+	t.Parallel()
+
+	// 4096x6144 is present in the audited Rousi archive. It is just above the
+	// 25 MP live-upload limit, but remains within the migration-only 100 MP
+	// envelope and must be readable after object verification.
+	if !validStoredScreenshotMetadata("image/jpeg", 2_075_681, 4096, 6144) {
+		t.Fatal("verified legacy screenshot should remain readable")
+	}
+	if validStoredScreenshotMetadata("image/jpeg", 2_075_681, 10_001, 10_000) {
+		t.Fatal("stored screenshot above the migration pixel envelope was accepted")
+	}
+	if validStoredScreenshotMetadata("image/jpeg", MaxStoredTorrentScreenshotBytes+1, 4096, 6144) {
+		t.Fatal("stored screenshot above the migration byte envelope was accepted")
+	}
+	if validStoredScreenshotMetadata("image/svg+xml", 1024, 4096, 6144) {
+		t.Fatal("unsupported stored screenshot type was accepted")
+	}
+}
+
 func TestStoreAndVerifyTorrentScreenshotsUsesContentAddressedObjectStore(t *testing.T) {
 	t.Parallel()
 

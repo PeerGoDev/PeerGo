@@ -23,6 +23,12 @@ const (
 	MaxStoredTorrentScreenshotBytes = 16 << 20
 	maxScreenshotDimension          = 32768
 	maxScreenshotPixels             = 25_000_000
+	// The immutable Rousi archive contains a small number of high-resolution
+	// originals above the live-upload pixel budget. They were admitted by the
+	// audited migration and are served only after their stored descriptor and
+	// location have been verified. Keeping this separate prevents the legacy
+	// compatibility envelope from weakening new upload admission.
+	maxStoredScreenshotPixels = 100_000_000
 )
 
 type TorrentScreenshotInput struct {
@@ -113,6 +119,14 @@ func supportedStoredScreenshotType(contentType string) bool {
 	}
 	_, _, ok := supportedScreenshotType(contentType)
 	return ok
+}
+
+func validStoredScreenshotMetadata(contentType string, byteLength, width, height int64) bool {
+	return supportedStoredScreenshotType(contentType) &&
+		byteLength >= 1 && byteLength <= MaxStoredTorrentScreenshotBytes &&
+		width >= 1 && width <= maxScreenshotDimension &&
+		height >= 1 && height <= maxScreenshotDimension &&
+		width*height <= maxStoredScreenshotPixels
 }
 
 func screenshotMetadata(prepared []preparedTorrentScreenshot) []TorrentScreenshot {

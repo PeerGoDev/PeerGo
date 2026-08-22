@@ -171,11 +171,8 @@ func (repository *PostgresTorrentReadRepository) PublishedScreenshotSource(ctx c
 		return PublicScreenshotSource{}, fmt.Errorf("get published torrent screenshot object: %w", err)
 	}
 	if object.TorrentID != int64(torrentID) || object.Position != int16(position) || object.ObjectID == uuid.Nil ||
-		len(object.ContentSha256) != 32 || object.ByteLength < 1 || object.ByteLength > MaxStoredTorrentScreenshotBytes ||
-		object.Width < 1 || object.Height < 1 || int64(object.Width)*int64(object.Height) > maxScreenshotPixels {
-		return PublicScreenshotSource{}, ErrTorrentReadInvariant
-	}
-	if !supportedStoredScreenshotType(object.ContentType) {
+		len(object.ContentSha256) != 32 ||
+		!validStoredScreenshotMetadata(object.ContentType, object.ByteLength, int64(object.Width), int64(object.Height)) {
 		return PublicScreenshotSource{}, ErrTorrentReadInvariant
 	}
 	var digest ObjectSHA256
@@ -231,12 +228,7 @@ func (repository *PostgresTorrentReadRepository) PublishedCoverSource(ctx contex
 		return PublicCoverSource{}, fmt.Errorf("get published torrent cover object: %w", err)
 	}
 	if object.TorrentID != int64(torrentID) || object.ObjectID == uuid.Nil || len(object.ContentSha256) != 32 ||
-		object.ByteLength < 1 || object.ByteLength > MaxStoredTorrentScreenshotBytes ||
-		object.Width < 1 || object.Height < 1 ||
-		int64(object.Width)*int64(object.Height) > maxScreenshotPixels {
-		return PublicCoverSource{}, ErrTorrentReadInvariant
-	}
-	if !supportedStoredScreenshotType(object.ContentType) {
+		!validStoredScreenshotMetadata(object.ContentType, object.ByteLength, int64(object.Width), int64(object.Height)) {
 		return PublicCoverSource{}, ErrTorrentReadInvariant
 	}
 	var digest ObjectSHA256

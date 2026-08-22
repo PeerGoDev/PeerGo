@@ -1,5 +1,5 @@
 .PHONY: generate format test check test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
-.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-hnr-work-reconcile
+.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-hnr-work-reconcile production-traffic-pipeline-reconfigure
 
 # These values are synthetic and limited to the loopback-only local Compose
 # environment. Production processes require explicit secret-backed variables.
@@ -996,6 +996,19 @@ production-down: production-config
 
 production-status: production-config
 	./scripts/production-compose.sh ps
+
+# Reconfigure the three ordered traffic stages after changing their bounded
+# concurrency values in .env.production. The Core durable is updated in place
+# before its projector restarts; its delivery position is never deleted or
+# recreated. Running only `compose up --force-recreate` would correctly fail
+# closed because MaxAckPending would still describe the previous concurrency.
+production-traffic-pipeline-reconfigure: production-ready
+	./scripts/production-compose.sh stop core-traffic-projector
+	./scripts/production-compose.sh run --rm --no-deps core-traffic-consumer-init
+	./scripts/production-compose.sh up -d --no-deps --force-recreate --wait \
+		settlement-policy-worker \
+		settlement-traffic-dispatcher \
+		core-traffic-projector
 
 # Run only after the administrator has reviewed registration, newcomer,
 # promotion and H&R policies, and sent a real test email from the backend.
