@@ -100,7 +100,7 @@ export function TorrentDownloadButton({
   const buttonLabel = purchaseChecking
     ? "检查权限…"
     : purchaseRequired && purchaseStatus.data
-      ? `购买并下载 · ${purchaseStatus.data.price} 魔力`
+      ? "购买并下载"
       : download.isPending
         ? "正在生成…"
         : "下载种子"
