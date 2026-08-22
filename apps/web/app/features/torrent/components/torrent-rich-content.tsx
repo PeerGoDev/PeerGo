@@ -169,45 +169,82 @@ export function TorrentMediaInfoCard({ mediaInfo }: { mediaInfo: string }) {
 }
 
 function MediaInfoSummaryList({ summary }: { summary: MediaInfoSummary }) {
-  const videoFacts = [
+  const videoFacts: [string, string | undefined][] = [
     ["时长", summary.duration],
     ["分辨率", summary.resolution],
-    ["比特率", summary.overallBitRate],
-    ["HDR", summary.bitDepth],
+    ["比特率", summary.videoBitRate || summary.overallBitRate],
+    ["HDR", mediaInfoHdrLabel(summary)],
     ["帧率", summary.frameRate],
     ["档次", summary.profile],
     ["格式", summary.videoFormat],
-  ].filter((fact): fact is [string, string] => Boolean(fact[1]))
+  ]
+  if (!summary.hdr && summary.bitDepth) {
+    videoFacts.splice(3, 0, ["位深", summary.bitDepth])
+  }
+  const visibleVideoFacts = videoFacts.filter(
+    (fact): fact is [string, string] => Boolean(fact[1])
+  )
 
   return (
-    <div className="grid gap-x-8 gap-y-1 text-sm sm:grid-cols-3">
+    <div className="grid gap-x-8 gap-y-3 text-sm md:grid-cols-3 md:gap-y-1">
       <dl className="flex flex-col gap-1">
-        {videoFacts.map(([label, value]) => (
+        {visibleVideoFacts.map(([label, value]) => (
           <MediaInfoFact key={label} label={label} value={value} />
         ))}
       </dl>
-      <dl className="flex flex-col gap-1">
-        {summary.audioTracks.map((value, index) => (
-          <MediaInfoFact
-            key={`audio-${index}`}
-            label={`音轨 #${index + 1}`}
-            value={value}
-            track
-          />
-        ))}
-      </dl>
-      <dl className="flex flex-col gap-1">
-        {summary.subtitleTracks.map((value, index) => (
-          <MediaInfoFact
-            key={`subtitle-${index}`}
-            label={`字幕 #${index + 1}`}
-            value={value}
-            track
-          />
-        ))}
-      </dl>
+      <MediaInfoTrackList kind="音轨" tracks={summary.audioTracks} />
+      <MediaInfoTrackList kind="字幕" tracks={summary.subtitleTracks} />
     </div>
   )
+}
+
+function MediaInfoTrackList({
+  kind,
+  tracks,
+}: {
+  kind: "音轨" | "字幕"
+  tracks: string[]
+}) {
+  const [expanded, setExpanded] = React.useState(false)
+  const visibleTrackLimit = 5
+  const visibleTracks = expanded ? tracks : tracks.slice(0, visibleTrackLimit)
+  const hiddenTrackCount = tracks.length - visibleTrackLimit
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <dl className="flex flex-col gap-1">
+        {visibleTracks.map((value, index) => (
+          <MediaInfoFact
+            key={`${kind}-${index}`}
+            label={`${kind} #${index + 1}`}
+            value={value}
+            track
+          />
+        ))}
+      </dl>
+      {hiddenTrackCount > 0 ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          className="inline-flex w-fit items-center gap-1 text-sm text-primary hover:underline"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <ChevronDownIcon
+            className={cn(
+              "size-3.5 transition-transform",
+              expanded && "rotate-180"
+            )}
+          />
+          {expanded ? "收起" : `展开更多${kind} (${hiddenTrackCount})`}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function mediaInfoHdrLabel(summary: MediaInfoSummary) {
+  if (!summary.hdr) return undefined
+  return [summary.hdr, summary.bitDepth].filter(Boolean).join(" / ")
 }
 
 function MediaInfoFact({

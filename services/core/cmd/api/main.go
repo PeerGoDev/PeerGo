@@ -497,6 +497,7 @@ func main() {
 		torrentAdministrationRepository,
 		authorizationService,
 		time.Now,
+		trackerOperationsClient,
 	)
 	if err != nil {
 		logger.Error("compose torrent administration service", "error", err)

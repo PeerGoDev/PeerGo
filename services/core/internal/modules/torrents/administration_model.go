@@ -20,6 +20,7 @@ var (
 	ErrManagedTorrentIdempotencyConflict = errors.New("torrent lifecycle idempotency key was reused")
 	ErrManagedTorrentCategoryUnavailable = errors.New("managed torrent category is unavailable")
 	ErrManagedTorrentObjectUnavailable   = errors.New("managed torrent object has no verified location")
+	ErrManagedTorrentPeersUnavailable    = errors.New("managed torrent active peers are unavailable")
 )
 
 // ManagedTorrent is the bounded staff projection used by the torrent
@@ -74,6 +75,48 @@ type ManagedTorrentPage struct {
 	Total       int64
 	Limit       int
 	Offset      int
+}
+
+// ManagedTorrentPeerTarget is the minimum persisted identity required to ask
+// Tracker for a live swarm. It does not copy peer activity into Core storage.
+type ManagedTorrentPeerTarget struct {
+	TorrentID      TorrentID
+	InfoHashV1     InfoHashV1
+	TotalSizeBytes int64
+	UploaderID     uuid.UUID
+}
+
+type ManagedTorrentPeerIdentity struct {
+	UserID      uuid.UUID
+	NumericID   int64
+	Username    string
+	DisplayName string
+}
+
+// ManagedTorrentPeer groups one user's currently active Tracker connections.
+// Endpoint and session identifiers are intentionally absent.
+type ManagedTorrentPeer struct {
+	UserID              uuid.UUID
+	NumericID           int64
+	Username            string
+	DisplayName         string
+	ClientFamilies      []string
+	ActiveConnections   int
+	SeedingConnections  int
+	LeechingConnections int
+	ProgressBasisPoints int
+	Uploaded            int64
+	Downloaded          int64
+	LastAnnounce        time.Time
+	Uploader            bool
+}
+
+type ManagedTorrentPeerList struct {
+	TorrentID        TorrentID
+	Items            []ManagedTorrentPeer
+	TotalConnections int
+	Truncated        bool
+	GeneratedAt      time.Time
 }
 
 type ManagedTorrentQuery struct {

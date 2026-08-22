@@ -999,6 +999,44 @@ ManagedTorrentsPath:
       default:
         $ref: "../responses.yaml#/ProblemResponse"
 
+ManagedTorrentPeersPath:
+  get:
+    operationId: listManagedTorrentPeers
+    summary: 查看单个已发布种子的实时活跃用户
+    description: >-
+      仅从 Tracker 的 TTL 内存状态读取最多 200 个连接并按用户聚合；不持久化
+      单次汇报，也不返回 IP、端口、passkey、peer ID 或会话标识。
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: torrent.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: 当前 Tracker 进程内的有界活跃用户视图。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/ManagedTorrentPeerList"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
 ManagedPublishedTorrentContentChangesPath:
   get:
     operationId: listManagedPublishedTorrentContentChanges

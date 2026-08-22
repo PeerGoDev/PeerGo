@@ -46,6 +46,49 @@ func NewPostgresTorrentAdministrationRepository(
 	}, nil
 }
 
+func (repository *PostgresTorrentAdministrationRepository) ManagedPeerTarget(ctx context.Context, torrentID TorrentID) (ManagedTorrentPeerTarget, error) {
+	row, err := torrentdb.New(repository.pool).GetManagedTorrentPeerTarget(ctx, int64(torrentID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ManagedTorrentPeerTarget{}, ErrManagedTorrentNotFound
+	}
+	if err != nil {
+		return ManagedTorrentPeerTarget{}, fmt.Errorf("get managed torrent peer target: %w", err)
+	}
+	if row.ID != int64(torrentID) || len(row.InfoHashV1) != 20 || row.TotalSizeBytes < 1 || row.UploaderID == uuid.Nil {
+		return ManagedTorrentPeerTarget{}, ErrTorrentReadInvariant
+	}
+	var infoHash InfoHashV1
+	copy(infoHash[:], row.InfoHashV1)
+	return ManagedTorrentPeerTarget{
+		TorrentID: torrentID, InfoHashV1: infoHash, TotalSizeBytes: row.TotalSizeBytes, UploaderID: row.UploaderID,
+	}, nil
+}
+
+func (repository *PostgresTorrentAdministrationRepository) ManagedPeerIdentities(ctx context.Context, userIDs []uuid.UUID) ([]ManagedTorrentPeerIdentity, error) {
+	if len(userIDs) == 0 {
+		return []ManagedTorrentPeerIdentity{}, nil
+	}
+	rows, err := torrentdb.New(repository.pool).ListManagedTorrentPeerIdentities(ctx, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list managed torrent peer identities: %w", err)
+	}
+	result := make([]ManagedTorrentPeerIdentity, 0, len(rows))
+	seen := make(map[uuid.UUID]struct{}, len(rows))
+	for _, row := range rows {
+		if row.ID == uuid.Nil || row.NumericID < 1 || strings.TrimSpace(row.Username) == "" || strings.TrimSpace(row.DisplayName) == "" {
+			return nil, ErrTorrentReadInvariant
+		}
+		if _, exists := seen[row.ID]; exists {
+			return nil, ErrTorrentReadInvariant
+		}
+		seen[row.ID] = struct{}{}
+		result = append(result, ManagedTorrentPeerIdentity{
+			UserID: row.ID, NumericID: row.NumericID, Username: row.Username, DisplayName: row.DisplayName,
+		})
+	}
+	return result, nil
+}
+
 func (repository *PostgresTorrentAdministrationRepository) ListManaged(ctx context.Context, query ManagedTorrentQuery) (ManagedTorrentPage, error) {
 	query, err := normalizeManagedTorrentQuery(query)
 	if err != nil {

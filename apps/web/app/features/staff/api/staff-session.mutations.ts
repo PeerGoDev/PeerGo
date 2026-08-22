@@ -42,8 +42,8 @@ export const staffSessionQueryOptions = queryOptions({
   retry: false,
 })
 
-export function useStaffSession() {
-  return useQuery(staffSessionQueryOptions)
+export function useStaffSession(enabled = true) {
+  return useQuery({ ...staffSessionQueryOptions, enabled })
 }
 
 export function useElevateStaffSession() {

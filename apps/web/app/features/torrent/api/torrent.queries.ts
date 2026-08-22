@@ -11,6 +11,8 @@ export type TorrentPublicContent = components["schemas"]["TorrentPublicContent"]
 export type TorrentRelatedVersions =
   components["schemas"]["TorrentRelatedVersions"]
 export type TorrentSwarmOverview = components["schemas"]["TorrentSwarmOverview"]
+export type ManagedTorrentPeerList =
+  components["schemas"]["ManagedTorrentPeerList"]
 export type TorrentFilePage = components["schemas"]["TorrentFilePage"]
 export type MyTorrentSubmissionPage =
   components["schemas"]["MyTorrentSubmissionPage"]
@@ -48,6 +50,8 @@ export const torrentKeys = {
     [...torrentKeys.detail(torrentId), "related"] as const,
   swarm: (torrentId: TorrentID) =>
     [...torrentKeys.detail(torrentId), "swarm"] as const,
+  managedPeers: (torrentId: TorrentID) =>
+    [...torrentKeys.detail(torrentId), "managed-peers"] as const,
   files: (torrentId: TorrentID, limit: number, offset: number) =>
     [...torrentKeys.detail(torrentId), "files", { limit, offset }] as const,
   mySubmissions: (userId: string, limit: number) =>
@@ -75,6 +79,25 @@ export function torrentSwarmQueryOptions(torrentId: TorrentID) {
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
+    retry: false,
+  })
+}
+
+export function managedTorrentPeersQueryOptions(torrentId: TorrentID) {
+  return queryOptions({
+    queryKey: torrentKeys.managedPeers(torrentId),
+    queryFn: async (): Promise<ManagedTorrentPeerList> => {
+      const { data, error, response } = await apiClient.GET(
+        "/api/v1/admin/torrents/{torrent_id}/peers",
+        { params: { path: { torrent_id: torrentId } } }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    staleTime: 10_000,
+    refetchInterval: 30_000,
     retry: false,
   })
 }
@@ -296,6 +319,13 @@ export function useTorrentRelatedVersions(
 export function useTorrentSwarm(torrentId: TorrentID, enabled = true) {
   return useQuery({
     ...torrentSwarmQueryOptions(torrentId),
+    enabled,
+  })
+}
+
+export function useManagedTorrentPeers(torrentId: TorrentID, enabled = true) {
+  return useQuery({
+    ...managedTorrentPeersQueryOptions(torrentId),
     enabled,
   })
 }

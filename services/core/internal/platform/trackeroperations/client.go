@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/peergo/peergo/contracts/go/trackerannouncev1"
 	"github.com/peergo/peergo/contracts/go/trackeroperationsv1"
 )
 
@@ -24,6 +25,7 @@ const responseLimit = 1 << 20
 
 type Client struct {
 	endpoint     string
+	origin       string
 	serviceToken string
 	httpClient   *http.Client
 }
@@ -40,14 +42,54 @@ func NewClient(origin, serviceToken string, timeout time.Duration) (*Client, err
 	if timeout <= 0 {
 		timeout = 3 * time.Second
 	}
+	baseOrigin := strings.TrimSuffix(parsed.String(), "/")
 	parsed.Path = "/internal/v1/operations/runtime"
 	return &Client{
-		endpoint: parsed.String(), serviceToken: serviceToken,
+		endpoint: parsed.String(), origin: baseOrigin, serviceToken: serviceToken,
 		httpClient: &http.Client{
 			Timeout:       timeout,
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
 	}, nil
+}
+
+// ActivePeers reads a bounded live-swarm view from Tracker memory. The
+// response contains no endpoint, peer ID, passkey or durable session token.
+func (client *Client) ActivePeers(ctx context.Context, infoHashV1 string, limit int) (trackeroperationsv1.ActivePeerPage, error) {
+	if _, err := trackerannouncev1.DecodeInfoHashV1(infoHashV1); err != nil || limit < 1 || limit > trackeroperationsv1.MaxActivePeerLimit {
+		return trackeroperationsv1.ActivePeerPage{}, errors.New("Tracker active peer query is invalid")
+	}
+	endpoint := fmt.Sprintf("%s/internal/v1/operations/swarms/%s/peers?limit=%d", client.origin, infoHashV1, limit)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return trackeroperationsv1.ActivePeerPage{}, fmt.Errorf("create Tracker active peer request: %w", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+client.serviceToken)
+	request.Header.Set("Accept", "application/json")
+	response, err := client.httpClient.Do(request)
+	if err != nil {
+		return trackeroperationsv1.ActivePeerPage{}, fmt.Errorf("read Tracker active peers: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, responseLimit))
+		return trackeroperationsv1.ActivePeerPage{}, fmt.Errorf("Tracker active peers returned status %d", response.StatusCode)
+	}
+	payload, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
+	if err != nil || len(payload) > responseLimit {
+		return trackeroperationsv1.ActivePeerPage{}, errors.New("Tracker returned an invalid active peer response")
+	}
+	var page trackeroperationsv1.ActivePeerPage
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&page); err != nil || !page.Valid(limit) {
+		return trackeroperationsv1.ActivePeerPage{}, errors.New("Tracker returned an invalid active peer response")
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return trackeroperationsv1.ActivePeerPage{}, errors.New("Tracker active peer response has trailing data")
+	}
+	return page, nil
 }
 
 func (client *Client) Runtime(ctx context.Context) (trackeroperationsv1.Runtime, error) {

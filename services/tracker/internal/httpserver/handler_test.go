@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/peergo/peergo/contracts/go/trackerannouncev1"
 	"github.com/peergo/peergo/contracts/go/trackercontrolv1"
+	"github.com/peergo/peergo/contracts/go/trackeroperationsv1"
 	"github.com/peergo/peergo/contracts/go/trackerruntimepolicyv1"
 	"github.com/peergo/peergo/contracts/go/trackersubjectcontrolv1"
 	"github.com/peergo/peergo/services/tracker/internal/announceevent"
@@ -21,6 +23,44 @@ import (
 	"github.com/peergo/peergo/services/tracker/internal/subjectcontrol"
 	"github.com/peergo/peergo/services/tracker/internal/swarm"
 )
+
+func TestHandlerServesAuthenticatedBoundedActivePeersWithoutEndpoints(t *testing.T) {
+	t.Parallel()
+	const passkey = "00112233445566778899aabbccddeeff"
+	const serviceToken = "peergo-test-tracker-service-token-2026"
+	var hash [20]byte
+	copy(hash[:], "aaaaaaaaaaaaaaaaaaaa")
+	handler, _ := testHandler(t, hash, passkey, true)
+	handler.config.Operations = &OperationsConfig{ServiceToken: serviceToken}
+
+	announce := httptest.NewRequest(http.MethodGet, "/tracker/"+passkey+"/announce?"+announceQuery("aaaaaaaaaaaaaaaaaaaa", "-qB4600-abcdefghijkl", 100), nil)
+	announce.RemoteAddr = "192.0.2.10:50000"
+	announceResponse := httptest.NewRecorder()
+	handler.ServeHTTP(announceResponse, announce)
+	if bytes.Contains(announceResponse.Body.Bytes(), []byte("failure reason")) {
+		t.Fatalf("announce failed: %q", announceResponse.Body.Bytes())
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/internal/v1/operations/swarms/"+strings.Repeat("61", 20)+"/peers?limit=10", nil)
+	request.Header.Set("Authorization", "Bearer "+serviceToken)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || bytes.Contains(response.Body.Bytes(), []byte("192.0.2.10")) ||
+		bytes.Contains(response.Body.Bytes(), []byte("6881")) || bytes.Contains(response.Body.Bytes(), []byte("peer_id")) {
+		t.Fatalf("active peer response status=%d body=%s", response.Code, response.Body.String())
+	}
+	var page trackeroperationsv1.ActivePeerPage
+	if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil || !page.Valid(10) || len(page.Items) != 1 ||
+		page.Items[0].ClientFamily != "qbittorrent" {
+		t.Fatalf("active peer page=%+v error=%v", page, err)
+	}
+
+	denied := httptest.NewRecorder()
+	handler.ServeHTTP(denied, httptest.NewRequest(http.MethodGet, request.URL.String(), nil))
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("unauthenticated status=%d", denied.Code)
+	}
+}
 
 type torrentAdmissionFixture struct {
 	hash               [20]byte

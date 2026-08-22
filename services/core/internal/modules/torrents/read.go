@@ -268,6 +268,13 @@ func (service *TorrentReadService) ChangeAvailability(ctx context.Context, actor
 	return service.administration.ChangeAvailability(ctx, actor, input)
 }
 
+func (service *TorrentReadService) ManagedActivePeers(ctx context.Context, actor authz.StaffActor, torrentID TorrentID) (ManagedTorrentPeerList, error) {
+	if service.administration == nil {
+		return ManagedTorrentPeerList{}, ErrManagedTorrentPeersUnavailable
+	}
+	return service.administration.ActivePeers(ctx, actor, torrentID)
+}
+
 func (service *TorrentReadService) Cover(ctx context.Context, torrentID TorrentID) (PublicCover, error) {
 	if torrentID < 1 {
 		return PublicCover{}, ErrTorrentReadInput

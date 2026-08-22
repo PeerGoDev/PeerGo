@@ -27,6 +27,7 @@ type TorrentReadService interface {
 	Files(context.Context, torrents.TorrentID, int, int) (torrents.PublicFilePage, error)
 	MySubmissions(context.Context, string, int) (torrents.MySubmissionPage, error)
 	ListManaged(context.Context, authz.StaffActor, torrents.ManagedTorrentQuery) (torrents.ManagedTorrentPage, error)
+	ManagedActivePeers(context.Context, authz.StaffActor, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error)
 	ChangeAvailability(context.Context, authz.StaffActor, torrents.ChangeTorrentAvailabilityInput) (torrents.TorrentAvailabilityResult, error)
 }
 

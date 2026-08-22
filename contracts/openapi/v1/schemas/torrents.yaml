@@ -1561,6 +1561,70 @@ ManagedTorrentPage:
       minimum: 0
       maximum: 1000000
 
+ManagedTorrentPeer:
+  type: object
+  additionalProperties: false
+  required:
+    - user_id
+    - user_numeric_id
+    - username
+    - display_name
+    - client_families
+    - active_connections
+    - seeding_connections
+    - leeching_connections
+    - progress_basis_points
+    - uploaded
+    - downloaded
+    - last_announce
+    - uploader
+  properties:
+    user_id: { type: string, format: uuid }
+    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    display_name: { type: string, minLength: 1, maxLength: 80 }
+    client_families:
+      type: array
+      maxItems: 8
+      uniqueItems: true
+      items:
+        type: string
+        minLength: 1
+        maxLength: 32
+    active_connections: { type: integer, minimum: 1, maximum: 200 }
+    seeding_connections: { type: integer, minimum: 0, maximum: 200 }
+    leeching_connections: { type: integer, minimum: 0, maximum: 200 }
+    progress_basis_points: { type: integer, minimum: 0, maximum: 10000 }
+    uploaded:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+      description: 该用户活跃连接所汇报的最大累计上传字节数。
+    downloaded:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+      description: 该用户活跃连接所汇报的最大累计下载字节数。
+    last_announce: { type: string, format: date-time }
+    uploader: { type: boolean }
+
+ManagedTorrentPeerList:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, items, total_connections, truncated, generated_at]
+  properties:
+    torrent_id: { type: integer, format: int64, minimum: 1 }
+    items:
+      type: array
+      maxItems: 200
+      items:
+        $ref: "#/ManagedTorrentPeer"
+    total_connections:
+      type: integer
+      minimum: 0
+      maximum: 200
+      description: 本次有界读取中返回的活跃连接数；truncated 为 true 时仍有更多连接。
+    truncated: { type: boolean }
+    generated_at: { type: string, format: date-time }
+
 ChangeTorrentAvailabilityRequest:
   type: object
   additionalProperties: false

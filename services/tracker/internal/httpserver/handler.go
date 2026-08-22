@@ -56,6 +56,7 @@ type SubjectAdmission interface {
 
 type SwarmEngine interface {
 	Announce(swarm.Request) (swarm.Result, error)
+	ActivePeers([20]byte, time.Time, int) ([]swarm.ActivePeer, bool)
 }
 
 type SwarmScraper interface {
@@ -182,6 +183,10 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.serveOperationsRuntime(response, request)
 		return
 	}
+	if strings.HasPrefix(request.URL.Path, "/internal/v1/operations/swarms/") {
+		handler.serveOperationsActivePeers(response, request)
+		return
+	}
 	startedAt := time.Now()
 	observation := RequestObservation{
 		Action: "unknown", Result: "failure_other", AddressFamily: "unknown",
@@ -202,9 +207,7 @@ func (handler *Handler) serveOperationsRuntime(response http.ResponseWriter, req
 		http.NotFound(response, request)
 		return
 	}
-	expected := []byte("Bearer " + operations.ServiceToken)
-	actual := []byte(request.Header.Get("Authorization"))
-	if len(actual) != len(expected) || subtle.ConstantTimeCompare(actual, expected) != 1 {
+	if !operationsAuthorized(request, operations.ServiceToken) {
 		handler.writeJSON(response, http.StatusForbidden, map[string]string{"code": "service_auth_failed"})
 		return
 	}
@@ -214,6 +217,63 @@ func (handler *Handler) serveOperationsRuntime(response http.ResponseWriter, req
 		applyRuntimePolicy(&runtime, handler.policy.CurrentStatus(), policy)
 	}
 	handler.writeJSON(response, http.StatusOK, runtime)
+}
+
+func (handler *Handler) serveOperationsActivePeers(response http.ResponseWriter, request *http.Request) {
+	operations := handler.config.Operations
+	if operations == nil || request.Method != http.MethodGet || request.ContentLength > 0 || len(request.TransferEncoding) != 0 {
+		http.NotFound(response, request)
+		return
+	}
+	if !operationsAuthorized(request, operations.ServiceToken) {
+		handler.writeJSON(response, http.StatusForbidden, map[string]string{"code": "service_auth_failed"})
+		return
+	}
+	prefix := "/internal/v1/operations/swarms/"
+	remainder := strings.TrimPrefix(request.URL.Path, prefix)
+	infoHashText, found := strings.CutSuffix(remainder, "/peers")
+	if !found || strings.Contains(infoHashText, "/") {
+		http.NotFound(response, request)
+		return
+	}
+	infoHash, err := trackerannouncev1.DecodeInfoHashV1(infoHashText)
+	if err != nil {
+		http.NotFound(response, request)
+		return
+	}
+	limit := 100
+	query := request.URL.Query()
+	if len(query) > 1 || (len(query) == 1 && !query.Has("limit")) || len(query["limit"]) > 1 {
+		handler.writeJSON(response, http.StatusBadRequest, map[string]string{"code": "invalid_peer_query"})
+		return
+	}
+	if value := query.Get("limit"); value != "" {
+		parsed, parseErr := strconv.Atoi(value)
+		if parseErr != nil || parsed < 1 || parsed > trackeroperationsv1.MaxActivePeerLimit {
+			handler.writeJSON(response, http.StatusBadRequest, map[string]string{"code": "invalid_peer_query"})
+			return
+		}
+		limit = parsed
+	}
+	now := handler.now().UTC().Round(0)
+	active, truncated := handler.swarms.ActivePeers(infoHash, now, limit)
+	items := make([]trackeroperationsv1.ActivePeer, 0, len(active))
+	for _, peer := range active {
+		items = append(items, trackeroperationsv1.ActivePeer{
+			UserID: peer.UserID, ClientFamily: peer.ClientFamily,
+			Uploaded: peer.Uploaded, Downloaded: peer.Downloaded, Left: peer.Left,
+			LastAnnounce: peer.LastAnnounce.UTC().Round(0),
+		})
+	}
+	handler.writeJSON(response, http.StatusOK, trackeroperationsv1.ActivePeerPage{
+		GeneratedAt: now, Items: items, Truncated: truncated,
+	})
+}
+
+func operationsAuthorized(request *http.Request, serviceToken string) bool {
+	expected := []byte("Bearer " + serviceToken)
+	actual := []byte(request.Header.Get("Authorization"))
+	return len(actual) == len(expected) && subtle.ConstantTimeCompare(actual, expected) == 1
 }
 
 func (handler *Handler) serveTracker(response http.ResponseWriter, request *http.Request, observation *RequestObservation) {
@@ -275,8 +335,10 @@ func (handler *Handler) serveTracker(response http.ResponseWriter, request *http
 		return
 	}
 	observation.Event = announceEventLabel(announce.Event)
+	clientFamily := "unknown"
 	if identity, identified := clientpolicy.Identify(announce.PeerID); identified {
 		observation.ClientFamily = string(identity.Family)
+		clientFamily = string(identity.Family)
 	}
 	if !clientpolicy.Allowed(policy, announce.PeerID) {
 		handler.writeTracker(response, protocol.EncodeFailure("client not allowed"))
@@ -302,7 +364,8 @@ func (handler *Handler) serveTracker(response http.ResponseWriter, request *http
 	result, err := handler.swarms.Announce(swarm.Request{
 		InfoHash: announce.InfoHash, UserID: subjectAdmission.Subject.UserID, PeerID: announce.PeerID,
 		Key: announce.Key, Endpoint: netip.AddrPortFrom(address, announce.Port),
-		Left: announce.Left, Downloaded: announce.Downloaded, Event: announce.Event, NumWant: announce.NumWant, Now: now,
+		ClientFamily: clientFamily, Left: announce.Left, Uploaded: announce.Uploaded,
+		Downloaded: announce.Downloaded, Event: announce.Event, NumWant: announce.NumWant, Now: now,
 	})
 	if errors.Is(err, swarm.ErrCapacity) {
 		handler.writeTracker(response, protocol.EncodeFailure("tracker busy"))

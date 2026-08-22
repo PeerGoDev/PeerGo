@@ -56,6 +56,59 @@ func (h *Handler) ListManagedTorrents(ctx context.Context, request generated.Lis
 	return generated.ListManagedTorrents200JSONResponse(managedTorrentPageDTO(page)), nil
 }
 
+func (h *Handler) ListManagedTorrentPeers(ctx context.Context, request generated.ListManagedTorrentPeersRequestObject) (generated.ListManagedTorrentPeersResponseObject, error) {
+	session, authenticationProblem, err := h.authenticateStaffRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.ListManagedTorrentPeers401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.ListManagedTorrentPeers403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	page, err := h.torrentRead.ManagedActivePeers(ctx, staffActor(session), torrents.TorrentID(request.TorrentId))
+	switch {
+	case errors.Is(err, torrents.ErrTorrentAdministrationInput):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_torrent_peer_query", "用户列表查询无效", "种子编号无效。")
+		return generated.ListManagedTorrentPeers400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, authz.ErrForbidden):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "torrent_management_read_denied", "无法查看实时用户", "当前后台身份没有 torrent.manage.read 权限。")
+		return generated.ListManagedTorrentPeers403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrManagedTorrentNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "torrent_not_found", "种子不可用", "该种子不存在或当前未发布。")
+		return generated.ListManagedTorrentPeers404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrManagedTorrentPeersUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "torrent_peers_unavailable", "实时用户暂时不可用", "Tracker 当前无法提供实时用户，请稍后重试。")
+		return generated.ListManagedTorrentPeersdefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.ListManagedTorrentPeers200JSONResponse{
+		Body:    managedTorrentPeerListDTO(page),
+		Headers: generated.ListManagedTorrentPeers200ResponseHeaders{CacheControl: "private, no-store"},
+	}, nil
+}
+
+func managedTorrentPeerListDTO(page torrents.ManagedTorrentPeerList) generated.ManagedTorrentPeerList {
+	items := make([]generated.ManagedTorrentPeer, 0, len(page.Items))
+	for _, peer := range page.Items {
+		items = append(items, generated.ManagedTorrentPeer{
+			UserId: peer.UserID, UserNumericId: peer.NumericID, Username: peer.Username, DisplayName: peer.DisplayName,
+			ClientFamilies: peer.ClientFamilies, ActiveConnections: peer.ActiveConnections,
+			SeedingConnections: peer.SeedingConnections, LeechingConnections: peer.LeechingConnections,
+			ProgressBasisPoints: peer.ProgressBasisPoints, Uploaded: strconv.FormatInt(peer.Uploaded, 10),
+			Downloaded: strconv.FormatInt(peer.Downloaded, 10), LastAnnounce: peer.LastAnnounce, Uploader: peer.Uploader,
+		})
+	}
+	return generated.ManagedTorrentPeerList{
+		TorrentId: int64(page.TorrentID), Items: items, TotalConnections: page.TotalConnections,
+		Truncated: page.Truncated, GeneratedAt: page.GeneratedAt,
+	}
+}
+
 func (h *Handler) ChangeManagedTorrentAvailability(ctx context.Context, request generated.ChangeManagedTorrentAvailabilityRequestObject) (generated.ChangeManagedTorrentAvailabilityResponseObject, error) {
 	if request.Body == nil {
 		return changeManagedTorrentAvailabilityBadRequest(ctx), nil

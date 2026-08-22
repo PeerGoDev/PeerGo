@@ -74,6 +74,22 @@ FROM torrents.torrents
 GROUP BY state
 ORDER BY state;
 
+-- name: GetManagedTorrentPeerTarget :one
+SELECT
+    torrent.id,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
+    torrent.uploader_id
+FROM torrents.torrents AS torrent
+WHERE torrent.id = sqlc.arg(torrent_id)::bigint
+  AND torrent.state = 'published';
+
+-- name: ListManagedTorrentPeerIdentities :many
+SELECT users.id, users.numeric_id, users.username, users.display_name
+FROM identity.users AS users
+WHERE users.id = ANY(sqlc.arg(user_ids)::uuid[])
+ORDER BY lower(users.username), users.id;
+
 -- name: GetManagedTorrentLifecycleChange :one
 SELECT
     id,

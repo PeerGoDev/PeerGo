@@ -8,16 +8,19 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/peergo/peergo/contracts/go/trackeroperationsv1"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 )
 
 type torrentAdministrationRepositoryStub struct {
-	page          ManagedTorrentPage
-	result        TorrentAvailabilityResult
-	listQuery     ManagedTorrentQuery
-	changeCommand ChangeTorrentAvailabilityCommand
-	listCalls     int
-	changeCalls   int
+	page           ManagedTorrentPage
+	result         TorrentAvailabilityResult
+	listQuery      ManagedTorrentQuery
+	changeCommand  ChangeTorrentAvailabilityCommand
+	listCalls      int
+	changeCalls    int
+	peerTarget     ManagedTorrentPeerTarget
+	peerIdentities []ManagedTorrentPeerIdentity
 }
 
 func (stub *torrentAdministrationRepositoryStub) ListManaged(_ context.Context, query ManagedTorrentQuery) (ManagedTorrentPage, error) {
@@ -30,6 +33,23 @@ func (stub *torrentAdministrationRepositoryStub) ChangeAvailability(_ context.Co
 	stub.changeCalls++
 	stub.changeCommand = command
 	return stub.result, nil
+}
+
+func (stub *torrentAdministrationRepositoryStub) ManagedPeerTarget(_ context.Context, torrentID TorrentID) (ManagedTorrentPeerTarget, error) {
+	stub.peerTarget.TorrentID = torrentID
+	return stub.peerTarget, nil
+}
+
+func (stub *torrentAdministrationRepositoryStub) ManagedPeerIdentities(_ context.Context, _ []uuid.UUID) ([]ManagedTorrentPeerIdentity, error) {
+	return stub.peerIdentities, nil
+}
+
+type trackerPeerReaderStub struct {
+	page trackeroperationsv1.ActivePeerPage
+}
+
+func (stub trackerPeerReaderStub) ActivePeers(context.Context, string, int) (trackeroperationsv1.ActivePeerPage, error) {
+	return stub.page, nil
 }
 
 type torrentAdministrationAuthorizerStub struct {
@@ -119,6 +139,42 @@ func TestTorrentAdministrationRejectsInvalidInputBeforeAuthorization(t *testing.
 	}
 	if repository.changeCalls != 0 || len(authorizer.requests) != 0 {
 		t.Fatalf("invalid input reached dependencies: repository=%d authorization=%d", repository.changeCalls, len(authorizer.requests))
+	}
+}
+
+func TestTorrentAdministrationAggregatesBoundedTrackerPeersByUser(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 22, 12, 0, 0, 0, time.UTC)
+	uploaderID := uuid.MustParse("0198f20a-6da8-7e51-9c64-222222222222")
+	leecherID := uuid.MustParse("0198f20a-6da8-7e51-9c64-333333333333")
+	repository := &torrentAdministrationRepositoryStub{
+		peerTarget: ManagedTorrentPeerTarget{InfoHashV1: InfoHashV1{1}, TotalSizeBytes: 1_000, UploaderID: uploaderID},
+		peerIdentities: []ManagedTorrentPeerIdentity{
+			{UserID: uploaderID, NumericID: 7, Username: "uploader", DisplayName: "发布者"},
+			{UserID: leecherID, NumericID: 8, Username: "leecher", DisplayName: "下载者"},
+		},
+	}
+	tracker := trackerPeerReaderStub{page: trackeroperationsv1.ActivePeerPage{
+		GeneratedAt: now,
+		Items: []trackeroperationsv1.ActivePeer{
+			{UserID: uploaderID.String(), ClientFamily: "qbittorrent", Uploaded: 500, Downloaded: 100, Left: 0, LastAnnounce: now.Add(-time.Minute)},
+			{UserID: uploaderID.String(), ClientFamily: "qbittorrent", Uploaded: 500, Downloaded: 100, Left: 0, LastAnnounce: now.Add(-2 * time.Minute)},
+			{UserID: leecherID.String(), ClientFamily: "transmission", Uploaded: 20, Downloaded: 700, Left: 300, LastAnnounce: now.Add(-3 * time.Minute)},
+		},
+	}}
+	authorizer := &torrentAdministrationAuthorizerStub{decision: torrentAdministrationAllowedDecision(now)}
+	service, err := NewTorrentAdministrationService(repository, authorizer, func() time.Time { return now }, tracker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.ActivePeers(context.Background(), torrentAdministrationTestActor(), 42)
+	if err != nil || page.TotalConnections != 3 || len(page.Items) != 2 || !page.Items[0].Uploader ||
+		page.Items[0].ActiveConnections != 2 || page.Items[1].ProgressBasisPoints != 7000 {
+		t.Fatalf("ActivePeers() = %+v, err = %v", page, err)
+	}
+	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionTorrentManageRead ||
+		authorizer.requests[0].CredentialAudience != authz.AudienceStaffSession {
+		t.Fatalf("authorization requests = %+v", authorizer.requests)
 	}
 }
 

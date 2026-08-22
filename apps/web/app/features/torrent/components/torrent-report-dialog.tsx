@@ -49,9 +49,11 @@ const maximumDetailsCharacters = 1_000
 export function TorrentReportDialog({
   torrentId,
   torrentTitle,
+  compact = false,
 }: {
   torrentId: number
   torrentTitle: string
+  compact?: boolean
 }) {
   const session = useWebSession()
   const capabilities = useCapabilities(session.data?.user.id)
@@ -114,10 +116,17 @@ export function TorrentReportDialog({
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger
-        render={<Button variant="outline" className="h-9 w-full" />}
+        render={
+          <Button
+            variant="outline"
+            size={compact ? "icon" : "default"}
+            className={compact ? undefined : "h-9 w-full"}
+            aria-label={compact ? `举报“${torrentTitle}”` : undefined}
+          />
+        }
       >
         <FlagIcon data-icon="inline-start" />
-        举报种子
+        {compact ? null : "举报种子"}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

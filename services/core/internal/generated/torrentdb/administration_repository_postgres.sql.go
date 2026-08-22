@@ -229,6 +229,36 @@ func (q *Queries) GetManagedTorrentLifecycleChange(ctx context.Context, changeID
 	return i, err
 }
 
+const getManagedTorrentPeerTarget = `-- name: GetManagedTorrentPeerTarget :one
+SELECT
+    torrent.id,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
+    torrent.uploader_id
+FROM torrents.torrents AS torrent
+WHERE torrent.id = $1::bigint
+  AND torrent.state = 'published'
+`
+
+type GetManagedTorrentPeerTargetRow struct {
+	ID             int64
+	InfoHashV1     []byte
+	TotalSizeBytes int64
+	UploaderID     uuid.UUID
+}
+
+func (q *Queries) GetManagedTorrentPeerTarget(ctx context.Context, torrentID int64) (GetManagedTorrentPeerTargetRow, error) {
+	row := q.db.QueryRow(ctx, getManagedTorrentPeerTarget, torrentID)
+	var i GetManagedTorrentPeerTargetRow
+	err := row.Scan(
+		&i.ID,
+		&i.InfoHashV1,
+		&i.TotalSizeBytes,
+		&i.UploaderID,
+	)
+	return i, err
+}
+
 const insertManagedTorrentLifecycleChange = `-- name: InsertManagedTorrentLifecycleChange :exec
 INSERT INTO torrents.torrent_lifecycle_changes (
     id,
@@ -310,6 +340,45 @@ func (q *Queries) ListManagedTorrentFilterCategories(ctx context.Context) ([]Lis
 	for rows.Next() {
 		var i ListManagedTorrentFilterCategoriesRow
 		if err := rows.Scan(&i.ID, &i.Name, &i.Enabled); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listManagedTorrentPeerIdentities = `-- name: ListManagedTorrentPeerIdentities :many
+SELECT users.id, users.numeric_id, users.username, users.display_name
+FROM identity.users AS users
+WHERE users.id = ANY($1::uuid[])
+ORDER BY lower(users.username), users.id
+`
+
+type ListManagedTorrentPeerIdentitiesRow struct {
+	ID          uuid.UUID
+	NumericID   int64
+	Username    string
+	DisplayName string
+}
+
+func (q *Queries) ListManagedTorrentPeerIdentities(ctx context.Context, userIds []uuid.UUID) ([]ListManagedTorrentPeerIdentitiesRow, error) {
+	rows, err := q.db.Query(ctx, listManagedTorrentPeerIdentities, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListManagedTorrentPeerIdentitiesRow{}
+	for rows.Next() {
+		var i ListManagedTorrentPeerIdentitiesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.NumericID,
+			&i.Username,
+			&i.DisplayName,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

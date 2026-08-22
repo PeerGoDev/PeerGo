@@ -298,6 +298,8 @@ paths:
     $ref: "./domains/torrents.yaml#/MyTorrentReviewVotesPath"
   /api/v1/admin/torrents:
     $ref: "./domains/torrents.yaml#/ManagedTorrentsPath"
+  /api/v1/admin/torrents/{torrent_id}/peers:
+    $ref: "./domains/torrents.yaml#/ManagedTorrentPeersPath"
   /api/v1/admin/torrents/content-changes:
     $ref: "./domains/torrents.yaml#/ManagedPublishedTorrentContentChangesPath"
   /api/v1/admin/torrents/content-changes/{request_id}/decision:

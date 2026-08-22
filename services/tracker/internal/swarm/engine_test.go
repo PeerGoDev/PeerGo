@@ -136,6 +136,25 @@ func TestEngineMarksOnlyKnownCompletionTransitionsAndSnapshotsStableCounts(t *te
 	}
 }
 
+func TestEngineReturnsBoundedPrivacyMinimizedActivePeers(t *testing.T) {
+	t.Parallel()
+	engine := testEngine(t, 10, 10)
+	now := time.Date(2026, 8, 22, 12, 0, 0, 0, time.UTC)
+	for index, user := range []string{"user-a", "user-b", "user-c"} {
+		request := testRequest(user, "192.0.2.1:6881", int64(index), now.Add(time.Duration(index)*time.Second))
+		request.PeerID[0] = byte(index + 1)
+		request.Uploaded = int64(index + 10)
+		request.Downloaded = int64(index + 20)
+		if _, err := engine.Announce(request); err != nil {
+			t.Fatal(err)
+		}
+	}
+	peers, truncated := engine.ActivePeers([20]byte{1}, now.Add(3*time.Second), 2)
+	if !truncated || len(peers) != 2 || peers[0].UserID != "user-c" || peers[0].Uploaded != 12 || peers[0].Downloaded != 22 {
+		t.Fatalf("ActivePeers() = %+v, truncated=%v", peers, truncated)
+	}
+}
+
 func testEngine(t *testing.T, maxSwarms int64, maxPeers int64) *Engine {
 	t.Helper()
 	engine, err := NewEngine(Config{
@@ -151,6 +170,7 @@ func testEngine(t *testing.T, maxSwarms int64, maxPeers int64) *Engine {
 func testRequest(user, endpoint string, left int64, now time.Time) Request {
 	return Request{
 		InfoHash: [20]byte{1}, UserID: user, PeerID: [20]byte{1},
-		Endpoint: netip.MustParseAddrPort(endpoint), Left: left, NumWant: 50, Now: now,
+		Endpoint: netip.MustParseAddrPort(endpoint), ClientFamily: "unknown",
+		Left: left, NumWant: 50, Now: now,
 	}
 }

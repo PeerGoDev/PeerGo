@@ -9,6 +9,7 @@ import {
   FolderOpenIcon,
   HashIcon,
   RefreshCwIcon,
+  WrenchIcon,
   ZapIcon,
 } from "lucide-react"
 
@@ -35,7 +36,13 @@ import {
   EmptyTitle,
 } from "~/components/ui/empty"
 import { Skeleton } from "~/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip"
 import { useWebSession } from "~/features/auth/api/session.mutations"
+import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import { ContentTipDialog } from "~/features/economy/components/content-tip-dialog"
 import { parseTorrentId } from "~/features/torrent/api/torrent.download"
 import {
@@ -61,6 +68,7 @@ import {
   useTorrentBookmarkControls,
 } from "~/features/torrent/hooks/use-torrent-bookmark-controls"
 import { formatTorrentSize } from "~/features/torrent/model/format"
+import { hasCapability } from "~/features/staff/model/capability"
 import { ApiProblemError } from "~/shared/api/problem"
 import { PageLayout } from "~/shared/components/page-layout"
 import {
@@ -170,6 +178,16 @@ function TorrentDetailContent({
             </h1>
           </div>
           <div className="flex shrink-0 items-center justify-end gap-1.5 max-sm:justify-start md:min-w-[178px]">
+            <TorrentManageShortcut
+              torrentId={detail.id}
+              torrentTitle={detail.title}
+              userId={userId}
+            />
+            <TorrentReportDialog
+              torrentId={detail.id}
+              torrentTitle={detail.title}
+              compact
+            />
             <TorrentBookmarkButton
               torrentId={detail.id}
               torrentName={detail.title}
@@ -314,10 +332,6 @@ function TorrentDetailContent({
               buttonSize="default"
               className="h-9 w-full"
             />
-            <TorrentReportDialog
-              torrentId={detail.id}
-              torrentTitle={detail.title}
-            />
           </div>
         </div>
 
@@ -369,6 +383,42 @@ function TorrentDetailContent({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function TorrentManageShortcut({
+  torrentId,
+  torrentTitle,
+  userId,
+}: {
+  torrentId: number
+  torrentTitle: string
+  userId?: string
+}) {
+  const capabilities = useCapabilities(userId)
+  if (!hasCapability(capabilities.data, "staff.session.create.self")) {
+    return null
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="outline"
+            size="icon"
+            render={
+              <Link
+                to={`/staff/content/torrents?query=${encodeURIComponent(torrentId)}`}
+                aria-label={`管理“${torrentTitle}”`}
+              />
+            }
+          />
+        }
+      >
+        <WrenchIcon />
+      </TooltipTrigger>
+      <TooltipContent>管理种子</TooltipContent>
+    </Tooltip>
   )
 }
 

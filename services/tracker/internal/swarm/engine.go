@@ -24,8 +24,9 @@ var (
 )
 
 const (
-	peerKeyDomain         = "peergo:tracker:swarm-peer-key:v1\x00"
-	completionTokenDomain = "peergo:tracker:completion-transition:v1\x00"
+	peerKeyDomain           = "peergo:tracker:swarm-peer-key:v1\x00"
+	completionTokenDomain   = "peergo:tracker:completion-transition:v1\x00"
+	maxActivePeerInspection = 1_000
 )
 
 type Config struct {
@@ -38,16 +39,18 @@ type Config struct {
 }
 
 type Request struct {
-	InfoHash   [20]byte
-	UserID     string
-	PeerID     [20]byte
-	Key        string
-	Endpoint   netip.AddrPort
-	Left       int64
-	Downloaded int64
-	Event      protocol.Event
-	NumWant    int
-	Now        time.Time
+	InfoHash     [20]byte
+	UserID       string
+	PeerID       [20]byte
+	Key          string
+	Endpoint     netip.AddrPort
+	ClientFamily string
+	Left         int64
+	Uploaded     int64
+	Downloaded   int64
+	Event        protocol.Event
+	NumWant      int
+	Now          time.Time
 }
 
 type Result struct {
@@ -86,7 +89,12 @@ type peerState struct {
 	key                      [32]byte
 	id                       [20]byte
 	endpoint                 netip.AddrPort
+	userID                   string
+	clientFamily             string
 	left                     int64
+	uploaded                 int64
+	downloaded               int64
+	lastAnnounce             time.Time
 	expiresAt                time.Time
 	lastCompletionDownloaded int64
 	lastCompletionToken      [32]byte
@@ -101,6 +109,18 @@ type SnapshotEntry struct {
 type Stats struct {
 	Complete   int
 	Incomplete int
+}
+
+// ActivePeer is the bounded, privacy-minimized management view of one live
+// in-memory connection. Network endpoints and protocol identifiers are never
+// returned.
+type ActivePeer struct {
+	UserID       string
+	ClientFamily string
+	Uploaded     int64
+	Downloaded   int64
+	Left         int64
+	LastAnnounce time.Time
 }
 
 func NewEngine(config Config) (*Engine, error) {
@@ -119,8 +139,9 @@ func NewEngine(config Config) (*Engine, error) {
 }
 
 func (engine *Engine) Announce(request Request) (Result, error) {
-	if request.UserID == "" || len(request.UserID) > 64 || len(request.Key) > protocol.MaxKeyBytes || !request.Endpoint.IsValid() ||
-		request.Endpoint.Port() == 0 || request.Left < 0 || request.Downloaded < 0 || request.NumWant < 0 ||
+	if request.UserID == "" || len(request.UserID) > 64 || len(request.Key) > protocol.MaxKeyBytes ||
+		request.ClientFamily == "" || len(request.ClientFamily) > 32 || !request.Endpoint.IsValid() ||
+		request.Endpoint.Port() == 0 || request.Left < 0 || request.Uploaded < 0 || request.Downloaded < 0 || request.NumWant < 0 ||
 		request.NumWant > 500 || request.Now.IsZero() || request.Event > protocol.EventCompleted {
 		return Result{}, ErrRequest
 	}
@@ -175,6 +196,41 @@ func (engine *Engine) Announce(request Request) (Result, error) {
 		engine.totalSwarms.Add(-1)
 	}
 	return result, nil
+}
+
+// ActivePeers returns at most limit unexpired connections from one swarm. It
+// performs no database or network access and intentionally stops once the
+// bounded response is full instead of scanning an arbitrarily large swarm.
+func (engine *Engine) ActivePeers(infoHash [20]byte, now time.Time, limit int) ([]ActivePeer, bool) {
+	if now.IsZero() || limit < 1 || limit > 200 {
+		return nil, false
+	}
+	shard := &engine.shards[shardIndex(infoHash, len(engine.shards))]
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+	state, exists := shard.swarms[infoHash]
+	if !exists {
+		return []ActivePeer{}, false
+	}
+	state.sweepExpired(now, engine.config.SweepBudget, &engine.totalPeers)
+	inspectionLimit := min(len(state.peers), maxActivePeerInspection)
+	peers := make([]ActivePeer, 0, min(inspectionLimit, limit+1))
+	for _, peer := range state.peers[:inspectionLimit] {
+		if !peer.expiresAt.After(now) {
+			continue
+		}
+		peers = append(peers, ActivePeer{
+			UserID: peer.userID, ClientFamily: peer.clientFamily,
+			Uploaded: peer.uploaded, Downloaded: peer.downloaded, Left: peer.left,
+			LastAnnounce: peer.lastAnnounce,
+		})
+	}
+	slices.SortFunc(peers, func(left, right ActivePeer) int { return right.LastAnnounce.Compare(left.LastAnnounce) })
+	truncated := inspectionLimit < len(state.peers) || len(peers) > limit
+	if len(peers) > limit {
+		peers = peers[:limit]
+	}
+	return peers, truncated
 }
 
 // Snapshot returns one complete, stable-order copy of all active swarm counts.
@@ -283,8 +339,10 @@ func (shard *engineShard) removeSwarm(hash [20]byte) {
 func (state *swarmState) insert(key [32]byte, request Request, ttl time.Duration) {
 	state.index[key] = len(state.peers)
 	state.peers = append(state.peers, peerState{
-		key: key, id: request.PeerID, endpoint: request.Endpoint, left: request.Left,
-		expiresAt: request.Now.Add(ttl), lastCompletionDownloaded: -1,
+		key: key, id: request.PeerID, endpoint: request.Endpoint,
+		userID: request.UserID, clientFamily: request.ClientFamily,
+		left: request.Left, uploaded: request.Uploaded, downloaded: request.Downloaded,
+		lastAnnounce: request.Now, expiresAt: request.Now.Add(ttl), lastCompletionDownloaded: -1,
 	})
 	state.incrementClass(request.Left)
 }
@@ -306,7 +364,12 @@ func (state *swarmState) updateAt(index int, request Request, ttl time.Duration)
 	}
 	peer.id = request.PeerID
 	peer.endpoint = request.Endpoint
+	peer.userID = request.UserID
+	peer.clientFamily = request.ClientFamily
 	peer.left = request.Left
+	peer.uploaded = request.Uploaded
+	peer.downloaded = request.Downloaded
+	peer.lastAnnounce = request.Now
 	peer.expiresAt = request.Now.Add(ttl)
 	return completionToken
 }

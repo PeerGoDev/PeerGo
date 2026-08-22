@@ -2584,6 +2584,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/torrents/{torrent_id}/peers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查看单个已发布种子的实时活跃用户
+         * @description 仅从 Tracker 的 TTL 内存状态读取最多 200 个连接并按用户聚合；不持久化 单次汇报，也不返回 IP、端口、passkey、peer ID 或会话标识。
+         */
+        get: operations["listManagedTorrentPeers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/torrents/content-changes": {
         parameters: {
             query?: never;
@@ -7160,6 +7180,36 @@ export interface components {
             disabled: number;
             /** Format: int64 */
             deleted: number;
+        };
+        ManagedTorrentPeer: {
+            /** Format: uuid */
+            user_id: string;
+            /** Format: int64 */
+            user_numeric_id: number;
+            username: string;
+            display_name: string;
+            client_families: string[];
+            active_connections: number;
+            seeding_connections: number;
+            leeching_connections: number;
+            progress_basis_points: number;
+            /** @description 该用户活跃连接所汇报的最大累计上传字节数。 */
+            uploaded: string;
+            /** @description 该用户活跃连接所汇报的最大累计下载字节数。 */
+            downloaded: string;
+            /** Format: date-time */
+            last_announce: string;
+            uploader: boolean;
+        };
+        ManagedTorrentPeerList: {
+            /** Format: int64 */
+            torrent_id: number;
+            items: components["schemas"]["ManagedTorrentPeer"][];
+            /** @description 本次有界读取中返回的活跃连接数；truncated 为 true 时仍有更多连接。 */
+            total_connections: number;
+            truncated: boolean;
+            /** Format: date-time */
+            generated_at: string;
         };
         ManagedPublishedTorrentContentChange: {
             change: components["schemas"]["PublishedTorrentContentChange"];
@@ -13887,6 +13937,36 @@ export interface operations {
             400: components["responses"]["ProblemResponse"];
             401: components["responses"]["ProblemResponse"];
             403: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listManagedTorrentPeers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 种子的唯一正整数 ID；迁移数据保留旧站 ID，新数据从当前最大值继续递增。 */
+                torrent_id: components["parameters"]["TorrentIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前 Tracker 进程内的有界活跃用户视图。 */
+            200: {
+                headers: {
+                    "Cache-Control": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedTorrentPeerList"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };

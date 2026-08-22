@@ -43,6 +43,30 @@ func TestClientReadsAuthenticatedRuntime(t *testing.T) {
 	}
 }
 
+func TestClientReadsAuthenticatedActivePeers(t *testing.T) {
+	const token = "peergo-test-tracker-service-token-2026"
+	const infoHash = "00112233445566778899aabbccddeeff00112233"
+	client, err := NewClient("https://tracker.example", token, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.httpClient.Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path != "/internal/v1/operations/swarms/"+infoHash+"/peers" || request.URL.Query().Get("limit") != "25" ||
+			request.Header.Get("Authorization") != "Bearer "+token {
+			t.Fatalf("unexpected request: %s", request.URL.String())
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"generated_at":"2026-08-22T12:00:00Z","items":[{"user_id":"0198f20a-6da8-7e51-9c64-111111111111","client_family":"qbittorrent","uploaded":10,"downloaded":20,"left":30,"last_announce":"2026-08-22T11:59:00Z"}],"truncated":false}`)),
+			Request:    request,
+		}, nil
+	})
+	page, err := client.ActivePeers(context.Background(), infoHash, 25)
+	if err != nil || len(page.Items) != 1 || page.Items[0].ClientFamily != "qbittorrent" {
+		t.Fatalf("ActivePeers() = %+v, err = %v", page, err)
+	}
+}
+
 func TestClientReadsRuntimeWithMaximumSeedboxRegistry(t *testing.T) {
 	runtime := validRuntime()
 	runtime.Seedbox = trackerruntimepolicyv1.SeedboxPolicy{

@@ -1006,6 +1006,10 @@ func (unavailableTorrentReadService) ListManaged(context.Context, authz.StaffAct
 	return torrents.ManagedTorrentPage{}, authz.ErrForbidden
 }
 
+func (unavailableTorrentReadService) ManagedActivePeers(context.Context, authz.StaffActor, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error) {
+	return torrents.ManagedTorrentPeerList{}, authz.ErrForbidden
+}
+
 func (unavailableTorrentReadService) ChangeAvailability(context.Context, authz.StaffActor, torrents.ChangeTorrentAvailabilityInput) (torrents.TorrentAvailabilityResult, error) {
 	return torrents.TorrentAvailabilityResult{}, authz.ErrForbidden
 }
@@ -1068,6 +1072,10 @@ func (service *recordingTorrentReadService) MySubmissions(_ context.Context, coo
 
 func (service *recordingTorrentReadService) ListManaged(context.Context, authz.StaffActor, torrents.ManagedTorrentQuery) (torrents.ManagedTorrentPage, error) {
 	return torrents.ManagedTorrentPage{}, nil
+}
+
+func (service *recordingTorrentReadService) ManagedActivePeers(context.Context, authz.StaffActor, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error) {
+	return torrents.ManagedTorrentPeerList{}, nil
 }
 
 func (service *recordingTorrentReadService) ChangeAvailability(context.Context, authz.StaffActor, torrents.ChangeTorrentAvailabilityInput) (torrents.TorrentAvailabilityResult, error) {
