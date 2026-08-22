@@ -2,6 +2,9 @@ package seedingreward_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -34,7 +37,10 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	createdAt := time.Now().UTC().Truncate(time.Microsecond)
+	// Keep every modeled business event in the past. The production apply path
+	// uses the wall clock for immutable receipt timestamps and must never accept
+	// a synthetic approval from the future.
+	createdAt := time.Now().UTC().Add(-4 * time.Hour).Truncate(time.Microsecond)
 	windowStart := createdAt.Truncate(time.Hour).Add(2 * time.Hour)
 	fixtureAt := windowStart.Add(-2 * time.Hour)
 	userID, torrentIDs := insertEvidenceFixture(t, ctx, pool, fixtureAt)
@@ -150,6 +156,86 @@ UPDATE economy.seeding_reward_benefit_snapshots
 SET vip_active = NOT vip_active
 WHERE window_start = $1 AND user_id = $2`, windowStart, userID); err == nil {
 		t.Fatal("immutable benefit snapshot unexpectedly accepted update")
+	}
+
+	var originalCalculation []byte
+	var benefitRevision string
+	var magicBefore int64
+	var experienceBefore string
+	if err := pool.QueryRow(ctx, `
+SELECT calculation.calculation_sha256, benefit.benefit_revision,
+       account.balance, progress.experience::text
+FROM economy.seeding_reward_calculations AS calculation
+JOIN economy.seeding_reward_benefit_snapshots AS benefit
+  ON benefit.window_start = calculation.window_start
+ AND benefit.user_id = calculation.user_id
+JOIN economy.magic_accounts AS account ON account.user_id = calculation.user_id
+JOIN progression.user_progress AS progress ON progress.user_id = calculation.user_id
+WHERE calculation.window_start = $1 AND calculation.user_id = $2`, windowStart, userID).
+		Scan(&originalCalculation, &benefitRevision, &magicBefore, &experienceBefore); err != nil {
+		t.Fatal(err)
+	}
+	correctionSource := fmt.Sprintf("seeding_compensation:v1:%d:%s", windowStart.Unix(), userID)
+	correctedCalculation := sha256.Sum256([]byte("corrected:" + correctionSource))
+	correctedEvidence := sha256.Sum256([]byte("evidence:" + correctionSource))
+	artifactDigest := sha256.Sum256([]byte("artifact:" + correctionSource))
+	artifact := seedingreward.CompensationArtifact{
+		Header: seedingreward.CompensationArtifactHeader{
+			SchemaVersion: seedingreward.CompensationPreviewSchemaVersion,
+			RecordType:    "manifest", TrackerSourceStream: "PEERGO_TRACKER_ANNOUNCE_V1",
+			TrackerFenceSequence: 42, MaximumIntervalSeconds: 2100,
+			FirstWindow: windowStart.Format(time.RFC3339), LastWindow: windowStart.Format(time.RFC3339),
+		},
+		Records: []seedingreward.CompensationArtifactRecord{{
+			SchemaVersion: seedingreward.CompensationPreviewSchemaVersion,
+			RecordType:    "positive_delta", SourceReference: correctionSource,
+			WindowStart: windowStart.Format(time.RFC3339), UserID: userID.String(),
+			PolicyRevision: policy.Revision, BenefitRevision: benefitRevision,
+			OriginalCalculationSHA256:  hex.EncodeToString(originalCalculation),
+			CorrectedCalculationSHA256: hex.EncodeToString(correctedCalculation[:]),
+			CorrectedEvidenceSHA256:    hex.EncodeToString(correctedEvidence[:]),
+			OriginalReward:             reward, CorrectedReward: reward + 7, MagicDelta: 7,
+			ExperienceDelta: "0.7", EligibleTorrentCount: 1,
+		}},
+		RecordCount: 1, MagicDelta: 7, ExperienceDelta: "0.7",
+	}
+	applyResult, err := settlementRepository.ApplyHistoricalCompensation(
+		ctx, artifact, artifactDigest, 1024, "test:late-evidence", evidenceNow.Add(2*time.Minute), 1, nil,
+	)
+	if err != nil || !applyResult.Completed || applyResult.AppliedRecords != 1 || applyResult.ReplayedRecords != 0 {
+		t.Fatalf("ApplyHistoricalCompensation() = %+v, %v", applyResult, err)
+	}
+	replayResult, err := settlementRepository.ApplyHistoricalCompensation(
+		ctx, artifact, artifactDigest, 1024, "test:late-evidence", evidenceNow.Add(3*time.Minute), 1, nil,
+	)
+	if err != nil || !replayResult.Completed || replayResult.AppliedRecords != 0 || replayResult.ReplayedRecords != 1 {
+		t.Fatalf("ApplyHistoricalCompensation(replay) = %+v, %v", replayResult, err)
+	}
+	var magicAfter int64
+	var experienceAfter string
+	var receiptCount, completionCount int
+	var experienceExact bool
+	if err := pool.QueryRow(ctx, `
+SELECT account.balance, progress.experience::text,
+       (SELECT count(*) FROM economy.seeding_reward_compensation_receipts WHERE source_reference = $2),
+       (SELECT count(*) FROM economy.seeding_reward_compensation_completions WHERE artifact_sha256 = $3),
+       progress.experience = $4::numeric + 0.7
+FROM economy.magic_accounts AS account
+JOIN progression.user_progress AS progress ON progress.user_id = account.user_id
+WHERE account.user_id = $1`, userID, correctionSource, artifactDigest[:], experienceBefore).
+		Scan(&magicAfter, &experienceAfter, &receiptCount, &completionCount, &experienceExact); err != nil {
+		t.Fatal(err)
+	}
+	if magicAfter != magicBefore+7 || !experienceExact ||
+		receiptCount != 1 || completionCount != 1 {
+		t.Fatalf("compensation projection magic=%d->%d experience=%s->%s receipts=%d completion=%d",
+			magicBefore, magicAfter, experienceBefore, experienceAfter, receiptCount, completionCount)
+	}
+	if _, err := pool.Exec(ctx, `
+UPDATE economy.seeding_reward_compensation_receipts
+SET magic_delta = magic_delta + 1
+WHERE source_reference = $1`, correctionSource); err == nil {
+		t.Fatal("immutable compensation receipt unexpectedly accepted update")
 	}
 }
 

@@ -8,7 +8,7 @@ package schemaversionv1
 
 const (
 	// Core is the latest Core schema required by both Core and legacy cutover tools.
-	Core int64 = 202608210005
+	Core int64 = 202608220001
 
 	// PrivacyVault is the latest Privacy Vault schema required by the legacy cutover.
 	PrivacyVault int64 = 202608150001

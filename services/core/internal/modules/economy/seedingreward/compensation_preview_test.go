@@ -43,7 +43,7 @@ func TestCorrectedWindowDigestBindsFenceAndOrderedItems(t *testing.T) {
 }
 
 func TestCompensationManifestBindsTrackerStream(t *testing.T) {
-	header := compensationArtifactHeader{
+	header := CompensationArtifactHeader{
 		SchemaVersion: CompensationPreviewSchemaVersion,
 		RecordType:    "manifest", TrackerSourceStream: "PEERGO_TRACKER_ANNOUNCE_V1",
 		TrackerFenceSequence: 42,

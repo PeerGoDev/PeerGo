@@ -319,5 +319,20 @@ outbox。JSONL 含内部用户标识，不得复制到工单、聊天或公开�
 总差额、文件路径与 SHA-256。
 
 预演完成后应先保存并人工核对文件 SHA-256、正向差额总量、最大单用户小时差额及受影响
-窗口。此命令不是入账命令；在补偿执行器具有“只追加正向账本、稳定来源引用、幂等重放、
-Core/outbox 对账和显式审批哈希”之前，不得用 SQL 直接修改余额，也不得覆盖原计算记录。
+窗口。确认后，把终端实际打印的值逐字填入（示例值不可直接使用）：
+
+```bash
+make production-seeding-reward-compensation-apply \
+  ARTIFACT='/opt/peergo/compensations/seeding-reward-compensation-preview-YYYYMMDDTHHMMSSZ.jsonl' \
+  APPROVE_SHA256='<64 位小写 SHA-256>' \
+  OPERATOR_REFERENCE='incident:late-evidence-20260821' \
+  CONFIRM_PEERGO_SEEDING_REWARD_COMPENSATION='APPLY:<同一个 SHA-256>'
+```
+
+应用器只接受补偿目录内权限严格为 `0600` 的普通文件，并在任何写操作前重新解析及哈希
+全部 JSONL。每条正向差额通过正式 economy/progression 写入口，在同一 Core 事务中追加
+平衡魔力值交易、经验条目和补偿收据；不覆盖原证据、原计算或旧账。制品审批、逐条收据和
+完成证明均不可变，稳定 `source_reference` 使中断后的重跑只跳过已经入账的记录。处理采用
+小批次事务，避免长时间占用做种铸币账户；日志只输出聚合进度，不输出用户标识。
+
+若未得到明确的 SHA-256 审批，不得运行应用命令，也不得用 SQL 直接修改余额。

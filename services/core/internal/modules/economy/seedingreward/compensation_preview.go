@@ -51,7 +51,9 @@ type CompensationPreviewSummary struct {
 	ArtifactSHA256       string    `json:"artifact_sha256,omitempty"`
 }
 
-type compensationArtifactHeader struct {
+// CompensationArtifactHeader binds a private preview to one immutable Tracker
+// stream prefix and one closed range of historical reward windows.
+type CompensationArtifactHeader struct {
 	SchemaVersion          string `json:"schema_version"`
 	RecordType             string `json:"record_type"`
 	TrackerSourceStream    string `json:"tracker_source_stream"`
@@ -61,7 +63,10 @@ type compensationArtifactHeader struct {
 	LastWindow             string `json:"last_window"`
 }
 
-type compensationArtifactRecord struct {
+// CompensationArtifactRecord is one strictly positive user-hour correction.
+// It intentionally retains private user identity only inside the mode-0600
+// operator artifact; summaries and progress logs never expose these fields.
+type CompensationArtifactRecord struct {
 	SchemaVersion              string `json:"schema_version"`
 	RecordType                 string `json:"record_type"`
 	SourceReference            string `json:"source_reference"`
@@ -156,7 +161,7 @@ func (repository *PostgresSettlementRepository) PreviewHistoricalCompensation(
 	}
 	if len(windows) == 0 {
 		summary.ExperienceDelta = "0"
-		if err := json.NewEncoder(output).Encode(compensationArtifactHeader{
+		if err := json.NewEncoder(output).Encode(CompensationArtifactHeader{
 			SchemaVersion: CompensationPreviewSchemaVersion, RecordType: "manifest",
 			TrackerSourceStream: stream, TrackerFenceSequence: fence,
 			MaximumIntervalSeconds: int64(compensationMaxIntervalCredit / time.Second),
@@ -168,7 +173,7 @@ func (repository *PostgresSettlementRepository) PreviewHistoricalCompensation(
 	summary.FirstWindow, summary.LastWindow = windows[0], windows[len(windows)-1]
 	encoder := json.NewEncoder(output)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(compensationArtifactHeader{
+	if err := encoder.Encode(CompensationArtifactHeader{
 		SchemaVersion: CompensationPreviewSchemaVersion, RecordType: "manifest",
 		TrackerSourceStream: stream, TrackerFenceSequence: fence,
 		MaximumIntervalSeconds: int64(compensationMaxIntervalCredit / time.Second),
@@ -271,7 +276,7 @@ LIMIT 1`, window.Start)
 			if err != nil {
 				return CompensationPreviewSummary{}, err
 			}
-			record := compensationArtifactRecord{
+			record := CompensationArtifactRecord{
 				SchemaVersion: CompensationPreviewSchemaVersion, RecordType: "positive_delta",
 				SourceReference: fmt.Sprintf("seeding_compensation:v1:%d:%s", window.Start.Unix(), userID.String()),
 				WindowStart:     window.Start.Format(time.RFC3339), UserID: userID.String(),
