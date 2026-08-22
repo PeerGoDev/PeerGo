@@ -40,6 +40,42 @@ func TestProcessBatchPreservesOrderAndAcknowledgesEveryCommittedMessage(t *testi
 	}
 }
 
+func TestProcessBatchRestoresStreamOrderForRedelivery(t *testing.T) {
+	processor := &testProcessor{results: []testProcessResult{
+		{result: ingest.ProcessResult{EventID: "event-1", Outcome: ingest.OutcomeBaseline}},
+		{result: ingest.ProcessResult{EventID: "event-2", Outcome: ingest.OutcomeInterval}},
+	}}
+	older := validTestMessage()
+	older.metadata.NumDelivered = 2
+	newer := validTestMessage()
+	newer.metadata.Sequence.Stream = older.metadata.Sequence.Stream + 1
+	newer.metadata.Sequence.Consumer = older.metadata.Sequence.Consumer - 1
+	runner := testRunner(t, processor)
+	if err := runner.processBatch(context.Background(), []Message{newer, older}); err != nil {
+		t.Fatal(err)
+	}
+	if len(processor.sequences) != 2 || processor.sequences[0] != 7 || processor.sequences[1] != 8 {
+		t.Fatalf("processed stream sequences = %v, want [7 8]", processor.sequences)
+	}
+	if older.doubleAcks != 1 || newer.doubleAcks != 1 {
+		t.Fatalf("acknowledgements older/newer=%d/%d", older.doubleAcks, newer.doubleAcks)
+	}
+}
+
+func TestProcessBatchRejectsDuplicateStreamSequence(t *testing.T) {
+	processor := &testProcessor{}
+	first := validTestMessage()
+	second := validTestMessage()
+	second.metadata.Sequence.Consumer++
+	runner := testRunner(t, processor)
+	err := runner.processBatch(context.Background(), []Message{first, second})
+	if !errors.Is(err, ingest.ErrSourceInvariant) || processor.calls != 0 ||
+		first.doubleAcks != 0 || second.doubleAcks != 0 {
+		t.Fatalf("processBatch() error=%v calls=%d acknowledgements=%d/%d",
+			err, processor.calls, first.doubleAcks, second.doubleAcks)
+	}
+}
+
 func TestProcessMessageRetriesSameDeliveryOnTransientFailure(t *testing.T) {
 	processor := &testProcessor{results: []testProcessResult{
 		{err: errors.New("database temporarily unavailable")},
@@ -111,13 +147,15 @@ type testProcessResult struct {
 }
 
 type testProcessor struct {
-	results []testProcessResult
-	calls   int
+	results   []testProcessResult
+	sequences []uint64
+	calls     int
 }
 
 func (processor *testProcessor) ProcessBatch(_ context.Context, deliveries []ingest.Delivery) ([]ingest.ProcessResult, error) {
 	results := make([]ingest.ProcessResult, len(deliveries))
 	for index := range deliveries {
+		processor.sequences = append(processor.sequences, deliveries[index].Sequence)
 		resultIndex := processor.calls
 		processor.calls++
 		if resultIndex >= len(processor.results) {

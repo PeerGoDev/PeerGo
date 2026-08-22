@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sort"
 	"time"
 
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/peergo/peergo/contracts/go/trackerannouncev1"
 	"github.com/peergo/peergo/services/settlement/internal/ingest"
 )
@@ -87,20 +89,39 @@ func (runner *Runner) processBatch(ctx context.Context, messages []Message) erro
 	if len(messages) == 0 || len(messages) > runner.config.BatchSize {
 		return fmt.Errorf("%w: unexpected JetStream batch size", ingest.ErrSourceInvariant)
 	}
-	deliveries := make([]ingest.Delivery, len(messages))
-	var previousSequence uint64
+	type orderedMessage struct {
+		message  Message
+		metadata *jetstream.MsgMetadata
+	}
+	ordered := make([]orderedMessage, len(messages))
 	for index, message := range messages {
 		metadata, err := message.Metadata()
 		if err != nil || metadata == nil || metadata.Stream != runner.config.Stream ||
 			metadata.Consumer != runner.config.Durable || metadata.Sequence.Stream == 0 || metadata.NumDelivered == 0 ||
-			message.Subject() != runner.config.Subject ||
-			(previousSequence != 0 && metadata.Sequence.Stream <= previousSequence) {
+			message.Subject() != runner.config.Subject {
 			return fmt.Errorf("%w: unexpected JetStream delivery metadata", ingest.ErrSourceInvariant)
 		}
-		previousSequence = metadata.Sequence.Stream
+		ordered[index] = orderedMessage{message: message, metadata: metadata}
+	}
+
+	// A durable pull consumer can redeliver an older unacknowledged message in
+	// the same fetch as newer messages after a process restart or a lost ACK.
+	// Consumer delivery order is therefore not a safe accounting order. The
+	// immutable stream sequence is authoritative, so restore that order before
+	// applying absolute counters in one PostgreSQL transaction.
+	sort.SliceStable(ordered, func(left, right int) bool {
+		return ordered[left].metadata.Sequence.Stream < ordered[right].metadata.Sequence.Stream
+	})
+	deliveries := make([]ingest.Delivery, len(ordered))
+	var previousSequence uint64
+	for index, item := range ordered {
+		if previousSequence != 0 && item.metadata.Sequence.Stream <= previousSequence {
+			return fmt.Errorf("%w: duplicate JetStream stream sequence in one batch", ingest.ErrSourceInvariant)
+		}
+		previousSequence = item.metadata.Sequence.Stream
 		deliveries[index] = ingest.Delivery{
-			Stream: metadata.Stream, Subject: message.Subject(), Sequence: metadata.Sequence.Stream,
-			DeliveryCount: metadata.NumDelivered, Payload: bytes.Clone(message.Data()),
+			Stream: item.metadata.Stream, Subject: item.message.Subject(), Sequence: item.metadata.Sequence.Stream,
+			DeliveryCount: item.metadata.NumDelivered, Payload: bytes.Clone(item.message.Data()),
 		}
 	}
 
@@ -115,9 +136,9 @@ func (runner *Runner) processBatch(ctx context.Context, messages []Message) erro
 			if len(results) != len(messages) {
 				return fmt.Errorf("%w: Settlement batch result cardinality changed", ingest.ErrSourceInvariant)
 			}
-			for index, message := range messages {
+			for index, item := range ordered {
 				ackCtx, ackCancel := context.WithTimeout(ctx, runner.config.AckTimeout)
-				ackErr := message.DoubleAck(ackCtx)
+				ackErr := item.message.DoubleAck(ackCtx)
 				ackCancel()
 				if ackErr != nil && ctx.Err() == nil {
 					// PostgreSQL already committed. Any unconfirmed ACK is safely
@@ -142,8 +163,8 @@ func (runner *Runner) processBatch(ctx context.Context, messages []Message) erro
 			"first_stream_sequence", deliveries[0].Sequence,
 			"last_stream_sequence", deliveries[len(deliveries)-1].Sequence,
 			"batch_size", len(deliveries), "error", processErr)
-		for index, message := range messages {
-			if progressErr := message.InProgress(); progressErr != nil {
+		for index, item := range ordered {
+			if progressErr := item.message.InProgress(); progressErr != nil {
 				runner.logger.Warn("Settlement JetStream in-progress acknowledgement failed",
 					"stream_sequence", deliveries[index].Sequence, "error", progressErr)
 			}
