@@ -67,3 +67,40 @@ func TestFactoryDerivesStableCompletionIdentityAcrossRequestRetries(t *testing.T
 		t.Fatal("distinct completion transition tokens produced the same identity")
 	}
 }
+
+func TestSequencedCodecKeepsLegacyBusinessEventAndProducerIdentity(t *testing.T) {
+	t.Parallel()
+	event, err := NewFactory(bytes.NewReader(bytes.Repeat([]byte{0x62}, 16))).New(Input{
+		ReceivedAt: time.Date(2026, 8, 22, 1, 0, 0, 0, time.UTC),
+		UserID:     "0198f20a-6da8-7e51-9c64-111111111111", TorrentID: 42,
+		InfoHash: [20]byte{1}, PeerID: [20]byte{2}, AddressFamily: 4,
+		Uploaded: 1, Downloaded: 2, Left: 3, CredentialVersion: 1,
+		TorrentControlSequence: 4, SubjectControlSequence: 5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := EncodeSequenced(event, Producer{
+		ID: "tracker-primary", Epoch: "0198f20a-6da8-7e51-9c64-333333333333", Sequence: 9,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeAny(encoded)
+	if err != nil || decoded.Event != event || decoded.Producer == nil || decoded.Producer.Sequence != 9 {
+		t.Fatalf("decoded=%+v error=%v", decoded, err)
+	}
+	legacy, err := DecodeAny(mustEncode(t, event))
+	if err != nil || legacy.Event != event || legacy.Producer != nil {
+		t.Fatalf("legacy=%+v error=%v", legacy, err)
+	}
+}
+
+func mustEncode(t *testing.T, event Event) []byte {
+	t.Helper()
+	encoded, err := Encode(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}

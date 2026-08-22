@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/peergo/peergo/contracts/go/deploymentv1"
+	"github.com/peergo/peergo/contracts/go/trackerannouncev2"
 	"github.com/peergo/peergo/contracts/go/trackerswarmv1"
 	"github.com/peergo/peergo/services/tracker/internal/jetstreampublisher"
 	"github.com/peergo/peergo/services/tracker/internal/swarm"
@@ -40,6 +41,7 @@ type ServerConfig struct {
 	NATSReconnectWait      time.Duration
 	AnnounceStream         string
 	AnnounceSubject        string
+	AnnounceProducerID     string
 	PublishTimeout         time.Duration
 	PublishRetryMinimum    time.Duration
 	PublishRetryMaximum    time.Duration
@@ -188,6 +190,10 @@ func LoadServer() (ServerConfig, error) {
 	if err != nil || !jetstreampublisher.ValidLiteralSubject(announceSubject) {
 		return ServerConfig{}, errors.New("PEERGO_TRACKER_ANNOUNCE_SUBJECT must be a valid literal NATS subject")
 	}
+	announceProducerID, err := required("PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID")
+	if err != nil || !trackerannouncev2.ValidProducerID(announceProducerID) {
+		return ServerConfig{}, errors.New("PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID must be a stable lowercase producer ID")
+	}
 	publishTimeout, err := parseDuration("PEERGO_TRACKER_ANNOUNCE_PUBLISH_TIMEOUT", 100*time.Millisecond, time.Minute)
 	if err != nil {
 		return ServerConfig{}, err
@@ -249,7 +255,7 @@ func LoadServer() (ServerConfig, error) {
 		WALPath: filepath.Clean(walPath), MaxWALBytes: maxWALBytes, WALCompactAtBytes: walCompactAtBytes,
 		NATSURLs: natsURLs, NATSCredentialsFile: natsCredentialsFile, NATSRootCAFile: natsRootCAFile,
 		NATSConnectTimeout: natsConnectTimeout, NATSReconnectWait: natsReconnectWait,
-		AnnounceStream: announceStream, AnnounceSubject: announceSubject,
+		AnnounceStream: announceStream, AnnounceSubject: announceSubject, AnnounceProducerID: announceProducerID,
 		PublishTimeout: publishTimeout, PublishRetryMinimum: publishRetryMinimum, PublishRetryMaximum: publishRetryMaximum,
 		SwarmSweepInterval: swarmSweepInterval, SwarmSweepBudget: swarmSweepBudget,
 		SwarmSnapshotStream: swarmSnapshotStream, SwarmSnapshotSubject: swarmSnapshotSubject,

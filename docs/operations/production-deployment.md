@@ -123,6 +123,11 @@ chmod 600 .env.production
   `PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT=35m`：前者等待有序
   announce 水位越过小时边界，后者拒绝把超过 Tracker peer 生命周期的断档推定为连续做种；
   closure 必须大于等于 credit。
+- `PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID=tracker-primary`：单个逻辑 Tracker 所有者的
+  稳定小写标识；每次进程启动会另建 UUIDv7 epoch，不能把随机容器 ID 写进该值。
+- Settlement 存储保留默认值：终态 outbox/work `72h`、过期 session `48h`、raw/流量/
+  做种 source 明细 `720h`、异常与违规速度证据 `4320h`；`production-ready` 会拒绝低于
+  数据库保护下限或高到重新造成无界增长的配置。
 
 `PEERGO_SECRET_DIR` 必须是宿主机绝对路径，目录和文件只允许运维账户读取。
 
@@ -174,6 +179,21 @@ counter 处理器。变更该值时先停止 `settlement-ingest`，再运行 `tr
 make production-hnr-work-reconcile \
   CONFIRM_PEERGO_HNR_RECONCILE=RECONCILE_IRRELEVANT_HNR_WORK
 ```
+
+`settlement-storage-maintenance` 随生产 Compose 常驻，默认每 15 秒按 retention 索引、每类最多
+处理 10,000 行，不运行全表 `DELETE`。升级后它会渐进清理历史 v1 payload、已发布 outbox、终态
+work、冗余 swarm snapshot entries/chunks/inbox/headers 和已经汇总的 30 天前流量明细；小时
+证据引用的 snapshot header 与每个路由 epoch 的最新水位保留。未发布事件、未结算 work、
+做种证据尚未闭合的 raw interval、活跃 H&R 需要的区间以及永久 UTC 日汇总均不会删除。有异常
+待核对的做种窗口会把 source 和选中快照明细随异常保留 180 天，补偿工具不会读到残缺依据。
+上线前保留数据库快照；上线后同时观察该进程日志、`pg_stat_user_tables.n_dead_tup`、autovacuum
+时间和 Tracker Ledger 卷使用量。普通 `VACUUM` 可按数据库运维策略执行，禁止在线运行会长时
+锁表并复制整表的 `VACUUM FULL`。DELETE 后物理文件不会立即缩小；目标是 autovacuum 回收并
+复用页，使磁盘在保留窗口高水位附近稳定，而不是持续线性增长。
+快照 entry 是最高速表，容量规划须满足 `batch_size / cleanup_interval >= 活跃 swarm 数 /
+snapshot_interval`；默认 `10000 / 15s` 可跟上约 20,000 个活跃 swarm 的 30 秒完整快照，超过时
+进程会持续输出 `batch saturated` 警告。此时应先降低快照频率或扩展专用 Ledger，而不是无限
+放大单次删除事务。
 
 流量 outbox 与 Core 流量投影默认也各自在单进程内使用 4 条固定通道。对应参数为
 `PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY` 和 `PEERGO_CORE_TRAFFIC_CONCURRENCY`，支持范围

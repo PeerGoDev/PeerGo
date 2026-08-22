@@ -119,8 +119,8 @@ func (sink *Sink) PublishBatch(ctx context.Context, messages []announcepublisher
 }
 
 func validateMessage(eventID string, payload []byte) error {
-	event, err := announceevent.Decode(payload)
-	if err != nil || event.EventID != eventID {
+	decoded, err := announceevent.DecodeAny(payload)
+	if err != nil || decoded.Event.EventID != eventID {
 		return ErrConfig
 	}
 	return nil

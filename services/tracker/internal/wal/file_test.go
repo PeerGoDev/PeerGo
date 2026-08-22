@@ -66,6 +66,48 @@ func TestFilePersistsReopensAndRecoversIncompleteTail(t *testing.T) {
 	}
 }
 
+func TestFileAssignsV2ProducerSequenceInDurableAppendOrder(t *testing.T) {
+	directory := protectedTempDir(t)
+	path := filepath.Join(directory, "announce-v2.wal")
+	log, err := OpenFile(path, 1<<20, ProducerConfig{ID: "tracker-primary"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := walTestEventAt(t, 0x41, 0)
+	second := walTestEventAt(t, 0x42, time.Second)
+	if err := log.Append(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := log.Append(second); err != nil {
+		t.Fatal(err)
+	}
+	records, err := log.NextBatch(3)
+	if err != nil || len(records) != 2 || records[0].Producer == nil || records[1].Producer == nil ||
+		records[0].Producer.ID != "tracker-primary" || records[0].Producer.Sequence != 1 ||
+		records[1].Producer.Sequence != 2 || records[0].Producer.Epoch != records[1].Producer.Epoch {
+		t.Fatalf("records=%+v error=%v", records, err)
+	}
+	firstEpoch := records[0].Producer.Epoch
+	if err := log.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := OpenFile(path, 1<<20, ProducerConfig{ID: "tracker-primary"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	third := walTestEventAt(t, 0x43, 2*time.Second)
+	if err := reopened.Append(third); err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := reopened.NextBatch(4)
+	if err != nil || len(replayed) != 3 || replayed[2].Producer == nil ||
+		replayed[2].Producer.Sequence != 1 || replayed[2].Producer.Epoch == firstEpoch {
+		t.Fatalf("replayed=%+v error=%v", replayed, err)
+	}
+}
+
 func TestFileCheckpointReplaysOnlyUnacknowledgedRecordsAndCompacts(t *testing.T) {
 	t.Parallel()
 	directory := protectedTempDir(t)

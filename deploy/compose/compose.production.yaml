@@ -357,6 +357,11 @@ services:
     command: ["settlement-policy-worker"]
     depends_on: *tracker-migrated
 
+  settlement-storage-maintenance:
+    <<: *long-running
+    command: ["settlement-storage-maintenance"]
+    depends_on: *tracker-migrated
+
   settlement-traffic-dispatcher:
     <<: *long-running
     command: ["settlement-traffic-dispatcher"]

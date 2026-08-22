@@ -175,17 +175,12 @@ SELECT coalesce(max(window_end), sqlc.arg(initial_window_start)::timestamptz)::t
 FROM ledger.seeding_evidence_windows;
 
 -- name: GetSeedingAnnounceFence :one
-WITH terminal_head AS (
-    SELECT source_sequence, received_at
-    FROM settlement.event_inbox
-    WHERE source_stream = sqlc.arg(source_stream)::text
-      AND outcome <> 'processing'
-    ORDER BY source_sequence DESC
-    LIMIT 1
-)
-SELECT source_sequence, received_at
-FROM terminal_head
-WHERE received_at >= sqlc.arg(fence_not_before)::timestamptz;
+SELECT
+    last_source_sequence AS source_sequence,
+    last_received_at AS received_at
+FROM settlement.ingest_stream_cursors
+WHERE source_stream = sqlc.arg(source_stream)::text
+  AND last_received_at >= sqlc.arg(fence_not_before)::timestamptz;
 
 -- name: GetSeedingSnapshotFence :one
 SELECT
@@ -226,11 +221,11 @@ SELECT
     greatest(raw.starts_at, sqlc.arg(window_start)::timestamptz)::timestamptz AS clipped_starts_at,
     least(raw.ends_at, sqlc.arg(window_end)::timestamptz)::timestamptz AS clipped_ends_at,
     raw.raw_uploaded,
-    inbox.source_sequence
+    coalesce(raw.source_sequence, inbox.source_sequence)::bigint AS source_sequence
 FROM ledger.raw_session_intervals AS raw
-INNER JOIN settlement.event_inbox AS inbox ON inbox.event_id = raw.event_id
-WHERE inbox.source_stream = sqlc.arg(source_stream)::text
-  AND inbox.source_sequence <= sqlc.arg(announce_fence_sequence)::bigint
+LEFT JOIN settlement.event_inbox AS inbox ON inbox.event_id = raw.event_id
+WHERE coalesce(raw.source_stream, inbox.source_stream) = sqlc.arg(source_stream)::text
+  AND coalesce(raw.source_sequence, inbox.source_sequence) <= sqlc.arg(announce_fence_sequence)::bigint
   AND raw.starts_at < sqlc.arg(window_end)::timestamptz
   AND raw.ends_at > sqlc.arg(window_start)::timestamptz
   AND raw.previous_left = 0

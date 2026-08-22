@@ -71,6 +71,31 @@ type SettlementHnrPolicyTimelineRevision struct {
 	RecordedAt                  pgtype.Timestamptz
 }
 
+type SettlementIngestProducerCursor struct {
+	ProducerID           string
+	ProducerEpoch        uuid.UUID
+	LastProducerSequence int64
+	LastEventID          uuid.UUID
+	LastPayloadSha256    []byte
+	LastOutcome          string
+	LastSessionEpoch     int64
+	LastSourceStream     string
+	LastSourceSequence   int64
+	LastReceivedAt       pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type SettlementIngestStreamCursor struct {
+	SourceStream       string
+	SourceSubject      string
+	LastSourceSequence int64
+	LastEventID        uuid.UUID
+	LastPayloadSha256  []byte
+	LastOutcome        string
+	LastReceivedAt     pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
 type SettlementPolicyTimelineRevision struct {
 	ID                          uuid.UUID
 	ScopeUserID                 pgtype.UUID

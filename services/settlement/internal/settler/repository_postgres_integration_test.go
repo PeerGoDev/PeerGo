@@ -127,6 +127,22 @@ WHERE settlement.settlement_id = $1::uuid`, interval.EventID).Scan(
 	if rawUploaded != 500 || rawDownloaded != 300 || creditedUploaded != 1000 || chargedDownloaded != 0 || segmentCount != 1 {
 		t.Fatalf("final settlement = raw %d/%d credited %d/%d segments %d", rawUploaded, rawDownloaded, creditedUploaded, chargedDownloaded, segmentCount)
 	}
+	var rollupRawUploaded, rollupRawDownloaded, rollupCreditedUploaded, rollupChargedDownloaded, rollupCount int64
+	if err := pool.QueryRow(ctx, `
+SELECT raw_uploaded, raw_downloaded, credited_uploaded, charged_downloaded, settlement_count
+FROM ledger.traffic_daily_rollups
+WHERE traffic_day = ($1::timestamptz AT TIME ZONE 'UTC')::date
+  AND user_id = $2::uuid
+  AND torrent_id = $3::bigint`, interval.ReceivedAt, userID, interval.TorrentID).Scan(
+		&rollupRawUploaded, &rollupRawDownloaded, &rollupCreditedUploaded, &rollupChargedDownloaded, &rollupCount,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if rollupRawUploaded != rawUploaded || rollupRawDownloaded != rawDownloaded ||
+		rollupCreditedUploaded != creditedUploaded || rollupChargedDownloaded != chargedDownloaded || rollupCount != 1 {
+		t.Fatalf("daily rollup = raw %d/%d credited %d/%d count %d",
+			rollupRawUploaded, rollupRawDownloaded, rollupCreditedUploaded, rollupChargedDownloaded, rollupCount)
+	}
 	event, err := settlementtrafficv1.Decode([]byte(payload))
 	if err != nil {
 		t.Fatal(err)

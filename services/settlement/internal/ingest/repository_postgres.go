@@ -96,10 +96,11 @@ func (repository *PostgresRepository) processInTransaction(
 		delivery.DeliveryCount == 0 || delivery.DeliveryCount > math.MaxInt64 {
 		return ProcessResult{}, ErrSourceInvariant
 	}
-	event, err := trackerannouncev1.Decode(delivery.Payload)
+	decoded, err := decodeAnnounce(delivery.Payload)
 	if err != nil {
 		return ProcessResult{}, ErrInvalidInput
 	}
+	event := decoded.Event
 	eventID, err := uuid.Parse(event.EventID)
 	if err != nil {
 		return ProcessResult{}, ErrInvalidInput
@@ -121,23 +122,52 @@ func (repository *PostgresRepository) processInTransaction(
 	if processedAt.IsZero() {
 		return ProcessResult{}, ErrInvalidInput
 	}
-
-	_, err = queries.ClaimInboxEvent(ctx, ledgerdb.ClaimInboxEventParams{
-		EventID: eventID, PayloadSha256: payloadDigest[:], PayloadJson: string(delivery.Payload),
-		SourceStream: delivery.Stream, SourceSubject: delivery.Subject,
-		SourceSequence: int64(delivery.Sequence), DeliveryCount: int64(delivery.DeliveryCount),
-		ReceivedAt: timestamp(event.ReceivedAt), IngestedAt: timestamp(processedAt),
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return repository.duplicateResult(ctx, queries, eventID, event, payloadDigest, delivery.Payload)
-	}
+	streamClaim, streamDuplicate, err := claimStreamDelivery(ctx, queries, delivery, eventID, event, payloadDigest)
 	if err != nil {
-		var postgresError *pgconn.PgError
-		if errors.As(err, &postgresError) && postgresError.ConstraintName == sourceSequenceConstraint {
-			return ProcessResult{}, fmt.Errorf("%w: stream sequence already belongs to another event", ErrSourceInvariant)
-		}
-		return ProcessResult{}, repositoryOperationError("claim Settlement inbox event", err)
+		return ProcessResult{}, err
 	}
+	if streamDuplicate != nil {
+		return *streamDuplicate, nil
+	}
+
+	var producerClaim producerCursorClaim
+	if decoded.Producer == nil {
+		_, err = queries.ClaimInboxEvent(ctx, ledgerdb.ClaimInboxEventParams{
+			EventID: eventID, PayloadSha256: payloadDigest[:], PayloadJson: string(delivery.Payload),
+			SourceStream: delivery.Stream, SourceSubject: delivery.Subject,
+			SourceSequence: int64(delivery.Sequence), DeliveryCount: int64(delivery.DeliveryCount),
+			ReceivedAt: timestamp(event.ReceivedAt), IngestedAt: timestamp(processedAt),
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			result, duplicateErr := repository.duplicateResult(ctx, queries, eventID, event, payloadDigest, delivery.Payload)
+			if duplicateErr != nil {
+				return ProcessResult{}, duplicateErr
+			}
+			if err := advanceStreamCursor(ctx, queries, streamClaim, delivery, eventID, event, payloadDigest, result, processedAt); err != nil {
+				return ProcessResult{}, err
+			}
+			return result, nil
+		}
+		if err != nil {
+			var postgresError *pgconn.PgError
+			if errors.As(err, &postgresError) && postgresError.ConstraintName == sourceSequenceConstraint {
+				return ProcessResult{}, fmt.Errorf("%w: stream sequence already belongs to another event", ErrSourceInvariant)
+			}
+			return ProcessResult{}, repositoryOperationError("claim Settlement inbox event", err)
+		}
+	} else {
+		producerClaim, streamDuplicate, err = claimProducerDelivery(ctx, queries, delivery, eventID, event, payloadDigest, *decoded.Producer)
+		if err != nil {
+			return ProcessResult{}, err
+		}
+		if streamDuplicate != nil {
+			if err := advanceStreamCursor(ctx, queries, streamClaim, delivery, eventID, event, payloadDigest, *streamDuplicate, processedAt); err != nil {
+				return ProcessResult{}, err
+			}
+			return *streamDuplicate, nil
+		}
+	}
+
 	if err := queries.LockSettlementSession(ctx, ledgerdb.LockSettlementSessionParams{
 		UserID: event.UserID, TorrentID: event.TorrentID, SessionToken: sessionToken[:],
 	}); err != nil {
@@ -172,19 +202,21 @@ func (repository *PostgresRepository) processInTransaction(
 		}
 	}
 	if transition.Interval != nil {
-		if err := insertInterval(ctx, queries, *transition.Interval, eventID, userID, infoHash, sessionToken, processedAt); err != nil {
+		if err := insertInterval(ctx, queries, *transition.Interval, eventID, userID, infoHash, sessionToken, processedAt, delivery, decoded.Producer); err != nil {
 			return ProcessResult{}, err
 		}
-		rows, err := queries.FinalizeInboxWithInterval(ctx, ledgerdb.FinalizeInboxWithIntervalParams{
-			SessionEpoch: transition.Epoch, ProcessedAt: timestamp(processedAt), EventID: eventID,
-		})
-		if err != nil {
-			return ProcessResult{}, repositoryOperationError("finalize Settlement interval inbox event", err)
+		if decoded.Producer == nil {
+			rows, err := queries.FinalizeInboxWithInterval(ctx, ledgerdb.FinalizeInboxWithIntervalParams{
+				SessionEpoch: transition.Epoch, ProcessedAt: timestamp(processedAt), EventID: eventID,
+			})
+			if err != nil {
+				return ProcessResult{}, repositoryOperationError("finalize Settlement interval inbox event", err)
+			}
+			if rows != 1 {
+				return ProcessResult{}, fmt.Errorf("%w: finalized %d interval inbox rows", ErrSessionInvariant, rows)
+			}
 		}
-		if rows != 1 {
-			return ProcessResult{}, fmt.Errorf("%w: finalized %d interval inbox rows", ErrSessionInvariant, rows)
-		}
-	} else {
+	} else if decoded.Producer == nil {
 		rows, err := queries.FinalizeInboxWithoutInterval(ctx, ledgerdb.FinalizeInboxWithoutIntervalParams{
 			Outcome: string(transition.Outcome), SessionEpoch: transition.Epoch,
 			ProcessedAt: timestamp(processedAt), EventID: eventID,
@@ -196,7 +228,201 @@ func (repository *PostgresRepository) processInTransaction(
 			return ProcessResult{}, fmt.Errorf("%w: finalized %d inbox rows", ErrSessionInvariant, rows)
 		}
 	}
-	return ProcessResult{EventID: event.EventID, Outcome: transition.Outcome}, nil
+	result := ProcessResult{EventID: event.EventID, Outcome: transition.Outcome}
+	if decoded.Producer != nil {
+		if err := advanceProducerCursor(ctx, queries, producerClaim, delivery, eventID, event, payloadDigest, *decoded.Producer, transition, processedAt); err != nil {
+			return ProcessResult{}, err
+		}
+	}
+	if err := advanceStreamCursor(ctx, queries, streamClaim, delivery, eventID, event, payloadDigest, result, processedAt); err != nil {
+		return ProcessResult{}, err
+	}
+	return result, nil
+}
+
+type streamCursorClaim struct {
+	exists           bool
+	previousSequence int64
+}
+
+func claimStreamDelivery(
+	ctx context.Context,
+	queries *ledgerdb.Queries,
+	delivery Delivery,
+	eventID uuid.UUID,
+	event trackerannouncev1.Event,
+	digest [sha256.Size]byte,
+) (streamCursorClaim, *ProcessResult, error) {
+	if err := queries.LockIngestStream(ctx, delivery.Stream); err != nil {
+		return streamCursorClaim{}, nil, fmt.Errorf("lock Settlement ingest stream: %w", err)
+	}
+	cursor, err := queries.GetIngestStreamCursorForUpdate(ctx, delivery.Stream)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if delivery.Sequence != 1 {
+			return streamCursorClaim{}, nil, fmt.Errorf("%w: stream does not begin at sequence one", ErrSourceInvariant)
+		}
+		return streamCursorClaim{}, nil, nil
+	}
+	if err != nil {
+		return streamCursorClaim{}, nil, fmt.Errorf("read Settlement ingest stream cursor: %w", err)
+	}
+	if cursor.SourceSubject != delivery.Subject || cursor.LastSourceSequence < 1 {
+		return streamCursorClaim{}, nil, ErrSourceInvariant
+	}
+	claim := streamCursorClaim{exists: true, previousSequence: cursor.LastSourceSequence}
+	sequence := int64(delivery.Sequence)
+	if sequence > cursor.LastSourceSequence+1 {
+		return streamCursorClaim{}, nil, fmt.Errorf("%w: gap after stream sequence %d", ErrSourceInvariant, cursor.LastSourceSequence)
+	}
+	if sequence == cursor.LastSourceSequence+1 {
+		return claim, nil, nil
+	}
+	result := ProcessResult{EventID: event.EventID, Outcome: OutcomeDuplicate, Duplicate: true}
+	if sequence == cursor.LastSourceSequence {
+		if cursor.LastEventID != eventID {
+			return streamCursorClaim{}, nil, ErrSourceInvariant
+		}
+		if !bytes.Equal(cursor.LastPayloadSha256, digest[:]) {
+			return streamCursorClaim{}, nil, ErrEventConflict
+		}
+		result.Outcome = Outcome(cursor.LastOutcome)
+	}
+	return claim, &result, nil
+}
+
+func advanceStreamCursor(
+	ctx context.Context,
+	queries *ledgerdb.Queries,
+	claim streamCursorClaim,
+	delivery Delivery,
+	eventID uuid.UUID,
+	event trackerannouncev1.Event,
+	digest [sha256.Size]byte,
+	result ProcessResult,
+	processedAt time.Time,
+) error {
+	if result.Outcome == "" {
+		return ErrSessionInvariant
+	}
+	if !claim.exists {
+		if delivery.Sequence != 1 {
+			return ErrSourceInvariant
+		}
+		if err := queries.InsertIngestStreamCursor(ctx, ledgerdb.InsertIngestStreamCursorParams{
+			SourceStream: delivery.Stream, SourceSubject: delivery.Subject,
+			LastSourceSequence: int64(delivery.Sequence), LastEventID: eventID,
+			LastPayloadSha256: digest[:], LastOutcome: string(result.Outcome),
+			LastReceivedAt: timestamp(event.ReceivedAt), UpdatedAt: timestamp(processedAt),
+		}); err != nil {
+			return repositoryOperationError("insert Settlement ingest stream cursor", err)
+		}
+		return nil
+	}
+	rows, err := queries.UpdateIngestStreamCursor(ctx, ledgerdb.UpdateIngestStreamCursorParams{
+		NewSourceSequence: int64(delivery.Sequence), LastEventID: eventID,
+		LastPayloadSha256: digest[:], LastOutcome: string(result.Outcome),
+		LastReceivedAt: timestamp(event.ReceivedAt), UpdatedAt: timestamp(processedAt),
+		SourceStream: delivery.Stream, SourceSubject: delivery.Subject,
+		ExpectedSourceSequence: claim.previousSequence,
+	})
+	if err != nil {
+		return repositoryOperationError("advance Settlement ingest stream cursor", err)
+	}
+	if rows != 1 {
+		return ErrSourceInvariant
+	}
+	return nil
+}
+
+type producerCursorClaim struct {
+	exists           bool
+	previousSequence int64
+	epoch            uuid.UUID
+}
+
+func claimProducerDelivery(
+	ctx context.Context,
+	queries *ledgerdb.Queries,
+	delivery Delivery,
+	eventID uuid.UUID,
+	event trackerannouncev1.Event,
+	digest [sha256.Size]byte,
+	producer producerIdentity,
+) (producerCursorClaim, *ProcessResult, error) {
+	epoch, err := uuid.Parse(producer.Epoch)
+	if err != nil || producer.Sequence < 1 {
+		return producerCursorClaim{}, nil, ErrInvalidInput
+	}
+	cursor, err := queries.GetIngestProducerCursorForUpdate(ctx, ledgerdb.GetIngestProducerCursorForUpdateParams{
+		ProducerID: producer.ID, ProducerEpoch: epoch,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		if producer.Sequence != 1 {
+			return producerCursorClaim{}, nil, fmt.Errorf("%w: producer epoch does not begin at sequence one", ErrSourceInvariant)
+		}
+		return producerCursorClaim{epoch: epoch}, nil, nil
+	}
+	if err != nil {
+		return producerCursorClaim{}, nil, fmt.Errorf("read Settlement producer cursor: %w", err)
+	}
+	claim := producerCursorClaim{exists: true, previousSequence: cursor.LastProducerSequence, epoch: epoch}
+	if producer.Sequence > cursor.LastProducerSequence+1 {
+		return producerCursorClaim{}, nil, fmt.Errorf("%w: gap after producer sequence %d", ErrSourceInvariant, cursor.LastProducerSequence)
+	}
+	if producer.Sequence == cursor.LastProducerSequence+1 {
+		return claim, nil, nil
+	}
+	result := ProcessResult{EventID: event.EventID, Outcome: OutcomeDuplicate, Duplicate: true}
+	if producer.Sequence == cursor.LastProducerSequence {
+		if cursor.LastEventID != eventID || !bytes.Equal(cursor.LastPayloadSha256, digest[:]) {
+			return producerCursorClaim{}, nil, ErrEventConflict
+		}
+		result.Outcome = Outcome(cursor.LastOutcome)
+	}
+	return claim, &result, nil
+}
+
+func advanceProducerCursor(
+	ctx context.Context,
+	queries *ledgerdb.Queries,
+	claim producerCursorClaim,
+	delivery Delivery,
+	eventID uuid.UUID,
+	event trackerannouncev1.Event,
+	digest [sha256.Size]byte,
+	producer producerIdentity,
+	transition Transition,
+	processedAt time.Time,
+) error {
+	if transition.Epoch < 1 || transition.Outcome == OutcomeDuplicate {
+		return ErrSessionInvariant
+	}
+	if !claim.exists {
+		if err := queries.InsertIngestProducerCursor(ctx, ledgerdb.InsertIngestProducerCursorParams{
+			ProducerID: producer.ID, ProducerEpoch: claim.epoch,
+			LastProducerSequence: producer.Sequence, LastEventID: eventID,
+			LastPayloadSha256: digest[:], LastOutcome: string(transition.Outcome), LastSessionEpoch: transition.Epoch,
+			LastSourceStream: delivery.Stream, LastSourceSequence: int64(delivery.Sequence),
+			LastReceivedAt: timestamp(event.ReceivedAt), UpdatedAt: timestamp(processedAt),
+		}); err != nil {
+			return repositoryOperationError("insert Settlement producer cursor", err)
+		}
+		return nil
+	}
+	rows, err := queries.UpdateIngestProducerCursor(ctx, ledgerdb.UpdateIngestProducerCursorParams{
+		NewProducerSequence: producer.Sequence, LastEventID: eventID,
+		LastPayloadSha256: digest[:], LastOutcome: string(transition.Outcome), LastSessionEpoch: transition.Epoch,
+		LastSourceStream: delivery.Stream, LastSourceSequence: int64(delivery.Sequence),
+		LastReceivedAt: timestamp(event.ReceivedAt), UpdatedAt: timestamp(processedAt),
+		ProducerID: producer.ID, ProducerEpoch: claim.epoch, ExpectedProducerSequence: claim.previousSequence,
+	})
+	if err != nil {
+		return repositoryOperationError("advance Settlement producer cursor", err)
+	}
+	if rows != 1 {
+		return ErrSourceInvariant
+	}
+	return nil
 }
 
 func (repository *PostgresRepository) duplicateResult(
@@ -292,6 +518,8 @@ func insertInterval(
 	infoHash [20]byte,
 	sessionToken [sha256.Size]byte,
 	processedAt time.Time,
+	delivery Delivery,
+	producer *producerIdentity,
 ) error {
 	previousEventID, err := uuid.Parse(interval.PreviousEventID)
 	if err != nil {
@@ -311,6 +539,20 @@ func insertInterval(
 	var uploadFactor, downloadFactor pgtype.Int4
 	var downloadFactorExplicit pgtype.Bool
 	var speedLimit pgtype.Int8
+	var sourceStream, producerID pgtype.Text
+	var sourceSequence, producerSequence pgtype.Int8
+	var producerEpoch pgtype.UUID
+	if producer != nil {
+		parsedEpoch, parseErr := uuid.Parse(producer.Epoch)
+		if parseErr != nil || producer.Sequence < 1 || delivery.Sequence == 0 || delivery.Sequence > math.MaxInt64 {
+			return ErrSessionInvariant
+		}
+		sourceStream = pgtype.Text{String: delivery.Stream, Valid: true}
+		sourceSequence = pgtype.Int8{Int64: int64(delivery.Sequence), Valid: true}
+		producerID = pgtype.Text{String: producer.ID, Valid: true}
+		producerEpoch = pgtype.UUID{Bytes: parsedEpoch, Valid: true}
+		producerSequence = pgtype.Int8{Int64: producer.Sequence, Valid: true}
+	}
 	if interval.NetworkEvidence != nil {
 		evidence := interval.NetworkEvidence
 		networkPolicySequence = pgtype.Int8{Int64: evidence.PolicySequence, Valid: true}
@@ -330,7 +572,10 @@ func insertInterval(
 		speedLimit = pgtype.Int8{Int64: evidence.SpeedLimitBytesPerSecond, Valid: true}
 	}
 	if err := queries.InsertRawSessionInterval(ctx, ledgerdb.InsertRawSessionIntervalParams{
-		EventID: eventID, PreviousEventID: previousEventID, UserID: userID,
+		EventID: eventID, PreviousEventID: previousEventID,
+		SourceStream: sourceStream, SourceSequence: sourceSequence,
+		ProducerID: producerID, ProducerEpoch: producerEpoch, ProducerSequence: producerSequence,
+		UserID:    userID,
 		TorrentID: interval.TorrentID, SessionToken: sessionToken[:], InfoHashV1: infoHash[:],
 		SessionEpoch: interval.SessionEpoch, StartsAt: timestamp(interval.StartsAt), EndsAt: timestamp(interval.EndsAt),
 		EventKind: interval.EventKind, AddressFamily: int16(interval.AddressFamily),

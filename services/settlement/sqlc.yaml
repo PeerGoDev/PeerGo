@@ -7,6 +7,7 @@ sql:
       - internal/settler/repository_postgres.sql
       - internal/hnr/repository_postgres.sql
       - internal/seedingevidence/repository_postgres.sql
+      - internal/storagecleanup/repository_postgres.sql
     gen:
       go:
         package: ledgerdb

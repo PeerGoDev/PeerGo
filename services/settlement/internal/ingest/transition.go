@@ -26,6 +26,7 @@ const (
 	OutcomeCounterReset     Outcome = "counter_reset"
 	OutcomeOutOfOrder       Outcome = "out_of_order"
 	OutcomeReopenedBaseline Outcome = "reopened_baseline"
+	OutcomeDuplicate        Outcome = "duplicate"
 )
 
 type Session struct {

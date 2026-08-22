@@ -8,10 +8,12 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"time"
 
 	"github.com/peergo/peergo/contracts/go/trackerannouncev1"
+	"github.com/peergo/peergo/contracts/go/trackerannouncev2"
 	"github.com/peergo/peergo/services/tracker/internal/protocol"
 	"github.com/peergo/peergo/services/tracker/internal/uuidv7"
 )
@@ -25,6 +27,20 @@ const (
 var ErrInvalid = trackerannouncev1.ErrInvalid
 
 type Event = trackerannouncev1.Event
+
+// Decoded normalizes both wire versions to the v1 business event consumed by
+// the existing settlement transition. Producer is non-nil only for v2 and is
+// the bounded idempotency identity used by Settlement.
+type Decoded struct {
+	Event    Event
+	Producer *Producer
+}
+
+type Producer struct {
+	ID       string
+	Epoch    string
+	Sequence int64
+}
 
 type Input struct {
 	ReceivedAt             time.Time
@@ -115,6 +131,48 @@ func Encode(event Event) ([]byte, error) {
 
 func Decode(encoded []byte) (Event, error) {
 	return trackerannouncev1.Decode(encoded)
+}
+
+func EncodeSequenced(event Event, producer Producer) ([]byte, error) {
+	sequenced, err := trackerannouncev2.FromV1(event, producer.ID, producer.Epoch, producer.Sequence)
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	return trackerannouncev2.Encode(sequenced)
+}
+
+// DecodeAny is intentionally the only mixed-version boundary. A tiny schema
+// header selects a strict canonical codec; unknown schemas and fields still
+// fail closed inside the selected contract.
+func DecodeAny(encoded []byte) (Decoded, error) {
+	if len(encoded) < 2 || len(encoded) > MaxEventBytes {
+		return Decoded{}, ErrInvalid
+	}
+	var header struct {
+		SchemaVersion string `json:"schema_version"`
+	}
+	if err := json.Unmarshal(encoded, &header); err != nil {
+		return Decoded{}, ErrInvalid
+	}
+	switch header.SchemaVersion {
+	case trackerannouncev1.SchemaVersion:
+		event, err := trackerannouncev1.Decode(encoded)
+		if err != nil {
+			return Decoded{}, ErrInvalid
+		}
+		return Decoded{Event: event}, nil
+	case trackerannouncev2.SchemaVersion:
+		event, err := trackerannouncev2.Decode(encoded)
+		if err != nil {
+			return Decoded{}, ErrInvalid
+		}
+		return Decoded{
+			Event:    event.ToV1(),
+			Producer: &Producer{ID: event.ProducerID, Epoch: event.ProducerEpoch, Sequence: event.ProducerSequence},
+		}, nil
+	default:
+		return Decoded{}, ErrInvalid
+	}
 }
 
 func sessionToken(input Input) string {

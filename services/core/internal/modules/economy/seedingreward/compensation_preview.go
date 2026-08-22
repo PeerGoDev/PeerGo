@@ -351,23 +351,17 @@ ORDER BY anomaly.window_start`, int64(compensationMaxIntervalCredit/time.Second)
 		return "", 0, windows, nil
 	}
 
-	// The announce consumer is ordered, but the preview independently proves
-	// that its repeatable-read snapshot contains a gap-free terminal prefix.
-	// This is the compensation watermark: a later live announce may advance a
-	// future preview, while no absent lower sequence can silently change this
-	// artifact after approval.
-	var first, fence, count, processing int64
+	// The transactionally advanced stream cursor is the gap-free terminal
+	// prefix. This avoids rescanning (and permanently retaining) one inbox row
+	// per announce merely to prove a watermark.
+	var fence int64
 	if err := tx.QueryRow(ctx, `
-SELECT
-    coalesce(min(source_sequence), 0),
-    coalesce(max(source_sequence), 0),
-    count(*)::bigint,
-    count(*) FILTER (WHERE outcome = 'processing')::bigint
-FROM settlement.event_inbox
-WHERE source_stream = $1`, stream).Scan(&first, &fence, &count, &processing); err != nil {
+SELECT last_source_sequence
+FROM settlement.ingest_stream_cursors
+WHERE source_stream = $1`, stream).Scan(&fence); err != nil {
 		return "", 0, nil, fmt.Errorf("read compensation Tracker fence: %w", err)
 	}
-	if first != 1 || fence < 1 || count != fence || processing != 0 {
+	if fence < 1 {
 		return "", 0, nil, fmt.Errorf("read compensation Tracker fence: %w", ErrInvariant)
 	}
 	return stream, fence, windows, nil

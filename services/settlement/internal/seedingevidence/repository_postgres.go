@@ -71,8 +71,9 @@ func validEvidenceTimingConfig(closureDelay, maxIntervalCredit time.Duration) bo
 }
 
 // ApplySnapshot stores one canonical full-snapshot chunk. It shares the
-// trackerswarmv1 contract with Core but retains complete historical entries;
-// a snapshot becomes eligible to close evidence only after every chunk commits.
+// trackerswarmv1 contract with Core; a snapshot becomes eligible to close
+// evidence only after every chunk commits. Redundant entry detail is pruned
+// after closure, while selected detail has a 30-day reconciliation window.
 func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, delivery SnapshotDelivery) (SnapshotApplyResult, error) {
 	if delivery.Stream != repository.config.SnapshotStream || delivery.Subject != repository.config.SnapshotSubject ||
 		delivery.Sequence == 0 || delivery.Sequence > math.MaxInt64 ||

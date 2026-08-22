@@ -41,6 +41,22 @@ func TestBuildSpeedObservationSkipsDisabledThreshold(t *testing.T) {
 	}
 }
 
+func TestBuildSpeedObservationDoesNotPersistNormalTraffic(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 8, 18, 2, 0, 0, 0, time.UTC)
+	raw := rawInterval{
+		EventID:  uuid.MustParse("0198f20a-6da8-7e51-9c64-111111111111"),
+		StartsAt: start, EndsAt: start.Add(10 * time.Second), RawUploaded: 100,
+		NetworkEvidence: &policy.NetworkEvidence{SpeedLimitBytesPerSecond: 10},
+	}
+	observation, err := buildSpeedObservation(raw, []policy.PolicySlice{{
+		StartsAt: start, EndsAt: raw.EndsAt, Snapshot: testObservationSnapshot(),
+	}}, start.Add(time.Minute))
+	if err != nil || observation != nil {
+		t.Fatalf("normal observation=%+v error=%v", observation, err)
+	}
+}
+
 func testObservationSnapshot() policy.Snapshot {
 	return policy.Snapshot{
 		Revision: policy.RuleRef{Source: policy.SourcePolicyRevision, ID: "baseline", Version: 1},

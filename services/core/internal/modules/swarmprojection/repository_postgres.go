@@ -212,7 +212,7 @@ func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, payload
 // retry has a new event ID but the same completion ID, so it is acknowledged as
 // a duplicate without incrementing again.
 func (repository *PostgresRepository) ApplyCompletion(ctx context.Context, payload []byte, receivedAt time.Time) (ApplyResult, error) {
-	event, err := trackerannouncev1.Decode(payload)
+	event, err := decodeCompletionAnnounce(payload)
 	if err != nil || receivedAt.IsZero() {
 		return ApplyResult{}, ErrInput
 	}

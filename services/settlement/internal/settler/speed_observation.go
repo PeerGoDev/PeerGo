@@ -40,22 +40,24 @@ func buildSpeedObservation(raw rawInterval, slices []policy.PolicySlice, observe
 	if err != nil {
 		return nil, err
 	}
-	outcome := speedOutcomeWithinLimit
-	if average > raw.NetworkEvidence.SpeedLimitBytesPerSecond {
-		vipSlices := 0
-		for _, slice := range slices {
-			if slice.Snapshot.Benefits.AccountTier != nil && slice.Snapshot.Benefits.AccountTier.Rule.Source == policy.SourceVIP {
-				vipSlices++
-			}
+	// Normal observations belong in bounded metrics, not an immutable row per
+	// announce. PostgreSQL retains only threshold violations and the historical
+	// exemption decision needed to explain them.
+	if average <= raw.NetworkEvidence.SpeedLimitBytesPerSecond {
+		return nil, nil
+	}
+	outcome := speedOutcomeExceeded
+	vipSlices := 0
+	for _, slice := range slices {
+		if slice.Snapshot.Benefits.AccountTier != nil && slice.Snapshot.Benefits.AccountTier.Rule.Source == policy.SourceVIP {
+			vipSlices++
 		}
-		switch {
-		case vipSlices == len(slices):
-			outcome = speedOutcomeVIPExempt
-		case vipSlices > 0:
-			outcome = speedOutcomePartiallyVIPExempt
-		default:
-			outcome = speedOutcomeExceeded
-		}
+	}
+	switch {
+	case vipSlices == len(slices):
+		outcome = speedOutcomeVIPExempt
+	case vipSlices > 0:
+		outcome = speedOutcomePartiallyVIPExempt
 	}
 	return &speedObservation{
 		IntervalEventID: raw.EventID, IntervalDurationNanoseconds: duration.Nanoseconds(),

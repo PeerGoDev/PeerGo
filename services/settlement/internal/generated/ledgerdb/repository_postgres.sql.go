@@ -1058,6 +1058,80 @@ func (q *Queries) GetInboxEvent(ctx context.Context, eventID uuid.UUID) (GetInbo
 	return i, err
 }
 
+const getIngestProducerCursorForUpdate = `-- name: GetIngestProducerCursorForUpdate :one
+SELECT
+    producer_id,
+    producer_epoch,
+    last_producer_sequence,
+    last_event_id,
+    last_payload_sha256,
+    last_outcome,
+    last_session_epoch,
+    last_source_stream,
+    last_source_sequence,
+    last_received_at,
+    updated_at
+FROM settlement.ingest_producer_cursors
+WHERE producer_id = $1::text
+  AND producer_epoch = $2::uuid
+FOR UPDATE
+`
+
+type GetIngestProducerCursorForUpdateParams struct {
+	ProducerID    string
+	ProducerEpoch uuid.UUID
+}
+
+func (q *Queries) GetIngestProducerCursorForUpdate(ctx context.Context, arg GetIngestProducerCursorForUpdateParams) (SettlementIngestProducerCursor, error) {
+	row := q.db.QueryRow(ctx, getIngestProducerCursorForUpdate, arg.ProducerID, arg.ProducerEpoch)
+	var i SettlementIngestProducerCursor
+	err := row.Scan(
+		&i.ProducerID,
+		&i.ProducerEpoch,
+		&i.LastProducerSequence,
+		&i.LastEventID,
+		&i.LastPayloadSha256,
+		&i.LastOutcome,
+		&i.LastSessionEpoch,
+		&i.LastSourceStream,
+		&i.LastSourceSequence,
+		&i.LastReceivedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getIngestStreamCursorForUpdate = `-- name: GetIngestStreamCursorForUpdate :one
+SELECT
+    source_stream,
+    source_subject,
+    last_source_sequence,
+    last_event_id,
+    last_payload_sha256,
+    last_outcome,
+    last_received_at,
+    updated_at
+FROM settlement.ingest_stream_cursors
+WHERE source_stream = $1::text
+FOR UPDATE
+`
+
+func (q *Queries) GetIngestStreamCursorForUpdate(ctx context.Context, sourceStream string) (SettlementIngestStreamCursor, error) {
+	row := q.db.QueryRow(ctx, getIngestStreamCursorForUpdate, sourceStream)
+	var i SettlementIngestStreamCursor
+	err := row.Scan(
+		&i.SourceStream,
+		&i.SourceSubject,
+		&i.LastSourceSequence,
+		&i.LastEventID,
+		&i.LastPayloadSha256,
+		&i.LastOutcome,
+		&i.LastReceivedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getLatestSeedingSnapshotForRoute = `-- name: GetLatestSeedingSnapshotForRoute :one
 SELECT snapshot_id, snapshot_sequence, observed_at
 FROM ledger.seeding_swarm_snapshots
@@ -1174,22 +1248,17 @@ func (q *Queries) GetPromotionRule(ctx context.Context, id uuid.UUID) (Settlemen
 }
 
 const getSeedingAnnounceFence = `-- name: GetSeedingAnnounceFence :one
-WITH terminal_head AS (
-    SELECT source_sequence, received_at
-    FROM settlement.event_inbox
-    WHERE source_stream = $2::text
-      AND outcome <> 'processing'
-    ORDER BY source_sequence DESC
-    LIMIT 1
-)
-SELECT source_sequence, received_at
-FROM terminal_head
-WHERE received_at >= $1::timestamptz
+SELECT
+    last_source_sequence AS source_sequence,
+    last_received_at AS received_at
+FROM settlement.ingest_stream_cursors
+WHERE source_stream = $1::text
+  AND last_received_at >= $2::timestamptz
 `
 
 type GetSeedingAnnounceFenceParams struct {
-	FenceNotBefore pgtype.Timestamptz
 	SourceStream   string
+	FenceNotBefore pgtype.Timestamptz
 }
 
 type GetSeedingAnnounceFenceRow struct {
@@ -1198,7 +1267,7 @@ type GetSeedingAnnounceFenceRow struct {
 }
 
 func (q *Queries) GetSeedingAnnounceFence(ctx context.Context, arg GetSeedingAnnounceFenceParams) (GetSeedingAnnounceFenceRow, error) {
-	row := q.db.QueryRow(ctx, getSeedingAnnounceFence, arg.FenceNotBefore, arg.SourceStream)
+	row := q.db.QueryRow(ctx, getSeedingAnnounceFence, arg.SourceStream, arg.FenceNotBefore)
 	var i GetSeedingAnnounceFenceRow
 	err := row.Scan(&i.SourceSequence, &i.ReceivedAt)
 	return i, err
@@ -1731,10 +1800,121 @@ func (q *Queries) InsertHNRObligation(ctx context.Context, arg InsertHNRObligati
 	return err
 }
 
+const insertIngestProducerCursor = `-- name: InsertIngestProducerCursor :exec
+INSERT INTO settlement.ingest_producer_cursors (
+    producer_id,
+    producer_epoch,
+    last_producer_sequence,
+    last_event_id,
+    last_payload_sha256,
+    last_outcome,
+    last_session_epoch,
+    last_source_stream,
+    last_source_sequence,
+    last_received_at,
+    updated_at
+) VALUES (
+    $1::text,
+    $2::uuid,
+    $3::bigint,
+    $4::uuid,
+    $5::bytea,
+    $6::text,
+    $7::bigint,
+    $8::text,
+    $9::bigint,
+    $10::timestamptz,
+    $11::timestamptz
+)
+`
+
+type InsertIngestProducerCursorParams struct {
+	ProducerID           string
+	ProducerEpoch        uuid.UUID
+	LastProducerSequence int64
+	LastEventID          uuid.UUID
+	LastPayloadSha256    []byte
+	LastOutcome          string
+	LastSessionEpoch     int64
+	LastSourceStream     string
+	LastSourceSequence   int64
+	LastReceivedAt       pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+func (q *Queries) InsertIngestProducerCursor(ctx context.Context, arg InsertIngestProducerCursorParams) error {
+	_, err := q.db.Exec(ctx, insertIngestProducerCursor,
+		arg.ProducerID,
+		arg.ProducerEpoch,
+		arg.LastProducerSequence,
+		arg.LastEventID,
+		arg.LastPayloadSha256,
+		arg.LastOutcome,
+		arg.LastSessionEpoch,
+		arg.LastSourceStream,
+		arg.LastSourceSequence,
+		arg.LastReceivedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertIngestStreamCursor = `-- name: InsertIngestStreamCursor :exec
+INSERT INTO settlement.ingest_stream_cursors (
+    source_stream,
+    source_subject,
+    last_source_sequence,
+    last_event_id,
+    last_payload_sha256,
+    last_outcome,
+    last_received_at,
+    updated_at
+) VALUES (
+    $1::text,
+    $2::text,
+    $3::bigint,
+    $4::uuid,
+    $5::bytea,
+    $6::text,
+    $7::timestamptz,
+    $8::timestamptz
+)
+`
+
+type InsertIngestStreamCursorParams struct {
+	SourceStream       string
+	SourceSubject      string
+	LastSourceSequence int64
+	LastEventID        uuid.UUID
+	LastPayloadSha256  []byte
+	LastOutcome        string
+	LastReceivedAt     pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) InsertIngestStreamCursor(ctx context.Context, arg InsertIngestStreamCursorParams) error {
+	_, err := q.db.Exec(ctx, insertIngestStreamCursor,
+		arg.SourceStream,
+		arg.SourceSubject,
+		arg.LastSourceSequence,
+		arg.LastEventID,
+		arg.LastPayloadSha256,
+		arg.LastOutcome,
+		arg.LastReceivedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const insertRawSessionInterval = `-- name: InsertRawSessionInterval :exec
 INSERT INTO ledger.raw_session_intervals (
     event_id,
     previous_event_id,
+    source_stream,
+    source_sequence,
+    producer_id,
+    producer_epoch,
+    producer_sequence,
     user_id,
     torrent_id,
     session_token,
@@ -1769,43 +1949,53 @@ INSERT INTO ledger.raw_session_intervals (
 ) VALUES (
     $1::uuid,
     $2::uuid,
-    $3::uuid,
+    $3::text,
     $4::bigint,
-    $5::bytea,
-    $6::bytea,
+    $5::text,
+    $6::uuid,
     $7::bigint,
-    $8::timestamptz,
-    $9::timestamptz,
-    $10::text,
-    $11::smallint,
+    $8::uuid,
+    $9::bigint,
+    $10::bytea,
+    $11::bytea,
     $12::bigint,
-    $13::bigint,
-    $14::bigint,
-    $15::bigint,
-    $16::bigint,
+    $13::timestamptz,
+    $14::timestamptz,
+    $15::text,
+    $16::smallint,
     $17::bigint,
     $18::bigint,
     $19::bigint,
     $20::bigint,
     $21::bigint,
     $22::bigint,
-    $23::boolean,
-    $24::bytea,
+    $23::bigint,
+    $24::bigint,
     $25::bigint,
-    $26::text,
-    $27::text,
-    $28::text,
-    $29::integer,
-    $30::integer,
-    $31::boolean,
-    $32::bigint,
-    $33::timestamptz
+    $26::bigint,
+    $27::bigint,
+    $28::boolean,
+    $29::bytea,
+    $30::bigint,
+    $31::text,
+    $32::text,
+    $33::text,
+    $34::integer,
+    $35::integer,
+    $36::boolean,
+    $37::bigint,
+    $38::timestamptz
 )
 `
 
 type InsertRawSessionIntervalParams struct {
 	EventID                          uuid.UUID
 	PreviousEventID                  uuid.UUID
+	SourceStream                     pgtype.Text
+	SourceSequence                   pgtype.Int8
+	ProducerID                       pgtype.Text
+	ProducerEpoch                    pgtype.UUID
+	ProducerSequence                 pgtype.Int8
 	UserID                           uuid.UUID
 	TorrentID                        int64
 	SessionToken                     []byte
@@ -1843,6 +2033,11 @@ func (q *Queries) InsertRawSessionInterval(ctx context.Context, arg InsertRawSes
 	_, err := q.db.Exec(ctx, insertRawSessionInterval,
 		arg.EventID,
 		arg.PreviousEventID,
+		arg.SourceStream,
+		arg.SourceSequence,
+		arg.ProducerID,
+		arg.ProducerEpoch,
+		arg.ProducerSequence,
 		arg.UserID,
 		arg.TorrentID,
 		arg.SessionToken,
@@ -2873,11 +3068,11 @@ SELECT
     greatest(raw.starts_at, $1::timestamptz)::timestamptz AS clipped_starts_at,
     least(raw.ends_at, $2::timestamptz)::timestamptz AS clipped_ends_at,
     raw.raw_uploaded,
-    inbox.source_sequence
+    coalesce(raw.source_sequence, inbox.source_sequence)::bigint AS source_sequence
 FROM ledger.raw_session_intervals AS raw
-INNER JOIN settlement.event_inbox AS inbox ON inbox.event_id = raw.event_id
-WHERE inbox.source_stream = $3::text
-  AND inbox.source_sequence <= $4::bigint
+LEFT JOIN settlement.event_inbox AS inbox ON inbox.event_id = raw.event_id
+WHERE coalesce(raw.source_stream, inbox.source_stream) = $3::text
+  AND coalesce(raw.source_sequence, inbox.source_sequence) <= $4::bigint
   AND raw.starts_at < $2::timestamptz
   AND raw.ends_at > $1::timestamptz
   AND raw.previous_left = 0
@@ -3253,6 +3448,18 @@ SELECT pg_advisory_xact_lock(hashtextextended('peergo-settlement-hnr-policy-time
 
 func (q *Queries) LockHNRPolicyTimeline(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, lockHNRPolicyTimeline)
+	return err
+}
+
+const lockIngestStream = `-- name: LockIngestStream :exec
+SELECT pg_advisory_xact_lock(hashtextextended(
+    'peergo-settlement-ingest-stream-v2:' || $1::text,
+    0
+))
+`
+
+func (q *Queries) LockIngestStream(ctx context.Context, sourceStream string) error {
+	_, err := q.db.Exec(ctx, lockIngestStream, sourceStream)
 	return err
 }
 
@@ -3708,6 +3915,623 @@ func (q *Queries) ReleaseTrafficOutboxEvent(ctx context.Context, arg ReleaseTraf
 	return result.RowsAffected(), nil
 }
 
+const storageCleanupDeleteHNROutbox = `-- name: StorageCleanupDeleteHNROutbox :execrows
+WITH candidate AS (
+    SELECT outbox.event_id
+    FROM settlement.hnr_outbox AS outbox
+    WHERE outbox.published_at < $1::timestamptz
+    ORDER BY outbox.published_at, outbox.event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM settlement.hnr_outbox AS outbox
+USING candidate
+WHERE outbox.event_id = candidate.event_id
+`
+
+type StorageCleanupDeleteHNROutboxParams struct {
+	TerminalBefore pgtype.Timestamptz
+	BatchSize      int32
+}
+
+func (q *Queries) StorageCleanupDeleteHNROutbox(ctx context.Context, arg StorageCleanupDeleteHNROutboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteHNROutbox, arg.TerminalBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteHNRWork = `-- name: StorageCleanupDeleteHNRWork :execrows
+WITH candidate AS (
+    SELECT work.interval_event_id
+    FROM settlement.hnr_work AS work
+    WHERE work.processed_at < $1::timestamptz
+    ORDER BY work.processed_at, work.interval_event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM settlement.hnr_work AS work
+USING candidate
+WHERE work.interval_event_id = candidate.interval_event_id
+`
+
+type StorageCleanupDeleteHNRWorkParams struct {
+	TerminalBefore pgtype.Timestamptz
+	BatchSize      int32
+}
+
+func (q *Queries) StorageCleanupDeleteHNRWork(ctx context.Context, arg StorageCleanupDeleteHNRWorkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteHNRWork, arg.TerminalBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteLegacyInbox = `-- name: StorageCleanupDeleteLegacyInbox :execrows
+WITH candidate AS (
+    SELECT inbox.event_id
+    FROM settlement.event_inbox AS inbox
+    WHERE inbox.processed_at < $1::timestamptz
+      AND inbox.outcome <> 'processing'
+      AND NOT EXISTS (
+          SELECT 1 FROM settlement.ingest_stream_cursors AS cursor
+          WHERE cursor.last_event_id = inbox.event_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM settlement.session_states AS state
+          WHERE state.last_event_id = inbox.event_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM ledger.raw_session_intervals AS raw
+          WHERE raw.event_id = inbox.event_id OR raw.previous_event_id = inbox.event_id
+      )
+    ORDER BY inbox.processed_at, inbox.event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM settlement.event_inbox AS inbox
+USING candidate
+WHERE inbox.event_id = candidate.event_id
+`
+
+type StorageCleanupDeleteLegacyInboxParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupDeleteLegacyInbox(ctx context.Context, arg StorageCleanupDeleteLegacyInboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteLegacyInbox, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeletePolicyWork = `-- name: StorageCleanupDeletePolicyWork :execrows
+WITH candidate AS (
+    SELECT work.interval_event_id
+    FROM settlement.policy_work AS work
+    WHERE work.settled_at < $1::timestamptz
+    ORDER BY work.settled_at, work.interval_event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM settlement.policy_work AS work
+USING candidate
+WHERE work.interval_event_id = candidate.interval_event_id
+`
+
+type StorageCleanupDeletePolicyWorkParams struct {
+	TerminalBefore pgtype.Timestamptz
+	BatchSize      int32
+}
+
+func (q *Queries) StorageCleanupDeletePolicyWork(ctx context.Context, arg StorageCleanupDeletePolicyWorkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeletePolicyWork, arg.TerminalBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteRawIntervals = `-- name: StorageCleanupDeleteRawIntervals :execrows
+WITH evidence_head AS (
+    SELECT max(window_end) AS closed_through
+    FROM ledger.seeding_evidence_windows
+), candidate AS (
+    SELECT raw.event_id
+    FROM ledger.raw_session_intervals AS raw
+    CROSS JOIN evidence_head
+    WHERE raw.ends_at < $1::timestamptz
+      AND (
+          raw.previous_left <> 0
+          OR raw.current_left <> 0
+          OR raw.ends_at <= coalesce(evidence_head.closed_through, '-infinity'::timestamptz)
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM settlement.policy_work AS work
+          WHERE work.interval_event_id = raw.event_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM ledger.traffic_settlements AS traffic
+          WHERE traffic.settlement_id = raw.event_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM settlement.hnr_work AS work
+          WHERE work.interval_event_id = raw.event_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM ledger.speed_observations AS observation
+          WHERE observation.interval_event_id = raw.event_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM ledger.seeding_evidence_sources AS source
+          WHERE source.interval_event_id = raw.event_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM ledger.seeding_evidence_anomalies AS anomaly
+          WHERE anomaly.interval_event_id = raw.event_id
+      )
+      AND NOT EXISTS (
+          SELECT 1
+          FROM ledger.hnr_obligations AS obligation
+          INNER JOIN ledger.hnr_completion_assessments AS assessment
+              ON assessment.id = obligation.assessment_id
+          WHERE obligation.state = 'tracking'
+            AND assessment.user_id = raw.user_id
+            AND assessment.torrent_id = raw.torrent_id
+            AND raw.ends_at > assessment.completed_at
+      )
+    ORDER BY raw.ends_at, raw.event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM ledger.raw_session_intervals AS raw
+USING candidate
+WHERE raw.event_id = candidate.event_id
+`
+
+type StorageCleanupDeleteRawIntervalsParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupDeleteRawIntervals(ctx context.Context, arg StorageCleanupDeleteRawIntervalsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteRawIntervals, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSeedingAnomalies = `-- name: StorageCleanupDeleteSeedingAnomalies :execrows
+WITH candidate AS (
+    SELECT anomaly.id
+    FROM ledger.seeding_evidence_anomalies AS anomaly
+    WHERE anomaly.detected_at < $1::timestamptz
+    ORDER BY anomaly.detected_at, anomaly.id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM ledger.seeding_evidence_anomalies AS anomaly
+USING candidate
+WHERE anomaly.id = candidate.id
+`
+
+type StorageCleanupDeleteSeedingAnomaliesParams struct {
+	AnomalyBefore pgtype.Timestamptz
+	BatchSize     int32
+}
+
+func (q *Queries) StorageCleanupDeleteSeedingAnomalies(ctx context.Context, arg StorageCleanupDeleteSeedingAnomaliesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSeedingAnomalies, arg.AnomalyBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSeedingEvidenceOutbox = `-- name: StorageCleanupDeleteSeedingEvidenceOutbox :execrows
+WITH candidate AS (
+    SELECT outbox.event_id
+    FROM settlement.seeding_evidence_outbox AS outbox
+    WHERE outbox.published_at < $1::timestamptz
+    ORDER BY outbox.published_at, outbox.event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM settlement.seeding_evidence_outbox AS outbox
+USING candidate
+WHERE outbox.event_id = candidate.event_id
+`
+
+type StorageCleanupDeleteSeedingEvidenceOutboxParams struct {
+	TerminalBefore pgtype.Timestamptz
+	BatchSize      int32
+}
+
+func (q *Queries) StorageCleanupDeleteSeedingEvidenceOutbox(ctx context.Context, arg StorageCleanupDeleteSeedingEvidenceOutboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSeedingEvidenceOutbox, arg.TerminalBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSeedingSources = `-- name: StorageCleanupDeleteSeedingSources :execrows
+WITH candidate AS (
+    SELECT source.window_start, source.user_id, source.torrent_id, source.interval_event_id
+    FROM ledger.seeding_evidence_sources AS source
+    WHERE source.window_start < $1::timestamptz
+      AND NOT EXISTS (
+          SELECT 1
+          FROM ledger.seeding_evidence_anomalies AS anomaly
+          WHERE anomaly.window_start = source.window_start
+      )
+    ORDER BY source.window_start, source.user_id, source.torrent_id, source.interval_event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM ledger.seeding_evidence_sources AS source
+USING candidate
+WHERE source.window_start = candidate.window_start
+  AND source.user_id = candidate.user_id
+  AND source.torrent_id = candidate.torrent_id
+  AND source.interval_event_id = candidate.interval_event_id
+`
+
+type StorageCleanupDeleteSeedingSourcesParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupDeleteSeedingSources(ctx context.Context, arg StorageCleanupDeleteSeedingSourcesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSeedingSources, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSessions = `-- name: StorageCleanupDeleteSessions :execrows
+WITH candidate AS (
+    SELECT state.user_id, state.torrent_id, state.session_token
+    FROM settlement.session_states AS state
+    WHERE state.updated_at < $1::timestamptz
+    ORDER BY state.updated_at, state.user_id, state.torrent_id, state.session_token
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM settlement.session_states AS state
+USING candidate
+WHERE state.user_id = candidate.user_id
+  AND state.torrent_id = candidate.torrent_id
+  AND state.session_token = candidate.session_token
+`
+
+type StorageCleanupDeleteSessionsParams struct {
+	SessionBefore pgtype.Timestamptz
+	BatchSize     int32
+}
+
+func (q *Queries) StorageCleanupDeleteSessions(ctx context.Context, arg StorageCleanupDeleteSessionsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSessions, arg.SessionBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSnapshotChunks = `-- name: StorageCleanupDeleteSnapshotChunks :execrows
+WITH candidate AS (
+    SELECT chunk.snapshot_id, chunk.chunk_index
+    FROM ledger.seeding_swarm_snapshot_chunks AS chunk
+    INNER JOIN ledger.seeding_swarm_snapshots AS snapshot
+        ON snapshot.snapshot_id = chunk.snapshot_id
+    WHERE snapshot.status IN ('collecting', 'complete')
+      AND snapshot.observed_at < $1::timestamptz
+      AND snapshot.observed_at < coalesce(
+          (SELECT max(evidence_window.window_end) FROM ledger.seeding_evidence_windows AS evidence_window),
+          '-infinity'::timestamptz
+      )
+    ORDER BY snapshot.observed_at, chunk.snapshot_id, chunk.chunk_index
+    LIMIT $2::integer
+    FOR UPDATE OF chunk SKIP LOCKED
+)
+DELETE FROM ledger.seeding_swarm_snapshot_chunks AS chunk
+USING candidate
+WHERE chunk.snapshot_id = candidate.snapshot_id
+  AND chunk.chunk_index = candidate.chunk_index
+`
+
+type StorageCleanupDeleteSnapshotChunksParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupDeleteSnapshotChunks(ctx context.Context, arg StorageCleanupDeleteSnapshotChunksParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSnapshotChunks, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSnapshotEntries = `-- name: StorageCleanupDeleteSnapshotEntries :execrows
+WITH candidate AS (
+    SELECT entry.snapshot_id, entry.info_hash_v1
+    FROM ledger.seeding_swarm_snapshot_entries AS entry
+    INNER JOIN ledger.seeding_swarm_snapshots AS snapshot
+        ON snapshot.snapshot_id = entry.snapshot_id
+    WHERE snapshot.status IN ('collecting', 'complete')
+      AND (
+        (
+            snapshot.observed_at < coalesce(
+                (SELECT max(evidence_window.window_end) FROM ledger.seeding_evidence_windows AS evidence_window),
+                '-infinity'::timestamptz
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM ledger.seeding_evidence_windows AS evidence_window
+                WHERE evidence_window.selected_snapshot_id = snapshot.snapshot_id
+            )
+        )
+        OR
+        (
+            snapshot.observed_at < $1::timestamptz
+            AND EXISTS (
+                SELECT 1
+                FROM ledger.seeding_evidence_windows AS retained_window
+                WHERE retained_window.selected_snapshot_id = snapshot.snapshot_id
+                  AND retained_window.window_end < $1::timestamptz
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM ledger.seeding_evidence_windows AS anomalous_window
+                INNER JOIN ledger.seeding_evidence_anomalies AS anomaly
+                    ON anomaly.window_start = anomalous_window.window_start
+                WHERE anomalous_window.selected_snapshot_id = snapshot.snapshot_id
+            )
+        )
+    )
+    ORDER BY snapshot.observed_at, entry.snapshot_id, entry.info_hash_v1
+    LIMIT $2::integer
+    FOR UPDATE OF entry SKIP LOCKED
+)
+DELETE FROM ledger.seeding_swarm_snapshot_entries AS entry
+USING candidate
+WHERE entry.snapshot_id = candidate.snapshot_id
+  AND entry.info_hash_v1 = candidate.info_hash_v1
+`
+
+type StorageCleanupDeleteSnapshotEntriesParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupDeleteSnapshotEntries(ctx context.Context, arg StorageCleanupDeleteSnapshotEntriesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSnapshotEntries, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSnapshotInbox = `-- name: StorageCleanupDeleteSnapshotInbox :execrows
+WITH candidate AS (
+    SELECT inbox.event_id
+    FROM settlement.seeding_swarm_snapshot_inbox AS inbox
+    INNER JOIN ledger.seeding_swarm_snapshots AS snapshot
+        ON snapshot.snapshot_id = inbox.snapshot_id
+    WHERE inbox.received_at < $1::timestamptz
+      AND snapshot.status IN ('collecting', 'complete')
+      AND snapshot.observed_at < coalesce(
+          (SELECT max(evidence_window.window_end) FROM ledger.seeding_evidence_windows AS evidence_window),
+          '-infinity'::timestamptz
+      )
+      AND NOT EXISTS (
+          SELECT 1
+          FROM ledger.seeding_swarm_snapshot_chunks AS chunk
+          WHERE chunk.event_id = inbox.event_id
+      )
+    ORDER BY inbox.received_at, inbox.event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM settlement.seeding_swarm_snapshot_inbox AS inbox
+USING candidate
+WHERE inbox.event_id = candidate.event_id
+`
+
+type StorageCleanupDeleteSnapshotInboxParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupDeleteSnapshotInbox(ctx context.Context, arg StorageCleanupDeleteSnapshotInboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSnapshotInbox, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSnapshotRuns = `-- name: StorageCleanupDeleteSnapshotRuns :execrows
+WITH candidate AS (
+    SELECT snapshot.snapshot_id
+    FROM ledger.seeding_swarm_snapshots AS snapshot
+    WHERE snapshot.status IN ('collecting', 'complete')
+      AND snapshot.observed_at < $1::timestamptz
+      AND snapshot.observed_at < coalesce(
+          (SELECT max(evidence_window.window_end) FROM ledger.seeding_evidence_windows AS evidence_window),
+          '-infinity'::timestamptz
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM settlement.seeding_swarm_snapshot_inbox AS inbox
+          WHERE inbox.snapshot_id = snapshot.snapshot_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM ledger.seeding_swarm_snapshot_chunks AS chunk
+          WHERE chunk.snapshot_id = snapshot.snapshot_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM ledger.seeding_swarm_snapshot_entries AS entry
+          WHERE entry.snapshot_id = snapshot.snapshot_id
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM ledger.seeding_evidence_windows AS evidence_window
+          WHERE evidence_window.selected_snapshot_id = snapshot.snapshot_id
+             OR evidence_window.snapshot_fence_id = snapshot.snapshot_id
+      )
+      AND EXISTS (
+          SELECT 1 FROM ledger.seeding_swarm_snapshots AS newer
+          WHERE newer.source_id = snapshot.source_id
+            AND newer.routing_epoch = snapshot.routing_epoch
+            AND newer.snapshot_sequence > snapshot.snapshot_sequence
+      )
+    ORDER BY snapshot.observed_at, snapshot.snapshot_id
+    LIMIT $2::integer
+    FOR UPDATE OF snapshot SKIP LOCKED
+)
+DELETE FROM ledger.seeding_swarm_snapshots AS snapshot
+USING candidate
+WHERE snapshot.snapshot_id = candidate.snapshot_id
+`
+
+type StorageCleanupDeleteSnapshotRunsParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupDeleteSnapshotRuns(ctx context.Context, arg StorageCleanupDeleteSnapshotRunsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSnapshotRuns, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteSpeedObservations = `-- name: StorageCleanupDeleteSpeedObservations :execrows
+WITH candidate AS (
+    SELECT observation.interval_event_id
+    FROM ledger.speed_observations AS observation
+    WHERE observation.observed_at < $1::timestamptz
+    ORDER BY observation.observed_at, observation.interval_event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM ledger.speed_observations AS observation
+USING candidate
+WHERE observation.interval_event_id = candidate.interval_event_id
+`
+
+type StorageCleanupDeleteSpeedObservationsParams struct {
+	AnomalyBefore pgtype.Timestamptz
+	BatchSize     int32
+}
+
+func (q *Queries) StorageCleanupDeleteSpeedObservations(ctx context.Context, arg StorageCleanupDeleteSpeedObservationsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSpeedObservations, arg.AnomalyBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteTrafficOutbox = `-- name: StorageCleanupDeleteTrafficOutbox :execrows
+WITH candidate AS (
+    SELECT outbox.event_id
+    FROM settlement.traffic_outbox AS outbox
+    WHERE outbox.published_at < $1::timestamptz
+    ORDER BY outbox.published_at, outbox.event_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM settlement.traffic_outbox AS outbox
+USING candidate
+WHERE outbox.event_id = candidate.event_id
+`
+
+type StorageCleanupDeleteTrafficOutboxParams struct {
+	TerminalBefore pgtype.Timestamptz
+	BatchSize      int32
+}
+
+func (q *Queries) StorageCleanupDeleteTrafficOutbox(ctx context.Context, arg StorageCleanupDeleteTrafficOutboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteTrafficOutbox, arg.TerminalBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteTrafficSettlementSegments = `-- name: StorageCleanupDeleteTrafficSettlementSegments :execrows
+DELETE FROM ledger.traffic_settlement_segments
+WHERE settlement_id = ANY($1::uuid[])
+`
+
+func (q *Queries) StorageCleanupDeleteTrafficSettlementSegments(ctx context.Context, settlementIds []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteTrafficSettlementSegments, settlementIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupDeleteTrafficSettlements = `-- name: StorageCleanupDeleteTrafficSettlements :execrows
+DELETE FROM ledger.traffic_settlements
+WHERE settlement_id = ANY($1::uuid[])
+`
+
+func (q *Queries) StorageCleanupDeleteTrafficSettlements(ctx context.Context, settlementIds []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, storageCleanupDeleteTrafficSettlements, settlementIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const storageCleanupListTrafficSettlements = `-- name: StorageCleanupListTrafficSettlements :many
+SELECT settlement.settlement_id
+FROM ledger.traffic_settlements AS settlement
+WHERE settlement.interval_ends_at < $1::timestamptz
+  AND NOT EXISTS (
+      SELECT 1
+      FROM settlement.traffic_outbox AS outbox
+      WHERE outbox.settlement_id = settlement.settlement_id
+  )
+ORDER BY settlement.interval_ends_at, settlement.settlement_id
+LIMIT $2::integer
+FOR UPDATE SKIP LOCKED
+`
+
+type StorageCleanupListTrafficSettlementsParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupListTrafficSettlements(ctx context.Context, arg StorageCleanupListTrafficSettlementsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, storageCleanupListTrafficSettlements, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var settlement_id uuid.UUID
+		if err := rows.Scan(&settlement_id); err != nil {
+			return nil, err
+		}
+		items = append(items, settlement_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateHNRObligationProgress = `-- name: UpdateHNRObligationProgress :execrows
 UPDATE ledger.hnr_obligations
 SET
@@ -3752,6 +4576,103 @@ func (q *Queries) UpdateHNRObligationProgress(ctx context.Context, arg UpdateHNR
 		arg.UpdatedAt,
 		arg.ID,
 		arg.ExpectedVersion,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateIngestProducerCursor = `-- name: UpdateIngestProducerCursor :execrows
+UPDATE settlement.ingest_producer_cursors
+SET
+    last_producer_sequence = $1::bigint,
+    last_event_id = $2::uuid,
+    last_payload_sha256 = $3::bytea,
+    last_outcome = $4::text,
+    last_session_epoch = $5::bigint,
+    last_source_stream = $6::text,
+    last_source_sequence = $7::bigint,
+    last_received_at = $8::timestamptz,
+    updated_at = $9::timestamptz
+WHERE producer_id = $10::text
+  AND producer_epoch = $11::uuid
+  AND last_producer_sequence = $12::bigint
+`
+
+type UpdateIngestProducerCursorParams struct {
+	NewProducerSequence      int64
+	LastEventID              uuid.UUID
+	LastPayloadSha256        []byte
+	LastOutcome              string
+	LastSessionEpoch         int64
+	LastSourceStream         string
+	LastSourceSequence       int64
+	LastReceivedAt           pgtype.Timestamptz
+	UpdatedAt                pgtype.Timestamptz
+	ProducerID               string
+	ProducerEpoch            uuid.UUID
+	ExpectedProducerSequence int64
+}
+
+func (q *Queries) UpdateIngestProducerCursor(ctx context.Context, arg UpdateIngestProducerCursorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateIngestProducerCursor,
+		arg.NewProducerSequence,
+		arg.LastEventID,
+		arg.LastPayloadSha256,
+		arg.LastOutcome,
+		arg.LastSessionEpoch,
+		arg.LastSourceStream,
+		arg.LastSourceSequence,
+		arg.LastReceivedAt,
+		arg.UpdatedAt,
+		arg.ProducerID,
+		arg.ProducerEpoch,
+		arg.ExpectedProducerSequence,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateIngestStreamCursor = `-- name: UpdateIngestStreamCursor :execrows
+UPDATE settlement.ingest_stream_cursors
+SET
+    last_source_sequence = $1::bigint,
+    last_event_id = $2::uuid,
+    last_payload_sha256 = $3::bytea,
+    last_outcome = $4::text,
+    last_received_at = $5::timestamptz,
+    updated_at = $6::timestamptz
+WHERE source_stream = $7::text
+  AND source_subject = $8::text
+  AND last_source_sequence = $9::bigint
+`
+
+type UpdateIngestStreamCursorParams struct {
+	NewSourceSequence      int64
+	LastEventID            uuid.UUID
+	LastPayloadSha256      []byte
+	LastOutcome            string
+	LastReceivedAt         pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+	SourceStream           string
+	SourceSubject          string
+	ExpectedSourceSequence int64
+}
+
+func (q *Queries) UpdateIngestStreamCursor(ctx context.Context, arg UpdateIngestStreamCursorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateIngestStreamCursor,
+		arg.NewSourceSequence,
+		arg.LastEventID,
+		arg.LastPayloadSha256,
+		arg.LastOutcome,
+		arg.LastReceivedAt,
+		arg.UpdatedAt,
+		arg.SourceStream,
+		arg.SourceSubject,
+		arg.ExpectedSourceSequence,
 	)
 	if err != nil {
 		return 0, err

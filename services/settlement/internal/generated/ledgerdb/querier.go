@@ -33,6 +33,8 @@ type Querier interface {
 	GetHNRCompletionAssessmentByCompletionID(ctx context.Context, completionID []byte) (LedgerHnrCompletionAssessment, error)
 	GetHNRPolicyTimelineRevision(ctx context.Context, id uuid.UUID) (SettlementHnrPolicyTimelineRevision, error)
 	GetInboxEvent(ctx context.Context, eventID uuid.UUID) (GetInboxEventRow, error)
+	GetIngestProducerCursorForUpdate(ctx context.Context, arg GetIngestProducerCursorForUpdateParams) (SettlementIngestProducerCursor, error)
+	GetIngestStreamCursorForUpdate(ctx context.Context, sourceStream string) (SettlementIngestStreamCursor, error)
 	GetLatestSeedingSnapshotForRoute(ctx context.Context, arg GetLatestSeedingSnapshotForRouteParams) (GetLatestSeedingSnapshotForRouteRow, error)
 	GetNextSeedingEvidenceWindowStart(ctx context.Context, initialWindowStart pgtype.Timestamptz) (pgtype.Timestamptz, error)
 	GetPolicyTimelineRevision(ctx context.Context, id uuid.UUID) (SettlementPolicyTimelineRevision, error)
@@ -49,6 +51,8 @@ type Querier interface {
 	IncrementSeedingSnapshotReceivedChunks(ctx context.Context, snapshotID uuid.UUID) (IncrementSeedingSnapshotReceivedChunksRow, error)
 	InsertHNRCompletionAssessment(ctx context.Context, arg InsertHNRCompletionAssessmentParams) error
 	InsertHNRObligation(ctx context.Context, arg InsertHNRObligationParams) error
+	InsertIngestProducerCursor(ctx context.Context, arg InsertIngestProducerCursorParams) error
+	InsertIngestStreamCursor(ctx context.Context, arg InsertIngestStreamCursorParams) error
 	InsertRawSessionInterval(ctx context.Context, arg InsertRawSessionIntervalParams) error
 	InsertSeedingEvidenceItem(ctx context.Context, arg InsertSeedingEvidenceItemParams) error
 	InsertSeedingEvidenceOutboxEvent(ctx context.Context, arg InsertSeedingEvidenceOutboxEventParams) error
@@ -74,6 +78,7 @@ type Querier interface {
 	ListWorkgroupBenefitTransitionsForInterval(ctx context.Context, arg ListWorkgroupBenefitTransitionsForIntervalParams) ([]ListWorkgroupBenefitTransitionsForIntervalRow, error)
 	LockHNRAggregate(ctx context.Context, arg LockHNRAggregateParams) error
 	LockHNRPolicyTimeline(ctx context.Context) error
+	LockIngestStream(ctx context.Context, sourceStream string) error
 	// Policy writes take the exclusive side of the same lock. This waits for every
 	// in-flight settlement resolver before appending history, then prevents new
 	// resolvers until the immutable policy transaction commits.
@@ -100,7 +105,27 @@ type Querier interface {
 	ReleasePolicyWork(ctx context.Context, arg ReleasePolicyWorkParams) (int64, error)
 	ReleaseSeedingEvidenceOutboxEvent(ctx context.Context, arg ReleaseSeedingEvidenceOutboxEventParams) (int64, error)
 	ReleaseTrafficOutboxEvent(ctx context.Context, arg ReleaseTrafficOutboxEventParams) (int64, error)
+	StorageCleanupDeleteHNROutbox(ctx context.Context, arg StorageCleanupDeleteHNROutboxParams) (int64, error)
+	StorageCleanupDeleteHNRWork(ctx context.Context, arg StorageCleanupDeleteHNRWorkParams) (int64, error)
+	StorageCleanupDeleteLegacyInbox(ctx context.Context, arg StorageCleanupDeleteLegacyInboxParams) (int64, error)
+	StorageCleanupDeletePolicyWork(ctx context.Context, arg StorageCleanupDeletePolicyWorkParams) (int64, error)
+	StorageCleanupDeleteRawIntervals(ctx context.Context, arg StorageCleanupDeleteRawIntervalsParams) (int64, error)
+	StorageCleanupDeleteSeedingAnomalies(ctx context.Context, arg StorageCleanupDeleteSeedingAnomaliesParams) (int64, error)
+	StorageCleanupDeleteSeedingEvidenceOutbox(ctx context.Context, arg StorageCleanupDeleteSeedingEvidenceOutboxParams) (int64, error)
+	StorageCleanupDeleteSeedingSources(ctx context.Context, arg StorageCleanupDeleteSeedingSourcesParams) (int64, error)
+	StorageCleanupDeleteSessions(ctx context.Context, arg StorageCleanupDeleteSessionsParams) (int64, error)
+	StorageCleanupDeleteSnapshotChunks(ctx context.Context, arg StorageCleanupDeleteSnapshotChunksParams) (int64, error)
+	StorageCleanupDeleteSnapshotEntries(ctx context.Context, arg StorageCleanupDeleteSnapshotEntriesParams) (int64, error)
+	StorageCleanupDeleteSnapshotInbox(ctx context.Context, arg StorageCleanupDeleteSnapshotInboxParams) (int64, error)
+	StorageCleanupDeleteSnapshotRuns(ctx context.Context, arg StorageCleanupDeleteSnapshotRunsParams) (int64, error)
+	StorageCleanupDeleteSpeedObservations(ctx context.Context, arg StorageCleanupDeleteSpeedObservationsParams) (int64, error)
+	StorageCleanupDeleteTrafficOutbox(ctx context.Context, arg StorageCleanupDeleteTrafficOutboxParams) (int64, error)
+	StorageCleanupDeleteTrafficSettlementSegments(ctx context.Context, settlementIds []uuid.UUID) (int64, error)
+	StorageCleanupDeleteTrafficSettlements(ctx context.Context, settlementIds []uuid.UUID) (int64, error)
+	StorageCleanupListTrafficSettlements(ctx context.Context, arg StorageCleanupListTrafficSettlementsParams) ([]uuid.UUID, error)
 	UpdateHNRObligationProgress(ctx context.Context, arg UpdateHNRObligationProgressParams) (int64, error)
+	UpdateIngestProducerCursor(ctx context.Context, arg UpdateIngestProducerCursorParams) (int64, error)
+	UpdateIngestStreamCursor(ctx context.Context, arg UpdateIngestStreamCursorParams) (int64, error)
 	UpdateSettlementSession(ctx context.Context, arg UpdateSettlementSessionParams) (int64, error)
 }
 

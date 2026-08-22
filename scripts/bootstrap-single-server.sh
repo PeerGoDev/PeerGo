@@ -247,6 +247,13 @@ hnr_stream_max_bytes="$(bootstrap_or_existing \
     10737418240 \
     53687091200)"
 
+tracker_announce_producer_id="$(bootstrap_or_existing \
+    PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID \
+    PEERGO_BOOTSTRAP_TRACKER_ANNOUNCE_PRODUCER_ID \
+    tracker-primary)"
+[[ "${tracker_announce_producer_id}" =~ ^[a-z][a-z0-9-]{0,62}$ ]] ||
+    fail "PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID must be a stable lowercase identifier"
+
 settlement_policy_concurrency="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_POLICY_CONCURRENCY \
     PEERGO_BOOTSTRAP_SETTLEMENT_POLICY_CONCURRENCY \
@@ -275,6 +282,35 @@ core_traffic_concurrency="$(bootstrap_or_existing \
     PEERGO_CORE_TRAFFIC_CONCURRENCY \
     PEERGO_BOOTSTRAP_CORE_TRAFFIC_CONCURRENCY \
     4)"
+
+storage_cleanup_interval="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_STORAGE_CLEANUP_INTERVAL \
+    PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_CLEANUP_INTERVAL \
+    15s)"
+storage_terminal_retention="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION \
+    PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_TERMINAL_RETENTION \
+    72h)"
+storage_session_retention="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_STORAGE_SESSION_RETENTION \
+    PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_SESSION_RETENTION \
+    48h)"
+storage_detail_retention="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION \
+    PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_DETAIL_RETENTION \
+    720h)"
+storage_anomaly_retention="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION \
+    PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_ANOMALY_RETENTION \
+    4320h)"
+storage_batch_size="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE \
+    PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_BATCH_SIZE \
+    10000)"
+storage_startup_timeout="$(bootstrap_or_existing \
+    PEERGO_SETTLEMENT_STORAGE_STARTUP_TIMEOUT \
+    PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_STARTUP_TIMEOUT \
+    15s)"
 [[ "${core_traffic_concurrency}" =~ ^[1-9][0-9]?$ ]] &&
     ((10#${core_traffic_concurrency} <= 32)) ||
     fail "PEERGO_CORE_TRAFFIC_CONCURRENCY must be an integer between 1 and 32"
@@ -414,10 +450,18 @@ set_env PEERGO_TORRENT_STORAGE_DRIVER filesystem
 set_env PEERGO_TORRENT_STORAGE_FILESYSTEM_ROOT /var/lib/peergo/objects
 set_env PEERGO_IMAGE_DERIVATIVE_TEMP_DIR /var/lib/peergo/image-derivative-tmp
 set_env PEERGO_SETTLEMENT_HNR_STREAM_MAX_BYTES "${hnr_stream_max_bytes}"
+set_env PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID "${tracker_announce_producer_id}"
 set_env PEERGO_SETTLEMENT_POLICY_CONCURRENCY "${settlement_policy_concurrency}"
 set_env PEERGO_SETTLEMENT_BATCH_SIZE "${settlement_batch_size}"
 set_env PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY "${settlement_traffic_outbox_concurrency}"
 set_env PEERGO_CORE_TRAFFIC_CONCURRENCY "${core_traffic_concurrency}"
+set_env PEERGO_SETTLEMENT_STORAGE_CLEANUP_INTERVAL "${storage_cleanup_interval}"
+set_env PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION "${storage_terminal_retention}"
+set_env PEERGO_SETTLEMENT_STORAGE_SESSION_RETENTION "${storage_session_retention}"
+set_env PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION "${storage_detail_retention}"
+set_env PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION "${storage_anomaly_retention}"
+set_env PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE "${storage_batch_size}"
+set_env PEERGO_SETTLEMENT_STORAGE_STARTUP_TIMEOUT "${storage_startup_timeout}"
 set_env PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY "${seeding_evidence_closure_delay}"
 set_env PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT "${seeding_evidence_max_interval_credit}"
 

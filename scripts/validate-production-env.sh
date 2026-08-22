@@ -43,6 +43,10 @@ require_value PEERGO_SMTP_FROM_ADDRESS
 require_value PEERGO_TRACKER_TRUSTED_PROXY_CIDRS
 [[ "$(env_get PEERGO_SMTP_HOST)" != smtp.example.com ]] || fail "replace the example SMTP host"
 
+tracker_announce_producer_id="$(env_get PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID)"
+[[ "${tracker_announce_producer_id}" =~ ^[a-z][a-z0-9-]{0,62}$ ]] ||
+    fail "PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID must be a stable lowercase identifier"
+
 seeding_start="$(env_get PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT)"
 [[ "${seeding_start}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:00:00Z$ ]] ||
     fail "PEERGO_SETTLEMENT_SEEDING_EVIDENCE_START_AT must be the exact UTC Tracker cutover hour"
@@ -82,6 +86,31 @@ settlement_batch_size="$(env_get PEERGO_SETTLEMENT_BATCH_SIZE)"
 [[ "${settlement_batch_size}" =~ ^[1-9][0-9]{0,2}$ ]] &&
     ((10#${settlement_batch_size} <= 512)) ||
     fail "PEERGO_SETTLEMENT_BATCH_SIZE must be an integer between 1 and 512"
+
+storage_interval_seconds="$(duration_seconds "$(env_get PEERGO_SETTLEMENT_STORAGE_CLEANUP_INTERVAL)")" ||
+    fail "PEERGO_SETTLEMENT_STORAGE_CLEANUP_INTERVAL must use one whole s, m or h unit"
+storage_terminal_seconds="$(duration_seconds "$(env_get PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION)")" ||
+    fail "PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION must use one whole s, m or h unit"
+storage_session_seconds="$(duration_seconds "$(env_get PEERGO_SETTLEMENT_STORAGE_SESSION_RETENTION)")" ||
+    fail "PEERGO_SETTLEMENT_STORAGE_SESSION_RETENTION must use one whole s, m or h unit"
+storage_detail_seconds="$(duration_seconds "$(env_get PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION)")" ||
+    fail "PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION must use one whole s, m or h unit"
+storage_anomaly_seconds="$(duration_seconds "$(env_get PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION)")" ||
+    fail "PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION must use one whole s, m or h unit"
+((storage_interval_seconds >= 10 && storage_interval_seconds <= 3600)) ||
+    fail "Settlement storage cleanup interval must be between 10s and 1h"
+((storage_terminal_seconds >= 72 * 3600 && storage_terminal_seconds <= 30 * 24 * 3600)) ||
+    fail "Settlement terminal retention must be between 72h and 720h"
+((storage_session_seconds >= 48 * 3600 && storage_session_seconds <= 30 * 24 * 3600)) ||
+    fail "Settlement session retention must be between 48h and 720h"
+((storage_detail_seconds >= 30 * 24 * 3600 && storage_detail_seconds <= 90 * 24 * 3600)) ||
+    fail "Settlement detail retention must be between 720h and 2160h"
+((storage_anomaly_seconds >= 180 * 24 * 3600 && storage_anomaly_seconds <= 365 * 24 * 3600)) ||
+    fail "Settlement anomaly retention must be between 4320h and 8760h"
+storage_batch_size="$(env_get PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE)"
+[[ "${storage_batch_size}" =~ ^[1-9][0-9]{2,4}$ ]] &&
+    ((10#${storage_batch_size} >= 100 && 10#${storage_batch_size} <= 10000)) ||
+    fail "PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE must be an integer between 100 and 10000"
 
 settlement_traffic_outbox_concurrency="$(env_get PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY)"
 [[ "${settlement_traffic_outbox_concurrency}" =~ ^[1-9][0-9]?$ ]] &&

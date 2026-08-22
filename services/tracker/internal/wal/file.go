@@ -7,11 +7,13 @@ package wal
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +21,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/peergo/peergo/contracts/go/trackerannouncev2"
 	"github.com/peergo/peergo/services/tracker/internal/announceevent"
+	"github.com/peergo/peergo/services/tracker/internal/uuidv7"
 )
 
 const (
@@ -43,6 +47,14 @@ type Appender interface {
 	Ready() error
 }
 
+// ProducerConfig opts new WAL records into the sequenced v2 envelope. The
+// epoch is generated once per process start, while File assigns sequence
+// numbers in the exact durable append order. Existing v1 WAL records remain
+// replayable alongside newly appended v2 records.
+type ProducerConfig struct {
+	ID string
+}
+
 type File struct {
 	mu             sync.Mutex
 	handle         *os.File
@@ -53,6 +65,9 @@ type File struct {
 	ackOffset      int64
 	wake           chan struct{}
 	fault          error
+	producerID     string
+	producerEpoch  string
+	producerNext   int64
 
 	appendMu      sync.Mutex
 	appendQueue   []*appendRequest
@@ -62,7 +77,7 @@ type File struct {
 }
 
 type appendRequest struct {
-	record []byte
+	event  announceevent.Event
 	result chan error
 }
 
@@ -73,9 +88,22 @@ type Stats struct {
 	CapacityBytes       int64
 }
 
-func OpenFile(path string, maxBytes int64) (*File, error) {
-	if strings.TrimSpace(path) == "" || !filepath.IsAbs(path) || maxBytes < 1<<20 {
+func OpenFile(path string, maxBytes int64, producerConfigs ...ProducerConfig) (*File, error) {
+	if strings.TrimSpace(path) == "" || !filepath.IsAbs(path) || maxBytes < 1<<20 || len(producerConfigs) > 1 {
 		return nil, ErrConfig
+	}
+	producerID := ""
+	producerEpoch := ""
+	if len(producerConfigs) == 1 {
+		producerID = producerConfigs[0].ID
+		if !trackerannouncev2.ValidProducerID(producerID) {
+			return nil, ErrConfig
+		}
+		epoch, err := uuidv7.New(time.Now().UTC(), rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("create Tracker announce producer epoch: %w", err)
+		}
+		producerEpoch = epoch
 	}
 	path = filepath.Clean(path)
 	parent := filepath.Dir(path)
@@ -122,6 +150,7 @@ func OpenFile(path string, maxBytes int64) (*File, error) {
 	wal := &File{
 		handle: handle, checkpointPath: target + ".checkpoint", parentPath: resolvedParent,
 		maxBytes: maxBytes, size: fileInfo.Size(), wake: make(chan struct{}, 1),
+		producerID: producerID, producerEpoch: producerEpoch,
 	}
 	if wal.size > maxBytes {
 		_ = wal.Close()
@@ -141,18 +170,11 @@ func OpenFile(path string, maxBytes int64) (*File, error) {
 }
 
 func (wal *File) Append(event announceevent.Event) error {
-	encoded, err := announceevent.Encode(event)
-	if err != nil {
+	if _, err := announceevent.Encode(event); err != nil {
 		return err
 	}
-	record := make([]byte, recordHeaderBytes+len(encoded)+recordDigestBytes)
-	copy(record[:4], magic[:])
-	binary.BigEndian.PutUint32(record[4:8], uint32(len(encoded)))
-	copy(record[8:], encoded)
-	digest := sha256.Sum256(encoded)
-	copy(record[8+len(encoded):], digest[:])
 
-	request := &appendRequest{record: record, result: make(chan error, 1)}
+	request := &appendRequest{event: event, result: make(chan error, 1)}
 	wal.appendMu.Lock()
 	if wal.appendClosed {
 		wal.appendMu.Unlock()
@@ -201,16 +223,10 @@ func (wal *File) appendBatch(batch []*appendRequest) error {
 	if len(batch) == 0 {
 		return ErrConfig
 	}
-	totalBytes := 0
 	for _, request := range batch {
-		if request == nil || len(request.record) < recordHeaderBytes+recordDigestBytes {
+		if request == nil {
 			return ErrConfig
 		}
-		totalBytes += len(request.record)
-	}
-	records := make([]byte, 0, totalBytes)
-	for _, request := range batch {
-		records = append(records, request.record...)
 	}
 
 	wal.mu.Lock()
@@ -220,6 +236,39 @@ func (wal *File) appendBatch(batch []*appendRequest) error {
 	}
 	if wal.handle == nil {
 		return ErrUnsafe
+	}
+	encodedRecords := make([][]byte, len(batch))
+	totalBytes := 0
+	nextSequence := wal.producerNext
+	for index, request := range batch {
+		var encoded []byte
+		var err error
+		if wal.producerID == "" {
+			encoded, err = announceevent.Encode(request.event)
+		} else {
+			if nextSequence == math.MaxInt64 {
+				return ErrFull
+			}
+			nextSequence++
+			encoded, err = announceevent.EncodeSequenced(request.event, announceevent.Producer{
+				ID: wal.producerID, Epoch: wal.producerEpoch, Sequence: nextSequence,
+			})
+		}
+		if err != nil {
+			return err
+		}
+		record := make([]byte, recordHeaderBytes+len(encoded)+recordDigestBytes)
+		copy(record[:4], magic[:])
+		binary.BigEndian.PutUint32(record[4:8], uint32(len(encoded)))
+		copy(record[8:], encoded)
+		digest := sha256.Sum256(encoded)
+		copy(record[8+len(encoded):], digest[:])
+		encodedRecords[index] = record
+		totalBytes += len(record)
+	}
+	records := make([]byte, 0, totalBytes)
+	for _, record := range encodedRecords {
+		records = append(records, record...)
 	}
 	if wal.size+int64(len(records)) > wal.maxBytes {
 		wal.fault = ErrFull
@@ -234,6 +283,7 @@ func (wal *File) appendBatch(batch []*appendRequest) error {
 		return wal.fault
 	}
 	wal.size += int64(len(records))
+	wal.producerNext = nextSequence
 	select {
 	case wal.wake <- struct{}{}:
 	default:
@@ -354,13 +404,13 @@ func (wal *File) recoverTail(checkpoint checkpoint) error {
 		if !bytes.Equal(digest[:], body[payloadSize:]) {
 			return ErrCorrupt
 		}
-		event, err := announceevent.Decode(body[:payloadSize])
+		decoded, err := announceevent.DecodeAny(body[:payloadSize])
 		if err != nil {
 			return ErrCorrupt
 		}
 		offset += recordSize
 		if offset == checkpoint.Offset {
-			if event.EventID != checkpoint.EventID || digest != checkpoint.PayloadSHA256 {
+			if decoded.Event.EventID != checkpoint.EventID || digest != checkpoint.PayloadSHA256 {
 				return ErrCorrupt
 			}
 			checkpointMatched = true

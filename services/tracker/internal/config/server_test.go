@@ -26,7 +26,7 @@ func TestLoadServerBuildsBoundedRuntimeConfiguration(t *testing.T) {
 		settings.Swarm.MaxPeers != 100000 || len(settings.NATSURLs) != 1 ||
 		len(settings.TrustedProxyCIDRs) != 2 || settings.TrustedProxyCIDRs[0] != netip.MustParsePrefix("192.0.2.10/32") ||
 		settings.TrustedProxyCIDRs[1] != netip.MustParsePrefix("2001:db8::10/128") ||
-		settings.AnnounceStream != "PEERGO_TRACKER_ANNOUNCE_V1" || settings.PublishTimeout != 3*time.Second ||
+		settings.AnnounceStream != "PEERGO_TRACKER_ANNOUNCE_V1" || settings.AnnounceProducerID != "tracker-primary" || settings.PublishTimeout != 3*time.Second ||
 		settings.SwarmSnapshotStream != "PEERGO_TRACKER_SWARM_SNAPSHOT_V1" || settings.SwarmRoutingEpoch != 1 {
 		t.Fatalf("settings = %+v", settings)
 	}
@@ -127,6 +127,7 @@ func serverTestValues(directory string) map[string]string {
 		"PEERGO_TRACKER_NATS_RECONNECT_WAIT":              "1s",
 		"PEERGO_TRACKER_ANNOUNCE_STREAM":                  "PEERGO_TRACKER_ANNOUNCE_V1",
 		"PEERGO_TRACKER_ANNOUNCE_SUBJECT":                 "peergo.tracker.announce.v1",
+		"PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID":             "tracker-primary",
 		"PEERGO_TRACKER_ANNOUNCE_PUBLISH_TIMEOUT":         "3s",
 		"PEERGO_TRACKER_ANNOUNCE_PUBLISH_RETRY_MIN":       "100ms",
 		"PEERGO_TRACKER_ANNOUNCE_PUBLISH_RETRY_MAX":       "10s",

@@ -47,6 +47,7 @@ RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-seeding-snapshot-consumer-init ./services/settlement/cmd/seeding-snapshot-consumer-init && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-seeding-evidence-worker ./services/settlement/cmd/seeding-evidence-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-policy-worker ./services/settlement/cmd/policy-worker && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-storage-maintenance ./services/settlement/cmd/storage-maintenance && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-control-api ./services/settlement/cmd/promotion-control-api && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-traffic-stream-init ./services/settlement/cmd/traffic-stream-init && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/settlement-traffic-dispatcher ./services/settlement/cmd/traffic-dispatcher && \

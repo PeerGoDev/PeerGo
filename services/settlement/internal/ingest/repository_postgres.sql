@@ -1,3 +1,118 @@
+-- name: LockIngestStream :exec
+SELECT pg_advisory_xact_lock(hashtextextended(
+    'peergo-settlement-ingest-stream-v2:' || sqlc.arg(source_stream)::text,
+    0
+));
+
+-- name: GetIngestStreamCursorForUpdate :one
+SELECT
+    source_stream,
+    source_subject,
+    last_source_sequence,
+    last_event_id,
+    last_payload_sha256,
+    last_outcome,
+    last_received_at,
+    updated_at
+FROM settlement.ingest_stream_cursors
+WHERE source_stream = sqlc.arg(source_stream)::text
+FOR UPDATE;
+
+-- name: InsertIngestStreamCursor :exec
+INSERT INTO settlement.ingest_stream_cursors (
+    source_stream,
+    source_subject,
+    last_source_sequence,
+    last_event_id,
+    last_payload_sha256,
+    last_outcome,
+    last_received_at,
+    updated_at
+) VALUES (
+    sqlc.arg(source_stream)::text,
+    sqlc.arg(source_subject)::text,
+    sqlc.arg(last_source_sequence)::bigint,
+    sqlc.arg(last_event_id)::uuid,
+    sqlc.arg(last_payload_sha256)::bytea,
+    sqlc.arg(last_outcome)::text,
+    sqlc.arg(last_received_at)::timestamptz,
+    sqlc.arg(updated_at)::timestamptz
+);
+
+-- name: UpdateIngestStreamCursor :execrows
+UPDATE settlement.ingest_stream_cursors
+SET
+    last_source_sequence = sqlc.arg(new_source_sequence)::bigint,
+    last_event_id = sqlc.arg(last_event_id)::uuid,
+    last_payload_sha256 = sqlc.arg(last_payload_sha256)::bytea,
+    last_outcome = sqlc.arg(last_outcome)::text,
+    last_received_at = sqlc.arg(last_received_at)::timestamptz,
+    updated_at = sqlc.arg(updated_at)::timestamptz
+WHERE source_stream = sqlc.arg(source_stream)::text
+  AND source_subject = sqlc.arg(source_subject)::text
+  AND last_source_sequence = sqlc.arg(expected_source_sequence)::bigint;
+
+-- name: GetIngestProducerCursorForUpdate :one
+SELECT
+    producer_id,
+    producer_epoch,
+    last_producer_sequence,
+    last_event_id,
+    last_payload_sha256,
+    last_outcome,
+    last_session_epoch,
+    last_source_stream,
+    last_source_sequence,
+    last_received_at,
+    updated_at
+FROM settlement.ingest_producer_cursors
+WHERE producer_id = sqlc.arg(producer_id)::text
+  AND producer_epoch = sqlc.arg(producer_epoch)::uuid
+FOR UPDATE;
+
+-- name: InsertIngestProducerCursor :exec
+INSERT INTO settlement.ingest_producer_cursors (
+    producer_id,
+    producer_epoch,
+    last_producer_sequence,
+    last_event_id,
+    last_payload_sha256,
+    last_outcome,
+    last_session_epoch,
+    last_source_stream,
+    last_source_sequence,
+    last_received_at,
+    updated_at
+) VALUES (
+    sqlc.arg(producer_id)::text,
+    sqlc.arg(producer_epoch)::uuid,
+    sqlc.arg(last_producer_sequence)::bigint,
+    sqlc.arg(last_event_id)::uuid,
+    sqlc.arg(last_payload_sha256)::bytea,
+    sqlc.arg(last_outcome)::text,
+    sqlc.arg(last_session_epoch)::bigint,
+    sqlc.arg(last_source_stream)::text,
+    sqlc.arg(last_source_sequence)::bigint,
+    sqlc.arg(last_received_at)::timestamptz,
+    sqlc.arg(updated_at)::timestamptz
+);
+
+-- name: UpdateIngestProducerCursor :execrows
+UPDATE settlement.ingest_producer_cursors
+SET
+    last_producer_sequence = sqlc.arg(new_producer_sequence)::bigint,
+    last_event_id = sqlc.arg(last_event_id)::uuid,
+    last_payload_sha256 = sqlc.arg(last_payload_sha256)::bytea,
+    last_outcome = sqlc.arg(last_outcome)::text,
+    last_session_epoch = sqlc.arg(last_session_epoch)::bigint,
+    last_source_stream = sqlc.arg(last_source_stream)::text,
+    last_source_sequence = sqlc.arg(last_source_sequence)::bigint,
+    last_received_at = sqlc.arg(last_received_at)::timestamptz,
+    updated_at = sqlc.arg(updated_at)::timestamptz
+WHERE producer_id = sqlc.arg(producer_id)::text
+  AND producer_epoch = sqlc.arg(producer_epoch)::uuid
+  AND last_producer_sequence = sqlc.arg(expected_producer_sequence)::bigint;
+
 -- name: ClaimInboxEvent :one
 INSERT INTO settlement.event_inbox (
     event_id,
@@ -131,6 +246,11 @@ WHERE user_id = sqlc.arg(user_id)::uuid
 INSERT INTO ledger.raw_session_intervals (
     event_id,
     previous_event_id,
+    source_stream,
+    source_sequence,
+    producer_id,
+    producer_epoch,
+    producer_sequence,
     user_id,
     torrent_id,
     session_token,
@@ -165,6 +285,11 @@ INSERT INTO ledger.raw_session_intervals (
 ) VALUES (
     sqlc.arg(event_id)::uuid,
     sqlc.arg(previous_event_id)::uuid,
+    sqlc.narg(source_stream)::text,
+    sqlc.narg(source_sequence)::bigint,
+    sqlc.narg(producer_id)::text,
+    sqlc.narg(producer_epoch)::uuid,
+    sqlc.narg(producer_sequence)::bigint,
     sqlc.arg(user_id)::uuid,
     sqlc.arg(torrent_id)::bigint,
     sqlc.arg(session_token)::bytea,

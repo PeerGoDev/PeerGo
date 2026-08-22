@@ -96,7 +96,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("compose Swarm Engine: %w", err)
 	}
-	eventWAL, err := wal.OpenFile(settings.WALPath, settings.MaxWALBytes)
+	eventWAL, err := wal.OpenFile(settings.WALPath, settings.MaxWALBytes, wal.ProducerConfig{ID: settings.AnnounceProducerID})
 	if err != nil {
 		return fmt.Errorf("open Tracker announce WAL: %w", err)
 	}

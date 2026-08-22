@@ -17,6 +17,7 @@ type Record struct {
 	Offset     int64
 	NextOffset int64
 	Event      announceevent.Event
+	Producer   *announceevent.Producer
 	Payload    []byte
 	digest     [sha256.Size]byte
 }
@@ -186,12 +187,12 @@ func readRecordAt(handle *os.File, offset, size int64) (Record, bool, error) {
 	if !bytes.Equal(digest[:], body[payloadSize:]) {
 		return Record{}, false, ErrCorrupt
 	}
-	event, err := announceevent.Decode(body[:payloadSize])
+	decoded, err := announceevent.DecodeAny(body[:payloadSize])
 	if err != nil {
 		return Record{}, false, ErrCorrupt
 	}
 	return Record{
-		Offset: offset, NextOffset: nextOffset, Event: event,
+		Offset: offset, NextOffset: nextOffset, Event: decoded.Event, Producer: decoded.Producer,
 		Payload: append([]byte(nil), body[:payloadSize]...), digest: digest,
 	}, true, nil
 }

@@ -1,4 +1,4 @@
-.PHONY: generate format test check test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
+.PHONY: generate format test check test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-storage-maintenance dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
 .PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-seeding-reward-compensation-preview production-seeding-reward-compensation-apply production-hnr-work-reconcile production-traffic-pipeline-reconfigure
 
 # These values are synthetic and limited to the loopback-only local Compose
@@ -48,6 +48,7 @@ LOCAL_TRACKER_SWARM_SEQUENCE_PATH ?= $(CURDIR)/.local/tracker/swarm-sequence.jso
 LOCAL_TRACKER_NATS_URLS ?= nats://127.0.0.1:4222
 LOCAL_TRACKER_ANNOUNCE_STREAM ?= PEERGO_TRACKER_ANNOUNCE_V1
 LOCAL_TRACKER_ANNOUNCE_SUBJECT ?= peergo.tracker.announce.v1
+LOCAL_TRACKER_ANNOUNCE_PRODUCER_ID ?= tracker-primary
 LOCAL_TRACKER_SWARM_SNAPSHOT_STREAM ?= PEERGO_TRACKER_SWARM_SNAPSHOT_V1
 LOCAL_TRACKER_SWARM_SNAPSHOT_SUBJECT ?= peergo.tracker.swarm.snapshot.v1
 LOCAL_TRACKER_SWARM_SOURCE_ID ?= tracker-primary
@@ -627,6 +628,7 @@ dev-tracker: dev-tracker-stream dev-tracker-swarm-stream
 	PEERGO_TRACKER_NATS_RECONNECT_WAIT="1s" \
 	PEERGO_TRACKER_ANNOUNCE_STREAM="$(LOCAL_TRACKER_ANNOUNCE_STREAM)" \
 	PEERGO_TRACKER_ANNOUNCE_SUBJECT="$(LOCAL_TRACKER_ANNOUNCE_SUBJECT)" \
+	PEERGO_TRACKER_ANNOUNCE_PRODUCER_ID="$(LOCAL_TRACKER_ANNOUNCE_PRODUCER_ID)" \
 	PEERGO_TRACKER_ANNOUNCE_PUBLISH_TIMEOUT="3s" \
 	PEERGO_TRACKER_ANNOUNCE_PUBLISH_RETRY_MIN="100ms" \
 	PEERGO_TRACKER_ANNOUNCE_PUBLISH_RETRY_MAX="10s" \
@@ -756,6 +758,20 @@ dev-settlement-policy:
 	PEERGO_SETTLEMENT_POLICY_STARTUP_TIMEOUT="10s" \
 	PEERGO_SETTLEMENT_POLICY_CONCURRENCY="4" \
 	go run ./services/settlement/cmd/policy-worker
+
+# Small indexed batches bound high-volume transport and evidence detail. The
+# database triggers enforce the same minimum windows if this target is edited.
+dev-settlement-storage-maintenance:
+	PEERGO_ENV=development \
+	PEERGO_TRACKER_DATABASE_URL="$(TRACKER_DATABASE_URL)" \
+	PEERGO_SETTLEMENT_STORAGE_CLEANUP_INTERVAL="15s" \
+	PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION="72h" \
+	PEERGO_SETTLEMENT_STORAGE_SESSION_RETENTION="48h" \
+	PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION="720h" \
+	PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION="4320h" \
+	PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE="10000" \
+	PEERGO_SETTLEMENT_STORAGE_STARTUP_TIMEOUT="10s" \
+	go run ./services/settlement/cmd/storage-maintenance
 
 # Write-only loopback control API for immutable promotion commands from Core.
 dev-settlement-promotion-control:
