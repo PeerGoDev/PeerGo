@@ -21,6 +21,7 @@ RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-policy-worker ./services/core/cmd/promotion-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-image-derivative-worker ./services/core/cmd/image-derivative-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-worker ./services/core/cmd/seeding-reward-worker && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-compensation-preview ./services/core/cmd/seeding-reward-compensation-preview && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-contribution-experience-worker ./services/core/cmd/contribution-experience-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-progression-level-worker ./services/core/cmd/progression-level-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-traffic-projector ./services/core/cmd/traffic-projector && \

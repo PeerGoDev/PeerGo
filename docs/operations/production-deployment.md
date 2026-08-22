@@ -294,3 +294,28 @@ make production-down
 不得使用 `docker compose down -v`。发生计费、事件完整性或广泛客户端兼容故障时，先停止
 PeerGo Tracker 与消费者并保存 WAL/JetStream/三库现场，再把 Web 和 Tracker 路由整体
 切回保留的 RousiPro；禁止两侧继续同时计费。
+
+### 历史做种奖励补偿预演
+
+早期 `seeding.evidence.v1` 窗口若在 Settlement 追赶 Tracker 流时过早关闭，会留下
+`late_announce_interval`，但不可回写既有证据或余额。修复遵循参考 Tracker 的三条边界：
+
+- IP 及 IPv4/IPv6 只用于来源限流，不进入用户/种子/客户端会话的计费身份；
+- 同一用户与种子的多客户端重叠区间先求并集，不能叠加做种时长；
+- 相邻 announce 超过 35 分钟不视为连续做种，且预演必须固定无缺口的终态流序列水位。
+
+先生成只读审批材料：
+
+```bash
+make production-seeding-reward-compensation-preview
+```
+
+命令在 Core 与 Tracker 上分别使用 `REPEATABLE READ READ ONLY`，复用历史时刻的不可变
+奖励政策、VIP/勋章/等级权益、种子元数据和 swarm 快照，再调用正式结算使用的同一计算器。
+它只写 `/opt/peergo/compensations/` 下权限为 `0600` 的 JSONL，不修改证据、魔力值、经验或
+outbox。JSONL 含内部用户标识，不得复制到工单、聊天或公开日志；日常输出只保留聚合数量、
+总差额、文件路径与 SHA-256。
+
+预演完成后应先保存并人工核对文件 SHA-256、正向差额总量、最大单用户小时差额及受影响
+窗口。此命令不是入账命令；在补偿执行器具有“只追加正向账本、稳定来源引用、幂等重放、
+Core/outbox 对账和显式审批哈希”之前，不得用 SQL 直接修改余额，也不得覆盖原计算记录。

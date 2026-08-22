@@ -402,51 +402,19 @@ type benefitDocument struct {
 	LevelTorrentBonus int32  `json:"level_seeding_count_bonus"`
 }
 
-func (repository *PostgresSettlementRepository) snapshotBenefits(ctx context.Context, tx pgx.Tx, windowStart time.Time, userID uuid.UUID, capturedAt time.Time) (BenefitInput, error) {
-	var entitlementRevision int64
-	var vipEnabled bool
-	var vipUntil *time.Time
-	var medalBonus int64
-	err := tx.QueryRow(ctx, `
-SELECT revision, vip_enabled, vip_until, medal_bonus_bps
-FROM identity.user_reward_benefit_revisions
-WHERE user_id = $1 AND effective_from <= $2
-ORDER BY effective_from DESC, revision DESC
-LIMIT 1`, userID, windowStart).Scan(&entitlementRevision, &vipEnabled, &vipUntil, &medalBonus)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return BenefitInput{}, ErrBenefitNotFound
-	}
-	if err != nil {
-		return BenefitInput{}, fmt.Errorf("read seeding reward entitlement: %w", err)
-	}
+type historicalBenefitSnapshot struct {
+	EntitlementRevision int64
+	LevelPolicyVersion  string
+	Level               int16
+	Input               BenefitInput
+}
 
-	levelPolicy, level, err := rewardLevelAt(ctx, tx, userID, windowStart)
+func (repository *PostgresSettlementRepository) snapshotBenefits(ctx context.Context, tx pgx.Tx, windowStart time.Time, userID uuid.UUID, capturedAt time.Time) (BenefitInput, error) {
+	snapshot, err := repository.readHistoricalBenefit(ctx, tx, windowStart, userID)
 	if err != nil {
 		return BenefitInput{}, err
 	}
-	var levelBonus int64
-	var torrentBonus int32
-	if err := tx.QueryRow(ctx, `
-SELECT karma_bonus_bps, seeding_count_bonus
-FROM progression.seeding_reward_level_benefits
-WHERE policy_version = $1 AND level = $2`, levelPolicy, level).Scan(&levelBonus, &torrentBonus); errors.Is(err, pgx.ErrNoRows) {
-		return BenefitInput{}, ErrBenefitNotFound
-	} else if err != nil {
-		return BenefitInput{}, fmt.Errorf("read seeding reward level benefit: %w", err)
-	}
-	vipActive := vipEnabled && (vipUntil == nil || vipUntil.After(windowStart))
-	revision := fmt.Sprintf("benefit-v1.e%d.l%d.%s", entitlementRevision, level, levelPolicy)
-	document := benefitDocument{
-		UserID: userID.String(), WindowStart: windowStart.Format(time.RFC3339Nano),
-		Entitlement: entitlementRevision, LevelPolicy: levelPolicy, Level: level,
-		VIPActive: vipActive, MedalBonusBPS: medalBonus, LevelBonusBPS: levelBonus,
-		LevelTorrentBonus: torrentBonus,
-	}
-	encoded, err := json.Marshal(document)
-	if err != nil {
-		return BenefitInput{}, ErrInvariant
-	}
-	digest := sha256.Sum256(encoded)
+	benefit := snapshot.Input
 	_, err = tx.Exec(ctx, `
 INSERT INTO economy.seeding_reward_benefit_snapshots (
     window_start, user_id, entitlement_revision, level_policy_version,
@@ -454,8 +422,9 @@ INSERT INTO economy.seeding_reward_benefit_snapshots (
     level_seeding_count_bonus, benefit_revision, benefit_sha256, captured_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (window_start, user_id) DO NOTHING`, windowStart, userID,
-		entitlementRevision, levelPolicy, level, vipActive, medalBonus, levelBonus,
-		torrentBonus, revision, digest[:], capturedAt)
+		snapshot.EntitlementRevision, snapshot.LevelPolicyVersion, snapshot.Level,
+		benefit.VIPActive, benefit.MedalBonusBPS, benefit.LevelBonusBPS,
+		benefit.LevelLinearTorrentBonus, benefit.Revision, benefit.SnapshotSHA256[:], capturedAt)
 	if err != nil {
 		return BenefitInput{}, classifySettlementDatabaseError("insert seeding reward benefit snapshot", err)
 	}
@@ -467,13 +436,71 @@ FROM economy.seeding_reward_benefit_snapshots
 WHERE window_start = $1 AND user_id = $2`, windowStart, userID).Scan(&storedRevision, &storedDigest); err != nil {
 		return BenefitInput{}, fmt.Errorf("verify seeding reward benefit snapshot: %w", err)
 	}
-	if storedRevision != revision || !bytes.Equal(storedDigest, digest[:]) {
+	if storedRevision != benefit.Revision || !bytes.Equal(storedDigest, benefit.SnapshotSHA256[:]) {
 		return BenefitInput{}, ErrEvidenceConflict
 	}
-	return BenefitInput{
-		Revision: revision, SnapshotSHA256: digest, VIPActive: vipActive,
-		MedalBonusBPS: medalBonus, LevelBonusBPS: levelBonus,
-		LevelLinearTorrentBonus: torrentBonus,
+	return benefit, nil
+}
+
+// readHistoricalBenefit resolves the immutable entitlement and level facts
+// that applied at the reward hour without writing a snapshot. The normal
+// settlement path persists the returned document; compensation preview uses
+// the same resolver so an audit cannot accidentally apply today's VIP, medal
+// or level benefits to an old hour.
+func (repository *PostgresSettlementRepository) readHistoricalBenefit(ctx context.Context, tx pgx.Tx, windowStart time.Time, userID uuid.UUID) (historicalBenefitSnapshot, error) {
+	var entitlementRevision int64
+	var vipEnabled bool
+	var vipUntil *time.Time
+	var medalBonus int64
+	err := tx.QueryRow(ctx, `
+SELECT revision, vip_enabled, vip_until, medal_bonus_bps
+FROM identity.user_reward_benefit_revisions
+WHERE user_id = $1 AND effective_from <= $2
+ORDER BY effective_from DESC, revision DESC
+LIMIT 1`, userID, windowStart).Scan(&entitlementRevision, &vipEnabled, &vipUntil, &medalBonus)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return historicalBenefitSnapshot{}, ErrBenefitNotFound
+	}
+	if err != nil {
+		return historicalBenefitSnapshot{}, fmt.Errorf("read seeding reward entitlement: %w", err)
+	}
+
+	levelPolicy, level, err := rewardLevelAt(ctx, tx, userID, windowStart)
+	if err != nil {
+		return historicalBenefitSnapshot{}, err
+	}
+	var levelBonus int64
+	var torrentBonus int32
+	if err := tx.QueryRow(ctx, `
+SELECT karma_bonus_bps, seeding_count_bonus
+FROM progression.seeding_reward_level_benefits
+WHERE policy_version = $1 AND level = $2`, levelPolicy, level).Scan(&levelBonus, &torrentBonus); errors.Is(err, pgx.ErrNoRows) {
+		return historicalBenefitSnapshot{}, ErrBenefitNotFound
+	} else if err != nil {
+		return historicalBenefitSnapshot{}, fmt.Errorf("read seeding reward level benefit: %w", err)
+	}
+	vipActive := vipEnabled && (vipUntil == nil || vipUntil.After(windowStart))
+	revision := fmt.Sprintf("benefit-v1.e%d.l%d.%s", entitlementRevision, level, levelPolicy)
+	document := benefitDocument{
+		UserID: userID.String(), WindowStart: windowStart.Format(time.RFC3339Nano),
+		Entitlement: entitlementRevision, LevelPolicy: levelPolicy, Level: level,
+		VIPActive: vipActive, MedalBonusBPS: medalBonus, LevelBonusBPS: levelBonus,
+		LevelTorrentBonus: torrentBonus,
+	}
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		return historicalBenefitSnapshot{}, ErrInvariant
+	}
+	digest := sha256.Sum256(encoded)
+	return historicalBenefitSnapshot{
+		EntitlementRevision: entitlementRevision,
+		LevelPolicyVersion:  levelPolicy,
+		Level:               level,
+		Input: BenefitInput{
+			Revision: revision, SnapshotSHA256: digest, VIPActive: vipActive,
+			MedalBonusBPS: medalBonus, LevelBonusBPS: levelBonus,
+			LevelLinearTorrentBonus: torrentBonus,
+		},
 	}, nil
 }
 
