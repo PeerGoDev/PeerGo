@@ -4161,18 +4161,33 @@ func (q *Queries) StorageCleanupDeleteSeedingEvidenceOutbox(ctx context.Context,
 }
 
 const storageCleanupDeleteSeedingSources = `-- name: StorageCleanupDeleteSeedingSources :execrows
-WITH candidate AS (
-    SELECT source.window_start, source.user_id, source.torrent_id, source.interval_event_id
-    FROM ledger.seeding_evidence_sources AS source
-    WHERE source.window_start < $1::timestamptz
+WITH eligible_windows AS MATERIALIZED (
+    -- Evidence windows are one row per hour. Select from that compact ledger
+    -- first so retained anomalous hours do not force every source row in those
+    -- hours to be scanned again on each cleanup pass.
+    SELECT evidence_window.window_start
+    FROM ledger.seeding_evidence_windows AS evidence_window
+    WHERE evidence_window.window_start < $1::timestamptz
+      AND EXISTS (
+          SELECT 1
+          FROM ledger.seeding_evidence_sources AS existing_source
+          WHERE existing_source.window_start = evidence_window.window_start
+      )
       AND NOT EXISTS (
           SELECT 1
           FROM ledger.seeding_evidence_anomalies AS anomaly
-          WHERE anomaly.window_start = source.window_start
+          WHERE anomaly.window_start = evidence_window.window_start
       )
+    ORDER BY evidence_window.window_start
+    LIMIT 256
+), candidate AS (
+    SELECT source.window_start, source.user_id, source.torrent_id, source.interval_event_id
+    FROM ledger.seeding_evidence_sources AS source
+    INNER JOIN eligible_windows
+        ON eligible_windows.window_start = source.window_start
     ORDER BY source.window_start, source.user_id, source.torrent_id, source.interval_event_id
     LIMIT $2::integer
-    FOR UPDATE SKIP LOCKED
+    FOR UPDATE OF source SKIP LOCKED
 )
 DELETE FROM ledger.seeding_evidence_sources AS source
 USING candidate
