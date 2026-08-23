@@ -3012,11 +3012,17 @@ func TestGetPublicUserProfileUsesMemberSessionAndReturnsOnlyPublicProjection(t *
 	}
 }
 
-func TestOpenAPIValidationReturnsProblemJSON(t *testing.T) {
+func TestOpenAPIValidationAcceptsCatalogLimit100AndRejects101(t *testing.T) {
 	t.Parallel()
 
 	handler := testHandler(t)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/torrents?limit=51", nil)
+	accepted := httptest.NewRecorder()
+	handler.ServeHTTP(accepted, httptest.NewRequest(http.MethodGet, "/api/v1/torrents?limit=100", nil))
+	if accepted.Code != http.StatusOK {
+		t.Fatalf("limit=100 status = %d, want %d; body=%s", accepted.Code, http.StatusOK, accepted.Body.String())
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/torrents?limit=101", nil)
 	request.Header.Set("X-Request-Id", "attacker-controlled-request-id")
 	response := httptest.NewRecorder()
 
