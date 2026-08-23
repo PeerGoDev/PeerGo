@@ -139,10 +139,10 @@ describe("TorrentDetailPage", () => {
     )
     expect(screen.getByText("完整发布说明")).toBeVisible()
     expect(screen.getByRole("button", { name: "分享到动态圈" })).toBeVisible()
-    expect(screen.getByText("18 个做种")).toBeVisible()
+    expect(screen.getByText("18 seeding")).toBeVisible()
     expect(screen.getByText("5 个下载者")).toBeVisible()
     const peerListHeader = screen
-      .getByText("用户列表")
+      .getByText("User List")
       .closest("[data-slot=card-header]")
     expect(peerListHeader).toHaveClass("p-6", "pb-2")
     expect(peerListHeader?.closest("[data-slot=card]")).toHaveClass(
@@ -166,7 +166,7 @@ describe("TorrentDetailPage", () => {
       mediaInfoCard?.querySelector("[data-slot=card-content]")
     ).toHaveClass("px-6", "pb-6")
     expect(
-      screen.getByText("用户列表").closest("[data-slot=card-title]")
+      screen.getByText("User List").closest("[data-slot=card-title]")
     ).toHaveClass("font-semibold")
     const rawMediaInfoButton = screen.getByRole("button", {
       name: "查看原始信息",
@@ -197,10 +197,19 @@ describe("TorrentDetailPage", () => {
       "src",
       `http://localhost:3000/api/v1/torrents/${torrentId}/screenshots/0`
     )
-    expect(screen.getByRole("button", { name: "查看截图 1" })).toHaveClass(
-      "w-32",
-      "sm:w-auto"
-    )
+    const firstScreenshot = screen.getByRole("button", {
+      name: "查看截图 1",
+    })
+    expect(firstScreenshot).toHaveClass("w-32", "sm:w-auto")
+    await user.click(firstScreenshot)
+    expect(screen.getByRole("img", { name: "截图 1 大图" })).toBeVisible()
+    expect(screen.getByText("1 / 2")).toBeVisible()
+    await user.click(screen.getByRole("button", { name: "下一张截图" }))
+    expect(screen.getByRole("img", { name: "截图 2 大图" })).toBeVisible()
+    expect(screen.getByText("2 / 2")).toBeVisible()
+    await user.click(screen.getByRole("button", { name: "上一张截图" }))
+    expect(screen.getByRole("img", { name: "截图 1 大图" })).toBeVisible()
+    await user.click(screen.getByRole("button", { name: "关闭" }))
     expect(
       screen.getByRole("link", { name: /Final Release 2026 2160p/ })
     ).toHaveAttribute("href", "/torrents/43")
@@ -250,11 +259,9 @@ describe("TorrentDetailPage", () => {
       screen.queryByRole("button", { name: "展开种子参数" })
     ).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole("button", { name: /用户列表/ }))
+    fireEvent.click(screen.getByRole("button", { name: /User List/ }))
 
-    expect(screen.getByText(/只显示 Tracker 聚合统计/)).toBeVisible()
-    expect(screen.getAllByText("18")).toHaveLength(2)
-    expect(screen.getAllByText("61")).toHaveLength(2)
+    expect(screen.getByText(/登录后可查看当前做种者和下载者/)).toBeVisible()
   })
 
   it("does not query a legacy demo slug as a real aggregate", () => {

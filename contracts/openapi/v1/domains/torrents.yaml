@@ -779,6 +779,44 @@ TorrentSwarmPath:
       default:
         $ref: "../responses.yaml#/ProblemResponse"
 
+TorrentPeersPath:
+  get:
+    operationId: listTorrentPeers
+    summary: 查看单个已发布种子的实时活跃用户
+    description: >-
+      仅向已登录站点成员返回 Tracker TTL 内存中最多 200 个连接的用户聚合视图；
+      不持久化单次汇报，也不返回 IP、端口、passkey、peer ID 或会话标识。
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.read
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+    responses:
+      "200":
+        description: 当前 Tracker 进程内的有界活跃用户视图。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/TorrentPeerList"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
 TorrentFilesPath:
   get:
     operationId: listTorrentFiles

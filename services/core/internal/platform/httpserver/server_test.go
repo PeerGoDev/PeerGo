@@ -1042,6 +1042,10 @@ func (unavailableTorrentReadService) MySubmissions(context.Context, string, int)
 	return torrents.MySubmissionPage{}, identity.ErrSessionNotFound
 }
 
+func (unavailableTorrentReadService) ActivePeers(context.Context, string, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error) {
+	return torrents.ManagedTorrentPeerList{}, identity.ErrSessionNotFound
+}
+
 func (unavailableTorrentReadService) ListManaged(context.Context, authz.StaffActor, torrents.ManagedTorrentQuery) (torrents.ManagedTorrentPage, error) {
 	return torrents.ManagedTorrentPage{}, authz.ErrForbidden
 }
@@ -1108,6 +1112,10 @@ func (service *recordingTorrentReadService) Files(_ context.Context, id torrents
 func (service *recordingTorrentReadService) MySubmissions(_ context.Context, cookieToken string, limit int) (torrents.MySubmissionPage, error) {
 	service.submissionCookie, service.submissionLimit = cookieToken, limit
 	return service.submissions, nil
+}
+
+func (service *recordingTorrentReadService) ActivePeers(context.Context, string, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error) {
+	return torrents.ManagedTorrentPeerList{}, nil
 }
 
 func (service *recordingTorrentReadService) ListManaged(context.Context, authz.StaffActor, torrents.ManagedTorrentQuery) (torrents.ManagedTorrentPage, error) {

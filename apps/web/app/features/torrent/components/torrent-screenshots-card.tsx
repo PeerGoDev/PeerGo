@@ -1,5 +1,5 @@
 import * as React from "react"
-import { ImageIcon } from "lucide-react"
+import { ChevronLeftIcon, ChevronRightIcon, ImageIcon } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
@@ -39,6 +39,32 @@ export function TorrentScreenshotsCard({
       ),
     [screenshotCount]
   )
+
+  const moveSelection = React.useCallback(
+    (direction: -1 | 1) => {
+      setSelectedPosition((current) => {
+        if (current === null || positions.length < 2) return current
+        return (current + direction + positions.length) % positions.length
+      })
+    },
+    [positions.length]
+  )
+
+  React.useEffect(() => {
+    if (selectedPosition === null || positions.length < 2) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault()
+        moveSelection(-1)
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault()
+        moveSelection(1)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [moveSelection, positions.length, selectedPosition])
 
   if (positions.length === 0) return null
 
@@ -82,7 +108,7 @@ export function TorrentScreenshotsCard({
           if (!open) setSelectedPosition(null)
         }}
       >
-        <DialogContent className="w-auto max-w-[calc(100%-2rem)] gap-2 p-2 sm:max-w-[calc(100%-3rem)]">
+        <DialogContent className="flex min-h-[50vh] w-auto max-w-[calc(100%-2rem)] items-center justify-center gap-0 overflow-hidden border-black bg-black p-2 sm:max-w-[calc(100%-3rem)] [&_[data-slot=dialog-close]]:bg-black/50 [&_[data-slot=dialog-close]]:text-white">
           <DialogTitle className="sr-only">
             {selectedPosition === null
               ? "种子截图"
@@ -92,15 +118,40 @@ export function TorrentScreenshotsCard({
             查看上传者随种子提交的截图。
           </DialogDescription>
           {selectedPosition !== null ? (
-            <img
-              src={torrentScreenshotUrl(torrentId, selectedPosition)}
-              alt={`截图 ${selectedPosition + 1} 大图`}
-              className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
-              onError={() => {
-                recordFailure(selectedPosition)
-                setSelectedPosition(null)
-              }}
-            />
+            <>
+              {positions.length > 1 ? (
+                <button
+                  type="button"
+                  aria-label="上一张截图"
+                  className="absolute left-2 z-10 rounded-full bg-black/55 p-2 text-white transition-colors hover:bg-black/75 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:left-4"
+                  onClick={() => moveSelection(-1)}
+                >
+                  <ChevronLeftIcon className="size-8 sm:size-12" />
+                </button>
+              ) : null}
+              <img
+                src={torrentScreenshotUrl(torrentId, selectedPosition)}
+                alt={`截图 ${selectedPosition + 1} 大图`}
+                className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
+                onError={() => {
+                  recordFailure(selectedPosition)
+                  setSelectedPosition(null)
+                }}
+              />
+              {positions.length > 1 ? (
+                <button
+                  type="button"
+                  aria-label="下一张截图"
+                  className="absolute right-2 z-10 rounded-full bg-black/55 p-2 text-white transition-colors hover:bg-black/75 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none sm:right-4"
+                  onClick={() => moveSelection(1)}
+                >
+                  <ChevronRightIcon className="size-8 sm:size-12" />
+                </button>
+              ) : null}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-sm text-white">
+                {selectedPosition + 1} / {positions.length}
+              </div>
+            </>
           ) : null}
         </DialogContent>
       </Dialog>

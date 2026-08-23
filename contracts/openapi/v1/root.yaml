@@ -266,6 +266,8 @@ paths:
     $ref: "./domains/torrents.yaml#/TorrentRelatedVersionsPath"
   /api/v1/torrents/{torrent_id}/swarm:
     $ref: "./domains/torrents.yaml#/TorrentSwarmPath"
+  /api/v1/torrents/{torrent_id}/peers:
+    $ref: "./domains/torrents.yaml#/TorrentPeersPath"
   /api/v1/torrents/{torrent_id}/files:
     $ref: "./domains/torrents.yaml#/TorrentFilesPath"
   /api/v1/torrents/{torrent_id}/comments:

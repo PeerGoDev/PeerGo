@@ -6139,6 +6139,44 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/torrents/{torrent_id}/peers:
+    get:
+      operationId: listTorrentPeers
+      summary: 查看单个已发布种子的实时活跃用户
+      description: 仅向已登录站点成员返回 Tracker TTL 内存中最多 200 个连接的用户聚合视图； 不持久化单次汇报，也不返回 IP、端口、passkey、peer ID 或会话标识。
+      tags:
+        - torrents
+      x-audience:
+        - web
+      x-owner: core-torrents
+      x-permission: torrent.read
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/TorrentIDPathParameter'
+      responses:
+        '200':
+          description: 当前 Tracker 进程内的有界活跃用户视图。
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TorrentPeerList'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/torrents/{torrent_id}/files:
     get:
       operationId: listTorrentFiles
@@ -21457,6 +21495,101 @@ components:
           maxItems: 10
           items:
             $ref: '#/components/schemas/TorrentSummary'
+    TorrentPeer:
+      type: object
+      additionalProperties: false
+      required:
+        - user_numeric_id
+        - username
+        - display_name
+        - client_families
+        - active_connections
+        - seeding_connections
+        - leeching_connections
+        - progress_basis_points
+        - uploaded
+        - downloaded
+        - last_announce
+        - uploader
+      properties:
+        user_numeric_id:
+          type: integer
+          format: int64
+          minimum: 1
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        client_families:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 32
+        active_connections:
+          type: integer
+          minimum: 1
+          maximum: 200
+        seeding_connections:
+          type: integer
+          minimum: 0
+          maximum: 200
+        leeching_connections:
+          type: integer
+          minimum: 0
+          maximum: 200
+        progress_basis_points:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        uploaded:
+          type: string
+          pattern: ^(0|[1-9][0-9]{0,18})$
+          description: 该用户活跃连接所汇报的最大累计上传字节数。
+        downloaded:
+          type: string
+          pattern: ^(0|[1-9][0-9]{0,18})$
+          description: 该用户活跃连接所汇报的最大累计下载字节数。
+        last_announce:
+          type: string
+          format: date-time
+        uploader:
+          type: boolean
+    TorrentPeerList:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent_id
+        - items
+        - total_connections
+        - truncated
+        - generated_at
+      properties:
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/TorrentPeer'
+        total_connections:
+          type: integer
+          minimum: 0
+          maximum: 200
+          description: 本次有界读取中返回的活跃连接数；truncated 为 true 时仍有更多连接。
+        truncated:
+          type: boolean
+        generated_at:
+          type: string
+          format: date-time
     TorrentPurchaseAccessState:
       type: string
       enum:

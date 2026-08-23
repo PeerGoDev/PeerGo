@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/peergo/peergo/contracts/go/trackeroperationsv1"
 	"github.com/peergo/peergo/services/core/internal/contracts/objectstorage"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
@@ -218,6 +219,77 @@ func TestTorrentReadAuthorizesOwnSubmissionHistory(t *testing.T) {
 		authorizer.request.Resource.OwnerID != userID ||
 		authorizer.request.CredentialAudience != authz.AudienceWebSession {
 		t.Fatalf("authorization request = %+v", authorizer.request)
+	}
+}
+
+func TestTorrentReadExposesPrivacyMinimizedActivePeersToSignedInMembers(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 23, 10, 0, 0, 0, time.UTC)
+	userID := uuid.MustParse("0198f20a-6da8-7e51-9c64-444444444444")
+	peerRepository := &torrentAdministrationRepositoryStub{
+		peerTarget: ManagedTorrentPeerTarget{
+			InfoHashV1: InfoHashV1{1}, TotalSizeBytes: 1_000, UploaderID: userID,
+		},
+		peerIdentities: []ManagedTorrentPeerIdentity{{
+			UserID: userID, NumericID: 9, Username: "member", DisplayName: "站点成员",
+		}},
+	}
+	staffAuthorizer := &torrentAdministrationAuthorizerStub{err: errors.New("member read must not enter staff authorization")}
+	administration, err := NewTorrentAdministrationService(
+		peerRepository,
+		staffAuthorizer,
+		func() time.Time { return now },
+		trackerPeerReaderStub{page: trackeroperationsv1.ActivePeerPage{
+			GeneratedAt: now,
+			Items: []trackeroperationsv1.ActivePeer{{
+				UserID: userID.String(), ClientFamily: "qbittorrent", Uploaded: 500,
+				Downloaded: 100, Left: 0, LastAnnounce: now.Add(-time.Minute),
+			}},
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewTorrentReadService(
+		torrentDownloadAuthenticatorFixture{session: identity.WebSession{User: identity.User{ID: userID}}},
+		&recordingTorrentUploadAuthorizer{now: now},
+		&torrentReadRepositoryFixture{},
+		mustReadStores(t),
+		nil,
+		func() time.Time { return now },
+		administration,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := service.ActivePeers(context.Background(), "member-cookie", 42)
+	if err != nil || len(page.Items) != 1 || page.Items[0].Username != "member" || page.Items[0].SeedingConnections != 1 {
+		t.Fatalf("ActivePeers() = %+v, %v", page, err)
+	}
+	if len(staffAuthorizer.requests) != 0 {
+		t.Fatalf("member peer read entered staff authorization: %+v", staffAuthorizer.requests)
+	}
+}
+
+func TestTorrentReadRejectsAnonymousActivePeerLookup(t *testing.T) {
+	t.Parallel()
+
+	service, err := NewTorrentReadService(
+		torrentDownloadAuthenticatorFixture{err: identity.ErrSessionNotFound},
+		&recordingTorrentUploadAuthorizer{},
+		&torrentReadRepositoryFixture{},
+		mustReadStores(t),
+		nil,
+		time.Now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.ActivePeers(context.Background(), "", 42)
+	if !errors.Is(err, identity.ErrSessionNotFound) {
+		t.Fatalf("ActivePeers() error = %v, want ErrSessionNotFound", err)
 	}
 }
 

@@ -76,6 +76,17 @@ func (service *TorrentAdministrationService) ActivePeers(ctx context.Context, ac
 	if _, err := authz.AuthorizeStaffAction(ctx, service.authorizer, actor, authz.ActionTorrentManageRead, authz.SiteScope(), now, "torrent-peer-list"); err != nil {
 		return ManagedTorrentPeerList{}, err
 	}
+	return service.activePeers(ctx, torrentID)
+}
+
+// activePeers is shared by the staff workbench and the authenticated member
+// projection. Callers must establish the appropriate credential boundary
+// before entering this method; the returned model never includes endpoints,
+// ports, passkeys, peer IDs or session keys.
+func (service *TorrentAdministrationService) activePeers(ctx context.Context, torrentID TorrentID) (ManagedTorrentPeerList, error) {
+	if torrentID < 1 {
+		return ManagedTorrentPeerList{}, ErrTorrentAdministrationInput
+	}
 	if service.peerReader == nil || service.peerRepository == nil {
 		return ManagedTorrentPeerList{}, ErrManagedTorrentPeersUnavailable
 	}

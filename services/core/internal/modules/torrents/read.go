@@ -275,6 +275,22 @@ func (service *TorrentReadService) ManagedActivePeers(ctx context.Context, actor
 	return service.administration.ActivePeers(ctx, actor, torrentID)
 }
 
+// ActivePeers restores the member-facing PtYes user list while retaining the
+// privacy-minimized Tracker projection. A valid Web session is required, and
+// network endpoints and protocol/session identifiers never leave Tracker.
+func (service *TorrentReadService) ActivePeers(ctx context.Context, cookieToken string, torrentID TorrentID) (ManagedTorrentPeerList, error) {
+	if torrentID < 1 {
+		return ManagedTorrentPeerList{}, ErrTorrentReadInput
+	}
+	if _, err := service.authenticator.CurrentSession(ctx, cookieToken); err != nil {
+		return ManagedTorrentPeerList{}, err
+	}
+	if service.administration == nil {
+		return ManagedTorrentPeerList{}, ErrManagedTorrentPeersUnavailable
+	}
+	return service.administration.activePeers(ctx, torrentID)
+}
+
 func (service *TorrentReadService) Cover(ctx context.Context, torrentID TorrentID) (PublicCover, error) {
 	if torrentID < 1 {
 		return PublicCover{}, ErrTorrentReadInput

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 
 	generated "github.com/peergo/peergo/services/core/internal/generated/api"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
@@ -25,10 +26,59 @@ type TorrentReadService interface {
 	Content(context.Context, torrents.TorrentID) (torrents.PublicContent, error)
 	RelatedVersions(context.Context, torrents.TorrentID) ([]catalog.TorrentSummary, error)
 	Files(context.Context, torrents.TorrentID, int, int) (torrents.PublicFilePage, error)
+	ActivePeers(context.Context, string, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error)
 	MySubmissions(context.Context, string, int) (torrents.MySubmissionPage, error)
 	ListManaged(context.Context, authz.StaffActor, torrents.ManagedTorrentQuery) (torrents.ManagedTorrentPage, error)
 	ManagedActivePeers(context.Context, authz.StaffActor, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error)
 	ChangeAvailability(context.Context, authz.StaffActor, torrents.ChangeTorrentAvailabilityInput) (torrents.TorrentAvailabilityResult, error)
+}
+
+func (h *Handler) ListTorrentPeers(ctx context.Context, request generated.ListTorrentPeersRequestObject) (generated.ListTorrentPeersResponseObject, error) {
+	page, err := h.torrentRead.ActivePeers(ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId))
+	switch {
+	case errors.Is(err, torrents.ErrTorrentReadInput), errors.Is(err, torrents.ErrTorrentAdministrationInput):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_torrent_peer_query", "用户列表查询无效", "种子编号无效。")
+		return generated.ListTorrentPeers400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, identity.ErrSessionNotFound):
+		problem := newProblemFromContext(ctx, http.StatusUnauthorized, "session_required", "需要登录", "请先登录站点账号后查看实时用户。")
+		return generated.ListTorrentPeers401ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, authz.ErrForbidden):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "torrent_peers_denied", "无法查看实时用户", "当前账号状态不允许查看实时用户。")
+		return generated.ListTorrentPeers403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrManagedTorrentNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "torrent_not_found", "种子不可用", "该种子不存在或当前未发布。")
+		return generated.ListTorrentPeers404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrManagedTorrentPeersUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "torrent_peers_unavailable", "实时用户暂时不可用", "Tracker 当前无法提供实时用户，请稍后重试。")
+		return generated.ListTorrentPeersdefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.ListTorrentPeers200JSONResponse{
+		Body: torrentPeerListDTO(page),
+		Headers: generated.ListTorrentPeers200ResponseHeaders{
+			CacheControl: "private, no-store",
+		},
+	}, nil
+}
+
+func torrentPeerListDTO(page torrents.ManagedTorrentPeerList) generated.TorrentPeerList {
+	items := make([]generated.TorrentPeer, 0, len(page.Items))
+	for _, peer := range page.Items {
+		items = append(items, generated.TorrentPeer{
+			UserNumericId: peer.NumericID, Username: peer.Username, DisplayName: peer.DisplayName,
+			ClientFamilies: peer.ClientFamilies, ActiveConnections: peer.ActiveConnections,
+			SeedingConnections: peer.SeedingConnections, LeechingConnections: peer.LeechingConnections,
+			ProgressBasisPoints: peer.ProgressBasisPoints, Uploaded: strconv.FormatInt(peer.Uploaded, 10),
+			Downloaded: strconv.FormatInt(peer.Downloaded, 10), LastAnnounce: peer.LastAnnounce, Uploader: peer.Uploader,
+		})
+	}
+	return generated.TorrentPeerList{
+		TorrentId: int64(page.TorrentID), Items: items, TotalConnections: page.TotalConnections,
+		Truncated: page.Truncated, GeneratedAt: page.GeneratedAt,
+	}
 }
 
 func (h *Handler) GetTorrentScreenshot(ctx context.Context, request generated.GetTorrentScreenshotRequestObject) (generated.GetTorrentScreenshotResponseObject, error) {
