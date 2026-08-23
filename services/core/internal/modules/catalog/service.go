@@ -11,7 +11,7 @@ import (
 
 const (
 	defaultTorrentLimit      = 20
-	maxTorrentLimit          = 50
+	maxTorrentLimit          = 100
 	maxTorrentOffset         = 1_000_000
 	maxQueryRunes            = 100
 	swarmFreshness           = 5 * time.Minute
@@ -22,7 +22,7 @@ const (
 
 var (
 	// ErrInvalidLimit means a caller tried to bypass the bounded list contract.
-	ErrInvalidLimit = errors.New("torrent limit must be between 1 and 50")
+	ErrInvalidLimit = errors.New("torrent limit must be between 1 and 100")
 	// ErrInvalidQuery means a caller provided a search term outside the contract.
 	ErrInvalidQuery = errors.New("torrent query must be at most 100 characters")
 	// ErrInvalidTorrentPage keeps the catalog list bounded before storage.

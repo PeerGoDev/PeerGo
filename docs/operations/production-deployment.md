@@ -19,6 +19,9 @@ git rev-parse HEAD
 代码只放在 `/opt/peergo/app`。三包放 `/opt/peergo/input`，运行数据分别落到
 `/opt/peergo/storage`、`tracker`、`audit`、`nats` 和 `cutovers`；更新代码不会覆盖数据。
 记录提交 SHA，并保留上一版本镜像、环境文件、数据库快照和入口配置。正式切流前不要删除 RousiPro。
+Web 的 `peergo_web_assets` 卷会合并当前构建并保留约三天的旧哈希资源，随后在容器启动时按
+文件年龄清理；HTML 始终替换为当前版本。这样旧浏览器标签页可跨发布完成动态模块加载，
+同时避免历史静态资源无界占用磁盘。
 
 ## 2. 外部依赖
 

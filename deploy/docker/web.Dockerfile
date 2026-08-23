@@ -13,5 +13,6 @@ RUN pnpm --filter @peergo/web build
 
 FROM nginx:1.29-alpine
 COPY deploy/docker/web.nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /src/apps/web/build/client /usr/share/nginx/html
+COPY --from=build /src/apps/web/build/client /opt/peergo-web-release
+COPY --chmod=755 deploy/docker/40-install-web-release.sh /docker-entrypoint.d/40-install-web-release.sh
 EXPOSE 8080

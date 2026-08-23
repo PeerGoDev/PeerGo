@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "~/components/ui/card"
 import { Progress } from "~/components/ui/progress"
+import { Skeleton } from "~/components/ui/skeleton"
 import { managedCategoryListQueryOptions } from "~/features/staff/api/category-administration.queries"
 import { newcomerPolicyListQueryOptions } from "~/features/staff/api/newcomer-administration.queries"
 import {
@@ -730,6 +731,23 @@ const statusPresentation: Record<
 }
 
 function SetupCheckCard({ check }: { check: SetupCheck }) {
+  if (check.status === "loading") {
+    return (
+      <Card size="sm" role="status" aria-label={`正在核对${check.title}`}>
+        <CardHeader>
+          <Skeleton className="h-5 w-36" aria-hidden="true" />
+          <Skeleton className="h-4 w-full" aria-hidden="true" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-4 w-2/3" aria-hidden="true" />
+        </CardContent>
+        <CardFooter>
+          <Skeleton className="h-8 w-24" aria-hidden="true" />
+        </CardFooter>
+      </Card>
+    )
+  }
+
   const presentation = statusPresentation[check.status]
   const Icon = presentation.icon
   return (

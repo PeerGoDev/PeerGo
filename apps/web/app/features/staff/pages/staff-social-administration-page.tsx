@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select"
+import { Skeleton } from "~/components/ui/skeleton"
 import { Switch } from "~/components/ui/switch"
 import { Textarea } from "~/components/ui/textarea"
 import { SocialPostCard } from "~/features/social/components/social-post-card"
@@ -129,7 +130,9 @@ function SocialAdministrationContent({
           内容管理
         </button>
       </div>
-      {boards.isError ? (
+      {boards.isPending ? (
+        <SocialAdministrationSkeleton />
+      ) : boards.isError ? (
         <Alert variant="destructive">
           <CircleAlertIcon />
           <AlertTitle>动态圈配置暂时不可用</AlertTitle>
@@ -483,7 +486,9 @@ function PostsSection({
           {posts.data?.total ?? 0} 条
         </span>
       </div>
-      {posts.isError ? (
+      {posts.isPending ? (
+        <SocialAdministrationSkeleton compact />
+      ) : posts.isError ? (
         <Alert variant="destructive">
           <AlertTitle>动态列表不可用</AlertTitle>
         </Alert>
@@ -533,6 +538,28 @@ function PostsSection({
           onClose={() => setEditing(undefined)}
         />
       ) : null}
+    </div>
+  )
+}
+
+function SocialAdministrationSkeleton({
+  compact = false,
+}: {
+  compact?: boolean
+}) {
+  return (
+    <div
+      role="status"
+      aria-label="正在读取动态圈内容"
+      className="grid gap-3 md:grid-cols-2"
+    >
+      {Array.from({ length: compact ? 4 : 6 }, (_, index) => (
+        <Skeleton
+          key={index}
+          className={compact ? "h-32 rounded-lg" : "h-40 rounded-lg"}
+          aria-hidden="true"
+        />
+      ))}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router"
 import { describe, expect, it } from "vitest"
 
@@ -55,7 +55,7 @@ describe("TorrentCatalogPage", () => {
       query: "release",
       categoryId: "movies",
       promotion: "free" as const,
-      limit: 20,
+      limit: 25,
       offset: 0,
     }
     queryClient.setQueryData(torrentListQueryOptions(filters).queryKey, {
@@ -76,10 +76,19 @@ describe("TorrentCatalogPage", () => {
           swarm_stale: false,
         },
       ],
-      total: 42,
-      limit: 20,
+      total: 60,
+      limit: 25,
       offset: 0,
     })
+    queryClient.setQueryData(
+      torrentListQueryOptions({ ...filters, limit: 100 }).queryKey,
+      {
+        items: [],
+        total: 60,
+        limit: 100,
+        offset: 0,
+      }
+    )
 
     render(
       <MemoryRouter
@@ -106,9 +115,9 @@ describe("TorrentCatalogPage", () => {
       "dark:aria-pressed:text-primary-foreground"
     )
     expect(screen.getByRole("button", { name: /纪录片\s*0/ })).toBeVisible()
-    expect(screen.getByRole("heading", { name: "共 42 个种子" })).toBeVisible()
+    expect(screen.getByRole("heading", { name: "共 60 个种子" })).toBeVisible()
     expect(
-      screen.getByRole("heading", { name: "共 42 个种子" }).closest("section")
+      screen.getByRole("heading", { name: "共 60 个种子" }).closest("section")
     ).toHaveClass("gap-2.5", "sm:gap-4")
     expect(
       screen.getAllByText("Release One 2026 1080p").length
@@ -117,7 +126,14 @@ describe("TorrentCatalogPage", () => {
     expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled()
     expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled()
     expect(screen.getByRole("spinbutton", { name: "跳转页码" })).toBeVisible()
-    expect(screen.getByRole("combobox", { name: "每页条数" })).toHaveValue("20")
+    expect(screen.getByRole("combobox", { name: "每页条数" })).toHaveValue("25")
+    expect(screen.getByRole("option", { name: "100" })).toBeVisible()
+    fireEvent.change(screen.getByRole("combobox", { name: "每页条数" }), {
+      target: { value: "100" },
+    })
+    expect(screen.getByRole("combobox", { name: "每页条数" })).toHaveValue(
+      "100"
+    )
     expect(
       screen.getByRole("combobox", { name: "促销" }).parentElement
     ).toHaveClass(

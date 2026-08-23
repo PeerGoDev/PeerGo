@@ -978,6 +978,7 @@ function CommentRow({
         username={comment.author.display_name}
         displayName={comment.author.display_name}
         colorSeed={comment.author.id}
+        loadImage={false}
         size={torrentAppearance ? "default" : isReply ? "sm" : "default"}
         className={cn(torrentAppearance && (isReply ? "size-8" : "size-10"))}
       />

@@ -49,12 +49,8 @@ import { useTorrentView } from "~/features/torrent/hooks/use-torrent-view"
 import { cn } from "~/lib/utils"
 import { PageLayout } from "~/shared/components/page-layout"
 
-// Production Core installations predating the current contract still enforce
-// the original 20-row public catalog ceiling. Keep the browser request inside
-// that deployed boundary so the legacy-style list remains usable during the
-// rolling Core upgrade window.
-const DEFAULT_PAGE_SIZE = 20
-const PAGE_SIZE_OPTIONS = [10, 20] as const
+const DEFAULT_PAGE_SIZE = 25
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const
 const PAGE_SIZE_STORAGE_KEY = "peergo.torrent-page-size.v1"
 
 type PromotionSelectValue = "all" | TorrentPromotion
@@ -116,6 +112,10 @@ export function TorrentCatalogPage() {
 
   React.useEffect(() => setDraftQuery(query), [query])
 
+  React.useEffect(() => {
+    if (torrents.isSuccess) storeCatalogPageSize(pageSize)
+  }, [pageSize, torrents.isSuccess])
+
   function updateFilters(
     updates: Record<string, string | undefined>,
     resetPage = true
@@ -148,7 +148,6 @@ export function TorrentCatalogPage() {
   function changePageSize(nextPageSize: number) {
     if (!isCatalogPageSize(nextPageSize)) return
     setPageSize(nextPageSize)
-    storeCatalogPageSize(nextPageSize)
     setCatalogPage(1)
   }
 
@@ -339,7 +338,7 @@ export function TorrentCatalogPage() {
         ) : null}
       </section>
 
-      {torrents.data && totalPages > 1 ? (
+      {torrents.isError || torrents.data ? (
         <CatalogPagination
           currentPage={Math.min(currentPage, totalPages)}
           totalPages={totalPages}

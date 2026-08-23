@@ -678,7 +678,7 @@ function StaffSettingsNavigationGroup({
                   tooltip={item.label}
                   isActive={active}
                   variant="classic"
-                  render={<Link to={item.to} />}
+                  render={<Link to={item.to} prefetch="intent" />}
                   className={staffNavigationButtonClass}
                 >
                   <span className="group-data-[collapsible=icon]:hidden">
@@ -740,7 +740,7 @@ function StaffSettingsNavigationSection({
             return (
               <SidebarMenuSubItem key={item.to}>
                 <SidebarMenuSubButton
-                  render={<Link to={item.to} />}
+                  render={<Link to={item.to} prefetch="intent" />}
                   isActive={itemActive}
                   className="h-9 translate-x-0 justify-end rounded-none border-r-2 border-transparent px-4 text-muted-foreground transition-colors data-active:border-primary data-active:bg-primary/10 data-active:text-primary"
                 >
@@ -789,7 +789,7 @@ function StaffNavigationGroup({
                   tooltip={item.label}
                   isActive={active}
                   variant="classic"
-                  render={<Link to={item.to} />}
+                  render={<Link to={item.to} prefetch="intent" />}
                   className={staffNavigationButtonClass}
                 >
                   <span className="group-data-[collapsible=icon]:hidden">

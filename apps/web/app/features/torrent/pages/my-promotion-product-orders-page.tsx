@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table"
+import { Skeleton } from "~/components/ui/skeleton"
 import { useWebSession } from "~/features/auth/api/session.mutations"
 import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import {
@@ -69,7 +70,7 @@ export function MyPromotionProductOrdersPage() {
       </h1>
 
       {session.isPending || (session.data && capabilities.isPending) ? (
-        <div className="h-72 animate-pulse rounded-lg border bg-muted/30" />
+        <Skeleton className="h-72 rounded-lg border" />
       ) : null}
 
       {!session.isPending && !session.data ? (
@@ -100,7 +101,7 @@ export function MyPromotionProductOrdersPage() {
       ) : null}
 
       {session.data && allowed && orders.isPending ? (
-        <div className="h-72 animate-pulse rounded-lg border bg-muted/30" />
+        <Skeleton className="h-72 rounded-lg border" />
       ) : null}
 
       {session.data && allowed && orders.isError ? (

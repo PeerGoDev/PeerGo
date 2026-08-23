@@ -847,6 +847,7 @@ function SidebarNavigationLink({
 
   return (
     <Link
+      prefetch="intent"
       {...props}
       onClick={(event) => {
         onClick?.(event)

@@ -171,3 +171,31 @@
     @apply bg-primary/20 text-foreground;
   }
 }
+
+@keyframes peergo-skeleton-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+[data-slot="skeleton"]::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--foreground) 8%, transparent),
+    transparent
+  );
+  animation: peergo-skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="skeleton"]::after {
+    animation: none;
+  }
+}

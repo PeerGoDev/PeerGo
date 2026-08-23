@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react"
+import * as React from "react"
 
 import {
   Avatar,
@@ -17,6 +17,7 @@ const fallbackColors = [
   "bg-chart-5 text-primary-foreground",
   "bg-destructive text-primary-foreground",
 ] as const
+const unavailableAvatarUsernames = new Set<string>()
 
 /**
  * Shared PtYes-compatible fallback avatar. Image migration is intentionally
@@ -29,21 +30,48 @@ export function UserAvatar({
   colorSeed,
   className,
   fallbackClassName,
+  loadImage = true,
   online = false,
   ...props
-}: Omit<ComponentProps<typeof Avatar>, "children"> & {
+}: Omit<React.ComponentProps<typeof Avatar>, "children"> & {
   username: string
   displayName: string
   colorSeed?: string
   fallbackClassName?: string
+  loadImage?: boolean
   online?: boolean
 }) {
   const identity = displayName.trim() || username.trim()
   const revision = useAvatarRevision(username)
-  const avatarPath = `/api/v1/users/${encodeURIComponent(username)}/avatar${revision ? `?v=${encodeURIComponent(revision)}` : ""}`
+  const usernameKey = username.toLocaleLowerCase()
+  const [imageUnavailable, setImageUnavailable] = React.useState(() =>
+    unavailableAvatarUsernames.has(usernameKey)
+  )
+
+  React.useEffect(() => {
+    if (revision) unavailableAvatarUsernames.delete(usernameKey)
+    setImageUnavailable(unavailableAvatarUsernames.has(usernameKey))
+  }, [revision, usernameKey])
+
+  const avatarPath =
+    loadImage && !imageUnavailable
+      ? `/api/v1/users/${encodeURIComponent(username)}/avatar${revision ? `?v=${encodeURIComponent(revision)}` : ""}`
+      : ""
   return (
     <Avatar className={className} {...props}>
-      <AvatarImage src={avatarPath} alt={`${identity}的头像`} />
+      {avatarPath ? (
+        <AvatarImage
+          src={avatarPath}
+          alt={`${identity}的头像`}
+          loading="lazy"
+          decoding="async"
+          onLoadingStatusChange={(status) => {
+            if (status !== "error") return
+            unavailableAvatarUsernames.add(usernameKey)
+            setImageUnavailable(true)
+          }}
+        />
+      ) : null}
       <AvatarFallback
         className={cn(
           "font-medium",

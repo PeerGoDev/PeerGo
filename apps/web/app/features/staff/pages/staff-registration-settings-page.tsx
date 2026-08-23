@@ -53,6 +53,7 @@ import {
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
 import { Separator } from "~/components/ui/separator"
+import { Skeleton } from "~/components/ui/skeleton"
 import { Spinner } from "~/components/ui/spinner"
 import { Switch } from "~/components/ui/switch"
 import { Textarea } from "~/components/ui/textarea"
@@ -126,10 +127,14 @@ function RegistrationSettingsContent({
       <StaffPageFrame>
         <RegistrationSettingsCard>
           <div
-            className="flex min-h-40 items-center justify-center text-sm text-muted-foreground"
-            aria-busy="true"
+            role="status"
+            aria-label="正在读取注册设置"
+            className="flex flex-col gap-4"
           >
-            加载中…
+            <Skeleton className="h-6 w-40" aria-hidden="true" />
+            <Skeleton className="h-10 w-full" aria-hidden="true" />
+            <Skeleton className="h-10 w-full" aria-hidden="true" />
+            <Skeleton className="h-24 w-full" aria-hidden="true" />
           </div>
         </RegistrationSettingsCard>
       </StaffPageFrame>

@@ -174,6 +174,8 @@ services:
         condition: service_healthy
     ports:
       - "${PEERGO_WEB_BIND_ADDRESS:-127.0.0.1}:${PEERGO_WEB_HOST_PORT:-8080}:8080"
+    volumes:
+      - ${PEERGO_WEB_ASSETS_VOLUME_SOURCE:-peergo_web_assets}:/usr/share/nginx/html
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 10s
@@ -440,3 +442,4 @@ volumes:
   peergo_tracker:
   peergo_audit:
   peergo_image_derivatives:
+  peergo_web_assets:

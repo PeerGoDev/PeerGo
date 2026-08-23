@@ -50,14 +50,20 @@ func TestListTorrentsFiltersAndMarksStaleStats(t *testing.T) {
 	}
 }
 
-func TestListTorrentsRejectsOutOfRangeLimit(t *testing.T) {
+func TestListTorrentsAcceptsMaximumAndRejectsOutOfRangeLimit(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, time.August, 5, 12, 0, 0, 0, time.UTC)
 	service := NewService(NewDemoRepository(now), func() time.Time { return now })
-	limit := 51
+	acceptedLimit := 100
+	page, err := service.ListTorrents(context.Background(), TorrentListRequest{Limit: &acceptedLimit})
+	if err != nil || page.Limit != acceptedLimit {
+		t.Fatalf("ListTorrents(limit=100) = %+v, error=%v", page, err)
+	}
 
-	_, err := service.ListTorrents(context.Background(), TorrentListRequest{Limit: &limit})
+	limit := 101
+
+	_, err = service.ListTorrents(context.Background(), TorrentListRequest{Limit: &limit})
 	if !errors.Is(err, ErrInvalidLimit) {
 		t.Fatalf("ListTorrents() error = %v, want ErrInvalidLimit", err)
 	}
