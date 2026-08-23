@@ -3942,7 +3942,7 @@ func (q *Queries) StorageCleanupDeleteHNROutbox(ctx context.Context, arg Storage
 	return result.RowsAffected(), nil
 }
 
-const storageCleanupDeleteHNRWork = `-- name: StorageCleanupDeleteHNRWork :execrows
+const storageCleanupDeleteHNRWork = `-- name: StorageCleanupDeleteHNRWork :many
 WITH candidate AS (
     SELECT work.interval_event_id
     FROM settlement.hnr_work AS work
@@ -3954,6 +3954,7 @@ WITH candidate AS (
 DELETE FROM settlement.hnr_work AS work
 USING candidate
 WHERE work.interval_event_id = candidate.interval_event_id
+RETURNING work.interval_event_id
 `
 
 type StorageCleanupDeleteHNRWorkParams struct {
@@ -3961,12 +3962,24 @@ type StorageCleanupDeleteHNRWorkParams struct {
 	BatchSize      int32
 }
 
-func (q *Queries) StorageCleanupDeleteHNRWork(ctx context.Context, arg StorageCleanupDeleteHNRWorkParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storageCleanupDeleteHNRWork, arg.TerminalBefore, arg.BatchSize)
+func (q *Queries) StorageCleanupDeleteHNRWork(ctx context.Context, arg StorageCleanupDeleteHNRWorkParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, storageCleanupDeleteHNRWork, arg.TerminalBefore, arg.BatchSize)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var interval_event_id uuid.UUID
+		if err := rows.Scan(&interval_event_id); err != nil {
+			return nil, err
+		}
+		items = append(items, interval_event_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const storageCleanupDeleteLegacyInbox = `-- name: StorageCleanupDeleteLegacyInbox :execrows
@@ -4009,7 +4022,7 @@ func (q *Queries) StorageCleanupDeleteLegacyInbox(ctx context.Context, arg Stora
 	return result.RowsAffected(), nil
 }
 
-const storageCleanupDeletePolicyWork = `-- name: StorageCleanupDeletePolicyWork :execrows
+const storageCleanupDeletePolicyWork = `-- name: StorageCleanupDeletePolicyWork :many
 WITH candidate AS (
     SELECT work.interval_event_id
     FROM settlement.policy_work AS work
@@ -4021,6 +4034,7 @@ WITH candidate AS (
 DELETE FROM settlement.policy_work AS work
 USING candidate
 WHERE work.interval_event_id = candidate.interval_event_id
+RETURNING work.interval_event_id
 `
 
 type StorageCleanupDeletePolicyWorkParams struct {
@@ -4028,54 +4042,73 @@ type StorageCleanupDeletePolicyWorkParams struct {
 	BatchSize      int32
 }
 
-func (q *Queries) StorageCleanupDeletePolicyWork(ctx context.Context, arg StorageCleanupDeletePolicyWorkParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storageCleanupDeletePolicyWork, arg.TerminalBefore, arg.BatchSize)
+func (q *Queries) StorageCleanupDeletePolicyWork(ctx context.Context, arg StorageCleanupDeletePolicyWorkParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, storageCleanupDeletePolicyWork, arg.TerminalBefore, arg.BatchSize)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var interval_event_id uuid.UUID
+		if err := rows.Scan(&interval_event_id); err != nil {
+			return nil, err
+		}
+		items = append(items, interval_event_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const storageCleanupDeleteRawIntervals = `-- name: StorageCleanupDeleteRawIntervals :execrows
-WITH evidence_head AS (
-    SELECT max(window_end) AS closed_through
-    FROM ledger.seeding_evidence_windows
-), candidate AS (
+WITH candidate AS (
     SELECT raw.event_id
     FROM ledger.raw_session_intervals AS raw
-    CROSS JOIN evidence_head
-    WHERE raw.ends_at < $1::timestamptz
+    WHERE raw.event_id = ANY($1::uuid[])
+      AND raw.ends_at < $2::timestamptz
       AND (
           raw.previous_left <> 0
           OR raw.current_left <> 0
-          OR raw.ends_at <= coalesce(evidence_head.closed_through, '-infinity'::timestamptz)
+          OR raw.ends_at <= coalesce(
+              (SELECT max(evidence_window.window_end)
+               FROM ledger.seeding_evidence_windows AS evidence_window),
+              '-infinity'::timestamptz
+          )
       )
-      AND NOT EXISTS (
-          SELECT 1 FROM settlement.policy_work AS work
+      AND (
+          SELECT true FROM settlement.policy_work AS work
           WHERE work.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.traffic_settlements AS traffic
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.traffic_settlements AS traffic
           WHERE traffic.settlement_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM settlement.hnr_work AS work
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM settlement.hnr_work AS work
           WHERE work.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.speed_observations AS observation
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.speed_observations AS observation
           WHERE observation.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.seeding_evidence_sources AS source
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.seeding_evidence_sources AS source
           WHERE source.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.seeding_evidence_anomalies AS anomaly
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.seeding_evidence_anomalies AS anomaly
           WHERE anomaly.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true
           FROM ledger.hnr_obligations AS obligation
           INNER JOIN ledger.hnr_completion_assessments AS assessment
               ON assessment.id = obligation.assessment_id
@@ -4083,9 +4116,10 @@ WITH evidence_head AS (
             AND assessment.user_id = raw.user_id
             AND assessment.torrent_id = raw.torrent_id
             AND raw.ends_at > assessment.completed_at
-      )
+          LIMIT 1 OFFSET 0
+      ) IS NULL
     ORDER BY raw.ends_at, raw.event_id
-    LIMIT $2::integer
+    LIMIT $3::integer
     FOR UPDATE SKIP LOCKED
 )
 DELETE FROM ledger.raw_session_intervals AS raw
@@ -4094,19 +4128,20 @@ WHERE raw.event_id = candidate.event_id
 `
 
 type StorageCleanupDeleteRawIntervalsParams struct {
-	DetailBefore pgtype.Timestamptz
-	BatchSize    int32
+	CandidateEventIds []uuid.UUID
+	DetailBefore      pgtype.Timestamptz
+	BatchSize         int32
 }
 
 func (q *Queries) StorageCleanupDeleteRawIntervals(ctx context.Context, arg StorageCleanupDeleteRawIntervalsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storageCleanupDeleteRawIntervals, arg.DetailBefore, arg.BatchSize)
+	result, err := q.db.Exec(ctx, storageCleanupDeleteRawIntervals, arg.CandidateEventIds, arg.DetailBefore, arg.BatchSize)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const storageCleanupDeleteSeedingAnomalies = `-- name: StorageCleanupDeleteSeedingAnomalies :execrows
+const storageCleanupDeleteSeedingAnomalies = `-- name: StorageCleanupDeleteSeedingAnomalies :many
 WITH candidate AS (
     SELECT anomaly.id
     FROM ledger.seeding_evidence_anomalies AS anomaly
@@ -4118,6 +4153,7 @@ WITH candidate AS (
 DELETE FROM ledger.seeding_evidence_anomalies AS anomaly
 USING candidate
 WHERE anomaly.id = candidate.id
+RETURNING anomaly.interval_event_id
 `
 
 type StorageCleanupDeleteSeedingAnomaliesParams struct {
@@ -4125,12 +4161,24 @@ type StorageCleanupDeleteSeedingAnomaliesParams struct {
 	BatchSize     int32
 }
 
-func (q *Queries) StorageCleanupDeleteSeedingAnomalies(ctx context.Context, arg StorageCleanupDeleteSeedingAnomaliesParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storageCleanupDeleteSeedingAnomalies, arg.AnomalyBefore, arg.BatchSize)
+func (q *Queries) StorageCleanupDeleteSeedingAnomalies(ctx context.Context, arg StorageCleanupDeleteSeedingAnomaliesParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, storageCleanupDeleteSeedingAnomalies, arg.AnomalyBefore, arg.BatchSize)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var interval_event_id uuid.UUID
+		if err := rows.Scan(&interval_event_id); err != nil {
+			return nil, err
+		}
+		items = append(items, interval_event_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const storageCleanupDeleteSeedingEvidenceOutbox = `-- name: StorageCleanupDeleteSeedingEvidenceOutbox :execrows
@@ -4160,7 +4208,7 @@ func (q *Queries) StorageCleanupDeleteSeedingEvidenceOutbox(ctx context.Context,
 	return result.RowsAffected(), nil
 }
 
-const storageCleanupDeleteSeedingSources = `-- name: StorageCleanupDeleteSeedingSources :execrows
+const storageCleanupDeleteSeedingSources = `-- name: StorageCleanupDeleteSeedingSources :many
 WITH eligible_window AS MATERIALIZED (
     -- Evidence windows are one row per hour. Select from that compact ledger
     -- first so retained anomalous hours do not force every source row in those
@@ -4199,6 +4247,7 @@ WHERE source.window_start = candidate.window_start
   AND source.user_id = candidate.user_id
   AND source.torrent_id = candidate.torrent_id
   AND source.interval_event_id = candidate.interval_event_id
+RETURNING source.interval_event_id
 `
 
 type StorageCleanupDeleteSeedingSourcesParams struct {
@@ -4206,12 +4255,24 @@ type StorageCleanupDeleteSeedingSourcesParams struct {
 	BatchSize    int32
 }
 
-func (q *Queries) StorageCleanupDeleteSeedingSources(ctx context.Context, arg StorageCleanupDeleteSeedingSourcesParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storageCleanupDeleteSeedingSources, arg.DetailBefore, arg.BatchSize)
+func (q *Queries) StorageCleanupDeleteSeedingSources(ctx context.Context, arg StorageCleanupDeleteSeedingSourcesParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, storageCleanupDeleteSeedingSources, arg.DetailBefore, arg.BatchSize)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var interval_event_id uuid.UUID
+		if err := rows.Scan(&interval_event_id); err != nil {
+			return nil, err
+		}
+		items = append(items, interval_event_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const storageCleanupDeleteSessions = `-- name: StorageCleanupDeleteSessions :execrows
@@ -4448,7 +4509,7 @@ func (q *Queries) StorageCleanupDeleteSnapshotRuns(ctx context.Context, arg Stor
 	return result.RowsAffected(), nil
 }
 
-const storageCleanupDeleteSpeedObservations = `-- name: StorageCleanupDeleteSpeedObservations :execrows
+const storageCleanupDeleteSpeedObservations = `-- name: StorageCleanupDeleteSpeedObservations :many
 WITH candidate AS (
     SELECT observation.interval_event_id
     FROM ledger.speed_observations AS observation
@@ -4466,6 +4527,7 @@ WITH candidate AS (
 DELETE FROM ledger.speed_observations AS observation
 USING candidate
 WHERE observation.interval_event_id = candidate.interval_event_id
+RETURNING observation.interval_event_id
 `
 
 type StorageCleanupDeleteSpeedObservationsParams struct {
@@ -4474,12 +4536,24 @@ type StorageCleanupDeleteSpeedObservationsParams struct {
 	BatchSize     int32
 }
 
-func (q *Queries) StorageCleanupDeleteSpeedObservations(ctx context.Context, arg StorageCleanupDeleteSpeedObservationsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storageCleanupDeleteSpeedObservations, arg.AnomalyBefore, arg.DetailBefore, arg.BatchSize)
+func (q *Queries) StorageCleanupDeleteSpeedObservations(ctx context.Context, arg StorageCleanupDeleteSpeedObservationsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, storageCleanupDeleteSpeedObservations, arg.AnomalyBefore, arg.DetailBefore, arg.BatchSize)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var interval_event_id uuid.UUID
+		if err := rows.Scan(&interval_event_id); err != nil {
+			return nil, err
+		}
+		items = append(items, interval_event_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const storageCleanupDeleteTrafficOutbox = `-- name: StorageCleanupDeleteTrafficOutbox :execrows

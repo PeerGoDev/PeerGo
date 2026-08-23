@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,6 +34,10 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	anomaly := cleanupTimestamp(cutoffs.AnomalyBefore)
 	batch := int32(batchSize)
 	var result Result
+	// A dependency deletion is the bounded signal that its raw interval may
+	// have become unreferenced. Carry those exact IDs through this pass so raw
+	// cleanup never searches the full interval ledger for possible orphans.
+	var rawIntervalCandidates []uuid.UUID
 	var err error
 
 	if result.TrafficOutbox, err = queries.StorageCleanupDeleteTrafficOutbox(ctx, ledgerdb.StorageCleanupDeleteTrafficOutboxParams{TerminalBefore: terminal, BatchSize: batch}); err != nil {
@@ -44,19 +49,31 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	if result.SeedingEvidenceOutbox, err = queries.StorageCleanupDeleteSeedingEvidenceOutbox(ctx, ledgerdb.StorageCleanupDeleteSeedingEvidenceOutboxParams{TerminalBefore: terminal, BatchSize: batch}); err != nil {
 		return result, cleanupError("delete published seeding evidence outbox", err)
 	}
-	if result.PolicyWork, err = queries.StorageCleanupDeletePolicyWork(ctx, ledgerdb.StorageCleanupDeletePolicyWorkParams{TerminalBefore: terminal, BatchSize: batch}); err != nil {
+	policyWorkCandidates, err := queries.StorageCleanupDeletePolicyWork(ctx, ledgerdb.StorageCleanupDeletePolicyWorkParams{TerminalBefore: terminal, BatchSize: batch})
+	if err != nil {
 		return result, cleanupError("delete settled policy work", err)
 	}
-	if result.HNRWork, err = queries.StorageCleanupDeleteHNRWork(ctx, ledgerdb.StorageCleanupDeleteHNRWorkParams{TerminalBefore: terminal, BatchSize: batch}); err != nil {
+	result.PolicyWork = int64(len(policyWorkCandidates))
+	rawIntervalCandidates = append(rawIntervalCandidates, policyWorkCandidates...)
+	hnrWorkCandidates, err := queries.StorageCleanupDeleteHNRWork(ctx, ledgerdb.StorageCleanupDeleteHNRWorkParams{TerminalBefore: terminal, BatchSize: batch})
+	if err != nil {
 		return result, cleanupError("delete processed H&R work", err)
 	}
-	result.TrafficSettlements, result.TrafficSegments, err = repository.cleanupTrafficDetails(ctx, detail, batch)
+	result.HNRWork = int64(len(hnrWorkCandidates))
+	rawIntervalCandidates = append(rawIntervalCandidates, hnrWorkCandidates...)
+	trafficCandidates, trafficSegments, err := repository.cleanupTrafficDetails(ctx, detail, batch)
 	if err != nil {
 		return result, err
 	}
-	if result.SeedingSources, err = queries.StorageCleanupDeleteSeedingSources(ctx, ledgerdb.StorageCleanupDeleteSeedingSourcesParams{DetailBefore: detail, BatchSize: batch}); err != nil {
+	result.TrafficSettlements = int64(len(trafficCandidates))
+	result.TrafficSegments = trafficSegments
+	rawIntervalCandidates = append(rawIntervalCandidates, trafficCandidates...)
+	seedingSourceCandidates, err := queries.StorageCleanupDeleteSeedingSources(ctx, ledgerdb.StorageCleanupDeleteSeedingSourcesParams{DetailBefore: detail, BatchSize: batch})
+	if err != nil {
 		return result, cleanupError("delete old seeding source links", err)
 	}
+	result.SeedingSources = int64(len(seedingSourceCandidates))
+	rawIntervalCandidates = append(rawIntervalCandidates, seedingSourceCandidates...)
 	if result.SnapshotEntries, err = queries.StorageCleanupDeleteSnapshotEntries(ctx, ledgerdb.StorageCleanupDeleteSnapshotEntriesParams{DetailBefore: detail, BatchSize: batch}); err != nil {
 		return result, cleanupError("delete redundant snapshot entries", err)
 	}
@@ -69,16 +86,27 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	if result.SnapshotRuns, err = queries.StorageCleanupDeleteSnapshotRuns(ctx, ledgerdb.StorageCleanupDeleteSnapshotRunsParams{DetailBefore: detail, BatchSize: batch}); err != nil {
 		return result, cleanupError("delete redundant snapshot headers", err)
 	}
-	if result.SpeedObservations, err = queries.StorageCleanupDeleteSpeedObservations(ctx, ledgerdb.StorageCleanupDeleteSpeedObservationsParams{
+	speedObservationCandidates, err := queries.StorageCleanupDeleteSpeedObservations(ctx, ledgerdb.StorageCleanupDeleteSpeedObservationsParams{
 		DetailBefore: detail, AnomalyBefore: anomaly, BatchSize: batch,
-	}); err != nil {
+	})
+	if err != nil {
 		return result, cleanupError("delete old speed observations", err)
 	}
-	if result.SeedingAnomalies, err = queries.StorageCleanupDeleteSeedingAnomalies(ctx, ledgerdb.StorageCleanupDeleteSeedingAnomaliesParams{AnomalyBefore: anomaly, BatchSize: batch}); err != nil {
+	result.SpeedObservations = int64(len(speedObservationCandidates))
+	rawIntervalCandidates = append(rawIntervalCandidates, speedObservationCandidates...)
+	seedingAnomalyCandidates, err := queries.StorageCleanupDeleteSeedingAnomalies(ctx, ledgerdb.StorageCleanupDeleteSeedingAnomaliesParams{AnomalyBefore: anomaly, BatchSize: batch})
+	if err != nil {
 		return result, cleanupError("delete old seeding anomalies", err)
 	}
-	if result.RawIntervals, err = queries.StorageCleanupDeleteRawIntervals(ctx, ledgerdb.StorageCleanupDeleteRawIntervalsParams{DetailBefore: detail, BatchSize: batch}); err != nil {
-		return result, cleanupError("delete unreferenced raw intervals", err)
+	result.SeedingAnomalies = int64(len(seedingAnomalyCandidates))
+	rawIntervalCandidates = append(rawIntervalCandidates, seedingAnomalyCandidates...)
+	if len(rawIntervalCandidates) > 0 {
+		result.RawIntervals, err = queries.StorageCleanupDeleteRawIntervals(ctx, ledgerdb.StorageCleanupDeleteRawIntervalsParams{
+			CandidateEventIds: rawIntervalCandidates, DetailBefore: detail, BatchSize: batch,
+		})
+		if err != nil {
+			return result, cleanupError("delete unreferenced raw intervals", err)
+		}
 	}
 	if result.Sessions, err = queries.StorageCleanupDeleteSessions(ctx, ledgerdb.StorageCleanupDeleteSessionsParams{SessionBefore: session, BatchSize: batch}); err != nil {
 		return result, cleanupError("delete stale session baselines", err)
@@ -89,10 +117,10 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	return result, nil
 }
 
-func (repository *PostgresRepository) cleanupTrafficDetails(ctx context.Context, detailBefore pgtype.Timestamptz, batchSize int32) (int64, int64, error) {
+func (repository *PostgresRepository) cleanupTrafficDetails(ctx context.Context, detailBefore pgtype.Timestamptz, batchSize int32) ([]uuid.UUID, int64, error) {
 	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return 0, 0, cleanupError("begin traffic detail cleanup", err)
+		return nil, 0, cleanupError("begin traffic detail cleanup", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := ledgerdb.New(tx)
@@ -100,26 +128,26 @@ func (repository *PostgresRepository) cleanupTrafficDetails(ctx context.Context,
 		DetailBefore: detailBefore, BatchSize: batchSize,
 	})
 	if err != nil {
-		return 0, 0, cleanupError("select traffic detail cleanup batch", err)
+		return nil, 0, cleanupError("select traffic detail cleanup batch", err)
 	}
 	if len(ids) == 0 {
-		return 0, 0, nil
+		return nil, 0, nil
 	}
 	segments, err := queries.StorageCleanupDeleteTrafficSettlementSegments(ctx, ids)
 	if err != nil {
-		return 0, 0, cleanupError("delete traffic settlement segments", err)
+		return nil, 0, cleanupError("delete traffic settlement segments", err)
 	}
 	settlements, err := queries.StorageCleanupDeleteTrafficSettlements(ctx, ids)
 	if err != nil {
-		return 0, 0, cleanupError("delete traffic settlements", err)
+		return nil, 0, cleanupError("delete traffic settlements", err)
 	}
 	if settlements != int64(len(ids)) {
-		return 0, 0, fmt.Errorf("%w: selected %d traffic settlements but deleted %d", ErrInvariant, len(ids), settlements)
+		return nil, 0, fmt.Errorf("%w: selected %d traffic settlements but deleted %d", ErrInvariant, len(ids), settlements)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return 0, 0, cleanupError("commit traffic detail cleanup", err)
+		return nil, 0, cleanupError("commit traffic detail cleanup", err)
 	}
-	return settlements, segments, nil
+	return ids, segments, nil
 }
 
 func validCutoffs(cutoffs Cutoffs) bool {

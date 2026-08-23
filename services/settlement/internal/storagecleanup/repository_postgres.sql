@@ -37,7 +37,7 @@ DELETE FROM settlement.seeding_evidence_outbox AS outbox
 USING candidate
 WHERE outbox.event_id = candidate.event_id;
 
--- name: StorageCleanupDeletePolicyWork :execrows
+-- name: StorageCleanupDeletePolicyWork :many
 WITH candidate AS (
     SELECT work.interval_event_id
     FROM settlement.policy_work AS work
@@ -48,9 +48,10 @@ WITH candidate AS (
 )
 DELETE FROM settlement.policy_work AS work
 USING candidate
-WHERE work.interval_event_id = candidate.interval_event_id;
+WHERE work.interval_event_id = candidate.interval_event_id
+RETURNING work.interval_event_id;
 
--- name: StorageCleanupDeleteHNRWork :execrows
+-- name: StorageCleanupDeleteHNRWork :many
 WITH candidate AS (
     SELECT work.interval_event_id
     FROM settlement.hnr_work AS work
@@ -61,7 +62,8 @@ WITH candidate AS (
 )
 DELETE FROM settlement.hnr_work AS work
 USING candidate
-WHERE work.interval_event_id = candidate.interval_event_id;
+WHERE work.interval_event_id = candidate.interval_event_id
+RETURNING work.interval_event_id;
 
 -- name: StorageCleanupListTrafficSettlements :many
 SELECT settlement.settlement_id
@@ -90,7 +92,7 @@ WHERE settlement_id = ANY(sqlc.arg(settlement_ids)::uuid[]);
 DELETE FROM ledger.traffic_settlements
 WHERE settlement_id = ANY(sqlc.arg(settlement_ids)::uuid[]);
 
--- name: StorageCleanupDeleteSeedingSources :execrows
+-- name: StorageCleanupDeleteSeedingSources :many
 WITH eligible_window AS MATERIALIZED (
     -- Evidence windows are one row per hour. Select from that compact ledger
     -- first so retained anomalous hours do not force every source row in those
@@ -128,9 +130,10 @@ USING candidate
 WHERE source.window_start = candidate.window_start
   AND source.user_id = candidate.user_id
   AND source.torrent_id = candidate.torrent_id
-  AND source.interval_event_id = candidate.interval_event_id;
+  AND source.interval_event_id = candidate.interval_event_id
+RETURNING source.interval_event_id;
 
--- name: StorageCleanupDeleteSpeedObservations :execrows
+-- name: StorageCleanupDeleteSpeedObservations :many
 WITH candidate AS (
     SELECT observation.interval_event_id
     FROM ledger.speed_observations AS observation
@@ -147,9 +150,10 @@ WITH candidate AS (
 )
 DELETE FROM ledger.speed_observations AS observation
 USING candidate
-WHERE observation.interval_event_id = candidate.interval_event_id;
+WHERE observation.interval_event_id = candidate.interval_event_id
+RETURNING observation.interval_event_id;
 
--- name: StorageCleanupDeleteSeedingAnomalies :execrows
+-- name: StorageCleanupDeleteSeedingAnomalies :many
 WITH candidate AS (
     SELECT anomaly.id
     FROM ledger.seeding_evidence_anomalies AS anomaly
@@ -160,7 +164,8 @@ WITH candidate AS (
 )
 DELETE FROM ledger.seeding_evidence_anomalies AS anomaly
 USING candidate
-WHERE anomaly.id = candidate.id;
+WHERE anomaly.id = candidate.id
+RETURNING anomaly.interval_event_id;
 
 -- name: StorageCleanupDeleteSnapshotEntries :execrows
 WITH eligible_snapshot AS MATERIALIZED (
@@ -312,45 +317,52 @@ USING candidate
 WHERE snapshot.snapshot_id = candidate.snapshot_id;
 
 -- name: StorageCleanupDeleteRawIntervals :execrows
-WITH evidence_head AS (
-    SELECT max(window_end) AS closed_through
-    FROM ledger.seeding_evidence_windows
-), candidate AS (
+WITH candidate AS (
     SELECT raw.event_id
     FROM ledger.raw_session_intervals AS raw
-    CROSS JOIN evidence_head
-    WHERE raw.ends_at < sqlc.arg(detail_before)::timestamptz
+    WHERE raw.event_id = ANY(sqlc.arg(candidate_event_ids)::uuid[])
+      AND raw.ends_at < sqlc.arg(detail_before)::timestamptz
       AND (
           raw.previous_left <> 0
           OR raw.current_left <> 0
-          OR raw.ends_at <= coalesce(evidence_head.closed_through, '-infinity'::timestamptz)
+          OR raw.ends_at <= coalesce(
+              (SELECT max(evidence_window.window_end)
+               FROM ledger.seeding_evidence_windows AS evidence_window),
+              '-infinity'::timestamptz
+          )
       )
-      AND NOT EXISTS (
-          SELECT 1 FROM settlement.policy_work AS work
+      AND (
+          SELECT true FROM settlement.policy_work AS work
           WHERE work.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.traffic_settlements AS traffic
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.traffic_settlements AS traffic
           WHERE traffic.settlement_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM settlement.hnr_work AS work
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM settlement.hnr_work AS work
           WHERE work.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.speed_observations AS observation
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.speed_observations AS observation
           WHERE observation.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.seeding_evidence_sources AS source
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.seeding_evidence_sources AS source
           WHERE source.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.seeding_evidence_anomalies AS anomaly
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.seeding_evidence_anomalies AS anomaly
           WHERE anomaly.interval_event_id = raw.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true
           FROM ledger.hnr_obligations AS obligation
           INNER JOIN ledger.hnr_completion_assessments AS assessment
               ON assessment.id = obligation.assessment_id
@@ -358,7 +370,8 @@ WITH evidence_head AS (
             AND assessment.user_id = raw.user_id
             AND assessment.torrent_id = raw.torrent_id
             AND raw.ends_at > assessment.completed_at
-      )
+          LIMIT 1 OFFSET 0
+      ) IS NULL
     ORDER BY raw.ends_at, raw.event_id
     LIMIT sqlc.arg(batch_size)::integer
     FOR UPDATE SKIP LOCKED
