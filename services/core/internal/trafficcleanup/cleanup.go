@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	MinimumDetailRetention  = 12 * time.Hour
-	MinimumHistoryRetention = 30 * 24 * time.Hour
-	backlogRetryInterval    = time.Second
+	MinimumDetailRetention      = 12 * time.Hour
+	MinimumHistoryRetention     = 30 * 24 * time.Hour
+	minimumBacklogRetryInterval = 30 * time.Second
 )
 
 var (
@@ -120,8 +120,15 @@ func (worker *Worker) Run(ctx context.Context) error {
 		}
 		nextRun := worker.config.RunInterval
 		if result.Saturated(int64(worker.config.BatchSize)) {
-			nextRun = backlogRetryInterval
+			nextRun = backlogRetryDelay(worker.config.RunInterval)
 		}
 		timer.Reset(nextRun)
 	}
+}
+
+func backlogRetryDelay(runInterval time.Duration) time.Duration {
+	if runInterval < minimumBacklogRetryInterval {
+		return minimumBacklogRetryInterval
+	}
+	return runInterval
 }

@@ -286,7 +286,7 @@ core_traffic_concurrency="$(bootstrap_or_existing \
 storage_cleanup_interval="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_CLEANUP_INTERVAL \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_CLEANUP_INTERVAL \
-    15s)"
+    30s)"
 storage_terminal_retention="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_TERMINAL_RETENTION \
@@ -306,7 +306,7 @@ storage_anomaly_retention="$(bootstrap_or_existing \
 storage_batch_size="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_BATCH_SIZE \
-    10000)"
+    5000)"
 storage_startup_timeout="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_STARTUP_TIMEOUT \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_STARTUP_TIMEOUT \
@@ -314,7 +314,7 @@ storage_startup_timeout="$(bootstrap_or_existing \
 core_storage_cleanup_interval="$(bootstrap_or_existing \
     PEERGO_CORE_STORAGE_CLEANUP_INTERVAL \
     PEERGO_BOOTSTRAP_CORE_STORAGE_CLEANUP_INTERVAL \
-    15s)"
+    30s)"
 core_storage_detail_retention="$(bootstrap_or_existing \
     PEERGO_CORE_STORAGE_DETAIL_RETENTION \
     PEERGO_BOOTSTRAP_CORE_STORAGE_DETAIL_RETENTION \
@@ -326,7 +326,7 @@ core_storage_history_retention="$(bootstrap_or_existing \
 core_storage_batch_size="$(bootstrap_or_existing \
     PEERGO_CORE_STORAGE_BATCH_SIZE \
     PEERGO_BOOTSTRAP_CORE_STORAGE_BATCH_SIZE \
-    10000)"
+    5000)"
 core_storage_startup_timeout="$(bootstrap_or_existing \
     PEERGO_CORE_STORAGE_STARTUP_TIMEOUT \
     PEERGO_BOOTSTRAP_CORE_STORAGE_STARTUP_TIMEOUT \

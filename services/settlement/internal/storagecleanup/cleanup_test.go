@@ -81,9 +81,12 @@ func TestResultReportsPerCategorySaturation(t *testing.T) {
 	}
 }
 
-func TestBacklogRetryIntervalStaysBelowSteadyStatePolling(t *testing.T) {
+func TestBacklogRetryNeverRunsFasterThanConfigured(t *testing.T) {
 	t.Parallel()
-	if backlogRetryInterval <= 0 || backlogRetryInterval >= 10*time.Second {
-		t.Fatalf("backlogRetryInterval = %v, want a positive delay below the minimum steady-state interval", backlogRetryInterval)
+	if delay := backlogRetryDelay(15 * time.Second); delay != 30*time.Second {
+		t.Fatalf("backlogRetryDelay(15s) = %v, want 30s", delay)
+	}
+	if delay := backlogRetryDelay(time.Minute); delay != time.Minute {
+		t.Fatalf("backlogRetryDelay(1m) = %v, want 1m", delay)
 	}
 }

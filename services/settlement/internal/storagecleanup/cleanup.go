@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	MinimumTerminalRetention = 3 * time.Hour
-	MinimumSessionRetention  = 12 * time.Hour
-	MinimumDetailRetention   = 12 * time.Hour
-	MinimumAnomalyRetention  = 30 * 24 * time.Hour
-	backlogRetryInterval     = time.Second
+	MinimumTerminalRetention    = 3 * time.Hour
+	MinimumSessionRetention     = 12 * time.Hour
+	MinimumDetailRetention      = 12 * time.Hour
+	MinimumAnomalyRetention     = 30 * 24 * time.Hour
+	minimumBacklogRetryInterval = 30 * time.Second
 )
 
 var (
@@ -162,12 +162,18 @@ func (worker *Worker) Run(ctx context.Context) error {
 		}
 		nextRun := worker.config.RunInterval
 		if result.Saturated(int64(worker.config.BatchSize)) {
-			// Each DELETE remains bounded by BatchSize. Only remove the idle
-			// interval while a category is still saturated so a finite backlog
-			// cannot grow faster merely because every successful batch waits the
-			// normal steady-state polling interval.
-			nextRun = backlogRetryInterval
+			// Backlog catch-up must yield to foreground traffic. Never poll more
+			// frequently than configured, and keep at least thirty seconds
+			// between saturated batches so autovacuum can make progress.
+			nextRun = backlogRetryDelay(worker.config.RunInterval)
 		}
 		timer.Reset(nextRun)
 	}
+}
+
+func backlogRetryDelay(runInterval time.Duration) time.Duration {
+	if runInterval < minimumBacklogRetryInterval {
+		return minimumBacklogRetryInterval
+	}
+	return runInterval
 }
