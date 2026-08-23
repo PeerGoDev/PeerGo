@@ -55,7 +55,7 @@ describe("TorrentCatalogPage", () => {
       query: "release",
       categoryId: "movies",
       promotion: "free" as const,
-      limit: 25,
+      limit: 20,
       offset: 0,
     }
     queryClient.setQueryData(torrentListQueryOptions(filters).queryKey, {
@@ -77,7 +77,7 @@ describe("TorrentCatalogPage", () => {
         },
       ],
       total: 42,
-      limit: 25,
+      limit: 20,
       offset: 0,
     })
 
@@ -113,11 +113,11 @@ describe("TorrentCatalogPage", () => {
     expect(
       screen.getAllByText("Release One 2026 1080p").length
     ).toBeGreaterThan(0)
-    expect(screen.getByText("第 1 页 / 共 2 页")).toBeVisible()
+    expect(screen.getByText("第 1 页 / 共 3 页")).toBeVisible()
     expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled()
     expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled()
     expect(screen.getByRole("spinbutton", { name: "跳转页码" })).toBeVisible()
-    expect(screen.getByRole("combobox", { name: "每页条数" })).toHaveValue("25")
+    expect(screen.getByRole("combobox", { name: "每页条数" })).toHaveValue("20")
     expect(
       screen.getByRole("combobox", { name: "促销" }).parentElement
     ).toHaveClass(

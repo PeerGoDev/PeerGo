@@ -49,8 +49,12 @@ import { useTorrentView } from "~/features/torrent/hooks/use-torrent-view"
 import { cn } from "~/lib/utils"
 import { PageLayout } from "~/shared/components/page-layout"
 
-const DEFAULT_PAGE_SIZE = 25
-const PAGE_SIZE_OPTIONS = [25, 50, 100] as const
+// Production Core installations predating the current contract still enforce
+// the original 20-row public catalog ceiling. Keep the browser request inside
+// that deployed boundary so the legacy-style list remains usable during the
+// rolling Core upgrade window.
+const DEFAULT_PAGE_SIZE = 20
+const PAGE_SIZE_OPTIONS = [10, 20] as const
 const PAGE_SIZE_STORAGE_KEY = "peergo.torrent-page-size.v1"
 
 type PromotionSelectValue = "all" | TorrentPromotion
@@ -531,6 +535,8 @@ function storeCatalogPageSize(pageSize: number) {
   }
 }
 
-function isCatalogPageSize(value: number): value is 25 | 50 | 100 {
+function isCatalogPageSize(
+  value: number
+): value is (typeof PAGE_SIZE_OPTIONS)[number] {
   return PAGE_SIZE_OPTIONS.some((option) => option === value)
 }
