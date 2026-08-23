@@ -101,12 +101,9 @@ CREATE TEMP TABLE legacy_reviewer_stage (
     status_transition_id uuid
 ) ON COMMIT DROP;
 
-COPY legacy_reviewer_stage (legacy_reviewer_id, legacy_user_id, source_status, source_total_reviews, source_accurate_count, source_joined_at, source_removed_at, source_remove_reason, source_last_activity_at, source_activity_status, source_created_at, source_updated_at, source_fingerprint_hex) FROM STDIN WITH (FORMAT csv, HEADER true);
 SQL
-cat "${reviewer_csv}"
+printf "\\copy legacy_reviewer_stage (legacy_reviewer_id, legacy_user_id, source_status, source_total_reviews, source_accurate_count, source_joined_at, source_removed_at, source_remove_reason, source_last_activity_at, source_activity_status, source_created_at, source_updated_at, source_fingerprint_hex) FROM '%s' WITH (FORMAT csv, HEADER true)\n" "${reviewer_csv}"
 cat <<'SQL'
-\.
-
 UPDATE legacy_reviewer_stage AS stage
 SET user_id = mapping.user_id
 FROM migration.user_id_map AS mapping
