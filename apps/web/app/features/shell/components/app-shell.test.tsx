@@ -199,8 +199,8 @@ describe("AppShell mobile navigation", () => {
       within(navigation).queryByRole("button", { name: "账户与成长" })
     ).not.toBeInTheDocument()
     expect(
-      within(navigation).queryByRole("link", { name: "我的上传" })
-    ).not.toBeInTheDocument()
+      within(navigation).getByRole("link", { name: "我的上传" })
+    ).toHaveAttribute("href", "/account/submissions")
     expect(
       within(navigation).getByRole("link", { name: "我的收藏" })
     ).toHaveAttribute("href", "/account/bookmarks")
@@ -249,9 +249,10 @@ describe("AppShell mobile navigation", () => {
       "href",
       "/account/hnr"
     )
-    expect(
-      screen.queryByRole("menuitem", { name: "我的上传" })
-    ).not.toBeInTheDocument()
+    expect(screen.getByRole("menuitem", { name: "我的上传" })).toHaveAttribute(
+      "href",
+      "/account/submissions"
+    )
     expect(screen.getByRole("menuitem", { name: "我的收藏" })).toHaveAttribute(
       "href",
       "/account/bookmarks"

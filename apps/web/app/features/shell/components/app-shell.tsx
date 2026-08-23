@@ -14,6 +14,7 @@ import {
   ClockAlertIcon,
   DownloadIcon,
   FileCheckIcon,
+  FolderClockIcon,
   GaugeIcon,
   GraduationCapIcon,
   HomeIcon,
@@ -150,6 +151,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
   const canReadDownloadRestriction = capabilities.data?.items.some(
     (capability) => capability.action === "user.downloadrestriction.read.self"
+  )
+  const canReadTorrentSubmissions = capabilities.data?.items.some(
+    (capability) => capability.action === "torrent.submission.read.self"
   )
   const canReadTorrentBookmarks = capabilities.data?.items.some(
     (capability) => capability.action === "torrent.bookmark.read.self"
@@ -325,6 +329,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             label: "促销记录",
             to: "/account/promotions",
             icon: PinIcon,
+          },
+        ]
+      : []),
+    ...(canReadTorrentSubmissions
+      ? [
+          {
+            label: "我的上传",
+            to: "/account/submissions",
+            icon: FolderClockIcon,
           },
         ]
       : []),
