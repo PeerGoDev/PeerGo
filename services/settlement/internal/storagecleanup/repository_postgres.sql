@@ -157,11 +157,12 @@ USING candidate
 WHERE anomaly.id = candidate.id;
 
 -- name: StorageCleanupDeleteSnapshotEntries :execrows
-WITH candidate AS (
-    SELECT entry.snapshot_id, entry.info_hash_v1
-    FROM ledger.seeding_swarm_snapshot_entries AS entry
-    INNER JOIN ledger.seeding_swarm_snapshots AS snapshot
-        ON snapshot.snapshot_id = entry.snapshot_id
+WITH eligible_snapshot AS MATERIALIZED (
+    -- Snapshot entries are keyed by snapshot_id. Choose one eligible snapshot
+    -- from the compact snapshot ledger first, then walk that primary-key prefix
+    -- instead of sorting every retained entry on each cleanup pass.
+    SELECT snapshot.snapshot_id
+    FROM ledger.seeding_swarm_snapshots AS snapshot
     WHERE snapshot.status IN ('collecting', 'complete')
       AND (
         (
@@ -192,10 +193,25 @@ WITH candidate AS (
                 WHERE anomalous_window.selected_snapshot_id = snapshot.snapshot_id
             )
         )
-    )
-    ORDER BY snapshot.observed_at, entry.snapshot_id, entry.info_hash_v1
-    LIMIT sqlc.arg(batch_size)::integer
-    FOR UPDATE OF entry SKIP LOCKED
+      )
+      AND EXISTS (
+          SELECT 1
+          FROM ledger.seeding_swarm_snapshot_entries AS existing_entry
+          WHERE existing_entry.snapshot_id = snapshot.snapshot_id
+      )
+    ORDER BY snapshot.observed_at, snapshot.snapshot_id
+    LIMIT 1
+), candidate AS (
+    SELECT entry.snapshot_id, entry.info_hash_v1
+    FROM eligible_snapshot
+    CROSS JOIN LATERAL (
+        SELECT entry.snapshot_id, entry.info_hash_v1
+        FROM ledger.seeding_swarm_snapshot_entries AS entry
+        WHERE entry.snapshot_id = eligible_snapshot.snapshot_id
+        ORDER BY entry.info_hash_v1
+        LIMIT sqlc.arg(batch_size)::integer
+        FOR UPDATE OF entry SKIP LOCKED
+    ) AS entry
 )
 DELETE FROM ledger.seeding_swarm_snapshot_entries AS entry
 USING candidate
