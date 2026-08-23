@@ -293,38 +293,6 @@ CREATE INDEX user_traffic_three_hour_rollups_retention_idx
         bucket_start, user_id, torrent_id
     );
 
--- Full canonical payloads duplicated a high-volume NATS event in PostgreSQL.
--- A SHA-256 fence is sufficient to reject a conflicting duplicate; legacy
--- payloads age out with their short-lived inbox rows without a table rewrite.
-ALTER TABLE traffic.settlement_inbox
-    ALTER COLUMN payload_json DROP NOT NULL,
-    DROP CONSTRAINT settlement_inbox_payload_json_check;
-
-ALTER TABLE traffic.settlement_inbox SET (
-    autovacuum_vacuum_scale_factor = 0.02,
-    autovacuum_vacuum_threshold = 1000,
-    autovacuum_analyze_scale_factor = 0.05,
-    autovacuum_analyze_threshold = 1000
-);
-ALTER TABLE traffic.user_traffic_entries SET (
-    autovacuum_vacuum_scale_factor = 0.02,
-    autovacuum_vacuum_threshold = 1000,
-    autovacuum_analyze_scale_factor = 0.05,
-    autovacuum_analyze_threshold = 1000
-);
-ALTER TABLE traffic.user_traffic_entry_explanations SET (
-    autovacuum_vacuum_scale_factor = 0.02,
-    autovacuum_vacuum_threshold = 1000,
-    autovacuum_analyze_scale_factor = 0.05,
-    autovacuum_analyze_threshold = 1000
-);
-ALTER TABLE traffic.user_traffic_entry_segments SET (
-    autovacuum_vacuum_scale_factor = 0.02,
-    autovacuum_vacuum_threshold = 1000,
-    autovacuum_analyze_scale_factor = 0.05,
-    autovacuum_analyze_threshold = 1000
-);
-
 -- Per-event rows may be removed only after twelve hours and only after the
 -- upload-experience cursor has consumed every relevant positive-upload row.
 -- The cleanup worker uses the same predicates and deletes children first.
