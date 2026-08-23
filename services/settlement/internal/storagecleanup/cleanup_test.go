@@ -80,3 +80,10 @@ func TestResultReportsPerCategorySaturation(t *testing.T) {
 		t.Fatal("totals across categories must not masquerade as one saturated query")
 	}
 }
+
+func TestBacklogRetryIntervalStaysBelowSteadyStatePolling(t *testing.T) {
+	t.Parallel()
+	if backlogRetryInterval <= 0 || backlogRetryInterval >= 10*time.Second {
+		t.Fatalf("backlogRetryInterval = %v, want a positive delay below the minimum steady-state interval", backlogRetryInterval)
+	}
+}

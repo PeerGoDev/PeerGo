@@ -17,6 +17,7 @@ const (
 	MinimumSessionRetention  = 48 * time.Hour
 	MinimumDetailRetention   = 30 * 24 * time.Hour
 	MinimumAnomalyRetention  = 180 * 24 * time.Hour
+	backlogRetryInterval     = time.Second
 )
 
 var (
@@ -155,9 +156,18 @@ func (worker *Worker) Run(ctx context.Context) error {
 			return nil
 		case <-timer.C:
 		}
-		if _, err := worker.RunOnce(ctx); err != nil {
+		result, err := worker.RunOnce(ctx)
+		if err != nil {
 			return err
 		}
-		timer.Reset(worker.config.RunInterval)
+		nextRun := worker.config.RunInterval
+		if result.Saturated(int64(worker.config.BatchSize)) {
+			// Each DELETE remains bounded by BatchSize. Only remove the idle
+			// interval while a category is still saturated so a finite backlog
+			// cannot grow faster merely because every successful batch waits the
+			// normal steady-state polling interval.
+			nextRun = backlogRetryInterval
+		}
+		timer.Reset(nextRun)
 	}
 }

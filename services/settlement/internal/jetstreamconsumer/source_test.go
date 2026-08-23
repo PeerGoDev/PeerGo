@@ -37,3 +37,18 @@ func TestValidateConsumerBindingRequiresOrderedConfirmedAckHeadroom(t *testing.T
 		t.Fatalf("parallel consumer error = %v", err)
 	}
 }
+
+func TestPendingRedeliveryDelayWaitsOneAckWindow(t *testing.T) {
+	t.Parallel()
+	info := &jetstream.ConsumerInfo{
+		Config:        jetstream.ConsumerConfig{AckWait: 30 * time.Second},
+		NumAckPending: 64,
+	}
+	if delay := pendingRedeliveryDelay(info); delay != 30*time.Second {
+		t.Fatalf("pendingRedeliveryDelay() = %v, want 30s", delay)
+	}
+	info.NumAckPending = 0
+	if delay := pendingRedeliveryDelay(info); delay != 0 {
+		t.Fatalf("pendingRedeliveryDelay() without pending messages = %v, want 0", delay)
+	}
+}

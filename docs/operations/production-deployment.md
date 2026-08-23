@@ -170,6 +170,9 @@ counter 处理器。变更该值时先停止 `settlement-ingest`，再运行 `tr
 `settlement-announce-consumer-init` 原位同步 durable 的 `MaxAckPending/MaxRequestBatch`，最后只
 重建 `settlement-ingest`。Provisioner 只允许这两个批量上限改变，过滤条件、起点、ACK 策略
 或重试语义发生漂移仍会拒绝启动。
+进程重启时若 durable 仍有未确认消息，runtime 会先等待一个现有 consumer `AckWait` 窗口，
+让旧连接遗留的投递重新进入最早序列，再开始抓取新批次；这不会重建 consumer、跳过事件或
+放宽 PostgreSQL 的连续序列不变量。
 
 旧 v1 H&R 曾为每个普通 announce 区间创建工作行；新路由只保留完成评估、待评估完成后的
 短暂竞态行和已有义务的后续区间。升级后保持 `settlement-hnr-worker` 停止，执行下面的可续跑
@@ -192,8 +195,9 @@ work、冗余 swarm snapshot entries/chunks/inbox/headers 和已经汇总的 30 
 复用页，使磁盘在保留窗口高水位附近稳定，而不是持续线性增长。
 快照 entry 是最高速表，容量规划须满足 `batch_size / cleanup_interval >= 活跃 swarm 数 /
 snapshot_interval`；默认 `10000 / 15s` 可跟上约 20,000 个活跃 swarm 的 30 秒完整快照，超过时
-进程会持续输出 `batch saturated` 警告。此时应先降低快照频率或扩展专用 Ledger，而不是无限
-放大单次删除事务。
+进程会持续输出 `batch saturated` 警告，并在每个仍然受 10,000 行上限保护的事务后以 1 秒
+间隔继续追赶，清空积压后自动恢复配置的稳态间隔。若长期无法退出饱和状态，应先降低快照
+频率或扩展专用 Ledger，而不是无限放大单次删除事务。
 
 流量 outbox 与 Core 流量投影默认也各自在单进程内使用 4 条固定通道。对应参数为
 `PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY` 和 `PEERGO_CORE_TRAFFIC_CONCURRENCY`，支持范围

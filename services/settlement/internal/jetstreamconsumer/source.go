@@ -39,8 +39,10 @@ type fetchConsumer interface {
 }
 
 type natsSource struct {
-	consumer  fetchConsumer
-	fetchWait time.Duration
+	consumer             fetchConsumer
+	fetchWait            time.Duration
+	initialRecoveryDelay time.Duration
+	recoveryWaited       bool
 }
 
 // OpenSource binds to an existing durable consumer. It deliberately uses the
@@ -61,7 +63,21 @@ func OpenSource(ctx context.Context, js jetstream.JetStream, config BindingConfi
 	if validateConsumerBinding(info, config) != nil {
 		return nil, ErrConsumerDrift
 	}
-	return newSource(consumer, config.FetchWait)
+	return newSource(consumer, config.FetchWait, pendingRedeliveryDelay(info))
+}
+
+// A process can stop after PostgreSQL commits an ordered batch but before all
+// confirmed ACKs reach JetStream. Until AckWait expires, a replacement process
+// may be offered newer messages while those older deliveries are still owned by
+// the previous connection. Waiting one complete ACK window when pending
+// deliveries exist restores the durable's oldest-first redelivery boundary
+// without deleting the consumer, skipping evidence, or weakening the database
+// sequence invariant.
+func pendingRedeliveryDelay(info *jetstream.ConsumerInfo) time.Duration {
+	if info == nil || info.NumAckPending == 0 || info.Config.AckWait <= 0 {
+		return 0
+	}
+	return info.Config.AckWait
 }
 
 func validateConsumerBinding(info *jetstream.ConsumerInfo, config BindingConfig) error {
@@ -80,11 +96,14 @@ func validateConsumerBinding(info *jetstream.ConsumerInfo, config BindingConfig)
 	return nil
 }
 
-func newSource(consumer fetchConsumer, fetchWait time.Duration) (Source, error) {
-	if consumer == nil || fetchWait < 100*time.Millisecond || fetchWait > time.Minute {
+func newSource(consumer fetchConsumer, fetchWait, initialRecoveryDelay time.Duration) (Source, error) {
+	if consumer == nil || fetchWait < 100*time.Millisecond || fetchWait > time.Minute ||
+		initialRecoveryDelay < 0 || initialRecoveryDelay > 10*time.Minute {
 		return nil, ErrConfig
 	}
-	return &natsSource{consumer: consumer, fetchWait: fetchWait}, nil
+	return &natsSource{
+		consumer: consumer, fetchWait: fetchWait, initialRecoveryDelay: initialRecoveryDelay,
+	}, nil
 }
 
 func (source *natsSource) NextBatch(ctx context.Context, limit int) ([]Message, error) {
@@ -93,6 +112,18 @@ func (source *natsSource) NextBatch(ctx context.Context, limit int) ([]Message, 
 	}
 	if limit < 1 || limit > 512 {
 		return nil, ErrConfig
+	}
+	if !source.recoveryWaited {
+		source.recoveryWaited = true
+		if source.initialRecoveryDelay > 0 {
+			timer := time.NewTimer(source.initialRecoveryDelay)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-timer.C:
+			}
+		}
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, source.fetchWait)
 	defer cancel()
