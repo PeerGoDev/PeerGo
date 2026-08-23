@@ -24,6 +24,7 @@ import {
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
 import { CategoryEditorSheet } from "~/features/staff/components/category-editor-sheet"
+import { CategoryFacetManagerSheet } from "~/features/staff/components/category-facet-manager-sheet"
 import { CategoryTable } from "~/features/staff/components/category-table"
 import { hasCapability } from "~/features/staff/model/capability"
 import type { components } from "~/generated/api"
@@ -64,9 +65,13 @@ function CategoriesContent({
 }) {
   const categories = useQuery(managedCategoryListQueryOptions)
   const [editor, setEditor] = React.useState<EditorState>()
+  const [facetCategoryId, setFacetCategoryId] = React.useState("")
   const [successMessage, setSuccessMessage] = React.useState("")
   const canCreate = hasCapability(capabilities, "category.create")
   const canUpdate = hasCapability(capabilities, "category.update")
+  const facetCategory = categories.data?.find(
+    (category) => category.id === facetCategoryId
+  )
 
   if (categories.isPending) {
     return <CategoriesSkeleton />
@@ -132,7 +137,7 @@ function CategoriesContent({
       {successMessage ? (
         <Alert>
           <CheckCircle2Icon />
-          <AlertTitle>分类已更新</AlertTitle>
+          <AlertTitle>分类目录已更新</AlertTitle>
           <AlertDescription>{successMessage}</AlertDescription>
         </Alert>
       ) : null}
@@ -153,6 +158,10 @@ function CategoriesContent({
         onEdit={(category) => {
           setSuccessMessage("")
           setEditor({ mode: "edit", category })
+        }}
+        onManageFacets={(category) => {
+          setSuccessMessage("")
+          setFacetCategoryId(category.id)
         }}
       />
 
@@ -178,6 +187,18 @@ function CategoriesContent({
             )
             setEditor(undefined)
           }}
+        />
+      ) : null}
+
+      {facetCategory ? (
+        <CategoryFacetManagerSheet
+          category={facetCategory}
+          csrfToken={csrfToken}
+          canUpdate={canUpdate}
+          onOpenChange={(open) => {
+            if (!open) setFacetCategoryId("")
+          }}
+          onSaved={setSuccessMessage}
         />
       ) : null}
     </CategoriesFrame>

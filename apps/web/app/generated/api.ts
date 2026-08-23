@@ -2099,6 +2099,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}/options/{option_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 添加或以乐观并发更新分类下的类型选项 */
+        put: operations["upsertManagedCategoryFacetOption"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/catalog/announcements": {
         parameters: {
             query?: never;
@@ -4115,6 +4132,7 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             contribution?: components["schemas"]["WorkgroupContributionProgress"];
+            legacy_reviewer?: components["schemas"]["LegacyReviewerEvidence"];
         };
         WorkgroupContributionProgress: {
             group_kind: components["schemas"]["WorkgroupKind"];
@@ -4746,6 +4764,7 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+            facets: components["schemas"]["ManagedCategoryFacet"][];
         };
         ManagedCategoryList: components["schemas"]["ManagedCategory"][];
         CreateManagedCategoryRequest: {
@@ -4760,6 +4779,41 @@ export interface components {
             display_order: number;
             enabled: boolean;
             /** Format: int64 */
+            expected_version: number;
+            reason: string;
+        };
+        ManagedCategoryFacet: {
+            id: string;
+            name: string;
+            selection_mode: components["schemas"]["CategoryFacetSelectionMode"];
+            required: boolean;
+            requirement_group?: string;
+            display_order: number;
+            options: components["schemas"]["ManagedCategoryFacetOption"][];
+        };
+        ManagedCategoryFacetOption: {
+            key: string;
+            label: string;
+            canonical_label: string;
+            display_order: number;
+            enabled: boolean;
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            torrent_count: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        UpsertManagedCategoryFacetOptionRequest: {
+            label: string;
+            display_order: number;
+            enabled: boolean;
+            /**
+             * Format: int64
+             * @description 传 0 表示新增；更新时必须传当前版本。
+             */
             expected_version: number;
             reason: string;
         };
@@ -7098,6 +7152,18 @@ export interface components {
         WorkgroupMembershipStatus: "active" | "suspended" | "ended";
         /** @enum {string} */
         WorkgroupContributionMetric: "trusted_torrents_published" | "torrent_review_votes" | "seeding_active_seconds";
+        LegacyReviewerEvidence: {
+            /** @enum {string} */
+            status: "active" | "suspended" | "removed";
+            /** @enum {string} */
+            activity_status: "active" | "inactive" | "dormant";
+            /** Format: int64 */
+            total_reviews: number;
+            /** Format: int64 */
+            accurate_count: number;
+            /** Format: date-time */
+            last_activity_at?: string;
+        };
         /** @enum {string} */
         WorkgroupApplicationStatus: "pending" | "approved" | "rejected";
         MyWorkgroup: {
@@ -7469,6 +7535,8 @@ export interface components {
             /** Format: int64 */
             torrent_count: number;
         };
+        /** @enum {string} */
+        CategoryFacetSelectionMode: "single_option" | "multi_option";
         CategoryFacetOption: {
             key: string;
             label: string;
@@ -7476,8 +7544,7 @@ export interface components {
         CategoryFacet: {
             id: string;
             name: string;
-            /** @enum {string} */
-            selection_mode: "single_option" | "multi_option";
+            selection_mode: components["schemas"]["CategoryFacetSelectionMode"];
             required: boolean;
             /** @description Facets sharing this value form an at-least-one upload requirement. */
             requirement_group?: string;
@@ -13142,6 +13209,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManagedCategory"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    upsertManagedCategoryFacetOption: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                /** @description 创建后不可变的分类稳定标识。 */
+                category_id: components["parameters"]["CategoryIDPathParameter"];
+                facet_id: string;
+                option_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertManagedCategoryFacetOptionRequest"];
+            };
+        };
+        responses: {
+            /** @description 分类类型选项和不可变审计记录已经原子提交。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedCategoryFacetOption"];
                 };
             };
             400: components["responses"]["ProblemResponse"];

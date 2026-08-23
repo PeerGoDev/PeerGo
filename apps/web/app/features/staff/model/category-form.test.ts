@@ -15,6 +15,7 @@ const category: ManagedCategory = {
   torrent_count: 12,
   created_at: "2026-08-05T08:00:00Z",
   updated_at: "2026-08-05T09:00:00Z",
+  facets: [],
 }
 
 describe("categoryFormSchema", () => {

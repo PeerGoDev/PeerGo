@@ -1,4 +1,4 @@
-import { FolderTreeIcon, PencilIcon } from "lucide-react"
+import { FolderTreeIcon, ListTreeIcon, PencilIcon } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
 import { Button } from "~/components/ui/button"
@@ -24,10 +24,12 @@ export function CategoryTable({
   categories,
   canUpdate,
   onEdit,
+  onManageFacets,
 }: {
   categories: ManagedCategory[]
   canUpdate: boolean
   onEdit: (category: ManagedCategory) => void
+  onManageFacets: (category: ManagedCategory) => void
 }) {
   if (categories.length === 0) {
     return (
@@ -73,6 +75,15 @@ export function CategoryTable({
                 {category.torrent_count.toLocaleString("zh-CN")} 个种子
               </span>
               <CategoryStatusBadge enabled={category.enabled} />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onManageFacets(category)}
+                aria-label={`管理 ${category.name} 的类型与属性`}
+              >
+                <ListTreeIcon data-icon="inline-start" />
+                类型
+              </Button>
               {canUpdate ? (
                 <Button
                   variant="ghost"
@@ -112,17 +123,27 @@ export function CategoryTable({
                 >
                   更新于 {formatDateTime(category.updated_at)}
                 </time>
-                {canUpdate ? (
+                <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onEdit(category)}
-                    aria-label={`编辑分类 ${category.name}`}
+                    onClick={() => onManageFacets(category)}
                   >
-                    <PencilIcon data-icon="inline-start" />
-                    编辑
+                    <ListTreeIcon data-icon="inline-start" />
+                    类型
                   </Button>
-                ) : null}
+                  {canUpdate ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit(category)}
+                      aria-label={`编辑分类 ${category.name}`}
+                    >
+                      <PencilIcon data-icon="inline-start" />
+                      编辑
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </CardContent>
           </Card>

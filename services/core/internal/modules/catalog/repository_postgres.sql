@@ -377,7 +377,7 @@ SELECT
     binding.required,
     COALESCE(binding.requirement_group, '')::text AS requirement_group,
     option.option_key,
-    option.label AS option_label
+    COALESCE(allowed.label_override, option.label)::text AS option_label
 FROM catalog.categories AS category
 JOIN catalog.category_facets AS binding
   ON binding.category_id = category.id
@@ -416,6 +416,169 @@ FROM catalog.categories AS category
 LEFT JOIN torrents.torrents AS torrent ON torrent.category_id = category.id
 GROUP BY category.id
 ORDER BY category.display_order, category.id;
+
+-- name: ListManagedCategoryFacetOptions :many
+SELECT
+    binding.category_id,
+    facet.id AS facet_id,
+    facet.name AS facet_name,
+    binding.selection_mode,
+    binding.required,
+    COALESCE(binding.requirement_group, '')::text AS requirement_group,
+    binding.display_order AS facet_display_order,
+    allowed.option_key,
+    COALESCE(allowed.label_override, option.label)::text AS option_label,
+    option.label AS canonical_label,
+    allowed.display_order AS option_display_order,
+    allowed.enabled,
+    allowed.version,
+    allowed.created_at,
+    allowed.updated_at,
+    count(value.torrent_id)::bigint AS torrent_count
+FROM catalog.category_facets AS binding
+JOIN catalog.facet_definitions AS facet
+  ON facet.id = binding.facet_id
+ AND facet.selection_mode = binding.selection_mode
+JOIN catalog.category_facet_options AS allowed
+  ON allowed.category_id = binding.category_id
+ AND allowed.facet_id = binding.facet_id
+ AND allowed.selection_mode = binding.selection_mode
+JOIN catalog.facet_options AS option
+  ON option.facet_id = allowed.facet_id
+ AND option.option_key = allowed.option_key
+ AND option.selection_mode = allowed.selection_mode
+LEFT JOIN torrents.torrent_facet_values AS value
+  ON value.category_id = allowed.category_id
+ AND value.facet_id = allowed.facet_id
+ AND value.option_key = allowed.option_key
+ AND value.selection_mode = allowed.selection_mode
+GROUP BY binding.category_id, facet.id, facet.name, binding.selection_mode,
+         binding.required, binding.requirement_group, binding.display_order,
+         allowed.option_key, allowed.label_override, option.label,
+         allowed.display_order, allowed.enabled, allowed.version,
+         allowed.created_at, allowed.updated_at
+ORDER BY binding.category_id, binding.display_order, facet.id,
+         allowed.display_order, allowed.option_key;
+
+-- name: GetCategoryFacetForOptionAdministration :one
+SELECT
+    binding.category_id,
+    binding.facet_id,
+    binding.selection_mode,
+    facet.name AS facet_name
+FROM catalog.category_facets AS binding
+JOIN catalog.facet_definitions AS facet
+  ON facet.id = binding.facet_id
+ AND facet.selection_mode = binding.selection_mode
+WHERE binding.category_id = sqlc.arg(category_id)::text
+  AND binding.facet_id = sqlc.arg(facet_id)::text
+FOR UPDATE OF binding;
+
+-- name: GetCanonicalFacetOption :one
+SELECT selection_mode, label, enabled
+FROM catalog.facet_options
+WHERE facet_id = sqlc.arg(facet_id)::text
+  AND option_key = sqlc.arg(option_key)::text;
+
+-- name: InsertCanonicalFacetOption :execrows
+INSERT INTO catalog.facet_options (
+    facet_id, option_key, selection_mode, label, display_order,
+    enabled, created_at, updated_at
+) VALUES (
+    sqlc.arg(facet_id)::text,
+    sqlc.arg(option_key)::text,
+    sqlc.arg(selection_mode)::text,
+    sqlc.arg(option_label)::text,
+    sqlc.arg(display_order)::integer,
+    true,
+    sqlc.arg(occurred_at)::timestamptz,
+    sqlc.arg(occurred_at)::timestamptz
+)
+ON CONFLICT DO NOTHING;
+
+-- name: GetManagedCategoryFacetOptionForUpdate :one
+SELECT
+    allowed.category_id,
+    allowed.facet_id,
+    allowed.option_key,
+    allowed.selection_mode,
+    COALESCE(allowed.label_override, option.label)::text AS option_label,
+    option.label AS canonical_label,
+    option.enabled AS canonical_enabled,
+    allowed.display_order,
+    allowed.enabled,
+    allowed.version,
+    allowed.created_at,
+    allowed.updated_at,
+    (SELECT count(*)::bigint
+       FROM torrents.torrent_facet_values AS value
+      WHERE value.category_id = allowed.category_id
+        AND value.facet_id = allowed.facet_id
+        AND value.option_key = allowed.option_key
+        AND value.selection_mode = allowed.selection_mode) AS torrent_count
+FROM catalog.category_facet_options AS allowed
+JOIN catalog.facet_options AS option
+  ON option.facet_id = allowed.facet_id
+ AND option.option_key = allowed.option_key
+ AND option.selection_mode = allowed.selection_mode
+WHERE allowed.category_id = sqlc.arg(category_id)::text
+  AND allowed.facet_id = sqlc.arg(facet_id)::text
+  AND allowed.option_key = sqlc.arg(option_key)::text
+FOR UPDATE OF allowed;
+
+-- name: InsertManagedCategoryFacetOption :one
+INSERT INTO catalog.category_facet_options (
+    category_id, facet_id, option_key, selection_mode, label_override,
+    display_order, enabled, version, created_at, updated_at
+) VALUES (
+    sqlc.arg(category_id)::text,
+    sqlc.arg(facet_id)::text,
+    sqlc.arg(option_key)::text,
+    sqlc.arg(selection_mode)::text,
+    sqlc.narg(label_override)::text,
+    sqlc.arg(display_order)::integer,
+    sqlc.arg(enabled)::boolean,
+    1,
+    sqlc.arg(occurred_at)::timestamptz,
+    sqlc.arg(occurred_at)::timestamptz
+)
+RETURNING category_id, facet_id, option_key, selection_mode,
+          label_override, display_order, enabled, version, created_at, updated_at;
+
+-- name: UpdateManagedCategoryFacetOption :one
+UPDATE catalog.category_facet_options
+SET label_override = sqlc.narg(label_override)::text,
+    display_order = sqlc.arg(display_order)::integer,
+    enabled = sqlc.arg(enabled)::boolean,
+    version = version + 1,
+    updated_at = sqlc.arg(occurred_at)::timestamptz
+WHERE category_id = sqlc.arg(category_id)::text
+  AND facet_id = sqlc.arg(facet_id)::text
+  AND option_key = sqlc.arg(option_key)::text
+  AND version = sqlc.arg(expected_version)::bigint
+RETURNING category_id, facet_id, option_key, selection_mode,
+          label_override, display_order, enabled, version, created_at, updated_at;
+
+-- name: InsertCategoryFacetOptionChange :exec
+INSERT INTO catalog.category_facet_option_changes (
+    id, category_id, facet_id, option_key, transition, actor_id, reason,
+    expected_version, resulting_version, before_state, after_state,
+    authorization_decision_id, occurred_at
+) VALUES (
+    sqlc.arg(change_id)::uuid,
+    sqlc.arg(category_id)::text,
+    sqlc.arg(facet_id)::text,
+    sqlc.arg(option_key)::text,
+    sqlc.arg(transition)::text,
+    sqlc.arg(actor_id)::uuid,
+    sqlc.arg(reason)::text,
+    sqlc.arg(expected_version)::bigint,
+    sqlc.arg(resulting_version)::bigint,
+    sqlc.narg(before_state)::jsonb,
+    sqlc.arg(after_state)::jsonb,
+    sqlc.arg(authorization_decision_id)::uuid,
+    sqlc.arg(occurred_at)::timestamptz
+);
 
 -- name: CreateManagedCategory :one
 INSERT INTO catalog.categories (

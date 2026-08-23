@@ -348,7 +348,7 @@ func (service *TorrentUploadService) Submit(ctx context.Context, cookieToken, cs
 	}
 	finalizedAt := service.now().UTC()
 	result, err := service.repository.Finalize(ctx, FinalizeTorrentUploadCommand{
-		UploadID: input.ID, RequestFingerprint: fingerprint, Torrent: pending,
+		UploadID: reservation.ID, RequestFingerprint: fingerprint, Torrent: pending,
 		Files: append([]File(nil), metainfo.Files...), Screenshots: storedScreenshots,
 		PolicyRevisionID: reservation.PolicyRevisionID,
 		OccurredAt:       finalizedAt,

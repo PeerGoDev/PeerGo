@@ -11,10 +11,15 @@ import (
 )
 
 var (
-	ErrCategoryAdministrationInput = errors.New("category administration input is invalid")
-	ErrCategoryAlreadyExists       = errors.New("category already exists")
-	ErrCategoryNotFound            = errors.New("category was not found")
-	ErrCategoryVersionConflict     = errors.New("category version changed")
+	ErrCategoryAdministrationInput   = errors.New("category administration input is invalid")
+	ErrCategoryAlreadyExists         = errors.New("category already exists")
+	ErrCategoryNotFound              = errors.New("category was not found")
+	ErrCategoryVersionConflict       = errors.New("category version changed")
+	ErrCategoryFacetNotFound         = errors.New("category facet was not found")
+	ErrCategoryOptionAlreadyExists   = errors.New("category facet option already exists")
+	ErrCategoryOptionNotFound        = errors.New("category facet option was not found")
+	ErrCategoryOptionUnavailable     = errors.New("canonical category facet option is unavailable")
+	ErrCategoryOptionVersionConflict = errors.New("category facet option version changed")
 )
 
 type CategoryTransition string
@@ -35,6 +40,61 @@ type ManagedCategory struct {
 	TorrentCount int64
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Facets       []ManagedCategoryFacet
+}
+
+// ManagedCategoryFacet and ManagedCategoryFacetOption expose the complete
+// category-scoped upload vocabulary to staff, including options hidden from
+// new uploads but still referenced by historical torrents.
+type ManagedCategoryFacet struct {
+	ID               string
+	Name             string
+	SelectionMode    FacetSelectionMode
+	Required         bool
+	RequirementGroup string
+	DisplayOrder     int
+	Options          []ManagedCategoryFacetOption
+}
+
+type ManagedCategoryFacetOption struct {
+	Key            string
+	Label          string
+	CanonicalLabel string
+	DisplayOrder   int
+	Enabled        bool
+	Version        int64
+	TorrentCount   int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type UpsertCategoryFacetOptionInput struct {
+	CategoryID      string
+	FacetID         string
+	OptionKey       string
+	Label           string
+	DisplayOrder    int
+	Enabled         bool
+	ExpectedVersion int64
+	Reason          string
+}
+
+type UpsertCategoryFacetOptionCommand struct {
+	UpsertCategoryFacetOptionInput
+	ChangeID      uuid.UUID
+	ActorID       uuid.UUID
+	OccurredAt    time.Time
+	Authorization authz.Decision
+}
+
+type CategoryFacetOptionAuditState struct {
+	CategoryID   string `json:"category_id"`
+	FacetID      string `json:"facet_id"`
+	OptionKey    string `json:"option_key"`
+	Label        string `json:"label"`
+	DisplayOrder int    `json:"display_order"`
+	Enabled      bool   `json:"enabled"`
+	Version      int64  `json:"version"`
 }
 
 type CreateCategoryInput struct {

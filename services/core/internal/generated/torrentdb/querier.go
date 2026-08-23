@@ -25,6 +25,10 @@ type Querier interface {
 	CountManagedTorrentsByState(ctx context.Context) ([]CountManagedTorrentsByStateRow, error)
 	CountStorageMigrationItems(ctx context.Context, migrationID uuid.UUID) (int64, error)
 	CountUnverifiedStorageMigrationItems(ctx context.Context, migrationID uuid.UUID) (int64, error)
+	// A browser reload creates a fresh idempotency key. The immutable content
+	// identity lets the original uploader resume an exact interrupted request;
+	// resumeReservation still verifies the uploader and request fingerprint.
+	GetActiveTorrentUploadIDByIdentity(ctx context.Context, arg GetActiveTorrentUploadIDByIdentityParams) (uuid.UUID, error)
 	GetCompletedTorrentUploadResult(ctx context.Context, uploadID uuid.UUID) (GetCompletedTorrentUploadResultRow, error)
 	GetManagedTorrentForAvailabilityUpdate(ctx context.Context, torrentID int64) (GetManagedTorrentForAvailabilityUpdateRow, error)
 	GetManagedTorrentLifecycleChange(ctx context.Context, changeID uuid.UUID) (GetManagedTorrentLifecycleChangeRow, error)

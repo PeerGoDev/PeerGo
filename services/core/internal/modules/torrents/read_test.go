@@ -251,9 +251,10 @@ func TestTorrentReadExposesPrivacyMinimizedActivePeersToSignedInMembers(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	memberAuthorizer := &recordingTorrentUploadAuthorizer{now: now}
 	service, err := NewTorrentReadService(
 		torrentDownloadAuthenticatorFixture{session: identity.WebSession{User: identity.User{ID: userID}}},
-		&recordingTorrentUploadAuthorizer{now: now},
+		memberAuthorizer,
 		&torrentReadRepositoryFixture{},
 		mustReadStores(t),
 		nil,
@@ -270,6 +271,11 @@ func TestTorrentReadExposesPrivacyMinimizedActivePeersToSignedInMembers(t *testi
 	}
 	if len(staffAuthorizer.requests) != 0 {
 		t.Fatalf("member peer read entered staff authorization: %+v", staffAuthorizer.requests)
+	}
+	if memberAuthorizer.request.Action != authz.ActionTorrentPeerReadMember ||
+		memberAuthorizer.request.Subject.ID != userID ||
+		memberAuthorizer.request.CredentialAudience != authz.AudienceWebSession {
+		t.Fatalf("member peer authorization request = %+v", memberAuthorizer.request)
 	}
 }
 

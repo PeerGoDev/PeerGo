@@ -282,7 +282,17 @@ func (service *TorrentReadService) ActivePeers(ctx context.Context, cookieToken 
 	if torrentID < 1 {
 		return ManagedTorrentPeerList{}, ErrTorrentReadInput
 	}
-	if _, err := service.authenticator.CurrentSession(ctx, cookieToken); err != nil {
+	session, err := service.authenticator.CurrentSession(ctx, cookieToken)
+	if err != nil {
+		return ManagedTorrentPeerList{}, err
+	}
+	if _, err := authz.AuthorizeWebMemberAction(
+		ctx,
+		service.authorizer,
+		session.User.ID,
+		authz.ActionTorrentPeerReadMember,
+		service.now().UTC(),
+	); err != nil {
 		return ManagedTorrentPeerList{}, err
 	}
 	if service.administration == nil {

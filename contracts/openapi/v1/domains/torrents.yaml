@@ -789,7 +789,7 @@ TorrentPeersPath:
     tags: [torrents]
     x-audience: [web]
     x-owner: core-torrents
-    x-permission: torrent.read
+    x-permission: torrent.peer.read.member
     x-credential-audience: web-session
     parameters:
       - $ref: "#/TorrentIDPathParameter"

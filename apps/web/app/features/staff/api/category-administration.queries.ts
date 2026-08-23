@@ -15,6 +15,11 @@ export type CreateManagedCategoryRequest =
   components["schemas"]["CreateManagedCategoryRequest"]
 export type UpdateManagedCategoryRequest =
   components["schemas"]["UpdateManagedCategoryRequest"]
+export type ManagedCategoryFacet = components["schemas"]["ManagedCategoryFacet"]
+export type ManagedCategoryFacetOption =
+  components["schemas"]["ManagedCategoryFacetOption"]
+export type UpsertManagedCategoryFacetOptionRequest =
+  components["schemas"]["UpsertManagedCategoryFacetOptionRequest"]
 
 export const categoryAdministrationKeys = {
   all: ["staff", "catalog", "categories"] as const,
@@ -73,6 +78,44 @@ export function useUpdateManagedCategory() {
           params: {
             header: { "X-CSRF-Token": input.csrfToken },
             path: { category_id: input.categoryId },
+          },
+          body: input.body,
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    onSuccess: invalidateCategoryQueries(queryClient),
+    onError: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: categoryAdministrationKeys.all,
+      })
+    },
+  })
+}
+
+export function useUpsertManagedCategoryFacetOption() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      csrfToken: string
+      categoryId: string
+      facetId: string
+      optionKey: string
+      body: UpsertManagedCategoryFacetOptionRequest
+    }): Promise<ManagedCategoryFacetOption> => {
+      const { data, error, response } = await apiClient.PUT(
+        "/api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}/options/{option_key}",
+        {
+          params: {
+            header: { "X-CSRF-Token": input.csrfToken },
+            path: {
+              category_id: input.categoryId,
+              facet_id: input.facetId,
+              option_key: input.optionKey,
+            },
           },
           body: input.body,
         }

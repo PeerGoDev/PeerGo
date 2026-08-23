@@ -85,14 +85,24 @@ func (repository *PostgresTorrentUploadRepository) Reserve(ctx context.Context, 
 		ContentSha256: command.Descriptor.SHA256[:], ByteLength: command.Descriptor.ByteLength,
 		BackendID: string(command.BackendID), ObjectKey: string(command.ObjectKey),
 		UploadPolicyRevisionID: command.PolicyRevisionID,
-		OccurredAt: storageTimestamp(command.OccurredAt),
+		OccurredAt:             storageTimestamp(command.OccurredAt),
 	})
 	if err != nil {
 		return TorrentUploadReservation{}, fmt.Errorf("insert torrent upload reservation: %w", err)
 	}
-	row, err = queries.GetTorrentUploadForUpdate(ctx, command.ID)
-	if errors.Is(err, pgx.ErrNoRows) && rows == 0 {
-		return TorrentUploadReservation{}, ErrTorrentUploadDuplicate
+	if rows == 0 {
+		activeUploadID, identityErr := queries.GetActiveTorrentUploadIDByIdentity(ctx, torrentdb.GetActiveTorrentUploadIDByIdentityParams{
+			InfoHashV1: command.InfoHashV1[:], ContentSha256: command.Descriptor.SHA256[:],
+		})
+		if errors.Is(identityErr, pgx.ErrNoRows) {
+			return TorrentUploadReservation{}, ErrTorrentUploadDuplicate
+		}
+		if identityErr != nil {
+			return TorrentUploadReservation{}, fmt.Errorf("find resumable torrent upload: %w", identityErr)
+		}
+		row, err = queries.GetTorrentUploadForUpdate(ctx, activeUploadID)
+	} else {
+		row, err = queries.GetTorrentUploadForUpdate(ctx, command.ID)
 	}
 	if err != nil {
 		return TorrentUploadReservation{}, fmt.Errorf("lock inserted torrent upload reservation: %w", err)

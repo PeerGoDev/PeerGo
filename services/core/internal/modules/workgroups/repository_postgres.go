@@ -29,9 +29,14 @@ const membershipSelect = `
 SELECT membership.id, membership.group_kind, membership.user_id,
        users.numeric_id, users.username, users.display_name,
        membership.status, membership.source, membership.version,
-       membership.started_at, membership.ended_at, membership.updated_at
+       membership.started_at, membership.ended_at, membership.updated_at,
+       reviewer.source_status, reviewer.source_activity_status,
+       reviewer.source_total_reviews, reviewer.source_accurate_count,
+       reviewer.source_last_activity_at
 FROM workgroups.memberships AS membership
-JOIN identity.users AS users ON users.id = membership.user_id`
+JOIN identity.users AS users ON users.id = membership.user_id
+LEFT JOIN migration.legacy_reviewer_openings AS reviewer
+  ON reviewer.membership_id = membership.id`
 
 const contributionPolicyRevisionSelect = `
 SELECT policy.group_kind, policy.revision, policy.metric, policy.period_kind,
@@ -1491,11 +1496,16 @@ func scanApplication(row scanner) (Application, error) {
 
 func scanMembership(row scanner) (Membership, error) {
 	var membership Membership
+	var legacyStatus, legacyActivityStatus pgtype.Text
+	var legacyTotalReviews, legacyAccurateCount pgtype.Int8
+	var legacyLastActivityAt pgtype.Timestamptz
 	if err := row.Scan(
 		&membership.ID, &membership.GroupKind, &membership.UserID,
 		&membership.UserNumericID, &membership.Username, &membership.DisplayName,
 		&membership.Status, &membership.Source, &membership.Version,
 		&membership.StartedAt, &membership.EndedAt, &membership.UpdatedAt,
+		&legacyStatus, &legacyActivityStatus, &legacyTotalReviews,
+		&legacyAccurateCount, &legacyLastActivityAt,
 	); err != nil {
 		return Membership{}, err
 	}
@@ -1504,6 +1514,20 @@ func scanMembership(row scanner) (Membership, error) {
 	if membership.EndedAt != nil {
 		endedAt := membership.EndedAt.UTC()
 		membership.EndedAt = &endedAt
+	}
+	if legacyStatus.Valid {
+		if !legacyActivityStatus.Valid || !legacyTotalReviews.Valid || !legacyAccurateCount.Valid ||
+			legacyTotalReviews.Int64 < 0 || legacyAccurateCount.Int64 < 0 || legacyAccurateCount.Int64 > legacyTotalReviews.Int64 {
+			return Membership{}, errors.New("legacy reviewer membership evidence is invalid")
+		}
+		membership.LegacyReviewer = &LegacyReviewerEvidence{
+			Status: legacyStatus.String, ActivityStatus: legacyActivityStatus.String,
+			TotalReviews: legacyTotalReviews.Int64, AccurateCount: legacyAccurateCount.Int64,
+		}
+		if legacyLastActivityAt.Valid {
+			value := legacyLastActivityAt.Time.UTC()
+			membership.LegacyReviewer.LastActivityAt = &value
+		}
 	}
 	return membership, nil
 }

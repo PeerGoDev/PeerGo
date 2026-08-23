@@ -50,6 +50,10 @@ func TestTorrentUploadIsRecoverableAndIdempotentAfterDatabaseFailure(t *testing.
 		t.Fatalf("stored objects after failed finalization = %d", len(store.objects))
 	}
 
+	// A page reload generates a new request ID. The repository returns the
+	// original reservation for an exact request and finalization must use that
+	// durable ID, not the newly generated browser key.
+	input.ID = uuid.New()
 	result, err := service.Submit(context.Background(), "cookie", "csrf", input)
 	if err != nil {
 		t.Fatalf("retry Submit() error = %v", err)
@@ -238,8 +242,11 @@ func (repository *memoryTorrentUploadRepository) Reserve(_ context.Context, comm
 			BackendID: command.BackendID, ObjectKey: command.ObjectKey,
 			State: TorrentUploadReserved, CreatedAt: command.OccurredAt,
 		}
-	} else if repository.reservation.ID != command.ID || repository.reservation.UploaderID != command.UploaderID ||
-		repository.reservation.RequestFingerprint != command.RequestFingerprint {
+	} else if repository.reservation.UploaderID != command.UploaderID ||
+		repository.reservation.RequestFingerprint != command.RequestFingerprint ||
+		repository.reservation.CategoryID != command.CategoryID ||
+		repository.reservation.InfoHashV1 != command.InfoHashV1 ||
+		repository.reservation.Descriptor != command.Descriptor {
 		return TorrentUploadReservation{}, ErrTorrentUploadIdempotencyConflict
 	}
 	return repository.reservation, nil
@@ -257,6 +264,9 @@ func (repository *memoryTorrentUploadRepository) RecordObjectVerified(_ context.
 
 func (repository *memoryTorrentUploadRepository) Finalize(_ context.Context, command FinalizeTorrentUploadCommand) (TorrentUploadResult, error) {
 	repository.finalizeCalls++
+	if command.UploadID != repository.reservation.ID {
+		return TorrentUploadResult{}, ErrTorrentUploadStateConflict
+	}
 	if repository.finalizeFailures > 0 {
 		repository.finalizeFailures--
 		return TorrentUploadResult{}, errSimulatedUploadCommit

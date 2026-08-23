@@ -5589,6 +5589,60 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}/options/{option_key}:
+    put:
+      operationId: upsertManagedCategoryFacetOption
+      summary: 添加或以乐观并发更新分类下的类型选项
+      tags:
+        - catalog
+      x-audience:
+        - staff
+      x-owner: core-catalog
+      x-permission: category.update
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/CategoryIDPathParameter'
+        - name: facet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        - name: option_key
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 80
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertManagedCategoryFacetOptionRequest'
+      responses:
+        '200':
+          description: 分类类型选项和不可变审计记录已经原子提交。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedCategoryFacetOption'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/catalog/announcements:
     get:
       operationId: listManagedAnnouncements
@@ -6149,7 +6203,7 @@ paths:
       x-audience:
         - web
       x-owner: core-torrents
-      x-permission: torrent.read
+      x-permission: torrent.peer.read.member
       x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
@@ -11476,6 +11530,8 @@ components:
           format: date-time
         contribution:
           $ref: '#/components/schemas/WorkgroupContributionProgress'
+        legacy_reviewer:
+          $ref: '#/components/schemas/LegacyReviewerEvidence'
     WorkgroupContributionProgress:
       type: object
       additionalProperties: false
@@ -13406,6 +13462,7 @@ components:
         - torrent_count
         - created_at
         - updated_at
+        - facets
       properties:
         id:
           type: string
@@ -13439,6 +13496,11 @@ components:
         updated_at:
           type: string
           format: date-time
+        facets:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/ManagedCategoryFacet'
     ManagedCategoryList:
       type: array
       items:
@@ -13495,6 +13557,116 @@ components:
           format: int64
           minimum: 1
           maximum: 9007199254740991
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+    ManagedCategoryFacet:
+      type: object
+      required:
+        - id
+        - name
+        - selection_mode
+        - required
+        - display_order
+        - options
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        selection_mode:
+          $ref: '#/components/schemas/CategoryFacetSelectionMode'
+        required:
+          type: boolean
+        requirement_group:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        display_order:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        options:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/ManagedCategoryFacetOption'
+    ManagedCategoryFacetOption:
+      type: object
+      required:
+        - key
+        - label
+        - canonical_label
+        - display_order
+        - enabled
+        - version
+        - torrent_count
+        - created_at
+        - updated_at
+      properties:
+        key:
+          type: string
+          minLength: 1
+          maxLength: 80
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        canonical_label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        display_order:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        enabled:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        torrent_count:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpsertManagedCategoryFacetOptionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - label
+        - display_order
+        - enabled
+        - expected_version
+        - reason
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        display_order:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        enabled:
+          type: boolean
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          description: 传 0 表示新增；更新时必须传当前版本。
         reason:
           type: string
           minLength: 10
@@ -20238,6 +20410,38 @@ components:
         - trusted_torrents_published
         - torrent_review_votes
         - seeding_active_seconds
+    LegacyReviewerEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - activity_status
+        - total_reviews
+        - accurate_count
+      properties:
+        status:
+          type: string
+          enum:
+            - active
+            - suspended
+            - removed
+        activity_status:
+          type: string
+          enum:
+            - active
+            - inactive
+            - dormant
+        total_reviews:
+          type: integer
+          format: int64
+          minimum: 0
+        accurate_count:
+          type: integer
+          format: int64
+          minimum: 0
+        last_activity_at:
+          type: string
+          format: date-time
     WorkgroupApplicationStatus:
       type: string
       enum:
@@ -21363,6 +21567,11 @@ components:
           format: int64
           minimum: 0
           maximum: 9007199254740991
+    CategoryFacetSelectionMode:
+      type: string
+      enum:
+        - single_option
+        - multi_option
     CategoryFacetOption:
       type: object
       additionalProperties: false
@@ -21396,10 +21605,7 @@ components:
           minLength: 1
           maxLength: 40
         selection_mode:
-          type: string
-          enum:
-            - single_option
-            - multi_option
+          $ref: '#/components/schemas/CategoryFacetSelectionMode'
         required:
           type: boolean
         requirement_group:

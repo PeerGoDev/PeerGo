@@ -227,6 +227,43 @@ WHERE torrent.id = $1`, result.ID).Scan(
 	if len(store.objects) != 3 {
 		t.Fatalf("stored objects before reconciliation = %d", len(store.objects))
 	}
+	recoveryService, err := NewTorrentUploadService(
+		staticTorrentUploadAuthenticator{session: identity.WebSession{User: identity.User{
+			ID: userID, EmailVerifiedAt: &verifiedAt,
+		}}},
+		&recordingTorrentUploadAuthorizer{now: failedAt},
+		repository,
+		registry,
+		TorrentUploadServiceConfig{ActiveBackendID: store.BackendID(), Now: func() time.Time { return failedAt }},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recoveredInput := failedInput
+	recoveredInput.ID = uuid.New()
+	recovered, err := recoveryService.Submit(ctx, "cookie", "csrf", recoveredInput)
+	if err != nil || recovered.State != StatePendingReview {
+		t.Fatalf("Submit() with a fresh browser key = %+v, %v", recovered, err)
+	}
+	var recoveredUploadState string
+	if err := pool.QueryRow(ctx, `SELECT state FROM torrents.torrent_uploads WHERE id = $1`, failedUploadID).Scan(&recoveredUploadState); err != nil {
+		t.Fatalf("read recovered upload: %v", err)
+	}
+	if recoveredUploadState != string(TorrentUploadCompleted) || len(store.objects) != 3 {
+		t.Fatalf("recovered state=%s stored=%d", recoveredUploadState, len(store.objects))
+	}
+
+	orphanUploadID := uuid.New()
+	orphanInput := TorrentUploadInput{
+		ID: orphanUploadID, CategoryID: categoryID, Title: "Orphaned integration release",
+		RawMetainfo: validSingleFixture(fmt.Sprintf("cleanup-%s.bin", orphanUploadID.String()[:8]), 9, 16*1024),
+	}
+	if _, err := failingService.Submit(ctx, "cookie", "csrf", orphanInput); !errors.Is(err, errIntegrationFinalization) {
+		t.Fatalf("orphan Submit() error = %v", err)
+	}
+	if len(store.objects) != 4 {
+		t.Fatalf("stored objects before orphan cleanup = %d", len(store.objects))
+	}
 	reconcileAt := failedAt.Add(25 * time.Hour)
 	orphanService, err := NewTorrentUploadOrphanService(repository, registry, TorrentUploadOrphanServiceConfig{
 		Retention: 24 * time.Hour, Now: func() time.Time { return reconcileAt },
@@ -243,13 +280,13 @@ WHERE torrent.id = $1`, result.ID).Scan(
 		t.Fatalf("RunBatch() processed=%d error=%v", processed, err)
 	}
 	var failedState string
-	if err := pool.QueryRow(ctx, `SELECT state FROM torrents.torrent_uploads WHERE id = $1`, failedUploadID).Scan(&failedState); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT state FROM torrents.torrent_uploads WHERE id = $1`, orphanUploadID).Scan(&failedState); err != nil {
 		t.Fatalf("read reconciled upload: %v", err)
 	}
-	if failedState != string(TorrentUploadAbandoned) || len(store.objects) != 2 {
+	if failedState != string(TorrentUploadAbandoned) || len(store.objects) != 3 {
 		t.Fatalf("reconciled state=%s stored=%d", failedState, len(store.objects))
 	}
-	if _, err := failingService.Submit(ctx, "cookie", "csrf", failedInput); !errors.Is(err, ErrTorrentUploadExpired) {
+	if _, err := failingService.Submit(ctx, "cookie", "csrf", orphanInput); !errors.Is(err, ErrTorrentUploadExpired) {
 		t.Fatalf("abandoned Submit() error = %v", err)
 	}
 }

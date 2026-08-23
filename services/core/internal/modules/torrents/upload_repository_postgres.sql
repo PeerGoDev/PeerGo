@@ -82,6 +82,17 @@ FROM torrents.torrent_uploads
 WHERE id = sqlc.arg(upload_id)::uuid
 FOR UPDATE;
 
+-- name: GetActiveTorrentUploadIDByIdentity :one
+-- A browser reload creates a fresh idempotency key. The immutable content
+-- identity lets the original uploader resume an exact interrupted request;
+-- resumeReservation still verifies the uploader and request fingerprint.
+SELECT id
+FROM torrents.torrent_uploads
+WHERE info_hash_v1 = sqlc.arg(info_hash_v1)::bytea
+  AND content_sha256 = sqlc.arg(content_sha256)::bytea
+  AND state <> 'abandoned'
+FOR UPDATE;
+
 -- name: GetCompletedTorrentUploadResult :one
 SELECT
     torrent.id,

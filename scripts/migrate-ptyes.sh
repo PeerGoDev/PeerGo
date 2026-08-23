@@ -22,6 +22,8 @@ Commands:
   restore            Restore the gzip-wrapped pg_dump into an empty source DB.
   users              Validate/import users and immutable attendance openings,
                      then prove an all-skipped retry.
+  reviewers          Restore PtYes reviewer membership and preserve reviewer
+                     status, activity and historical accuracy evidence.
   medals             Import and fully reconcile medal definitions, ownership,
                      wear/expiry state, settings, reward benefit openings, and
                      typed workgroup memberships derived from reviewed medals.
@@ -41,8 +43,9 @@ Commands:
   reconcile          Prove stable torrent/image retries and close the run.
   acceptance         Verify the reconciled target, stored bytes, and signed
                      Tracker snapshots; write a non-overwriting final gate.
-  all                Run users, medals, seedboxes, torrents, purchase rights,
-                     media, reconciliation, and verified WebP derivatives.
+  all                Run users, reviewers, medals, seedboxes, torrents,
+                     purchase rights, media, reconciliation, and verified WebP
+                     derivatives.
                      It intentionally stops before Tracker projection/acceptance.
 
 inspect requires:
@@ -342,6 +345,14 @@ run_medals() {
     run_core_command legacy-medals --action import
 }
 
+run_reviewers() {
+    ensure_cutover_preflight
+    note "importing PtYes reviewer memberships and historical reviewer evidence"
+    bash "${script_dir}/import-legacy-reviewers.sh"
+    note "verifying an idempotent reviewer retry and full source reconciliation"
+    bash "${script_dir}/import-legacy-reviewers.sh"
+}
+
 run_seedboxes() {
     ensure_cutover_preflight
     note "importing user-bound PtYes seedbox addresses and strict accounting factors"
@@ -499,6 +510,9 @@ case "${command_name}" in
     medals)
         run_medals
         ;;
+    reviewers)
+        run_reviewers
+        ;;
     seedboxes)
         run_seedboxes
         ;;
@@ -537,6 +551,7 @@ case "${command_name}" in
         ;;
     all)
         run_users
+        run_reviewers
         run_medals
         run_seedboxes
         run_torrent_validation

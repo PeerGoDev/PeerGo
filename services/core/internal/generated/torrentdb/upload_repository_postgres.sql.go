@@ -139,6 +139,30 @@ func (q *Queries) CompleteTorrentUpload(ctx context.Context, arg CompleteTorrent
 	return result.RowsAffected(), nil
 }
 
+const getActiveTorrentUploadIDByIdentity = `-- name: GetActiveTorrentUploadIDByIdentity :one
+SELECT id
+FROM torrents.torrent_uploads
+WHERE info_hash_v1 = $1::bytea
+  AND content_sha256 = $2::bytea
+  AND state <> 'abandoned'
+FOR UPDATE
+`
+
+type GetActiveTorrentUploadIDByIdentityParams struct {
+	InfoHashV1    []byte
+	ContentSha256 []byte
+}
+
+// A browser reload creates a fresh idempotency key. The immutable content
+// identity lets the original uploader resume an exact interrupted request;
+// resumeReservation still verifies the uploader and request fingerprint.
+func (q *Queries) GetActiveTorrentUploadIDByIdentity(ctx context.Context, arg GetActiveTorrentUploadIDByIdentityParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getActiveTorrentUploadIDByIdentity, arg.InfoHashV1, arg.ContentSha256)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getCompletedTorrentUploadResult = `-- name: GetCompletedTorrentUploadResult :one
 SELECT
     torrent.id,

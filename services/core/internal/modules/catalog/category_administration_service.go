@@ -8,6 +8,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 )
 
@@ -21,6 +23,27 @@ type CategoryAdministrationRepository interface {
 	ListManagedCategories(context.Context) ([]ManagedCategory, error)
 	CreateCategory(context.Context, CreateCategoryCommand) (ManagedCategory, error)
 	UpdateCategory(context.Context, UpdateCategoryCommand) (ManagedCategory, error)
+	UpsertCategoryFacetOption(context.Context, UpsertCategoryFacetOptionCommand) (ManagedCategoryFacetOption, error)
+}
+
+func (service *CategoryAdministrationService) UpsertFacetOption(ctx context.Context, actor authz.StaffActor, input UpsertCategoryFacetOptionInput) (ManagedCategoryFacetOption, error) {
+	normalized, err := normalizedUpsertCategoryFacetOptionInput(input)
+	if err != nil {
+		return ManagedCategoryFacetOption{}, err
+	}
+	now := service.now().UTC()
+	decision, err := authorizeCatalogStaff(ctx, service.authorizer, actor, authz.ActionCategoryUpdate, now, "catalog-category-facet-option-administration")
+	if err != nil {
+		return ManagedCategoryFacetOption{}, err
+	}
+	result, err := service.repository.UpsertCategoryFacetOption(ctx, UpsertCategoryFacetOptionCommand{
+		UpsertCategoryFacetOptionInput: normalized,
+		ChangeID:                       uuid.New(), ActorID: actor.Subject.ID, OccurredAt: now, Authorization: decision,
+	})
+	if err != nil {
+		return ManagedCategoryFacetOption{}, fmt.Errorf("upsert category facet option: %w", err)
+	}
+	return result, nil
 }
 
 type CategoryAdministrationService struct {
@@ -120,4 +143,23 @@ func validCategoryFields(id, name string, displayOrder int, reason string) bool 
 	return utf8.ValidString(name) && utf8.ValidString(reason) && validCatalogID(id) &&
 		nameRunes >= 1 && nameRunes <= 40 && displayOrder >= 0 && displayOrder <= maxCategoryDisplayOrder &&
 		reasonRunes >= minCategoryReasonRunes && reasonRunes <= maxCategoryReasonRunes
+}
+
+func normalizedUpsertCategoryFacetOptionInput(input UpsertCategoryFacetOptionInput) (UpsertCategoryFacetOptionInput, error) {
+	input.CategoryID = strings.TrimSpace(input.CategoryID)
+	input.FacetID = strings.TrimSpace(input.FacetID)
+	input.OptionKey = strings.TrimSpace(input.OptionKey)
+	input.Label = strings.TrimSpace(input.Label)
+	input.Reason = strings.TrimSpace(input.Reason)
+	optionKeyRunes := utf8.RuneCountInString(input.OptionKey)
+	labelRunes := utf8.RuneCountInString(input.Label)
+	reasonRunes := utf8.RuneCountInString(input.Reason)
+	if !validCatalogID(input.CategoryID) || !validCatalogID(input.FacetID) ||
+		!utf8.ValidString(input.OptionKey) || optionKeyRunes < 1 || optionKeyRunes > 80 || strings.ContainsAny(input.OptionKey, "/?#") ||
+		!utf8.ValidString(input.Label) || labelRunes < 1 || labelRunes > 80 ||
+		input.DisplayOrder < 0 || input.DisplayOrder > maxCategoryDisplayOrder || input.ExpectedVersion < 0 ||
+		!utf8.ValidString(input.Reason) || reasonRunes < minCategoryReasonRunes || reasonRunes > maxCategoryReasonRunes {
+		return UpsertCategoryFacetOptionInput{}, ErrCategoryAdministrationInput
+	}
+	return input, nil
 }

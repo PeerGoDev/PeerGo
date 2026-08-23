@@ -796,6 +796,15 @@ func workgroupMembershipDTO(membership workgroups.Membership) generated.Workgrou
 		value := workgroupContributionDTO(*membership.Contribution)
 		dto.Contribution = &value
 	}
+	if membership.LegacyReviewer != nil {
+		dto.LegacyReviewer = &generated.LegacyReviewerEvidence{
+			Status:         generated.LegacyReviewerEvidenceStatus(membership.LegacyReviewer.Status),
+			ActivityStatus: generated.LegacyReviewerEvidenceActivityStatus(membership.LegacyReviewer.ActivityStatus),
+			TotalReviews:   membership.LegacyReviewer.TotalReviews,
+			AccurateCount:  membership.LegacyReviewer.AccurateCount,
+			LastActivityAt: membership.LegacyReviewer.LastActivityAt,
+		}
+	}
 	return dto
 }
 

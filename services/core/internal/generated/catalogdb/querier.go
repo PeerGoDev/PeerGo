@@ -25,8 +25,11 @@ type Querier interface {
 	EnabledCategoryExists(ctx context.Context, categoryID string) (bool, error)
 	GetAnnouncementAggregateForUpdate(ctx context.Context, announcementID string) (GetAnnouncementAggregateForUpdateRow, error)
 	GetAnnouncementRevisionByID(ctx context.Context, revisionID int64) (GetAnnouncementRevisionByIDRow, error)
+	GetCanonicalFacetOption(ctx context.Context, arg GetCanonicalFacetOptionParams) (GetCanonicalFacetOptionRow, error)
+	GetCategoryFacetForOptionAdministration(ctx context.Context, arg GetCategoryFacetForOptionAdministrationParams) (GetCategoryFacetForOptionAdministrationRow, error)
 	GetLatestAnnouncement(ctx context.Context) (GetLatestAnnouncementRow, error)
 	GetManagedAnnouncement(ctx context.Context, announcementID string) (CatalogManagedAnnouncementProjection, error)
+	GetManagedCategoryFacetOptionForUpdate(ctx context.Context, arg GetManagedCategoryFacetOptionForUpdateParams) (GetManagedCategoryFacetOptionForUpdateRow, error)
 	GetManagedCategoryForUpdate(ctx context.Context, categoryID string) (GetManagedCategoryForUpdateRow, error)
 	GetPublishedAnnouncement(ctx context.Context, announcementID string) (CatalogPublicAnnouncementProjection, error)
 	GetPublishedTorrentSwarm(ctx context.Context, torrentID int64) (GetPublishedTorrentSwarmRow, error)
@@ -34,6 +37,9 @@ type Querier interface {
 	GetSiteDisplaySettingsForUpdate(ctx context.Context) (GetSiteDisplaySettingsForUpdateRow, error)
 	GetSiteInfo(ctx context.Context, asOf pgtype.Timestamptz) (GetSiteInfoRow, error)
 	InsertAnnouncementRevision(ctx context.Context, arg InsertAnnouncementRevisionParams) (int64, error)
+	InsertCanonicalFacetOption(ctx context.Context, arg InsertCanonicalFacetOptionParams) (int64, error)
+	InsertCategoryFacetOptionChange(ctx context.Context, arg InsertCategoryFacetOptionChangeParams) error
+	InsertManagedCategoryFacetOption(ctx context.Context, arg InsertManagedCategoryFacetOptionParams) (InsertManagedCategoryFacetOptionRow, error)
 	ListAnnouncementRevisions(ctx context.Context, arg ListAnnouncementRevisionsParams) ([]ListAnnouncementRevisionsRow, error)
 	// Public counts follow the write-side aggregate, not an orphaned read-model
 	// row. This keeps category totals aligned with torrents that can open a real
@@ -45,6 +51,7 @@ type Querier interface {
 	// category affects review, moderation, and historical records as well as the
 	// currently public catalog.
 	ListManagedCategories(ctx context.Context) ([]ListManagedCategoriesRow, error)
+	ListManagedCategoryFacetOptions(ctx context.Context) ([]ListManagedCategoryFacetOptionsRow, error)
 	ListPublishedAnnouncements(ctx context.Context, arg ListPublishedAnnouncementsParams) ([]ListPublishedAnnouncementsRow, error)
 	// catalog.torrents supplies the denormalized public presentation, while the
 	// aggregate join is the publication authority. Never publish projection-only
@@ -57,6 +64,7 @@ type Querier interface {
 	ScheduleAnnouncementDraft(ctx context.Context, arg ScheduleAnnouncementDraftParams) (int64, error)
 	UpdateAnnouncementDraftPointer(ctx context.Context, arg UpdateAnnouncementDraftPointerParams) (int64, error)
 	UpdateManagedCategory(ctx context.Context, arg UpdateManagedCategoryParams) (UpdateManagedCategoryRow, error)
+	UpdateManagedCategoryFacetOption(ctx context.Context, arg UpdateManagedCategoryFacetOptionParams) (UpdateManagedCategoryFacetOptionRow, error)
 	UpdateSiteDisplaySettings(ctx context.Context, arg UpdateSiteDisplaySettingsParams) (UpdateSiteDisplaySettingsRow, error)
 	WithdrawAnnouncement(ctx context.Context, arg WithdrawAnnouncementParams) (int64, error)
 }

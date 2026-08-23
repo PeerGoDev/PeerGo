@@ -156,19 +156,28 @@ type ApplicationPage struct {
 }
 
 type Membership struct {
-	ID            uuid.UUID
-	GroupKind     GroupKind
-	UserID        uuid.UUID
-	UserNumericID int64
-	Username      string
-	DisplayName   string
-	Status        MembershipStatus
-	Source        string
-	Version       int64
-	StartedAt     time.Time
-	EndedAt       *time.Time
-	UpdatedAt     time.Time
-	Contribution  *ContributionProgress
+	ID             uuid.UUID
+	GroupKind      GroupKind
+	UserID         uuid.UUID
+	UserNumericID  int64
+	Username       string
+	DisplayName    string
+	Status         MembershipStatus
+	Source         string
+	Version        int64
+	StartedAt      time.Time
+	EndedAt        *time.Time
+	UpdatedAt      time.Time
+	Contribution   *ContributionProgress
+	LegacyReviewer *LegacyReviewerEvidence
+}
+
+type LegacyReviewerEvidence struct {
+	Status         string
+	ActivityStatus string
+	TotalReviews   int64
+	AccurateCount  int64
+	LastActivityAt *time.Time
 }
 
 // ContributionMetric is deliberately closed and maps one-to-one to a group.

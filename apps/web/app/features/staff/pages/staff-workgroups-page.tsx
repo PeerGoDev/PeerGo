@@ -824,33 +824,63 @@ function MembershipTable({
                 {membership.source === "application"
                   ? "申请批准"
                   : membership.source === "legacy_migration"
-                    ? "Rousi 勋章迁移"
+                    ? membership.legacy_reviewer
+                      ? "Rousi 种审迁移"
+                      : "Rousi 勋章迁移"
                     : "管理员授予"}
               </TableCell>
               <TableCell>
-                {membership.contribution ? (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">
-                      {contributionMetricLabel(membership.contribution.metric)}
-                    </span>
-                    <span className="text-sm tabular-nums">
-                      {formatContributionValue(
-                        membership.contribution.metric,
-                        membership.contribution.current_value
-                      )}{" "}
-                      /{" "}
-                      {formatContributionValue(
-                        membership.contribution.metric,
-                        membership.contribution.target_value
-                      )}
-                    </span>
-                    <Badge
-                      variant={
-                        membership.contribution.met ? "outline" : "secondary"
-                      }
-                    >
-                      {membership.contribution.met ? "已达标" : "观察中"}
-                    </Badge>
+                {membership.contribution || membership.legacy_reviewer ? (
+                  <div className="flex flex-col gap-2">
+                    {membership.legacy_reviewer ? (
+                      <div className="flex flex-col gap-0.5 text-xs">
+                        <span className="text-muted-foreground">
+                          旧站审核记录
+                        </span>
+                        <span className="tabular-nums">
+                          {membership.legacy_reviewer.total_reviews.toLocaleString(
+                            "zh-CN"
+                          )}{" "}
+                          次 · 准确率{" "}
+                          {membership.legacy_reviewer.total_reviews > 0
+                            ? (
+                                (membership.legacy_reviewer.accurate_count /
+                                  membership.legacy_reviewer.total_reviews) *
+                                100
+                              ).toFixed(1) + "%"
+                            : "—"}
+                        </span>
+                      </div>
+                    ) : null}
+                    {membership.contribution ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">
+                          {contributionMetricLabel(
+                            membership.contribution.metric
+                          )}
+                        </span>
+                        <span className="text-sm tabular-nums">
+                          {formatContributionValue(
+                            membership.contribution.metric,
+                            membership.contribution.current_value
+                          )}{" "}
+                          /{" "}
+                          {formatContributionValue(
+                            membership.contribution.metric,
+                            membership.contribution.target_value
+                          )}
+                        </span>
+                        <Badge
+                          variant={
+                            membership.contribution.met
+                              ? "outline"
+                              : "secondary"
+                          }
+                        >
+                          {membership.contribution.met ? "已达标" : "观察中"}
+                        </Badge>
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <span className="text-xs text-muted-foreground">—</span>

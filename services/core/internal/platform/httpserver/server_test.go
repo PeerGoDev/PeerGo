@@ -1652,6 +1652,10 @@ func (unavailableCategoryAdministrationService) Update(context.Context, authz.St
 	return catalog.ManagedCategory{}, authz.ErrForbidden
 }
 
+func (unavailableCategoryAdministrationService) UpsertFacetOption(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetOptionInput) (catalog.ManagedCategoryFacetOption, error) {
+	return catalog.ManagedCategoryFacetOption{}, authz.ErrForbidden
+}
+
 type unavailableAnnouncementAdministrationService struct{}
 
 func (unavailableAnnouncementAdministrationService) List(context.Context, authz.StaffActor, int, int) (catalog.ManagedAnnouncementPage, error) {
@@ -1875,6 +1879,11 @@ func (service *recordingCategoryAdministrationService) Update(_ context.Context,
 	service.updateActor = actor
 	service.updateInput = input
 	return service.updateResult, service.err
+}
+
+func (service *recordingCategoryAdministrationService) UpsertFacetOption(_ context.Context, actor authz.StaffActor, input catalog.UpsertCategoryFacetOptionInput) (catalog.ManagedCategoryFacetOption, error) {
+	service.updateActor = actor
+	return catalog.ManagedCategoryFacetOption{}, service.err
 }
 
 type recordingGrantAdministrationService struct {

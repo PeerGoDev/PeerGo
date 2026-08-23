@@ -15,8 +15,10 @@ type categoryAdministrationRepositoryStub struct {
 	listed        []ManagedCategory
 	created       ManagedCategory
 	updated       ManagedCategory
+	upserted      ManagedCategoryFacetOption
 	createCommand CreateCategoryCommand
 	updateCommand UpdateCategoryCommand
+	upsertCommand UpsertCategoryFacetOptionCommand
 	listCalls     int
 }
 
@@ -33,6 +35,11 @@ func (stub *categoryAdministrationRepositoryStub) CreateCategory(_ context.Conte
 func (stub *categoryAdministrationRepositoryStub) UpdateCategory(_ context.Context, command UpdateCategoryCommand) (ManagedCategory, error) {
 	stub.updateCommand = command
 	return stub.updated, nil
+}
+
+func (stub *categoryAdministrationRepositoryStub) UpsertCategoryFacetOption(_ context.Context, command UpsertCategoryFacetOptionCommand) (ManagedCategoryFacetOption, error) {
+	stub.upsertCommand = command
+	return stub.upserted, nil
 }
 
 type categoryAuthorizerStub struct {
@@ -120,6 +127,36 @@ func TestCategoryAdministrationRejectsInvalidInputBeforeAuthorization(t *testing
 	}
 	if len(authorizer.requests) != 0 {
 		t.Fatalf("authorization requests = %+v, want none", authorizer.requests)
+	}
+}
+
+func TestCategoryAdministrationUpsertFacetOptionNormalizesAndAudits(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 23, 15, 0, 0, 0, time.UTC)
+	repository := &categoryAdministrationRepositoryStub{upserted: ManagedCategoryFacetOption{Key: "action", Label: "动作", Version: 2}}
+	authorizer := &categoryAuthorizerStub{decision: categoryAllowedDecision(now)}
+	service, err := NewCategoryAdministrationService(repository, authorizer, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := categoryTestActor(now)
+	result, err := service.UpsertFacetOption(context.Background(), actor, UpsertCategoryFacetOptionInput{
+		CategoryID: " movies ", FacetID: " genre ", OptionKey: " action ", Label: " 动作 ",
+		DisplayOrder: 10, Enabled: true, ExpectedVersion: 1,
+		Reason: " 调整电影分类下动作类型的显示顺序。 ",
+	})
+	if err != nil {
+		t.Fatalf("UpsertFacetOption() error = %v", err)
+	}
+	if result.Key != "action" || repository.upsertCommand.CategoryID != "movies" ||
+		repository.upsertCommand.FacetID != "genre" || repository.upsertCommand.OptionKey != "action" ||
+		repository.upsertCommand.Label != "动作" || repository.upsertCommand.ChangeID == uuid.Nil ||
+		repository.upsertCommand.Authorization.ID != authorizer.decision.ID {
+		t.Fatalf("result=%+v command=%+v", result, repository.upsertCommand)
+	}
+	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionCategoryUpdate {
+		t.Fatalf("authorization requests = %+v", authorizer.requests)
 	}
 }
 

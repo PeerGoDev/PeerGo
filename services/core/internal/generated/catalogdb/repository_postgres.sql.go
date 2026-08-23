@@ -362,6 +362,70 @@ func (q *Queries) GetAnnouncementRevisionByID(ctx context.Context, revisionID in
 	return i, err
 }
 
+const getCanonicalFacetOption = `-- name: GetCanonicalFacetOption :one
+SELECT selection_mode, label, enabled
+FROM catalog.facet_options
+WHERE facet_id = $1::text
+  AND option_key = $2::text
+`
+
+type GetCanonicalFacetOptionParams struct {
+	FacetID   string
+	OptionKey string
+}
+
+type GetCanonicalFacetOptionRow struct {
+	SelectionMode string
+	Label         string
+	Enabled       bool
+}
+
+func (q *Queries) GetCanonicalFacetOption(ctx context.Context, arg GetCanonicalFacetOptionParams) (GetCanonicalFacetOptionRow, error) {
+	row := q.db.QueryRow(ctx, getCanonicalFacetOption, arg.FacetID, arg.OptionKey)
+	var i GetCanonicalFacetOptionRow
+	err := row.Scan(&i.SelectionMode, &i.Label, &i.Enabled)
+	return i, err
+}
+
+const getCategoryFacetForOptionAdministration = `-- name: GetCategoryFacetForOptionAdministration :one
+SELECT
+    binding.category_id,
+    binding.facet_id,
+    binding.selection_mode,
+    facet.name AS facet_name
+FROM catalog.category_facets AS binding
+JOIN catalog.facet_definitions AS facet
+  ON facet.id = binding.facet_id
+ AND facet.selection_mode = binding.selection_mode
+WHERE binding.category_id = $1::text
+  AND binding.facet_id = $2::text
+FOR UPDATE OF binding
+`
+
+type GetCategoryFacetForOptionAdministrationParams struct {
+	CategoryID string
+	FacetID    string
+}
+
+type GetCategoryFacetForOptionAdministrationRow struct {
+	CategoryID    string
+	FacetID       string
+	SelectionMode string
+	FacetName     string
+}
+
+func (q *Queries) GetCategoryFacetForOptionAdministration(ctx context.Context, arg GetCategoryFacetForOptionAdministrationParams) (GetCategoryFacetForOptionAdministrationRow, error) {
+	row := q.db.QueryRow(ctx, getCategoryFacetForOptionAdministration, arg.CategoryID, arg.FacetID)
+	var i GetCategoryFacetForOptionAdministrationRow
+	err := row.Scan(
+		&i.CategoryID,
+		&i.FacetID,
+		&i.SelectionMode,
+		&i.FacetName,
+	)
+	return i, err
+}
+
 const getLatestAnnouncement = `-- name: GetLatestAnnouncement :one
 SELECT
     announcement.id,
@@ -435,6 +499,80 @@ func (q *Queries) GetManagedAnnouncement(ctx context.Context, announcementID str
 		&i.WithdrawnAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getManagedCategoryFacetOptionForUpdate = `-- name: GetManagedCategoryFacetOptionForUpdate :one
+SELECT
+    allowed.category_id,
+    allowed.facet_id,
+    allowed.option_key,
+    allowed.selection_mode,
+    COALESCE(allowed.label_override, option.label)::text AS option_label,
+    option.label AS canonical_label,
+    option.enabled AS canonical_enabled,
+    allowed.display_order,
+    allowed.enabled,
+    allowed.version,
+    allowed.created_at,
+    allowed.updated_at,
+    (SELECT count(*)::bigint
+       FROM torrents.torrent_facet_values AS value
+      WHERE value.category_id = allowed.category_id
+        AND value.facet_id = allowed.facet_id
+        AND value.option_key = allowed.option_key
+        AND value.selection_mode = allowed.selection_mode) AS torrent_count
+FROM catalog.category_facet_options AS allowed
+JOIN catalog.facet_options AS option
+  ON option.facet_id = allowed.facet_id
+ AND option.option_key = allowed.option_key
+ AND option.selection_mode = allowed.selection_mode
+WHERE allowed.category_id = $1::text
+  AND allowed.facet_id = $2::text
+  AND allowed.option_key = $3::text
+FOR UPDATE OF allowed
+`
+
+type GetManagedCategoryFacetOptionForUpdateParams struct {
+	CategoryID string
+	FacetID    string
+	OptionKey  string
+}
+
+type GetManagedCategoryFacetOptionForUpdateRow struct {
+	CategoryID       string
+	FacetID          string
+	OptionKey        string
+	SelectionMode    string
+	OptionLabel      string
+	CanonicalLabel   string
+	CanonicalEnabled bool
+	DisplayOrder     int32
+	Enabled          bool
+	Version          int64
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	TorrentCount     int64
+}
+
+func (q *Queries) GetManagedCategoryFacetOptionForUpdate(ctx context.Context, arg GetManagedCategoryFacetOptionForUpdateParams) (GetManagedCategoryFacetOptionForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getManagedCategoryFacetOptionForUpdate, arg.CategoryID, arg.FacetID, arg.OptionKey)
+	var i GetManagedCategoryFacetOptionForUpdateRow
+	err := row.Scan(
+		&i.CategoryID,
+		&i.FacetID,
+		&i.OptionKey,
+		&i.SelectionMode,
+		&i.OptionLabel,
+		&i.CanonicalLabel,
+		&i.CanonicalEnabled,
+		&i.DisplayOrder,
+		&i.Enabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.TorrentCount,
 	)
 	return i, err
 }
@@ -723,6 +861,175 @@ func (q *Queries) InsertAnnouncementRevision(ctx context.Context, arg InsertAnno
 	return id, err
 }
 
+const insertCanonicalFacetOption = `-- name: InsertCanonicalFacetOption :execrows
+INSERT INTO catalog.facet_options (
+    facet_id, option_key, selection_mode, label, display_order,
+    enabled, created_at, updated_at
+) VALUES (
+    $1::text,
+    $2::text,
+    $3::text,
+    $4::text,
+    $5::integer,
+    true,
+    $6::timestamptz,
+    $6::timestamptz
+)
+ON CONFLICT DO NOTHING
+`
+
+type InsertCanonicalFacetOptionParams struct {
+	FacetID       string
+	OptionKey     string
+	SelectionMode string
+	OptionLabel   string
+	DisplayOrder  int32
+	OccurredAt    pgtype.Timestamptz
+}
+
+func (q *Queries) InsertCanonicalFacetOption(ctx context.Context, arg InsertCanonicalFacetOptionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertCanonicalFacetOption,
+		arg.FacetID,
+		arg.OptionKey,
+		arg.SelectionMode,
+		arg.OptionLabel,
+		arg.DisplayOrder,
+		arg.OccurredAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const insertCategoryFacetOptionChange = `-- name: InsertCategoryFacetOptionChange :exec
+INSERT INTO catalog.category_facet_option_changes (
+    id, category_id, facet_id, option_key, transition, actor_id, reason,
+    expected_version, resulting_version, before_state, after_state,
+    authorization_decision_id, occurred_at
+) VALUES (
+    $1::uuid,
+    $2::text,
+    $3::text,
+    $4::text,
+    $5::text,
+    $6::uuid,
+    $7::text,
+    $8::bigint,
+    $9::bigint,
+    $10::jsonb,
+    $11::jsonb,
+    $12::uuid,
+    $13::timestamptz
+)
+`
+
+type InsertCategoryFacetOptionChangeParams struct {
+	ChangeID                pgtype.UUID
+	CategoryID              string
+	FacetID                 string
+	OptionKey               string
+	Transition              string
+	ActorID                 pgtype.UUID
+	Reason                  string
+	ExpectedVersion         int64
+	ResultingVersion        int64
+	BeforeState             []byte
+	AfterState              []byte
+	AuthorizationDecisionID pgtype.UUID
+	OccurredAt              pgtype.Timestamptz
+}
+
+func (q *Queries) InsertCategoryFacetOptionChange(ctx context.Context, arg InsertCategoryFacetOptionChangeParams) error {
+	_, err := q.db.Exec(ctx, insertCategoryFacetOptionChange,
+		arg.ChangeID,
+		arg.CategoryID,
+		arg.FacetID,
+		arg.OptionKey,
+		arg.Transition,
+		arg.ActorID,
+		arg.Reason,
+		arg.ExpectedVersion,
+		arg.ResultingVersion,
+		arg.BeforeState,
+		arg.AfterState,
+		arg.AuthorizationDecisionID,
+		arg.OccurredAt,
+	)
+	return err
+}
+
+const insertManagedCategoryFacetOption = `-- name: InsertManagedCategoryFacetOption :one
+INSERT INTO catalog.category_facet_options (
+    category_id, facet_id, option_key, selection_mode, label_override,
+    display_order, enabled, version, created_at, updated_at
+) VALUES (
+    $1::text,
+    $2::text,
+    $3::text,
+    $4::text,
+    $5::text,
+    $6::integer,
+    $7::boolean,
+    1,
+    $8::timestamptz,
+    $8::timestamptz
+)
+RETURNING category_id, facet_id, option_key, selection_mode,
+          label_override, display_order, enabled, version, created_at, updated_at
+`
+
+type InsertManagedCategoryFacetOptionParams struct {
+	CategoryID    string
+	FacetID       string
+	OptionKey     string
+	SelectionMode string
+	LabelOverride pgtype.Text
+	DisplayOrder  int32
+	Enabled       bool
+	OccurredAt    pgtype.Timestamptz
+}
+
+type InsertManagedCategoryFacetOptionRow struct {
+	CategoryID    string
+	FacetID       string
+	OptionKey     string
+	SelectionMode string
+	LabelOverride pgtype.Text
+	DisplayOrder  int32
+	Enabled       bool
+	Version       int64
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
+func (q *Queries) InsertManagedCategoryFacetOption(ctx context.Context, arg InsertManagedCategoryFacetOptionParams) (InsertManagedCategoryFacetOptionRow, error) {
+	row := q.db.QueryRow(ctx, insertManagedCategoryFacetOption,
+		arg.CategoryID,
+		arg.FacetID,
+		arg.OptionKey,
+		arg.SelectionMode,
+		arg.LabelOverride,
+		arg.DisplayOrder,
+		arg.Enabled,
+		arg.OccurredAt,
+	)
+	var i InsertManagedCategoryFacetOptionRow
+	err := row.Scan(
+		&i.CategoryID,
+		&i.FacetID,
+		&i.OptionKey,
+		&i.SelectionMode,
+		&i.LabelOverride,
+		&i.DisplayOrder,
+		&i.Enabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listAnnouncementRevisions = `-- name: ListAnnouncementRevisions :many
 SELECT
     revision.revision_number,
@@ -850,7 +1157,7 @@ SELECT
     binding.required,
     COALESCE(binding.requirement_group, '')::text AS requirement_group,
     option.option_key,
-    option.label AS option_label
+    COALESCE(allowed.label_override, option.label)::text AS option_label
 FROM catalog.categories AS category
 JOIN catalog.category_facets AS binding
   ON binding.category_id = category.id
@@ -1039,6 +1346,106 @@ func (q *Queries) ListManagedCategories(ctx context.Context) ([]ListManagedCateg
 			&i.ID,
 			&i.Name,
 			&i.DisplayOrder,
+			&i.Enabled,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.TorrentCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listManagedCategoryFacetOptions = `-- name: ListManagedCategoryFacetOptions :many
+SELECT
+    binding.category_id,
+    facet.id AS facet_id,
+    facet.name AS facet_name,
+    binding.selection_mode,
+    binding.required,
+    COALESCE(binding.requirement_group, '')::text AS requirement_group,
+    binding.display_order AS facet_display_order,
+    allowed.option_key,
+    COALESCE(allowed.label_override, option.label)::text AS option_label,
+    option.label AS canonical_label,
+    allowed.display_order AS option_display_order,
+    allowed.enabled,
+    allowed.version,
+    allowed.created_at,
+    allowed.updated_at,
+    count(value.torrent_id)::bigint AS torrent_count
+FROM catalog.category_facets AS binding
+JOIN catalog.facet_definitions AS facet
+  ON facet.id = binding.facet_id
+ AND facet.selection_mode = binding.selection_mode
+JOIN catalog.category_facet_options AS allowed
+  ON allowed.category_id = binding.category_id
+ AND allowed.facet_id = binding.facet_id
+ AND allowed.selection_mode = binding.selection_mode
+JOIN catalog.facet_options AS option
+  ON option.facet_id = allowed.facet_id
+ AND option.option_key = allowed.option_key
+ AND option.selection_mode = allowed.selection_mode
+LEFT JOIN torrents.torrent_facet_values AS value
+  ON value.category_id = allowed.category_id
+ AND value.facet_id = allowed.facet_id
+ AND value.option_key = allowed.option_key
+ AND value.selection_mode = allowed.selection_mode
+GROUP BY binding.category_id, facet.id, facet.name, binding.selection_mode,
+         binding.required, binding.requirement_group, binding.display_order,
+         allowed.option_key, allowed.label_override, option.label,
+         allowed.display_order, allowed.enabled, allowed.version,
+         allowed.created_at, allowed.updated_at
+ORDER BY binding.category_id, binding.display_order, facet.id,
+         allowed.display_order, allowed.option_key
+`
+
+type ListManagedCategoryFacetOptionsRow struct {
+	CategoryID         string
+	FacetID            string
+	FacetName          string
+	SelectionMode      string
+	Required           bool
+	RequirementGroup   string
+	FacetDisplayOrder  int32
+	OptionKey          string
+	OptionLabel        string
+	CanonicalLabel     string
+	OptionDisplayOrder int32
+	Enabled            bool
+	Version            int64
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+	TorrentCount       int64
+}
+
+func (q *Queries) ListManagedCategoryFacetOptions(ctx context.Context) ([]ListManagedCategoryFacetOptionsRow, error) {
+	rows, err := q.db.Query(ctx, listManagedCategoryFacetOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListManagedCategoryFacetOptionsRow{}
+	for rows.Next() {
+		var i ListManagedCategoryFacetOptionsRow
+		if err := rows.Scan(
+			&i.CategoryID,
+			&i.FacetID,
+			&i.FacetName,
+			&i.SelectionMode,
+			&i.Required,
+			&i.RequirementGroup,
+			&i.FacetDisplayOrder,
+			&i.OptionKey,
+			&i.OptionLabel,
+			&i.CanonicalLabel,
+			&i.OptionDisplayOrder,
 			&i.Enabled,
 			&i.Version,
 			&i.CreatedAt,
@@ -1398,6 +1805,72 @@ func (q *Queries) UpdateManagedCategory(ctx context.Context, arg UpdateManagedCa
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.DisplayOrder,
+		&i.Enabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateManagedCategoryFacetOption = `-- name: UpdateManagedCategoryFacetOption :one
+UPDATE catalog.category_facet_options
+SET label_override = $1::text,
+    display_order = $2::integer,
+    enabled = $3::boolean,
+    version = version + 1,
+    updated_at = $4::timestamptz
+WHERE category_id = $5::text
+  AND facet_id = $6::text
+  AND option_key = $7::text
+  AND version = $8::bigint
+RETURNING category_id, facet_id, option_key, selection_mode,
+          label_override, display_order, enabled, version, created_at, updated_at
+`
+
+type UpdateManagedCategoryFacetOptionParams struct {
+	LabelOverride   pgtype.Text
+	DisplayOrder    int32
+	Enabled         bool
+	OccurredAt      pgtype.Timestamptz
+	CategoryID      string
+	FacetID         string
+	OptionKey       string
+	ExpectedVersion int64
+}
+
+type UpdateManagedCategoryFacetOptionRow struct {
+	CategoryID    string
+	FacetID       string
+	OptionKey     string
+	SelectionMode string
+	LabelOverride pgtype.Text
+	DisplayOrder  int32
+	Enabled       bool
+	Version       int64
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateManagedCategoryFacetOption(ctx context.Context, arg UpdateManagedCategoryFacetOptionParams) (UpdateManagedCategoryFacetOptionRow, error) {
+	row := q.db.QueryRow(ctx, updateManagedCategoryFacetOption,
+		arg.LabelOverride,
+		arg.DisplayOrder,
+		arg.Enabled,
+		arg.OccurredAt,
+		arg.CategoryID,
+		arg.FacetID,
+		arg.OptionKey,
+		arg.ExpectedVersion,
+	)
+	var i UpdateManagedCategoryFacetOptionRow
+	err := row.Scan(
+		&i.CategoryID,
+		&i.FacetID,
+		&i.OptionKey,
+		&i.SelectionMode,
+		&i.LabelOverride,
 		&i.DisplayOrder,
 		&i.Enabled,
 		&i.Version,

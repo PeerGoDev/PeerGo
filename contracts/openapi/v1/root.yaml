@@ -244,6 +244,8 @@ paths:
     $ref: "./domains/catalog.yaml#/ManagedCategoriesPath"
   /api/v1/admin/catalog/categories/{category_id}:
     $ref: "./domains/catalog.yaml#/ManagedCategoryPath"
+  /api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}/options/{option_key}:
+    $ref: "./domains/catalog.yaml#/ManagedCategoryFacetOptionPath"
   /api/v1/admin/catalog/announcements:
     $ref: "./domains/catalog.yaml#/ManagedAnnouncementsPath"
   /api/v1/admin/catalog/announcements/{announcement_id}:
@@ -650,6 +652,12 @@ components:
       $ref: "./schemas/catalog.yaml#/CreateManagedCategoryRequest"
     UpdateManagedCategoryRequest:
       $ref: "./schemas/catalog.yaml#/UpdateManagedCategoryRequest"
+    ManagedCategoryFacet:
+      $ref: "./schemas/catalog.yaml#/ManagedCategoryFacet"
+    ManagedCategoryFacetOption:
+      $ref: "./schemas/catalog.yaml#/ManagedCategoryFacetOption"
+    UpsertManagedCategoryFacetOptionRequest:
+      $ref: "./schemas/catalog.yaml#/UpsertManagedCategoryFacetOptionRequest"
     TorrentSummary:
       $ref: "./schemas/catalog.yaml#/TorrentSummary"
     TorrentList:

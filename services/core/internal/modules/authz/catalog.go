@@ -125,6 +125,7 @@ const (
 	ActionTorrentLifecycleUpdate                  Action = "torrent.lifecycle.update"
 	ActionTorrentManageRead                       Action = "torrent.manage.read"
 	ActionTorrentMetadataUpdateSelf               Action = "torrent.metadata.update.self"
+	ActionTorrentPeerReadMember                   Action = "torrent.peer.read.member"
 	ActionTorrentPromotionPurchaseSelf            Action = "torrent.promotion.purchase.self"
 	ActionTorrentPurchaseCreateSelf               Action = "torrent.purchase.create.self"
 	ActionTorrentPurchaseManageRead               Action = "torrent.purchase.manage.read"
@@ -775,6 +776,11 @@ var permissionCatalog = []PermissionDefinition{
 	{
 		Action: ActionTorrentMetadataUpdateSelf, Description: "修改自己已发布种子的基础发布资料", Risk: RiskMedium,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionTorrentPeerReadMember, Description: "查看已发布种子的隐私最小化实时用户列表", Risk: RiskLow,
+		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},
 	{

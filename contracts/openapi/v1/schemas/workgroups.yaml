@@ -354,6 +354,18 @@ WorkgroupMembership:
     ended_at: { type: string, format: date-time }
     updated_at: { type: string, format: date-time }
     contribution: { $ref: "#/WorkgroupContributionProgress" }
+    legacy_reviewer: { $ref: "#/LegacyReviewerEvidence" }
+
+LegacyReviewerEvidence:
+  type: object
+  additionalProperties: false
+  required: [status, activity_status, total_reviews, accurate_count]
+  properties:
+    status: { type: string, enum: [active, suspended, removed] }
+    activity_status: { type: string, enum: [active, inactive, dormant] }
+    total_reviews: { type: integer, format: int64, minimum: 0 }
+    accurate_count: { type: integer, format: int64, minimum: 0 }
+    last_activity_at: { type: string, format: date-time }
 
 MyWorkgroup:
   type: object
