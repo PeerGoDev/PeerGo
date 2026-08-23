@@ -72,6 +72,7 @@ function summarizeStandardMediaInfo(lines: string[]): MediaInfoSummary {
   let videoWidth: string | undefined
   let videoHeight: string | undefined
   let aspectRatio: string | undefined
+  let legacyAspectRatio: string | undefined
 
   const finishTrack = () => {
     if (!track) return
@@ -111,11 +112,17 @@ function summarizeStandardMediaInfo(lines: string[]): MediaInfoSummary {
       continue
     }
 
-    const separator = line.indexOf(":")
-    if (separator < 1) continue
-    const key = line.slice(0, separator).trim().toLowerCase()
-    const value = line.slice(separator + 1).trim()
-    if (!value) continue
+    const field = mediaInfoField(line)
+    if (!field) continue
+    const { key, value } = field
+
+    const legacyField = applyLegacyReleaseField(summary, key, value)
+    if (legacyField.handled) {
+      if (legacyField.aspectRatio) {
+        legacyAspectRatio = legacyField.aspectRatio
+      }
+      continue
+    }
 
     switch (section) {
       case "general":
@@ -163,12 +170,102 @@ function summarizeStandardMediaInfo(lines: string[]): MediaInfoSummary {
   }
   finishTrack()
 
+  const resolvedAspectRatio = aspectRatio || legacyAspectRatio
   if (videoHeight) {
-    summary.resolution = `${videoHeight}p${aspectRatio ? ` (${aspectRatio})` : ""}`
+    summary.resolution = `${videoHeight}p${resolvedAspectRatio ? ` (${resolvedAspectRatio})` : ""}`
   } else if (videoWidth) {
-    summary.resolution = `${videoWidth}px${aspectRatio ? ` (${aspectRatio})` : ""}`
+    summary.resolution = `${videoWidth}px${resolvedAspectRatio ? ` (${resolvedAspectRatio})` : ""}`
+  } else if (
+    summary.resolution &&
+    resolvedAspectRatio &&
+    !summary.resolution.includes(resolvedAspectRatio)
+  ) {
+    summary.resolution = `${summary.resolution} (${resolvedAspectRatio})`
   }
   return summary
+}
+
+function mediaInfoField(line: string) {
+  const asciiSeparator = line.indexOf(":")
+  const fullWidthSeparator = line.indexOf("：")
+  const separator =
+    asciiSeparator < 0
+      ? fullWidthSeparator
+      : fullWidthSeparator < 0
+        ? asciiSeparator
+        : Math.min(asciiSeparator, fullWidthSeparator)
+  if (separator < 1) return undefined
+
+  const key = line.slice(0, separator).trim().toLowerCase()
+  const value = line.slice(separator + 1).trim()
+  return value ? { key, value } : undefined
+}
+
+function applyLegacyReleaseField(
+  summary: MediaInfoSummary,
+  rawKey: string,
+  value: string
+): { handled: boolean; aspectRatio?: string } {
+  const key = rawKey.replace(/[\s\u3000._…·]+/g, "").toLowerCase()
+
+  if (key === "duration" || key === "时长") {
+    if (!summary.duration) summary.duration = value
+    return { handled: true }
+  }
+  if (key === "overallbitrate" || key === "总码率") {
+    if (!summary.overallBitRate) summary.overallBitRate = value
+    return { handled: true }
+  }
+  if (key === "videobitrate" || key === "视频码率") {
+    if (!summary.videoBitRate) summary.videoBitRate = value
+    return { handled: true }
+  }
+  if (key === "framerate" || key === "帧率") {
+    if (!summary.frameRate) summary.frameRate = value
+    return { handled: true }
+  }
+  if (key === "resolution" || key === "分辨率") {
+    if (!summary.resolution) summary.resolution = value
+    return { handled: true }
+  }
+  if (key === "displayaspectratio" || key === "长宽比") {
+    return { handled: true, aspectRatio: value }
+  }
+  if (key === "videocodec" || key === "视频信息") {
+    applyLegacyVideoDescription(summary, value)
+    return { handled: true }
+  }
+  if (/^audio\d*$/.test(key) || key === "音轨") {
+    if (summary.audioTracks.length < mediaInfoTrackLimit) {
+      summary.audioTracks.push(value)
+    }
+    return { handled: true }
+  }
+  if (/^subtitles?\d*$/.test(key) || /^字幕\d*$/.test(key)) {
+    if (summary.subtitleTracks.length < mediaInfoTrackLimit) {
+      summary.subtitleTracks.push(value)
+    }
+    return { handled: true }
+  }
+  return { handled: false }
+}
+
+function applyLegacyVideoDescription(summary: MediaInfoSummary, value: string) {
+  if (!summary.videoFormat) {
+    summary.videoFormat = value.match(
+      /\b(?:MPEG-H HEVC Video|HEVC|AVC|AV1|VP9|H\.26[45]|x26[45])\b/i
+    )?.[0]
+  }
+  if (!summary.profile) {
+    summary.profile = value.match(
+      /\b(?:Baseline|Main|High)(?:\s*10)?@L[\d.]+\b/i
+    )?.[0]
+  }
+  if (!summary.videoBitRate) {
+    summary.videoBitRate = value
+      .match(/(?:^|@|\s)([\d,.][\d\s,.]*\s*[kmg]?b(?:it)?\/?s)\b/i)?.[1]
+      ?.trim()
+  }
 }
 
 function summarizeBdInfo(lines: string[]): MediaInfoSummary {
@@ -360,14 +457,24 @@ function looksLikeBdInfo(lines: string[]) {
 }
 
 function mediaInfoSection(line: string): MediaInfoSection | undefined {
-  const match = /^(General|Video|Audio|Text|Subtitle)(?:\s*#\d+)?$/i.exec(line)
+  const heading = line
+    .replace(/^[★☆=*\-\s]+/, "")
+    .replace(/[★☆=*\-\s]+$/, "")
+    .trim()
+  const match =
+    /^(General(?:\s+Information)?|Video(?:\s+Information)?|Audio(?:\s+Information)?|Text|Subtitle)(?:\s*#\d+)?$/i.exec(
+      heading
+    )
   if (!match) return undefined
   switch (match[1]?.toLowerCase()) {
     case "general":
+    case "general information":
       return "general"
     case "video":
+    case "video information":
       return "video"
     case "audio":
+    case "audio information":
       return "audio"
     case "text":
     case "subtitle":

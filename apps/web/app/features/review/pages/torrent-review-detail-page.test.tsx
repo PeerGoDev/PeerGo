@@ -64,8 +64,11 @@ describe("TorrentReviewDetailPage", () => {
       external_identifiers: [{ provider: "imdb", external_id: "tt1234567" }],
       description: "**发布说明已经完整展示**",
       description_format: "markdown",
-      media_info:
-        "General\nFormat : Matroska\nVideo\nFormat : AVC\nWidth : 1 920 pixels\nHeight : 1 080 pixels",
+      media_info: `★★★★★ General Information ★★★★★
+DURATION.......: 01:42:03
+VIDEO.CODEC....: x264 High@L4.1 @ 8 000 kb/s
+RESOLUTION.....: 1920 x 1080
+AUDIO.1........: Chinese AAC 2 channels`,
     } satisfies MyTorrentReviewDetail)
     queryClient.setQueryData(torrentReviewVotingKeys.files(torrentId, 50, 0), {
       torrent_id: torrentId,
@@ -107,6 +110,8 @@ describe("TorrentReviewDetailPage", () => {
     expect(screen.getByText("旧版发布者")).toBeVisible()
     expect(screen.getByText("分辨率：1080p")).toBeVisible()
     expect(screen.getByText("MediaInfo/BDInfo")).toBeVisible()
+    expect(screen.getByText("1920 x 1080")).toBeVisible()
+    expect(screen.getByText("Chinese AAC 2 channels")).toBeVisible()
     expect(screen.getByText("发布说明已经完整展示")).toBeVisible()
     expect(
       screen.getByText("Legacy.Review.Release.2026/movie.mkv")

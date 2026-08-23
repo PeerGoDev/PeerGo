@@ -65,11 +65,7 @@ import {
   type TorrentReviewVoteResult,
   useCreateTorrentReviewVote,
 } from "~/features/review/api/torrent-review-voting.queries"
-import { TorrentScreenshotsCard } from "~/features/torrent/components/torrent-screenshots-card"
-import {
-  TorrentDescriptionCard,
-  TorrentMediaInfoCard,
-} from "~/features/torrent/components/torrent-rich-content"
+import { TorrentRichContentView } from "~/features/torrent/components/torrent-rich-content"
 import { resolveApiUrl } from "~/shared/api/client"
 import { ApiProblemError, requestErrorDescription } from "~/shared/api/problem"
 import { PageLayout } from "~/shared/components/page-layout"
@@ -179,17 +175,13 @@ export function TorrentReviewDetailPage() {
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <main className="min-w-0 space-y-5">
           <ReviewEvidenceSummary detail={detail.data} />
-          {detail.data.media_info ? (
-            <TorrentMediaInfoCard mediaInfo={detail.data.media_info} />
-          ) : null}
-          <TorrentScreenshotsCard
+          <TorrentRichContentView
             torrentId={detail.data.id}
             screenshotCount={detail.data.screenshot_count}
-            screenshotUrl={reviewScreenshotUrl}
-          />
-          <TorrentDescriptionCard
+            mediaInfo={detail.data.media_info}
             description={detail.data.description}
-            format={detail.data.description_format}
+            descriptionFormat={detail.data.description_format}
+            screenshotUrl={reviewScreenshotUrl}
           />
           <ReviewFilesCard
             torrentId={detail.data.id}

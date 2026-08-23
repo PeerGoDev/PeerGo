@@ -111,22 +111,22 @@ INSERT INTO identity.user_avatar_object_locations (
     sqlc.arg(observed_sha256),
     sqlc.arg(verified_at)
 )
-ON CONFLICT (object_id, backend_id) DO UPDATE SET
+ON CONFLICT (backend_id, object_key) DO UPDATE SET
     version_id = CASE
-        WHEN identity.user_avatar_object_locations.object_key = EXCLUDED.object_key
+        WHEN identity.user_avatar_object_locations.object_id = EXCLUDED.object_id
           AND identity.user_avatar_object_locations.observed_byte_length = EXCLUDED.observed_byte_length
           AND identity.user_avatar_object_locations.observed_sha256 = EXCLUDED.observed_sha256
         THEN COALESCE(EXCLUDED.version_id, identity.user_avatar_object_locations.version_id)
         ELSE identity.user_avatar_object_locations.version_id
     END,
     verified_at = CASE
-        WHEN identity.user_avatar_object_locations.object_key = EXCLUDED.object_key
+        WHEN identity.user_avatar_object_locations.object_id = EXCLUDED.object_id
           AND identity.user_avatar_object_locations.observed_byte_length = EXCLUDED.observed_byte_length
           AND identity.user_avatar_object_locations.observed_sha256 = EXCLUDED.observed_sha256
         THEN GREATEST(identity.user_avatar_object_locations.verified_at, EXCLUDED.verified_at)
         ELSE identity.user_avatar_object_locations.verified_at
     END
-WHERE identity.user_avatar_object_locations.object_key = EXCLUDED.object_key
+WHERE identity.user_avatar_object_locations.object_id = EXCLUDED.object_id
   AND identity.user_avatar_object_locations.observed_byte_length = EXCLUDED.observed_byte_length
   AND identity.user_avatar_object_locations.observed_sha256 = EXCLUDED.observed_sha256;
 

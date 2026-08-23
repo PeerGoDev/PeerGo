@@ -96,26 +96,58 @@ export function TorrentRichContent({
   }
 
   return (
+    <TorrentRichContentView
+      torrentId={torrentId}
+      screenshotCount={screenshotCount}
+      mediaInfo={content.data.media_info}
+      description={content.data.description}
+      descriptionFormat={content.data.description_format}
+      shareAction={
+        <TorrentShareToSocial
+          torrentId={torrentId}
+          title={torrentTitle}
+          subtitle={torrentSubtitle}
+          sizeBytes={torrentSizeBytes}
+          screenshotCount={screenshotCount}
+        />
+      }
+    />
+  )
+}
+
+// Published and pending-review torrents use different authorization endpoints,
+// but their submitted rich content is the same evidence. Keeping the renderer
+// pure lets both surfaces share ordering, MediaInfo/BDInfo parsing, screenshots,
+// and description behavior without making private review data public.
+export function TorrentRichContentView({
+  torrentId,
+  screenshotCount,
+  mediaInfo,
+  description,
+  descriptionFormat,
+  screenshotUrl,
+  shareAction,
+}: {
+  torrentId: number
+  screenshotCount: number
+  mediaInfo: string
+  description: string
+  descriptionFormat: "markdown" | "plain_text"
+  screenshotUrl?: (torrentId: number, position: number) => string
+  shareAction?: React.ReactNode
+}) {
+  return (
     <>
-      {content.data.media_info ? (
-        <TorrentMediaInfoCard mediaInfo={content.data.media_info} />
-      ) : null}
+      {mediaInfo ? <TorrentMediaInfoCard mediaInfo={mediaInfo} /> : null}
       <TorrentScreenshotsCard
         torrentId={torrentId}
         screenshotCount={screenshotCount}
+        screenshotUrl={screenshotUrl}
       />
       <TorrentDescriptionCard
-        description={content.data.description}
-        format={content.data.description_format}
-        shareAction={
-          <TorrentShareToSocial
-            torrentId={torrentId}
-            title={torrentTitle}
-            subtitle={torrentSubtitle}
-            sizeBytes={torrentSizeBytes}
-            screenshotCount={screenshotCount}
-          />
-        }
+        description={description}
+        format={descriptionFormat}
+        shareAction={shareAction}
       />
     </>
   )

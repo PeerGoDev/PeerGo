@@ -118,6 +118,59 @@ ${audioRows}`)
     expect(summary.audioTracks).toHaveLength(32)
   })
 
+  it("parses decorated release-sheet MediaInfo from migrated PtYes rows", () => {
+    const summary = summarizeMediaInfo(`★★★★★ General Information ★★★★★
+
+RELEASE.NAME...: Example.Release.2026.1080p.WEB-DL
+DURATION.......: 00:58:03.648 (HH:MM:SS.MMM)
+OVERALL.BITRATE: 4 377 kb/s
+VIDEO.CODEC....: x264 High@L4.1 @ 3 732 kb/s
+FRAME.RATE.....: 23.976 (24000/1001) FPS
+RESOLUTION.....: 1920 x 960
+AUDIO.1........: English Dolby Digital Plus 6 channels @ 640 kb/s
+SUBTITLES.1....: Chinese Simplified / UTF-8
+SUBTITLES.2....: English / UTF-8`)
+
+    expect(summary).toEqual({
+      duration: "00:58:03.648 (HH:MM:SS.MMM)",
+      resolution: "1920 x 960",
+      overallBitRate: "4 377 kb/s",
+      videoBitRate: "3 732 kb/s",
+      frameRate: "23.976 (24000/1001) FPS",
+      profile: "High@L4.1",
+      videoFormat: "x264",
+      audioTracks: ["English Dolby Digital Plus 6 channels @ 640 kb/s"],
+      subtitleTracks: ["Chinese Simplified / UTF-8", "English / UTF-8"],
+    })
+  })
+
+  it("parses the flattened Chinese MediaInfo format used by legacy reviews", () => {
+    const summary =
+      summarizeMediaInfo(`显示/隐藏原始 MediaInfo文 件 名.........: Example.Release.1080P.WEB-DL
+时　　长.........: 00:24:29.056 (HH:MM:SS:FF)
+视频信息.........: AVC High@L4 x264
+帧　　率.........: 29.970 fps
+视频码率.........: 5 872 kb/s
+分 辨 率.........: 1920 x 1080
+长 宽 比.........: 16:9
+音　　轨.........: AAC 2 channels 192 kb/s Japanese
+音　　轨.........: AAC 2 channels 128 kb/s Chinese`)
+
+    expect(summary).toEqual({
+      duration: "00:24:29.056 (HH:MM:SS:FF)",
+      resolution: "1920 x 1080 (16:9)",
+      videoBitRate: "5 872 kb/s",
+      frameRate: "29.970 fps",
+      profile: "High@L4",
+      videoFormat: "AVC",
+      audioTracks: [
+        "AAC 2 channels 192 kb/s Japanese",
+        "AAC 2 channels 128 kb/s Chinese",
+      ],
+      subtitleTracks: [],
+    })
+  })
+
   it("returns an empty summary for unsupported text", () => {
     const summary = summarizeMediaInfo("custom release notes only")
     expect(hasMediaInfoSummary(summary)).toBe(false)

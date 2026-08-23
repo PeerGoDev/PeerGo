@@ -184,8 +184,12 @@ WHERE window_start >= $1 AND window_end <= $2`,
 
 	var trafficApplied, hnrApplied pgtype.Timestamptz
 	if err := tx.QueryRow(ctx, `
-SELECT count(*), max(applied_at)
-FROM traffic.settlement_inbox`).Scan(&result.Consumers.TrafficEntries, &trafficApplied); err != nil {
+-- user_totals preserves one entry_count increment for every applied traffic
+-- settlement, even after bounded retention removes per-event inbox evidence.
+-- Reading this compact projection avoids repeatedly scanning the multi-GB
+-- settlement_inbox from the staff page's polling request.
+SELECT COALESCE(sum(entry_count), 0)::bigint, max(updated_at)
+FROM traffic.user_totals`).Scan(&result.Consumers.TrafficEntries, &trafficApplied); err != nil {
 		return TrackerOverview{}, fmt.Errorf("read traffic consumer status: %w", err)
 	}
 	if err := tx.QueryRow(ctx, `
