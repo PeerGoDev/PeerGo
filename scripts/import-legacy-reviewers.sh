@@ -63,11 +63,8 @@ COPY (
     ORDER BY reviewer.id
 ) TO STDOUT WITH (FORMAT csv, HEADER true)" >"${reviewer_csv}"
 
-psql "${PEERGO_CORE_DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-    -v reviewer_csv="${reviewer_csv}" \
-    -v run_id="${PEERGO_LEGACY_RUN_ID}" \
-    -v occurred_at="${PEERGO_LEGACY_OCCURRED_AT}" \
-    -v dry_run="${PEERGO_LEGACY_REVIEWER_IMPORT_DRY_RUN:-false}" <<'SQL'
+{
+cat <<'SQL'
 BEGIN;
 
 CREATE TEMP TABLE legacy_reviewer_import_config (
@@ -104,7 +101,11 @@ CREATE TEMP TABLE legacy_reviewer_stage (
     status_transition_id uuid
 ) ON COMMIT DROP;
 
-\copy legacy_reviewer_stage (legacy_reviewer_id, legacy_user_id, source_status, source_total_reviews, source_accurate_count, source_joined_at, source_removed_at, source_remove_reason, source_last_activity_at, source_activity_status, source_created_at, source_updated_at, source_fingerprint_hex) FROM :'reviewer_csv' WITH (FORMAT csv, HEADER true)
+COPY legacy_reviewer_stage (legacy_reviewer_id, legacy_user_id, source_status, source_total_reviews, source_accurate_count, source_joined_at, source_removed_at, source_remove_reason, source_last_activity_at, source_activity_status, source_created_at, source_updated_at, source_fingerprint_hex) FROM STDIN WITH (FORMAT csv, HEADER true);
+SQL
+cat "${reviewer_csv}"
+cat <<'SQL'
+\.
 
 UPDATE legacy_reviewer_stage AS stage
 SET user_id = mapping.user_id
@@ -454,3 +455,7 @@ FROM migration.legacy_reviewer_openings AS opening
 JOIN workgroups.memberships AS membership ON membership.id = opening.membership_id
 WHERE opening.source_system = 'ptyes';
 SQL
+} | psql "${PEERGO_CORE_DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+    -v run_id="${PEERGO_LEGACY_RUN_ID}" \
+    -v occurred_at="${PEERGO_LEGACY_OCCURRED_AT}" \
+    -v dry_run="${PEERGO_LEGACY_REVIEWER_IMPORT_DRY_RUN:-false}"
