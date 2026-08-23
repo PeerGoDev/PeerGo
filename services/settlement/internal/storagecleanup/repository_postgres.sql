@@ -66,15 +66,21 @@ WHERE work.interval_event_id = candidate.interval_event_id;
 -- name: StorageCleanupListTrafficSettlements :many
 SELECT settlement.settlement_id
 FROM ledger.traffic_settlements AS settlement
+LEFT JOIN LATERAL (
+    -- OFFSET 0 deliberately keeps this as a parameterized primary-key probe.
+    -- The equivalent NOT EXISTS is estimated as nearly empty and PostgreSQL
+    -- otherwise builds a hash over both multi-million-row ledgers before it
+    -- can return the first cleanup batch.
+    SELECT outbox.settlement_id
+    FROM settlement.traffic_outbox AS outbox
+    WHERE outbox.settlement_id = settlement.settlement_id
+    OFFSET 0
+) AS retained_outbox ON true
 WHERE settlement.interval_ends_at < sqlc.arg(detail_before)::timestamptz
-  AND NOT EXISTS (
-      SELECT 1
-      FROM settlement.traffic_outbox AS outbox
-      WHERE outbox.settlement_id = settlement.settlement_id
-  )
+  AND retained_outbox.settlement_id IS NULL
 ORDER BY settlement.interval_ends_at, settlement.settlement_id
 LIMIT sqlc.arg(batch_size)::integer
-FOR UPDATE SKIP LOCKED;
+FOR UPDATE OF settlement SKIP LOCKED;
 
 -- name: StorageCleanupDeleteTrafficSettlementSegments :execrows
 DELETE FROM ledger.traffic_settlement_segments
