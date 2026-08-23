@@ -248,8 +248,8 @@ func (h *Handler) VoteSocialPoll(ctx context.Context, r generated.VoteSocialPoll
 
 func (h *Handler) ClaimSocialRedPacket(ctx context.Context, r generated.ClaimSocialRedPacketRequestObject) (generated.ClaimSocialRedPacketResponseObject, error) {
 	v, e := h.socialPosts.ClaimRedPacket(ctx, sessionTokenFromContext(ctx), string(r.Params.XCSRFToken), r.PostId, r.Params.IdempotencyKey)
-	if errors.Is(e, social.ErrSocialRedPacketEmpty) || errors.Is(e, social.ErrSocialRedPacketSelfClaim) {
-		p := newProblemFromContext(ctx, 409, "social_red_packet_unavailable", "红包不可领取", "红包已领完或不能领取自己发布的红包。")
+	if errors.Is(e, social.ErrSocialRedPacketEmpty) {
+		p := newProblemFromContext(ctx, 409, "social_red_packet_unavailable", "红包不可领取", "红包已经领完。")
 		return generated.ClaimSocialRedPacket409ApplicationProblemPlusJSONResponse(p), nil
 	}
 	if p, s := interactionProblem(ctx, e); s > 0 {

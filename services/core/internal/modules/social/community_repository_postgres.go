@@ -412,18 +412,14 @@ func (repository *PostgresPostRepository) ClaimRedPacket(ctx context.Context, cl
 		return RedPacketClaim{}, err
 	}
 	var internalID int64
-	var creatorID uuid.UUID
 	var remaining int64
 	var claims int
-	err = tx.QueryRow(ctx, `SELECT post.id,packet.creator_id,packet.remaining_amount,packet.remaining_claims FROM social.posts AS post JOIN social.boards AS board ON board.id=post.board_id JOIN social.post_red_packets AS packet ON packet.post_id=post.id WHERE post.public_id=$1 AND post.state='visible' AND board.enabled FOR UPDATE OF packet`, postID).Scan(&internalID, &creatorID, &remaining, &claims)
+	err = tx.QueryRow(ctx, `SELECT post.id,packet.remaining_amount,packet.remaining_claims FROM social.posts AS post JOIN social.boards AS board ON board.id=post.board_id JOIN social.post_red_packets AS packet ON packet.post_id=post.id WHERE post.public_id=$1 AND post.state='visible' AND board.enabled FOR UPDATE OF packet`, postID).Scan(&internalID, &remaining, &claims)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RedPacketClaim{}, ErrPostNotFound
 	}
 	if err != nil {
 		return RedPacketClaim{}, err
-	}
-	if creatorID == claimantID {
-		return RedPacketClaim{}, ErrSocialRedPacketSelfClaim
 	}
 	if claims < 1 || remaining < 1 {
 		return RedPacketClaim{}, ErrSocialRedPacketEmpty

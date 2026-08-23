@@ -132,7 +132,13 @@ export function useModerateSocialPost() {
         throw new ApiProblemError(response.status, error)
       return data
     },
-    onSuccess: async () =>
-      queryClient.invalidateQueries({ queryKey: socialAdministrationKeys.all }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: socialAdministrationKeys.all,
+        }),
+        queryClient.invalidateQueries({ queryKey: ["social", "posts"] }),
+      ])
+    },
   })
 }

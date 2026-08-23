@@ -49,6 +49,12 @@ import {
   useSocialPostRepost,
   useUpdateSocialPost,
 } from "~/features/social/api/posts.queries"
+import { useModerateSocialPost } from "~/features/staff/api/social-administration.queries"
+import {
+  useStaffCapabilities,
+  useStaffSession,
+} from "~/features/staff/api/staff-session.mutations"
+import { hasCapability } from "~/features/staff/model/capability"
 import { formatRelativeTime } from "~/features/torrent/model/format"
 import { UserAvatar } from "~/shared/components/user-avatar"
 import { ApiProblemError } from "~/shared/api/problem"
@@ -82,7 +88,16 @@ export function SocialPostCard({
   const follow = useSocialFollow()
   const vote = useSocialPollVote()
   const claimPacket = useClaimSocialRedPacket()
+  const staffSession = useStaffSession(Boolean(currentUserId && csrfToken))
+  const staffCapabilities = useStaffCapabilities(staffSession.data?.user.id)
+  const moderatePost = useModerateSocialPost()
   const isOwner = currentUserId === post.author.id
+  const canModerate = hasCapability(
+    staffCapabilities.data,
+    "social.post.moderate"
+  )
+  const deletingAsModerator = canModerate && !isOwner
+  const removalError = deletePost.error ?? moderatePost.error
   const topics = post.topics ?? []
   const media = post.media ?? []
 
@@ -101,18 +116,54 @@ export function SocialPostCard({
   }
 
   async function removePost() {
-    if (!csrfToken) return
+    const writeToken = deletingAsModerator
+      ? staffSession.data?.csrf_token
+      : csrfToken
+    if (!writeToken) return
     try {
-      await deletePost.mutateAsync({
-        postId: post.id,
-        expectedVersion: post.version,
-        csrfToken,
-      })
+      if (deletingAsModerator) {
+        await moderatePost.mutateAsync({
+          postId: post.id,
+          csrfToken: writeToken,
+          body: {
+            board_id: post.board.id,
+            pinned: post.pinned,
+            featured: post.featured,
+            hidden: true,
+            expected_version: post.version,
+            reason: "管理员在动态圈快捷删除该动态。",
+          },
+        })
+      } else {
+        await deletePost.mutateAsync({
+          postId: post.id,
+          expectedVersion: post.version,
+          csrfToken: writeToken,
+        })
+      }
       setConfirmDelete(false)
       onDeleted?.()
     } catch {
       // Keep the confirmation open for a safe retry.
     }
+  }
+
+  async function togglePinned() {
+    if (!canModerate || !staffSession.data?.csrf_token) return
+    await moderatePost.mutateAsync({
+      postId: post.id,
+      csrfToken: staffSession.data.csrf_token,
+      body: {
+        board_id: post.board.id,
+        pinned: !post.pinned,
+        featured: post.featured,
+        hidden: Boolean(post.hidden),
+        expected_version: post.version,
+        reason: post.pinned
+          ? "管理员在动态圈快捷取消置顶。"
+          : "管理员在动态圈快捷置顶该动态。",
+      },
+    })
   }
 
   const content = editing ? (
@@ -268,7 +319,7 @@ export function SocialPostCard({
               {post.author.followed_by_me ? "已关注" : "关注"}
             </Button>
           ) : null}
-          {isOwner ? (
+          {isOwner || canModerate ? (
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -282,21 +333,33 @@ export function SocialPostCard({
                 <MoreHorizontalIcon data-icon="inline-start" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-32">
-                <DropdownMenuItem
-                  onClick={() => {
-                    setDraft(post.content)
-                    setEditing(true)
-                  }}
-                >
-                  <PencilIcon />
-                  编辑
-                </DropdownMenuItem>
+                {isOwner ? (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setDraft(post.content)
+                      setEditing(true)
+                    }}
+                  >
+                    <PencilIcon />
+                    编辑
+                  </DropdownMenuItem>
+                ) : null}
+                {canModerate ? (
+                  <DropdownMenuItem
+                    disabled={moderatePost.isPending}
+                    onClick={() => void togglePinned()}
+                  >
+                    <PinIcon />
+                    {post.pinned ? "取消置顶" : "置顶动态"}
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem
                   variant="destructive"
+                  disabled={deletePost.isPending || moderatePost.isPending}
                   onClick={() => setConfirmDelete(true)}
                 >
                   <Trash2Icon />
-                  删除
+                  删除动态
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -406,7 +469,7 @@ export function SocialPostCard({
             <Badge variant="secondary">
               已领 {post.red_packet.my_claim_amount}
             </Badge>
-          ) : !isOwner ? (
+          ) : (
             <Button
               type="button"
               size="sm"
@@ -429,7 +492,7 @@ export function SocialPostCard({
               ) : null}
               领取
             </Button>
-          ) : null}
+          )}
         </div>
       ) : null}
 
@@ -542,22 +605,26 @@ export function SocialPostCard({
             </AlertDialogMedia>
             <AlertDialogTitle>删除动态</AlertDialogTitle>
             <AlertDialogDescription>
-              删除后动态将不再公开，且不能恢复。评论审核证据仍会保留。
+              {deletingAsModerator
+                ? "删除后动态将立即从前台隐藏；如有误操作，可在动态圈后台恢复。"
+                : "删除后动态将不再公开，且不能恢复。评论审核证据仍会保留。"}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {deletePost.error ? (
-            <ProblemAlert title="删除失败" error={deletePost.error} />
+          {removalError ? (
+            <ProblemAlert title="删除失败" error={removalError} />
           ) : null}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletePost.isPending}>
+            <AlertDialogCancel
+              disabled={deletePost.isPending || moderatePost.isPending}
+            >
               取消
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={removePost}
-              disabled={deletePost.isPending}
+              disabled={deletePost.isPending || moderatePost.isPending}
             >
-              {deletePost.isPending ? (
+              {deletePost.isPending || moderatePost.isPending ? (
                 <Spinner data-icon="inline-start" />
               ) : null}
               删除

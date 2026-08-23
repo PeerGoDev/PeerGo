@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/peergo/peergo/services/core/internal/modules/economy"
 	platformpostgres "github.com/peergo/peergo/services/core/internal/platform/postgres"
 )
 
@@ -201,6 +202,82 @@ UPDATE social.comment_revisions SET body = body || 'x'
 WHERE comment_id = (SELECT id FROM social.comments WHERE public_id = $1)
   AND version = 1`, rootPublicID); err == nil {
 		t.Fatal("immutable comment revision unexpectedly accepted an update")
+	}
+}
+
+func TestPostgresSocialRedPacketLetsSenderClaimOneShare(t *testing.T) {
+	databaseURL := os.Getenv("PEERGO_TEST_CORE_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("PEERGO_TEST_CORE_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("pgxpool.New() error = %v", err)
+	}
+	t.Cleanup(pool.Close)
+	if err := platformpostgres.RequireCurrentMigration(ctx, pool); err != nil {
+		t.Fatalf("RequireCurrentMigration() error = %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	senderID := insertCommentIntegrationUser(t, ctx, pool, "red-packet-sender", now)
+	ledger, err := economy.NewPostgresRepository(pool)
+	if err != nil {
+		t.Fatalf("NewPostgresRepository(economy) error = %v", err)
+	}
+	openingReference := "social-red-packet-integration:" + uuid.NewString()
+	openingDigest := sha256.Sum256([]byte(openingReference))
+	if _, err := ledger.Record(ctx, economy.RecordCommand{
+		TransactionID:   uuid.New(),
+		TransactionType: economy.TransactionActivityReward,
+		IdempotencyKey:  openingReference,
+		SourceReference: openingReference,
+		PolicyRevision:  "social-red-packet-integration-v1",
+		PayloadSHA256:   openingDigest,
+		OccurredAt:      now,
+		RecordedAt:      now,
+		Postings: []economy.PostingInput{
+			{AccountID: economy.ActivityMintAccountID(), Amount: -100},
+			{AccountID: senderID, Amount: 100},
+		},
+	}); err != nil {
+		t.Fatalf("fund sender account: %v", err)
+	}
+
+	repository, err := NewPostgresPostRepository(pool)
+	if err != nil {
+		t.Fatalf("NewPostgresPostRepository() error = %v", err)
+	}
+	postID := uuid.New()
+	requestID := uuid.New()
+	body := "发送者也可以领取一份红包。"
+	redPacket := &CreateRedPacketInput{TotalAmount: 50, ClaimCount: 2}
+	created, err := repository.Create(ctx, createPostCommand{
+		PublicID:         postID,
+		RequestID:        requestID,
+		AuthorID:         senderID,
+		Body:             body,
+		BoardID:          "general",
+		RedPacket:        redPacket,
+		CreateBodySHA256: createPostInputSHA256(body, "general", nil, nil, redPacket),
+		CreatedAt:        now.Add(time.Second),
+	})
+	if err != nil || created.ID != postID {
+		t.Fatalf("Create(red packet) post=%+v error=%v", created, err)
+	}
+
+	claim, err := repository.ClaimRedPacket(ctx, senderID, postID, uuid.New(), now.Add(2*time.Second))
+	if err != nil {
+		t.Fatalf("ClaimRedPacket(sender) error = %v", err)
+	}
+	if claim.Amount != 25 || claim.RemainingAmount != 25 || claim.RemainingClaims != 1 || claim.Replayed {
+		t.Fatalf("ClaimRedPacket(sender) = %+v", claim)
+	}
+	replayed, err := repository.ClaimRedPacket(ctx, senderID, postID, uuid.New(), now.Add(3*time.Second))
+	if err != nil || !replayed.Replayed || replayed.Amount != claim.Amount {
+		t.Fatalf("ClaimRedPacket(sender replay) = %+v, %v", replayed, err)
 	}
 }
 
