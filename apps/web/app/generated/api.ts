@@ -2882,6 +2882,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/torrent-reviews/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取当前种审员已经提交的不可变审核票 */
+        get: operations["listMyReviewedTorrentReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/torrent-reviews/{torrent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取当前种审员尚未投票种子的完整审核证据 */
+        get: operations["getMyTorrentReviewAssignment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/torrent-reviews/{torrent_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 分页获取当前审核任务的不可变文件清单 */
+        get: operations["listMyTorrentReviewFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/torrent-reviews/{torrent_id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取当前审核任务的封面 */
+        get: operations["getMyTorrentReviewCover"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/torrent-reviews/{torrent_id}/screenshots/{position}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 按位置获取当前审核任务的截图 */
+        get: operations["getMyTorrentReviewScreenshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/torrent-reviews/{torrent_id}/votes": {
         parameters: {
             query?: never;
@@ -5607,6 +5692,43 @@ export interface components {
         };
         PendingTorrentReviewPage: {
             items: components["schemas"]["PendingTorrentReview"][];
+            /** Format: int64 */
+            total: number;
+        };
+        MyTorrentReviewDetail: components["schemas"]["MyTorrentReviewAssignment"] & {
+            /** @description 审核页仍显示已脱敏的上传者名称；此字段只说明发布后是否匿名。 */
+            anonymous: boolean;
+            facets: components["schemas"]["TorrentPublicFacet"][];
+            external_identifiers: components["schemas"]["TorrentExternalIdentifier"][];
+            /** Format: int64 */
+            payload_size_bytes: number;
+            padding_file_count: number;
+            screenshot_count: number;
+            /** Format: int64 */
+            piece_length_bytes: number;
+            piece_count: number;
+            description: string;
+            /** @enum {string} */
+            description_format: "markdown" | "plain_text";
+            media_info: string;
+        };
+        ReviewedTorrentReview: components["schemas"]["PendingTorrentReview"] & {
+            /** Format: uuid */
+            vote_id: string;
+            /** Format: uuid */
+            round_id: string;
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            reason_code: components["schemas"]["TorrentReviewReasonCode"];
+            reason: string;
+            /** Format: date-time */
+            voted_at: string;
+            approve_count: number;
+            reject_count: number;
+            outcome: components["schemas"]["TorrentReviewRoundOutcome"];
+        };
+        ReviewedTorrentReviewPage: {
+            items: components["schemas"]["ReviewedTorrentReview"][];
             /** Format: int64 */
             total: number;
         };
@@ -15175,6 +15297,161 @@ export interface operations {
             400: components["responses"]["ProblemResponse"];
             401: components["responses"]["ProblemResponse"];
             403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listMyReviewedTorrentReviews: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 只返回本人的审核票；因为判断已经提交，所以可显示当前赞成/反对分布和本轮结果。 */
+            200: {
+                headers: {
+                    "Cache-Control": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewedTorrentReviewPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMyTorrentReviewAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 种子的唯一正整数 ID；迁移数据保留旧站 ID，新数据从当前最大值继续递增。 */
+                torrent_id: components["parameters"]["TorrentIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 仅向具备有效种审组资格且尚未在本轮投票的成员返回；包含发布资料、 MediaInfo、截图数量和不可变 metainfo 摘要，但不包含其他审核员的票型。 */
+            200: {
+                headers: {
+                    "Cache-Control": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyTorrentReviewDetail"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listMyTorrentReviewFiles: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description 种子的唯一正整数 ID；迁移数据保留旧站 ID，新数据从当前最大值继续递增。 */
+                torrent_id: components["parameters"]["TorrentIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前待审提交按 metainfo 原始序号排序的文件清单。 */
+            200: {
+                headers: {
+                    "Cache-Control": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TorrentFilePage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMyTorrentReviewCover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 种子的唯一正整数 ID；迁移数据保留旧站 ID，新数据从当前最大值继续递增。 */
+                torrent_id: components["parameters"]["TorrentIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 经不可变长度与 SHA-256 证据校验的待审封面。 */
+            200: {
+                headers: {
+                    "Cache-Control": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                    "image/gif": string;
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMyTorrentReviewScreenshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 种子的唯一正整数 ID；迁移数据保留旧站 ID，新数据从当前最大值继续递增。 */
+                torrent_id: components["parameters"]["TorrentIDPathParameter"];
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 经不可变长度与 SHA-256 证据校验的待审截图。 */
+            200: {
+                headers: {
+                    "Cache-Control": string;
+                    ETag: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                    "image/gif": string;
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };

@@ -1231,6 +1231,26 @@ func (unavailableTorrentReviewService) ListAssignments(context.Context, string, 
 	return review.ReviewAssignmentPage{}, authz.ErrForbidden
 }
 
+func (unavailableTorrentReviewService) GetAssignment(context.Context, string, torrents.TorrentID) (review.ReviewDetail, error) {
+	return review.ReviewDetail{}, authz.ErrForbidden
+}
+
+func (unavailableTorrentReviewService) ListReviewed(context.Context, string, int) (review.ReviewedTorrentPage, error) {
+	return review.ReviewedTorrentPage{}, authz.ErrForbidden
+}
+
+func (unavailableTorrentReviewService) AssignmentFiles(context.Context, string, torrents.TorrentID, int, int) (torrents.PublicFilePage, error) {
+	return torrents.PublicFilePage{}, authz.ErrForbidden
+}
+
+func (unavailableTorrentReviewService) AssignmentCover(context.Context, string, torrents.TorrentID) (torrents.PublicCover, error) {
+	return torrents.PublicCover{}, authz.ErrForbidden
+}
+
+func (unavailableTorrentReviewService) AssignmentScreenshot(context.Context, string, torrents.TorrentID, int) (torrents.PublicScreenshot, error) {
+	return torrents.PublicScreenshot{}, authz.ErrForbidden
+}
+
 func (unavailableTorrentReviewService) Vote(context.Context, string, string, review.VoteInput) (review.VoteResult, error) {
 	return review.VoteResult{}, authz.ErrForbidden
 }
@@ -1255,6 +1275,26 @@ type recordingTorrentReviewService struct {
 
 func (service *recordingTorrentReviewService) ListAssignments(context.Context, string, int) (review.ReviewAssignmentPage, error) {
 	return review.ReviewAssignmentPage{}, service.err
+}
+
+func (service *recordingTorrentReviewService) GetAssignment(context.Context, string, torrents.TorrentID) (review.ReviewDetail, error) {
+	return review.ReviewDetail{}, service.err
+}
+
+func (service *recordingTorrentReviewService) ListReviewed(context.Context, string, int) (review.ReviewedTorrentPage, error) {
+	return review.ReviewedTorrentPage{}, service.err
+}
+
+func (service *recordingTorrentReviewService) AssignmentFiles(context.Context, string, torrents.TorrentID, int, int) (torrents.PublicFilePage, error) {
+	return torrents.PublicFilePage{}, service.err
+}
+
+func (service *recordingTorrentReviewService) AssignmentCover(context.Context, string, torrents.TorrentID) (torrents.PublicCover, error) {
+	return torrents.PublicCover{}, service.err
+}
+
+func (service *recordingTorrentReviewService) AssignmentScreenshot(context.Context, string, torrents.TorrentID, int) (torrents.PublicScreenshot, error) {
+	return torrents.PublicScreenshot{}, service.err
 }
 
 func (service *recordingTorrentReviewService) Vote(context.Context, string, string, review.VoteInput) (review.VoteResult, error) {

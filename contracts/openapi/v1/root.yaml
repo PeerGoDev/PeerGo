@@ -330,6 +330,16 @@ paths:
     $ref: "./domains/torrents.yaml#/TorrentReviewsPath"
   /api/v1/me/torrent-reviews:
     $ref: "./domains/torrents.yaml#/MyTorrentReviewsPath"
+  /api/v1/me/torrent-reviews/history:
+    $ref: "./domains/torrents.yaml#/MyTorrentReviewHistoryPath"
+  /api/v1/me/torrent-reviews/{torrent_id}:
+    $ref: "./domains/torrents.yaml#/MyTorrentReviewDetailPath"
+  /api/v1/me/torrent-reviews/{torrent_id}/files:
+    $ref: "./domains/torrents.yaml#/MyTorrentReviewFilesPath"
+  /api/v1/me/torrent-reviews/{torrent_id}/cover:
+    $ref: "./domains/torrents.yaml#/MyTorrentReviewCoverPath"
+  /api/v1/me/torrent-reviews/{torrent_id}/screenshots/{position}:
+    $ref: "./domains/torrents.yaml#/MyTorrentReviewScreenshotPath"
   /api/v1/me/torrent-reviews/{torrent_id}/votes:
     $ref: "./domains/torrents.yaml#/MyTorrentReviewVotesPath"
   /api/v1/admin/torrents:
@@ -816,6 +826,12 @@ components:
       $ref: "./schemas/torrents.yaml#/PendingTorrentReview"
     PendingTorrentReviewPage:
       $ref: "./schemas/torrents.yaml#/PendingTorrentReviewPage"
+    MyTorrentReviewDetail:
+      $ref: "./schemas/torrents.yaml#/MyTorrentReviewDetail"
+    ReviewedTorrentReview:
+      $ref: "./schemas/torrents.yaml#/ReviewedTorrentReview"
+    ReviewedTorrentReviewPage:
+      $ref: "./schemas/torrents.yaml#/ReviewedTorrentReviewPage"
     TorrentReviewDecisionRequest:
       $ref: "./schemas/torrents.yaml#/TorrentReviewDecisionRequest"
     TorrentReviewDecisionResult:

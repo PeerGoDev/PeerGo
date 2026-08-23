@@ -12,6 +12,222 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getPendingReviewCoverObject = `-- name: GetPendingReviewCoverObject :one
+SELECT
+    torrent.id AS torrent_id,
+    object.id AS object_id,
+    object.content_sha256,
+    object.byte_length,
+    object.content_type,
+    object.width,
+    object.height
+FROM torrents.torrents AS torrent
+JOIN torrents.torrent_screenshot_set_heads AS head
+  ON head.torrent_id = torrent.id
+JOIN torrents.torrent_screenshot_set_items AS screenshot
+  ON screenshot.set_id = head.active_set_id
+ AND screenshot.position = 0
+JOIN torrents.torrent_screenshot_objects AS object
+  ON object.id = screenshot.object_id
+WHERE torrent.id = $1::bigint
+  AND torrent.state = 'pending_review'
+`
+
+type GetPendingReviewCoverObjectRow struct {
+	TorrentID     int64
+	ObjectID      uuid.UUID
+	ContentSha256 []byte
+	ByteLength    int64
+	ContentType   string
+	Width         int32
+	Height        int32
+}
+
+func (q *Queries) GetPendingReviewCoverObject(ctx context.Context, torrentID int64) (GetPendingReviewCoverObjectRow, error) {
+	row := q.db.QueryRow(ctx, getPendingReviewCoverObject, torrentID)
+	var i GetPendingReviewCoverObjectRow
+	err := row.Scan(
+		&i.TorrentID,
+		&i.ObjectID,
+		&i.ContentSha256,
+		&i.ByteLength,
+		&i.ContentType,
+		&i.Width,
+		&i.Height,
+	)
+	return i, err
+}
+
+const getPendingReviewEvidence = `-- name: GetPendingReviewEvidence :one
+SELECT
+    torrent.id,
+    torrent.category_id,
+    category.name AS category_name,
+    torrent.title,
+    torrent.subtitle,
+    torrent.content_name,
+    uploader.display_name AS uploader_display_name,
+    torrent.anonymous,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
+    torrent.payload_size_bytes,
+    torrent.file_count,
+    torrent.padding_file_count,
+    coalesce((
+        SELECT count(*)
+        FROM torrents.torrent_screenshot_set_heads AS head
+        JOIN torrents.torrent_screenshot_set_items AS screenshot
+          ON screenshot.set_id = head.active_set_id
+        WHERE head.torrent_id = torrent.id
+    ), 0)::integer AS screenshot_count,
+    torrent.piece_length_bytes,
+    torrent.piece_count,
+    torrent.state,
+    torrent.version,
+    torrent.submitted_at,
+    torrent.state_changed_at AS review_requested_at,
+    torrent.description,
+    torrent.description_format,
+    torrent.media_info
+FROM torrents.torrents AS torrent
+JOIN catalog.categories AS category ON category.id = torrent.category_id
+JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
+WHERE torrent.id = $1::bigint
+  AND torrent.state = 'pending_review'
+`
+
+type GetPendingReviewEvidenceRow struct {
+	ID                  int64
+	CategoryID          string
+	CategoryName        string
+	Title               string
+	Subtitle            string
+	ContentName         string
+	UploaderDisplayName string
+	Anonymous           bool
+	InfoHashV1          []byte
+	TotalSizeBytes      int64
+	PayloadSizeBytes    int64
+	FileCount           int32
+	PaddingFileCount    int32
+	ScreenshotCount     int32
+	PieceLengthBytes    int64
+	PieceCount          int32
+	State               string
+	Version             int64
+	SubmittedAt         pgtype.Timestamptz
+	ReviewRequestedAt   pgtype.Timestamptz
+	Description         string
+	DescriptionFormat   string
+	MediaInfo           string
+}
+
+func (q *Queries) GetPendingReviewEvidence(ctx context.Context, torrentID int64) (GetPendingReviewEvidenceRow, error) {
+	row := q.db.QueryRow(ctx, getPendingReviewEvidence, torrentID)
+	var i GetPendingReviewEvidenceRow
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryID,
+		&i.CategoryName,
+		&i.Title,
+		&i.Subtitle,
+		&i.ContentName,
+		&i.UploaderDisplayName,
+		&i.Anonymous,
+		&i.InfoHashV1,
+		&i.TotalSizeBytes,
+		&i.PayloadSizeBytes,
+		&i.FileCount,
+		&i.PaddingFileCount,
+		&i.ScreenshotCount,
+		&i.PieceLengthBytes,
+		&i.PieceCount,
+		&i.State,
+		&i.Version,
+		&i.SubmittedAt,
+		&i.ReviewRequestedAt,
+		&i.Description,
+		&i.DescriptionFormat,
+		&i.MediaInfo,
+	)
+	return i, err
+}
+
+const getPendingReviewFileTarget = `-- name: GetPendingReviewFileTarget :one
+SELECT
+    torrent.id,
+    torrent.file_count
+FROM torrents.torrents AS torrent
+WHERE torrent.id = $1::bigint
+  AND torrent.state = 'pending_review'
+`
+
+type GetPendingReviewFileTargetRow struct {
+	ID        int64
+	FileCount int32
+}
+
+func (q *Queries) GetPendingReviewFileTarget(ctx context.Context, torrentID int64) (GetPendingReviewFileTargetRow, error) {
+	row := q.db.QueryRow(ctx, getPendingReviewFileTarget, torrentID)
+	var i GetPendingReviewFileTargetRow
+	err := row.Scan(&i.ID, &i.FileCount)
+	return i, err
+}
+
+const getPendingReviewScreenshotObject = `-- name: GetPendingReviewScreenshotObject :one
+SELECT
+    torrent.id AS torrent_id,
+    screenshot.position,
+    object.id AS object_id,
+    object.content_sha256,
+    object.byte_length,
+    object.content_type,
+    object.width,
+    object.height
+FROM torrents.torrents AS torrent
+JOIN torrents.torrent_screenshot_set_heads AS head
+  ON head.torrent_id = torrent.id
+JOIN torrents.torrent_screenshot_set_items AS screenshot
+  ON screenshot.set_id = head.active_set_id
+ AND screenshot.position = $1::smallint
+JOIN torrents.torrent_screenshot_objects AS object
+  ON object.id = screenshot.object_id
+WHERE torrent.id = $2::bigint
+  AND torrent.state = 'pending_review'
+`
+
+type GetPendingReviewScreenshotObjectParams struct {
+	ScreenshotPosition int16
+	TorrentID          int64
+}
+
+type GetPendingReviewScreenshotObjectRow struct {
+	TorrentID     int64
+	Position      int16
+	ObjectID      uuid.UUID
+	ContentSha256 []byte
+	ByteLength    int64
+	ContentType   string
+	Width         int32
+	Height        int32
+}
+
+func (q *Queries) GetPendingReviewScreenshotObject(ctx context.Context, arg GetPendingReviewScreenshotObjectParams) (GetPendingReviewScreenshotObjectRow, error) {
+	row := q.db.QueryRow(ctx, getPendingReviewScreenshotObject, arg.ScreenshotPosition, arg.TorrentID)
+	var i GetPendingReviewScreenshotObjectRow
+	err := row.Scan(
+		&i.TorrentID,
+		&i.Position,
+		&i.ObjectID,
+		&i.ContentSha256,
+		&i.ByteLength,
+		&i.ContentType,
+		&i.Width,
+		&i.Height,
+	)
+	return i, err
+}
+
 const getPublishedTorrentContent = `-- name: GetPublishedTorrentContent :one
 SELECT
     torrent.id AS torrent_id,

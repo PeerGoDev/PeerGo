@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -99,6 +100,71 @@ func (repository *PostgresRepository) ListAssignments(ctx context.Context, revie
 		page.Items = append(page.Items, ReviewAssignment{
 			PendingTorrent: pending, VotesCast: int(row.VotesCast),
 			RequiredVotes: int(row.RequiredVotes), MaximumVotes: int(row.MaximumVotes),
+		})
+		page.Total = row.TotalCount
+	}
+	return page, nil
+}
+
+func (repository *PostgresRepository) GetAssignment(ctx context.Context, reviewerID uuid.UUID, torrentID torrents.TorrentID) (ReviewAssignment, error) {
+	if reviewerID == uuid.Nil || torrentID < 1 {
+		return ReviewAssignment{}, ErrTorrentReviewInput
+	}
+	row, err := repository.queries.GetTorrentReviewAssignment(ctx, reviewdb.GetTorrentReviewAssignmentParams{
+		TorrentID: int64(torrentID), ReviewerID: reviewerID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ReviewAssignment{}, ErrTorrentReviewNotFound
+	}
+	if err != nil {
+		return ReviewAssignment{}, fmt.Errorf("query torrent review assignment: %w", err)
+	}
+	pending, err := pendingTorrentFromValues(
+		row.ID, row.UploaderID, row.UploaderDisplayName, row.CategoryID, row.CategoryName,
+		row.Title, row.Subtitle, row.ContentName, row.InfoHashV1, row.TotalSizeBytes,
+		row.FileCount, row.Version, row.SubmittedAt, row.ReviewRequestedAt,
+	)
+	if err != nil || row.VotesCast < 0 || row.RequiredVotes != RequiredReviewVotes || row.MaximumVotes != MaximumReviewVotes {
+		return ReviewAssignment{}, errors.New("torrent review assignment projection is invalid")
+	}
+	return ReviewAssignment{
+		PendingTorrent: pending, VotesCast: int(row.VotesCast),
+		RequiredVotes: int(row.RequiredVotes), MaximumVotes: int(row.MaximumVotes),
+	}, nil
+}
+
+func (repository *PostgresRepository) ListReviewed(ctx context.Context, reviewerID uuid.UUID, limit int32) (ReviewedTorrentPage, error) {
+	if reviewerID == uuid.Nil || limit < 1 || limit > maxPendingReviewLimit {
+		return ReviewedTorrentPage{}, ErrTorrentReviewInput
+	}
+	rows, err := repository.queries.ListReviewedTorrentReviews(ctx, reviewdb.ListReviewedTorrentReviewsParams{
+		ReviewerID: reviewerID, ResultLimit: limit,
+	})
+	if err != nil {
+		return ReviewedTorrentPage{}, fmt.Errorf("query reviewed torrents: %w", err)
+	}
+	page := ReviewedTorrentPage{Items: make([]ReviewedTorrent, 0, len(rows))}
+	for _, row := range rows {
+		pending, conversionErr := pendingTorrentFromValues(
+			row.ID, row.UploaderID, row.UploaderDisplayName, row.CategoryID, row.CategoryName,
+			row.Title, row.Subtitle, row.ContentName, row.InfoHashV1, row.TotalSizeBytes,
+			row.FileCount, row.Version, row.SubmittedAt, row.ReviewRequestedAt,
+		)
+		decision, reasonCode, outcome := Decision(row.Decision), ReasonCode(row.ReasonCode), RoundOutcome(row.Outcome)
+		if conversionErr != nil || row.VoteID == uuid.Nil || row.RoundID == uuid.Nil ||
+			!row.VotedAt.Valid || strings.TrimSpace(row.Reason) == "" ||
+			(row.ApproveCount < 0 || row.RejectCount < 0 || int(row.ApproveCount+row.RejectCount) > MaximumReviewVotes) ||
+			(decision != DecisionApprove && decision != DecisionReject) ||
+			(outcome != RoundWaiting && outcome != RoundPublished && outcome != RoundRejected && outcome != RoundEscalated) ||
+			(decision == DecisionApprove && reasonCode != ReasonMeetsRequirements) ||
+			(decision == DecisionReject && !validRejectionReasonCode(reasonCode)) {
+			return ReviewedTorrentPage{}, errors.New("reviewed torrent projection is invalid")
+		}
+		page.Items = append(page.Items, ReviewedTorrent{
+			PendingTorrent: pending, VoteID: row.VoteID, RoundID: row.RoundID,
+			Decision: decision, ReasonCode: reasonCode, Reason: row.Reason,
+			VotedAt: row.VotedAt.Time.UTC(), ApproveCount: int(row.ApproveCount),
+			RejectCount: int(row.RejectCount), Outcome: outcome,
 		})
 		page.Total = row.TotalCount
 	}

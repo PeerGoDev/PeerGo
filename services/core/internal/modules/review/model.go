@@ -102,6 +102,35 @@ type ReviewAssignmentPage struct {
 	Total int64
 }
 
+// ReviewedTorrent is the reviewer's own immutable voting history. Unlike the
+// pending assignment projection, vote distribution is safe to disclose here:
+// the caller has already committed an independent vote for this round.
+type ReviewedTorrent struct {
+	PendingTorrent
+	VoteID       uuid.UUID
+	RoundID      uuid.UUID
+	Decision     Decision
+	ReasonCode   ReasonCode
+	Reason       string
+	VotedAt      time.Time
+	ApproveCount int
+	RejectCount  int
+	Outcome      RoundOutcome
+}
+
+type ReviewedTorrentPage struct {
+	Items []ReviewedTorrent
+	Total int64
+}
+
+// ReviewDetail combines the queue assignment with the immutable upload
+// evidence required for a real review decision. Storage coordinates and
+// uploader credentials never cross this boundary.
+type ReviewDetail struct {
+	ReviewAssignment
+	Evidence torrents.PendingReviewEvidence
+}
+
 type DecideInput struct {
 	DecisionID      uuid.UUID
 	TorrentID       torrents.TorrentID

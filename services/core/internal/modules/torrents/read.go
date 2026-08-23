@@ -21,15 +21,16 @@ const (
 )
 
 var (
-	ErrTorrentReadInput             = errors.New("torrent read input is invalid")
-	ErrTorrentReadNotFound          = errors.New("published torrent was not found")
-	ErrTorrentReadInvariant         = errors.New("torrent read projection violates persisted invariants")
-	ErrTorrentCoverNotFound         = errors.New("published torrent cover was not found")
-	ErrTorrentCoverUnavailable      = errors.New("published torrent cover storage is unavailable")
-	ErrTorrentCoverConflict         = errors.New("published torrent cover failed immutable verification")
-	ErrTorrentScreenshotNotFound    = errors.New("published torrent screenshot was not found")
-	ErrTorrentScreenshotUnavailable = errors.New("published torrent screenshot storage is unavailable")
-	ErrTorrentScreenshotConflict    = errors.New("published torrent screenshot failed immutable verification")
+	ErrTorrentReadInput                 = errors.New("torrent read input is invalid")
+	ErrTorrentReadNotFound              = errors.New("published torrent was not found")
+	ErrTorrentReadInvariant             = errors.New("torrent read projection violates persisted invariants")
+	ErrTorrentCoverNotFound             = errors.New("published torrent cover was not found")
+	ErrTorrentCoverUnavailable          = errors.New("published torrent cover storage is unavailable")
+	ErrTorrentCoverConflict             = errors.New("published torrent cover failed immutable verification")
+	ErrTorrentScreenshotNotFound        = errors.New("published torrent screenshot was not found")
+	ErrTorrentScreenshotUnavailable     = errors.New("published torrent screenshot storage is unavailable")
+	ErrTorrentScreenshotConflict        = errors.New("published torrent screenshot failed immutable verification")
+	ErrTorrentReviewEvidenceUnavailable = errors.New("pending torrent review evidence is unavailable")
 )
 
 // PublicDetail contains stable aggregate metadata. Comments and live swarm
@@ -74,6 +75,43 @@ type PublicContent struct {
 	Description       string
 	DescriptionFormat string
 	MediaInfo         string
+}
+
+// PendingReviewEvidence is a private, reviewer-only view of the immutable
+// upload. It intentionally has no promotion, swarm or download fields because
+// a pending torrent is not public and is not yet eligible for Tracker traffic.
+type PendingReviewEvidence struct {
+	ID                  TorrentID
+	Category            catalog.Category
+	Title               string
+	Subtitle            string
+	ContentName         string
+	UploaderDisplayName string
+	Anonymous           bool
+	Facets              []PublicFacet
+	ExternalIdentifiers []ExternalIdentifier
+	InfoHashV1          InfoHashV1
+	TotalSizeBytes      int64
+	PayloadSizeBytes    int64
+	FileCount           int
+	PaddingFileCount    int
+	ScreenshotCount     int
+	PieceLengthBytes    int64
+	PieceCount          int
+	State               State
+	Version             int64
+	SubmittedAt         time.Time
+	ReviewRequestedAt   time.Time
+	Description         string
+	DescriptionFormat   string
+	MediaInfo           string
+}
+
+type PendingReviewEvidenceRepository interface {
+	PendingReviewEvidence(context.Context, TorrentID) (PendingReviewEvidence, error)
+	PendingReviewCoverSource(context.Context, TorrentID) (PublicCoverSource, error)
+	PendingReviewScreenshotSource(context.Context, TorrentID, int) (PublicScreenshotSource, error)
+	PendingReviewFiles(context.Context, TorrentID, int, int) (PublicFilePage, error)
 }
 
 type PublicCoverSource struct {
@@ -309,6 +347,10 @@ func (service *TorrentReadService) Cover(ctx context.Context, torrentID TorrentI
 	if err != nil {
 		return PublicCover{}, err
 	}
+	return service.readCoverSource(ctx, source)
+}
+
+func (service *TorrentReadService) readCoverSource(ctx context.Context, source PublicCoverSource) (PublicCover, error) {
 	if service.derivatives != nil {
 		derivative, derivativeErr := service.derivatives.ReadyForTorrentScreenshot(ctx, source.ObjectID, imaging.VariantThumbnail)
 		if derivativeErr == nil {
@@ -352,6 +394,10 @@ func (service *TorrentReadService) Screenshot(ctx context.Context, torrentID Tor
 	if err != nil {
 		return PublicScreenshot{}, err
 	}
+	return service.readScreenshotSource(ctx, source)
+}
+
+func (service *TorrentReadService) readScreenshotSource(ctx context.Context, source PublicScreenshotSource) (PublicScreenshot, error) {
 	if service.derivatives != nil {
 		derivative, derivativeErr := service.derivatives.ReadyForTorrentScreenshot(ctx, source.ObjectID, imaging.VariantDisplay)
 		if derivativeErr == nil {
@@ -381,6 +427,58 @@ func (service *TorrentReadService) Screenshot(ctx context.Context, torrentID Tor
 		ContentType: source.ContentType,
 		ETag:        `"sha256-` + source.Descriptor.SHA256.Hex() + `"`,
 	}, nil
+}
+
+func (service *TorrentReadService) PendingReviewEvidence(ctx context.Context, torrentID TorrentID) (PendingReviewEvidence, error) {
+	if torrentID < 1 {
+		return PendingReviewEvidence{}, ErrTorrentReadInput
+	}
+	repository, ok := service.repository.(PendingReviewEvidenceRepository)
+	if !ok {
+		return PendingReviewEvidence{}, ErrTorrentReviewEvidenceUnavailable
+	}
+	return repository.PendingReviewEvidence(ctx, torrentID)
+}
+
+func (service *TorrentReadService) PendingReviewFiles(ctx context.Context, torrentID TorrentID, limit, offset int) (PublicFilePage, error) {
+	if torrentID < 1 || limit < 1 || limit > MaxTorrentFileLimit || offset < 0 || offset > 99999 {
+		return PublicFilePage{}, ErrTorrentReadInput
+	}
+	repository, ok := service.repository.(PendingReviewEvidenceRepository)
+	if !ok {
+		return PublicFilePage{}, ErrTorrentReviewEvidenceUnavailable
+	}
+	return repository.PendingReviewFiles(ctx, torrentID, limit, offset)
+}
+
+func (service *TorrentReadService) PendingReviewCover(ctx context.Context, torrentID TorrentID) (PublicCover, error) {
+	if torrentID < 1 {
+		return PublicCover{}, ErrTorrentReadInput
+	}
+	repository, ok := service.repository.(PendingReviewEvidenceRepository)
+	if !ok {
+		return PublicCover{}, ErrTorrentReviewEvidenceUnavailable
+	}
+	source, err := repository.PendingReviewCoverSource(ctx, torrentID)
+	if err != nil {
+		return PublicCover{}, err
+	}
+	return service.readCoverSource(ctx, source)
+}
+
+func (service *TorrentReadService) PendingReviewScreenshot(ctx context.Context, torrentID TorrentID, position int) (PublicScreenshot, error) {
+	if torrentID < 1 || position < 0 || position >= MaxTorrentScreenshots {
+		return PublicScreenshot{}, ErrTorrentReadInput
+	}
+	repository, ok := service.repository.(PendingReviewEvidenceRepository)
+	if !ok {
+		return PublicScreenshot{}, ErrTorrentReviewEvidenceUnavailable
+	}
+	source, err := repository.PendingReviewScreenshotSource(ctx, torrentID, position)
+	if err != nil {
+		return PublicScreenshot{}, err
+	}
+	return service.readScreenshotSource(ctx, source)
 }
 
 func (service *TorrentReadService) Detail(ctx context.Context, torrentID TorrentID) (PublicDetail, error) {

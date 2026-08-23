@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -14,9 +15,144 @@ import (
 
 type TorrentReviewService interface {
 	ListAssignments(context.Context, string, int) (review.ReviewAssignmentPage, error)
+	GetAssignment(context.Context, string, torrents.TorrentID) (review.ReviewDetail, error)
+	ListReviewed(context.Context, string, int) (review.ReviewedTorrentPage, error)
+	AssignmentFiles(context.Context, string, torrents.TorrentID, int, int) (torrents.PublicFilePage, error)
+	AssignmentCover(context.Context, string, torrents.TorrentID) (torrents.PublicCover, error)
+	AssignmentScreenshot(context.Context, string, torrents.TorrentID, int) (torrents.PublicScreenshot, error)
 	Vote(context.Context, string, string, review.VoteInput) (review.VoteResult, error)
 	ListPending(context.Context, authz.StaffActor, int) (review.PendingTorrentPage, error)
 	Decide(context.Context, authz.StaffActor, review.DecideInput) (review.DecisionResult, error)
+}
+
+func (h *Handler) GetMyTorrentReviewAssignment(ctx context.Context, request generated.GetMyTorrentReviewAssignmentRequestObject) (generated.GetMyTorrentReviewAssignmentResponseObject, error) {
+	detail, err := h.torrentReview.GetAssignment(ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId))
+	if problem, status, handled := torrentReviewerReadProblem(ctx, err); handled {
+		switch status {
+		case http.StatusBadRequest:
+			return generated.GetMyTorrentReviewAssignment400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, nil
+		case http.StatusUnauthorized:
+			return generated.GetMyTorrentReviewAssignment401ApplicationProblemPlusJSONResponse(problem), nil
+		case http.StatusForbidden:
+			return generated.GetMyTorrentReviewAssignment403ApplicationProblemPlusJSONResponse(problem), nil
+		default:
+			return generated.GetMyTorrentReviewAssignment404ApplicationProblemPlusJSONResponse(problem), nil
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return generated.GetMyTorrentReviewAssignment200JSONResponse{
+		Body:    torrentReviewDetailDTO(detail),
+		Headers: generated.GetMyTorrentReviewAssignment200ResponseHeaders{CacheControl: "private, no-store"},
+	}, nil
+}
+
+func (h *Handler) ListMyReviewedTorrentReviews(ctx context.Context, request generated.ListMyReviewedTorrentReviewsRequestObject) (generated.ListMyReviewedTorrentReviewsResponseObject, error) {
+	limit := 20
+	if request.Params.Limit != nil {
+		limit = *request.Params.Limit
+	}
+	page, err := h.torrentReview.ListReviewed(ctx, sessionTokenFromContext(ctx), limit)
+	if problem, status, handled := torrentReviewerReadProblem(ctx, err); handled {
+		switch status {
+		case http.StatusBadRequest:
+			return generated.ListMyReviewedTorrentReviews400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, nil
+		case http.StatusUnauthorized:
+			return generated.ListMyReviewedTorrentReviews401ApplicationProblemPlusJSONResponse(problem), nil
+		default:
+			return generated.ListMyReviewedTorrentReviews403ApplicationProblemPlusJSONResponse(problem), nil
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	items := make([]generated.ReviewedTorrentReview, 0, len(page.Items))
+	for _, item := range page.Items {
+		items = append(items, reviewedTorrentReviewDTO(item))
+	}
+	return generated.ListMyReviewedTorrentReviews200JSONResponse{
+		Body:    generated.ReviewedTorrentReviewPage{Items: items, Total: page.Total},
+		Headers: generated.ListMyReviewedTorrentReviews200ResponseHeaders{CacheControl: "private, no-store"},
+	}, nil
+}
+
+func (h *Handler) ListMyTorrentReviewFiles(ctx context.Context, request generated.ListMyTorrentReviewFilesRequestObject) (generated.ListMyTorrentReviewFilesResponseObject, error) {
+	limit, offset := torrents.DefaultTorrentFileLimit, 0
+	if request.Params.Limit != nil {
+		limit = *request.Params.Limit
+	}
+	if request.Params.Offset != nil {
+		offset = *request.Params.Offset
+	}
+	page, err := h.torrentReview.AssignmentFiles(ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId), limit, offset)
+	if problem, status, handled := torrentReviewerReadProblem(ctx, err); handled {
+		switch status {
+		case http.StatusBadRequest:
+			return generated.ListMyTorrentReviewFiles400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, nil
+		case http.StatusUnauthorized:
+			return generated.ListMyTorrentReviewFiles401ApplicationProblemPlusJSONResponse(problem), nil
+		case http.StatusForbidden:
+			return generated.ListMyTorrentReviewFiles403ApplicationProblemPlusJSONResponse(problem), nil
+		default:
+			return generated.ListMyTorrentReviewFiles404ApplicationProblemPlusJSONResponse(problem), nil
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return generated.ListMyTorrentReviewFiles200JSONResponse{
+		Body:    torrentFilePageDTO(page),
+		Headers: generated.ListMyTorrentReviewFiles200ResponseHeaders{CacheControl: "private, no-store"},
+	}, nil
+}
+
+func (h *Handler) GetMyTorrentReviewCover(ctx context.Context, request generated.GetMyTorrentReviewCoverRequestObject) (generated.GetMyTorrentReviewCoverResponseObject, error) {
+	cover, err := h.torrentReview.AssignmentCover(ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId))
+	if response, handled := myTorrentReviewCoverError(ctx, err); handled {
+		return response, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	headers := generated.GetMyTorrentReviewCover200ResponseHeaders{CacheControl: "private, no-store", ETag: cover.ETag}
+	reader := bytes.NewReader(cover.Data)
+	switch cover.ContentType {
+	case "image/gif":
+		return generated.GetMyTorrentReviewCover200ImagegifResponse{Body: reader, Headers: headers, ContentLength: int64(len(cover.Data))}, nil
+	case "image/jpeg":
+		return generated.GetMyTorrentReviewCover200ImagejpegResponse{Body: reader, Headers: headers, ContentLength: int64(len(cover.Data))}, nil
+	case "image/png":
+		return generated.GetMyTorrentReviewCover200ImagepngResponse{Body: reader, Headers: headers, ContentLength: int64(len(cover.Data))}, nil
+	case "image/webp":
+		return generated.GetMyTorrentReviewCover200ImagewebpResponse{Body: reader, Headers: headers, ContentLength: int64(len(cover.Data))}, nil
+	default:
+		return nil, torrents.ErrTorrentCoverConflict
+	}
+}
+
+func (h *Handler) GetMyTorrentReviewScreenshot(ctx context.Context, request generated.GetMyTorrentReviewScreenshotRequestObject) (generated.GetMyTorrentReviewScreenshotResponseObject, error) {
+	screenshot, err := h.torrentReview.AssignmentScreenshot(ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId), request.Position)
+	if response, handled := myTorrentReviewScreenshotError(ctx, err); handled {
+		return response, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	headers := generated.GetMyTorrentReviewScreenshot200ResponseHeaders{CacheControl: "private, no-store", ETag: screenshot.ETag}
+	reader := bytes.NewReader(screenshot.Data)
+	switch screenshot.ContentType {
+	case "image/gif":
+		return generated.GetMyTorrentReviewScreenshot200ImagegifResponse{Body: reader, Headers: headers, ContentLength: int64(len(screenshot.Data))}, nil
+	case "image/jpeg":
+		return generated.GetMyTorrentReviewScreenshot200ImagejpegResponse{Body: reader, Headers: headers, ContentLength: int64(len(screenshot.Data))}, nil
+	case "image/png":
+		return generated.GetMyTorrentReviewScreenshot200ImagepngResponse{Body: reader, Headers: headers, ContentLength: int64(len(screenshot.Data))}, nil
+	case "image/webp":
+		return generated.GetMyTorrentReviewScreenshot200ImagewebpResponse{Body: reader, Headers: headers, ContentLength: int64(len(screenshot.Data))}, nil
+	default:
+		return nil, torrents.ErrTorrentScreenshotConflict
+	}
 }
 
 func (h *Handler) ListMyTorrentReviewAssignments(ctx context.Context, request generated.ListMyTorrentReviewAssignmentsRequestObject) (generated.ListMyTorrentReviewAssignmentsResponseObject, error) {
@@ -233,6 +369,119 @@ func myTorrentReviewAssignmentDTO(item review.ReviewAssignment) generated.MyTorr
 		RequiredVotes: generated.MyTorrentReviewAssignmentRequiredVotes(item.RequiredVotes),
 		MaximumVotes:  generated.MyTorrentReviewAssignmentMaximumVotes(item.MaximumVotes),
 	}
+}
+
+func torrentReviewDetailDTO(detail review.ReviewDetail) generated.MyTorrentReviewDetail {
+	assignment := detail.ReviewAssignment
+	evidence := detail.Evidence
+	facets := make([]generated.TorrentPublicFacet, 0, len(evidence.Facets))
+	for _, facet := range evidence.Facets {
+		facets = append(facets, generated.TorrentPublicFacet{
+			FacetId: facet.FacetID, FacetName: facet.FacetName,
+			OptionKey: facet.OptionKey, OptionLabel: facet.OptionLabel,
+		})
+	}
+	identifiers := make([]generated.TorrentExternalIdentifier, 0, len(evidence.ExternalIdentifiers))
+	for _, identifier := range evidence.ExternalIdentifiers {
+		identifiers = append(identifiers, generated.TorrentExternalIdentifier{
+			Provider: generated.TorrentExternalIdentifierProvider(identifier.Provider), ExternalId: identifier.ExternalID,
+		})
+	}
+	return generated.MyTorrentReviewDetail{
+		Id: int64(assignment.ID), UploaderId: assignment.UploaderID,
+		UploaderDisplayName: assignment.UploaderDisplayName,
+		CategoryId:          assignment.CategoryID, CategoryName: assignment.CategoryName,
+		Title: assignment.Title, Subtitle: assignment.Subtitle, ContentName: assignment.ContentName,
+		InfoHashV1: assignment.InfoHashV1.Hex(), TotalSizeBytes: assignment.TotalSizeBytes,
+		FileCount: assignment.FileCount, Version: assignment.Version,
+		SubmittedAt: assignment.SubmittedAt, ReviewRequestedAt: assignment.ReviewRequestedAt,
+		VotesCast:     assignment.VotesCast,
+		RequiredVotes: generated.MyTorrentReviewDetailRequiredVotes(assignment.RequiredVotes),
+		MaximumVotes:  generated.MyTorrentReviewDetailMaximumVotes(assignment.MaximumVotes),
+		Anonymous:     evidence.Anonymous, Facets: facets, ExternalIdentifiers: identifiers,
+		PayloadSizeBytes: evidence.PayloadSizeBytes, PaddingFileCount: evidence.PaddingFileCount,
+		ScreenshotCount: evidence.ScreenshotCount, PieceLengthBytes: evidence.PieceLengthBytes,
+		PieceCount: evidence.PieceCount, Description: evidence.Description,
+		DescriptionFormat: generated.MyTorrentReviewDetailDescriptionFormat(evidence.DescriptionFormat),
+		MediaInfo:         evidence.MediaInfo,
+	}
+}
+
+func reviewedTorrentReviewDTO(item review.ReviewedTorrent) generated.ReviewedTorrentReview {
+	pending := pendingTorrentReviewDTO(item.PendingTorrent)
+	return generated.ReviewedTorrentReview{
+		Id: pending.Id, UploaderId: pending.UploaderId, UploaderDisplayName: pending.UploaderDisplayName,
+		CategoryId: pending.CategoryId, CategoryName: pending.CategoryName,
+		Title: pending.Title, Subtitle: pending.Subtitle, ContentName: pending.ContentName,
+		InfoHashV1: pending.InfoHashV1, TotalSizeBytes: pending.TotalSizeBytes,
+		FileCount: pending.FileCount, Version: pending.Version,
+		SubmittedAt: pending.SubmittedAt, ReviewRequestedAt: pending.ReviewRequestedAt,
+		VoteId: item.VoteID, RoundId: item.RoundID,
+		Decision:   generated.ReviewedTorrentReviewDecision(item.Decision),
+		ReasonCode: generated.TorrentReviewReasonCode(item.ReasonCode), Reason: item.Reason,
+		VotedAt: item.VotedAt, ApproveCount: item.ApproveCount, RejectCount: item.RejectCount,
+		Outcome: generated.TorrentReviewRoundOutcome(item.Outcome),
+	}
+}
+
+func torrentReviewerReadProblem(ctx context.Context, err error) (generated.Problem, int, bool) {
+	switch {
+	case err == nil:
+		return generated.Problem{}, 0, false
+	case errors.Is(err, review.ErrTorrentReviewInput), errors.Is(err, torrents.ErrTorrentReadInput):
+		return newProblemFromContext(ctx, http.StatusBadRequest, "invalid_torrent_review_query", "审核请求无效", "请检查种子编号或分页参数。"), http.StatusBadRequest, true
+	case errors.Is(err, identity.ErrSessionNotFound):
+		return newProblemFromContext(ctx, http.StatusUnauthorized, "session_required", "需要登录", "请重新登录后查看种审任务。"), http.StatusUnauthorized, true
+	case errors.Is(err, authz.ErrForbidden):
+		return newProblemFromContext(ctx, http.StatusForbidden, "torrent_review_vote_denied", "无法查看种审任务", "当前账号没有种审投票权限。"), http.StatusForbidden, true
+	case errors.Is(err, review.ErrTorrentReviewMembership):
+		return newProblemFromContext(ctx, http.StatusForbidden, "torrent_review_membership_required", "需要有效种审组资格", "当前种审组成员资格不存在或已经失效。"), http.StatusForbidden, true
+	case errors.Is(err, review.ErrTorrentReviewNotFound), errors.Is(err, torrents.ErrTorrentReadNotFound),
+		errors.Is(err, torrents.ErrTorrentCoverNotFound), errors.Is(err, torrents.ErrTorrentScreenshotNotFound):
+		return newProblemFromContext(ctx, http.StatusNotFound, "torrent_review_not_found", "审核任务不存在", "该种子已不再等待您审核，或本轮已经投过票。"), http.StatusNotFound, true
+	default:
+		return generated.Problem{}, 0, false
+	}
+}
+
+func myTorrentReviewCoverError(ctx context.Context, err error) (generated.GetMyTorrentReviewCoverResponseObject, bool) {
+	if problem, status, handled := torrentReviewerReadProblem(ctx, err); handled {
+		switch status {
+		case http.StatusBadRequest:
+			return generated.GetMyTorrentReviewCover400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, true
+		case http.StatusUnauthorized:
+			return generated.GetMyTorrentReviewCover401ApplicationProblemPlusJSONResponse(problem), true
+		case http.StatusForbidden:
+			return generated.GetMyTorrentReviewCover403ApplicationProblemPlusJSONResponse(problem), true
+		default:
+			return generated.GetMyTorrentReviewCover404ApplicationProblemPlusJSONResponse(problem), true
+		}
+	}
+	if errors.Is(err, torrents.ErrTorrentCoverUnavailable) || errors.Is(err, torrents.ErrTorrentCoverConflict) {
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "torrent_review_cover_unavailable", "审核封面暂时不可用", "对象存储读取或完整性校验暂时失败。")
+		return generated.GetMyTorrentReviewCoverdefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, true
+	}
+	return nil, false
+}
+
+func myTorrentReviewScreenshotError(ctx context.Context, err error) (generated.GetMyTorrentReviewScreenshotResponseObject, bool) {
+	if problem, status, handled := torrentReviewerReadProblem(ctx, err); handled {
+		switch status {
+		case http.StatusBadRequest:
+			return generated.GetMyTorrentReviewScreenshot400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, true
+		case http.StatusUnauthorized:
+			return generated.GetMyTorrentReviewScreenshot401ApplicationProblemPlusJSONResponse(problem), true
+		case http.StatusForbidden:
+			return generated.GetMyTorrentReviewScreenshot403ApplicationProblemPlusJSONResponse(problem), true
+		default:
+			return generated.GetMyTorrentReviewScreenshot404ApplicationProblemPlusJSONResponse(problem), true
+		}
+	}
+	if errors.Is(err, torrents.ErrTorrentScreenshotUnavailable) || errors.Is(err, torrents.ErrTorrentScreenshotConflict) {
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "torrent_review_screenshot_unavailable", "审核截图暂时不可用", "对象存储读取或完整性校验暂时失败。")
+		return generated.GetMyTorrentReviewScreenshotdefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, true
+	}
+	return nil, false
 }
 
 func torrentReviewVoteDTO(result review.VoteResult) generated.TorrentReviewVoteResult {

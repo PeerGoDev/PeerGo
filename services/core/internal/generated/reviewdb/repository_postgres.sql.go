@@ -92,6 +92,93 @@ func (q *Queries) GetPendingTorrentReviewForUpdate(ctx context.Context, torrentI
 	return i, err
 }
 
+const getTorrentReviewAssignment = `-- name: GetTorrentReviewAssignment :one
+SELECT
+    torrent.id,
+    torrent.uploader_id,
+    uploader.display_name AS uploader_display_name,
+    torrent.category_id,
+    category.name AS category_name,
+    torrent.title,
+    torrent.subtitle,
+    torrent.content_name,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
+    torrent.file_count,
+    torrent.version,
+    torrent.submitted_at,
+    torrent.state_changed_at AS review_requested_at,
+    COALESCE(round.approve_count + round.reject_count, 0)::integer AS votes_cast,
+    COALESCE(round.required_votes, 3)::integer AS required_votes,
+    COALESCE(round.maximum_votes, 4)::integer AS maximum_votes
+FROM torrents.torrents AS torrent
+JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
+JOIN catalog.categories AS category ON category.id = torrent.category_id
+LEFT JOIN review.torrent_review_rounds AS round
+  ON round.torrent_id = torrent.id
+ AND round.expected_torrent_version = torrent.version
+WHERE torrent.id = $1::bigint
+  AND torrent.state = 'pending_review'
+  AND torrent.uploader_id <> $2::uuid
+  AND (round.id IS NULL OR round.status = 'open')
+  AND NOT EXISTS (
+      SELECT 1
+      FROM review.torrent_review_votes AS vote
+      WHERE vote.round_id = round.id
+        AND vote.voter_id = $2::uuid
+  )
+`
+
+type GetTorrentReviewAssignmentParams struct {
+	TorrentID  int64
+	ReviewerID uuid.UUID
+}
+
+type GetTorrentReviewAssignmentRow struct {
+	ID                  int64
+	UploaderID          uuid.UUID
+	UploaderDisplayName string
+	CategoryID          string
+	CategoryName        string
+	Title               string
+	Subtitle            string
+	ContentName         string
+	InfoHashV1          []byte
+	TotalSizeBytes      int64
+	FileCount           int32
+	Version             int64
+	SubmittedAt         pgtype.Timestamptz
+	ReviewRequestedAt   pgtype.Timestamptz
+	VotesCast           int32
+	RequiredVotes       int32
+	MaximumVotes        int32
+}
+
+func (q *Queries) GetTorrentReviewAssignment(ctx context.Context, arg GetTorrentReviewAssignmentParams) (GetTorrentReviewAssignmentRow, error) {
+	row := q.db.QueryRow(ctx, getTorrentReviewAssignment, arg.TorrentID, arg.ReviewerID)
+	var i GetTorrentReviewAssignmentRow
+	err := row.Scan(
+		&i.ID,
+		&i.UploaderID,
+		&i.UploaderDisplayName,
+		&i.CategoryID,
+		&i.CategoryName,
+		&i.Title,
+		&i.Subtitle,
+		&i.ContentName,
+		&i.InfoHashV1,
+		&i.TotalSizeBytes,
+		&i.FileCount,
+		&i.Version,
+		&i.SubmittedAt,
+		&i.ReviewRequestedAt,
+		&i.VotesCast,
+		&i.RequiredVotes,
+		&i.MaximumVotes,
+	)
+	return i, err
+}
+
 const getTorrentReviewDecision = `-- name: GetTorrentReviewDecision :one
 SELECT
     decision.id,
@@ -329,6 +416,125 @@ func (q *Queries) ListPendingTorrentReviews(ctx context.Context, resultLimit int
 			&i.Version,
 			&i.SubmittedAt,
 			&i.ReviewRequestedAt,
+			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReviewedTorrentReviews = `-- name: ListReviewedTorrentReviews :many
+SELECT
+    torrent.id,
+    torrent.uploader_id,
+    uploader.display_name AS uploader_display_name,
+    torrent.category_id,
+    category.name AS category_name,
+    torrent.title,
+    torrent.subtitle,
+    torrent.content_name,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
+    torrent.file_count,
+    vote.expected_torrent_version AS version,
+    torrent.submitted_at,
+    round.opened_at AS review_requested_at,
+    vote.id AS vote_id,
+    vote.round_id,
+    vote.decision,
+    vote.reason_code,
+    vote.reason,
+    vote.occurred_at AS voted_at,
+    round.approve_count,
+    round.reject_count,
+    (CASE
+        WHEN round.status = 'escalated' THEN 'escalated'
+        WHEN round.status = 'resolved' AND final_decision.resulting_state = 'published' THEN 'published'
+        WHEN round.status = 'resolved' AND final_decision.resulting_state = 'rejected' THEN 'rejected'
+        ELSE 'waiting'
+    END)::text AS outcome,
+    count(*) OVER ()::bigint AS total_count
+FROM review.torrent_review_votes AS vote
+JOIN review.torrent_review_rounds AS round ON round.id = vote.round_id
+JOIN torrents.torrents AS torrent ON torrent.id = vote.torrent_id
+JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
+JOIN catalog.categories AS category ON category.id = torrent.category_id
+LEFT JOIN review.torrent_decisions AS final_decision ON final_decision.id = round.final_decision_id
+WHERE vote.voter_id = $1::uuid
+ORDER BY vote.occurred_at DESC, vote.id DESC
+LIMIT $2::integer
+`
+
+type ListReviewedTorrentReviewsParams struct {
+	ReviewerID  uuid.UUID
+	ResultLimit int32
+}
+
+type ListReviewedTorrentReviewsRow struct {
+	ID                  int64
+	UploaderID          uuid.UUID
+	UploaderDisplayName string
+	CategoryID          string
+	CategoryName        string
+	Title               string
+	Subtitle            string
+	ContentName         string
+	InfoHashV1          []byte
+	TotalSizeBytes      int64
+	FileCount           int32
+	Version             int64
+	SubmittedAt         pgtype.Timestamptz
+	ReviewRequestedAt   pgtype.Timestamptz
+	VoteID              uuid.UUID
+	RoundID             uuid.UUID
+	Decision            string
+	ReasonCode          string
+	Reason              string
+	VotedAt             pgtype.Timestamptz
+	ApproveCount        int16
+	RejectCount         int16
+	Outcome             string
+	TotalCount          int64
+}
+
+func (q *Queries) ListReviewedTorrentReviews(ctx context.Context, arg ListReviewedTorrentReviewsParams) ([]ListReviewedTorrentReviewsRow, error) {
+	rows, err := q.db.Query(ctx, listReviewedTorrentReviews, arg.ReviewerID, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReviewedTorrentReviewsRow{}
+	for rows.Next() {
+		var i ListReviewedTorrentReviewsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UploaderID,
+			&i.UploaderDisplayName,
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.Title,
+			&i.Subtitle,
+			&i.ContentName,
+			&i.InfoHashV1,
+			&i.TotalSizeBytes,
+			&i.FileCount,
+			&i.Version,
+			&i.SubmittedAt,
+			&i.ReviewRequestedAt,
+			&i.VoteID,
+			&i.RoundID,
+			&i.Decision,
+			&i.ReasonCode,
+			&i.Reason,
+			&i.VotedAt,
+			&i.ApproveCount,
+			&i.RejectCount,
+			&i.Outcome,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

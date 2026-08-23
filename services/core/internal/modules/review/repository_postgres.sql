@@ -60,6 +60,83 @@ WHERE torrent.state = 'pending_review'
 ORDER BY torrent.state_changed_at, torrent.id
 LIMIT sqlc.arg(result_limit)::integer;
 
+-- name: GetTorrentReviewAssignment :one
+SELECT
+    torrent.id,
+    torrent.uploader_id,
+    uploader.display_name AS uploader_display_name,
+    torrent.category_id,
+    category.name AS category_name,
+    torrent.title,
+    torrent.subtitle,
+    torrent.content_name,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
+    torrent.file_count,
+    torrent.version,
+    torrent.submitted_at,
+    torrent.state_changed_at AS review_requested_at,
+    COALESCE(round.approve_count + round.reject_count, 0)::integer AS votes_cast,
+    COALESCE(round.required_votes, 3)::integer AS required_votes,
+    COALESCE(round.maximum_votes, 4)::integer AS maximum_votes
+FROM torrents.torrents AS torrent
+JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
+JOIN catalog.categories AS category ON category.id = torrent.category_id
+LEFT JOIN review.torrent_review_rounds AS round
+  ON round.torrent_id = torrent.id
+ AND round.expected_torrent_version = torrent.version
+WHERE torrent.id = sqlc.arg(torrent_id)::bigint
+  AND torrent.state = 'pending_review'
+  AND torrent.uploader_id <> sqlc.arg(reviewer_id)::uuid
+  AND (round.id IS NULL OR round.status = 'open')
+  AND NOT EXISTS (
+      SELECT 1
+      FROM review.torrent_review_votes AS vote
+      WHERE vote.round_id = round.id
+        AND vote.voter_id = sqlc.arg(reviewer_id)::uuid
+  );
+
+-- name: ListReviewedTorrentReviews :many
+SELECT
+    torrent.id,
+    torrent.uploader_id,
+    uploader.display_name AS uploader_display_name,
+    torrent.category_id,
+    category.name AS category_name,
+    torrent.title,
+    torrent.subtitle,
+    torrent.content_name,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
+    torrent.file_count,
+    vote.expected_torrent_version AS version,
+    torrent.submitted_at,
+    round.opened_at AS review_requested_at,
+    vote.id AS vote_id,
+    vote.round_id,
+    vote.decision,
+    vote.reason_code,
+    vote.reason,
+    vote.occurred_at AS voted_at,
+    round.approve_count,
+    round.reject_count,
+    (CASE
+        WHEN round.status = 'escalated' THEN 'escalated'
+        WHEN round.status = 'resolved' AND final_decision.resulting_state = 'published' THEN 'published'
+        WHEN round.status = 'resolved' AND final_decision.resulting_state = 'rejected' THEN 'rejected'
+        ELSE 'waiting'
+    END)::text AS outcome,
+    count(*) OVER ()::bigint AS total_count
+FROM review.torrent_review_votes AS vote
+JOIN review.torrent_review_rounds AS round ON round.id = vote.round_id
+JOIN torrents.torrents AS torrent ON torrent.id = vote.torrent_id
+JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
+JOIN catalog.categories AS category ON category.id = torrent.category_id
+LEFT JOIN review.torrent_decisions AS final_decision ON final_decision.id = round.final_decision_id
+WHERE vote.voter_id = sqlc.arg(reviewer_id)::uuid
+ORDER BY vote.occurred_at DESC, vote.id DESC
+LIMIT sqlc.arg(result_limit)::integer;
+
 -- name: GetTorrentReviewDecision :one
 SELECT
     decision.id,

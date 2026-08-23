@@ -16,9 +16,11 @@ const maximumScreenshotCount = 6
 export function TorrentScreenshotsCard({
   torrentId,
   screenshotCount,
+  screenshotUrl = torrentScreenshotUrl,
 }: {
   torrentId: number
   screenshotCount: number
+  screenshotUrl?: (torrentId: number, position: number) => string
 }) {
   const [selectedPosition, setSelectedPosition] = React.useState<number | null>(
     null
@@ -96,6 +98,7 @@ export function TorrentScreenshotsCard({
                 failed={failedPositions.has(position)}
                 onFailure={() => recordFailure(position)}
                 onSelect={() => setSelectedPosition(position)}
+                screenshotUrl={screenshotUrl}
               />
             ))}
           </div>
@@ -130,7 +133,7 @@ export function TorrentScreenshotsCard({
                 </button>
               ) : null}
               <img
-                src={torrentScreenshotUrl(torrentId, selectedPosition)}
+                src={screenshotUrl(torrentId, selectedPosition)}
                 alt={`截图 ${selectedPosition + 1} 大图`}
                 className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
                 onError={() => {
@@ -165,12 +168,14 @@ function ScreenshotThumbnail({
   failed,
   onFailure,
   onSelect,
+  screenshotUrl,
 }: {
   torrentId: number
   position: number
   failed: boolean
   onFailure: () => void
   onSelect: () => void
+  screenshotUrl: (torrentId: number, position: number) => string
 }) {
   return (
     <button
@@ -192,7 +197,7 @@ function ScreenshotThumbnail({
         </span>
       ) : (
         <img
-          src={torrentScreenshotUrl(torrentId, position)}
+          src={screenshotUrl(torrentId, position)}
           alt={`截图 ${position + 1}`}
           className="size-full object-cover"
           loading="lazy"

@@ -65,6 +65,43 @@ JOIN catalog.facet_options AS option
 WHERE value.torrent_id = sqlc.arg(torrent_id)::bigint
 ORDER BY facet.display_order, value.position, value.option_key;
 
+-- name: GetPendingReviewEvidence :one
+SELECT
+    torrent.id,
+    torrent.category_id,
+    category.name AS category_name,
+    torrent.title,
+    torrent.subtitle,
+    torrent.content_name,
+    uploader.display_name AS uploader_display_name,
+    torrent.anonymous,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
+    torrent.payload_size_bytes,
+    torrent.file_count,
+    torrent.padding_file_count,
+    coalesce((
+        SELECT count(*)
+        FROM torrents.torrent_screenshot_set_heads AS head
+        JOIN torrents.torrent_screenshot_set_items AS screenshot
+          ON screenshot.set_id = head.active_set_id
+        WHERE head.torrent_id = torrent.id
+    ), 0)::integer AS screenshot_count,
+    torrent.piece_length_bytes,
+    torrent.piece_count,
+    torrent.state,
+    torrent.version,
+    torrent.submitted_at,
+    torrent.state_changed_at AS review_requested_at,
+    torrent.description,
+    torrent.description_format,
+    torrent.media_info
+FROM torrents.torrents AS torrent
+JOIN catalog.categories AS category ON category.id = torrent.category_id
+JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
+WHERE torrent.id = sqlc.arg(torrent_id)::bigint
+  AND torrent.state = 'pending_review';
+
 -- name: ListPublishedTorrentExternalIdentifiers :many
 SELECT identifier.provider, identifier.external_id
 FROM torrents.torrent_external_identifiers AS identifier
@@ -90,6 +127,26 @@ JOIN torrents.torrent_screenshot_objects AS object
   ON object.id = screenshot.object_id
 WHERE torrent.id = sqlc.arg(torrent_id)::bigint
   AND torrent.state = 'published';
+
+-- name: GetPendingReviewCoverObject :one
+SELECT
+    torrent.id AS torrent_id,
+    object.id AS object_id,
+    object.content_sha256,
+    object.byte_length,
+    object.content_type,
+    object.width,
+    object.height
+FROM torrents.torrents AS torrent
+JOIN torrents.torrent_screenshot_set_heads AS head
+  ON head.torrent_id = torrent.id
+JOIN torrents.torrent_screenshot_set_items AS screenshot
+  ON screenshot.set_id = head.active_set_id
+ AND screenshot.position = 0
+JOIN torrents.torrent_screenshot_objects AS object
+  ON object.id = screenshot.object_id
+WHERE torrent.id = sqlc.arg(torrent_id)::bigint
+  AND torrent.state = 'pending_review';
 
 -- name: ListPublishedTorrentCoverLocations :many
 SELECT
@@ -129,6 +186,27 @@ JOIN torrents.torrent_screenshot_objects AS object
   ON object.id = screenshot.object_id
 WHERE torrent.id = sqlc.arg(torrent_id)::bigint
   AND torrent.state = 'published';
+
+-- name: GetPendingReviewScreenshotObject :one
+SELECT
+    torrent.id AS torrent_id,
+    screenshot.position,
+    object.id AS object_id,
+    object.content_sha256,
+    object.byte_length,
+    object.content_type,
+    object.width,
+    object.height
+FROM torrents.torrents AS torrent
+JOIN torrents.torrent_screenshot_set_heads AS head
+  ON head.torrent_id = torrent.id
+JOIN torrents.torrent_screenshot_set_items AS screenshot
+  ON screenshot.set_id = head.active_set_id
+ AND screenshot.position = sqlc.arg(screenshot_position)::smallint
+JOIN torrents.torrent_screenshot_objects AS object
+  ON object.id = screenshot.object_id
+WHERE torrent.id = sqlc.arg(torrent_id)::bigint
+  AND torrent.state = 'pending_review';
 
 -- name: ListPublishedTorrentScreenshotLocations :many
 SELECT
@@ -213,6 +291,14 @@ SELECT
 FROM torrents.torrents AS torrent
 WHERE torrent.id = sqlc.arg(torrent_id)::bigint
   AND torrent.state = 'published';
+
+-- name: GetPendingReviewFileTarget :one
+SELECT
+    torrent.id,
+    torrent.file_count
+FROM torrents.torrents AS torrent
+WHERE torrent.id = sqlc.arg(torrent_id)::bigint
+  AND torrent.state = 'pending_review';
 
 -- name: ListPublishedTorrentFiles :many
 SELECT

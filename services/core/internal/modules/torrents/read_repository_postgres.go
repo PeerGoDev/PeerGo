@@ -156,6 +156,176 @@ func (repository *PostgresTorrentReadRepository) PublishedDetail(ctx context.Con
 	}, nil
 }
 
+func (repository *PostgresTorrentReadRepository) PendingReviewEvidence(ctx context.Context, torrentID TorrentID) (PendingReviewEvidence, error) {
+	if torrentID < 1 {
+		return PendingReviewEvidence{}, ErrTorrentReadInput
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return PendingReviewEvidence{}, fmt.Errorf("begin pending review evidence read: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := torrentdb.New(tx)
+	row, err := queries.GetPendingReviewEvidence(ctx, int64(torrentID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PendingReviewEvidence{}, ErrTorrentReadNotFound
+	}
+	if err != nil {
+		return PendingReviewEvidence{}, fmt.Errorf("get pending review evidence: %w", err)
+	}
+	if row.ID != int64(torrentID) || row.State != string(StatePendingReview) || row.Version < 1 ||
+		row.CategoryID == "" || strings.TrimSpace(row.CategoryName) == "" ||
+		strings.TrimSpace(row.Title) == "" || strings.TrimSpace(row.ContentName) == "" ||
+		strings.TrimSpace(row.UploaderDisplayName) == "" || len(row.InfoHashV1) != 20 ||
+		row.TotalSizeBytes <= 0 || row.PayloadSizeBytes <= 0 || row.PayloadSizeBytes > row.TotalSizeBytes ||
+		row.FileCount < 1 || row.FileCount > 100000 || row.PaddingFileCount < 0 || row.PaddingFileCount > row.FileCount ||
+		row.ScreenshotCount < 0 || row.ScreenshotCount > MaxTorrentScreenshots ||
+		row.PieceLengthBytes <= 0 || row.PieceCount <= 0 || !row.SubmittedAt.Valid || !row.ReviewRequestedAt.Valid ||
+		row.ReviewRequestedAt.Time.Before(row.SubmittedAt.Time) ||
+		(row.DescriptionFormat != "markdown" && row.DescriptionFormat != "plain_text") ||
+		len(row.Description) > 4*1024*1024 || len(row.MediaInfo) > 16*1024*1024 {
+		return PendingReviewEvidence{}, ErrTorrentReadInvariant
+	}
+	facetRows, err := queries.ListPublishedTorrentFacetValues(ctx, row.ID)
+	if err != nil {
+		return PendingReviewEvidence{}, fmt.Errorf("list pending review facets: %w", err)
+	}
+	if len(facetRows) > 50 {
+		return PendingReviewEvidence{}, ErrTorrentReadInvariant
+	}
+	facets := make([]PublicFacet, 0, len(facetRows))
+	seenFacets := make(map[string]struct{}, len(facetRows))
+	for _, facet := range facetRows {
+		key := facet.FacetID + "\x00" + facet.OptionKey
+		if strings.TrimSpace(facet.FacetID) == "" || strings.TrimSpace(facet.FacetName) == "" ||
+			strings.TrimSpace(facet.OptionKey) == "" || strings.TrimSpace(facet.OptionLabel) == "" {
+			return PendingReviewEvidence{}, ErrTorrentReadInvariant
+		}
+		if _, duplicate := seenFacets[key]; duplicate {
+			return PendingReviewEvidence{}, ErrTorrentReadInvariant
+		}
+		seenFacets[key] = struct{}{}
+		facets = append(facets, PublicFacet{FacetID: facet.FacetID, FacetName: facet.FacetName, OptionKey: facet.OptionKey, OptionLabel: facet.OptionLabel})
+	}
+	identifierRows, err := queries.ListPublishedTorrentExternalIdentifiers(ctx, row.ID)
+	if err != nil {
+		return PendingReviewEvidence{}, fmt.Errorf("list pending review external identifiers: %w", err)
+	}
+	if len(identifierRows) > 5 {
+		return PendingReviewEvidence{}, ErrTorrentReadInvariant
+	}
+	identifiers := make([]ExternalIdentifier, 0, len(identifierRows))
+	seenProviders := make(map[string]struct{}, len(identifierRows))
+	for _, identifier := range identifierRows {
+		if !validExternalIdentifierProvider(identifier.Provider) || strings.TrimSpace(identifier.ExternalID) == "" {
+			return PendingReviewEvidence{}, ErrTorrentReadInvariant
+		}
+		if _, duplicate := seenProviders[identifier.Provider]; duplicate {
+			return PendingReviewEvidence{}, ErrTorrentReadInvariant
+		}
+		seenProviders[identifier.Provider] = struct{}{}
+		identifiers = append(identifiers, ExternalIdentifier{Provider: identifier.Provider, ExternalID: identifier.ExternalID})
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return PendingReviewEvidence{}, fmt.Errorf("commit pending review evidence read: %w", err)
+	}
+	var infoHash InfoHashV1
+	copy(infoHash[:], row.InfoHashV1)
+	return PendingReviewEvidence{
+		ID: TorrentID(row.ID), Category: catalog.Category{ID: row.CategoryID, Name: row.CategoryName},
+		Title: row.Title, Subtitle: row.Subtitle, ContentName: row.ContentName,
+		UploaderDisplayName: row.UploaderDisplayName, Anonymous: row.Anonymous,
+		Facets: facets, ExternalIdentifiers: identifiers, InfoHashV1: infoHash,
+		TotalSizeBytes: row.TotalSizeBytes, PayloadSizeBytes: row.PayloadSizeBytes,
+		FileCount: int(row.FileCount), PaddingFileCount: int(row.PaddingFileCount),
+		ScreenshotCount: int(row.ScreenshotCount), PieceLengthBytes: row.PieceLengthBytes,
+		PieceCount: int(row.PieceCount), State: StatePendingReview, Version: row.Version,
+		SubmittedAt: row.SubmittedAt.Time.UTC(), ReviewRequestedAt: row.ReviewRequestedAt.Time.UTC(),
+		Description: row.Description, DescriptionFormat: row.DescriptionFormat, MediaInfo: row.MediaInfo,
+	}, nil
+}
+
+func (repository *PostgresTorrentReadRepository) PendingReviewScreenshotSource(ctx context.Context, torrentID TorrentID, position int) (PublicScreenshotSource, error) {
+	if torrentID < 1 || position < 0 || position >= MaxTorrentScreenshots {
+		return PublicScreenshotSource{}, ErrTorrentReadInput
+	}
+	object, err := repository.queries.GetPendingReviewScreenshotObject(ctx, torrentdb.GetPendingReviewScreenshotObjectParams{
+		ScreenshotPosition: int16(position), TorrentID: int64(torrentID),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicScreenshotSource{}, ErrTorrentScreenshotNotFound
+	}
+	if err != nil {
+		return PublicScreenshotSource{}, fmt.Errorf("get pending review screenshot object: %w", err)
+	}
+	if object.TorrentID != int64(torrentID) || object.Position != int16(position) || object.ObjectID == uuid.Nil ||
+		len(object.ContentSha256) != 32 ||
+		!validStoredScreenshotMetadata(object.ContentType, object.ByteLength, int64(object.Width), int64(object.Height)) {
+		return PublicScreenshotSource{}, ErrTorrentReadInvariant
+	}
+	var digest ObjectSHA256
+	copy(digest[:], object.ContentSha256)
+	rows, err := repository.queries.ListPublishedTorrentScreenshotLocations(ctx, object.ObjectID)
+	if err != nil {
+		return PublicScreenshotSource{}, fmt.Errorf("list pending review screenshot locations: %w", err)
+	}
+	locations, err := publicScreenshotLocations(object.ObjectID, rows)
+	if err != nil {
+		return PublicScreenshotSource{}, err
+	}
+	return PublicScreenshotSource{
+		TorrentID: torrentID, Position: position, ObjectID: object.ObjectID,
+		ContentType: object.ContentType, Width: int(object.Width), Height: int(object.Height),
+		Descriptor: StoredObjectDescriptor{SHA256: digest, ByteLength: object.ByteLength}, Locations: locations,
+	}, nil
+}
+
+func (repository *PostgresTorrentReadRepository) PendingReviewCoverSource(ctx context.Context, torrentID TorrentID) (PublicCoverSource, error) {
+	if torrentID < 1 {
+		return PublicCoverSource{}, ErrTorrentReadInput
+	}
+	object, err := repository.queries.GetPendingReviewCoverObject(ctx, int64(torrentID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicCoverSource{}, ErrTorrentCoverNotFound
+	}
+	if err != nil {
+		return PublicCoverSource{}, fmt.Errorf("get pending review cover object: %w", err)
+	}
+	if object.TorrentID != int64(torrentID) || object.ObjectID == uuid.Nil || len(object.ContentSha256) != 32 ||
+		!validStoredScreenshotMetadata(object.ContentType, object.ByteLength, int64(object.Width), int64(object.Height)) {
+		return PublicCoverSource{}, ErrTorrentReadInvariant
+	}
+	var digest ObjectSHA256
+	copy(digest[:], object.ContentSha256)
+	rows, err := repository.queries.ListPublishedTorrentCoverLocations(ctx, object.ObjectID)
+	if err != nil {
+		return PublicCoverSource{}, fmt.Errorf("list pending review cover locations: %w", err)
+	}
+	locations := make([]ReadableObjectLocation, 0, len(rows))
+	for _, row := range rows {
+		backendID, backendErr := ParseStorageBackendID(row.BackendID)
+		objectKey, keyErr := ParseObjectKey(row.ObjectKey)
+		if backendErr != nil || keyErr != nil || row.ID == uuid.Nil || row.ObjectID != object.ObjectID ||
+			row.ObservedByteLength < 1 || len(row.ObservedSha256) != 32 || !row.VerifiedAt.Valid ||
+			(row.State != string(StorageLocationVerified) && row.State != string(StorageLocationRetiring)) {
+			return PublicCoverSource{}, ErrTorrentReadInvariant
+		}
+		var observedDigest ObjectSHA256
+		copy(observedDigest[:], row.ObservedSha256)
+		locations = append(locations, ReadableObjectLocation{
+			ID: row.ID, BackendID: backendID, ObjectKey: objectKey, Preferred: row.IsPreferred,
+			VersionID:  nullableStorageString(row.VersionID),
+			Descriptor: StoredObjectDescriptor{SHA256: observedDigest, ByteLength: row.ObservedByteLength},
+			VerifiedAt: row.VerifiedAt.Time.UTC(),
+		})
+	}
+	return PublicCoverSource{
+		TorrentID: torrentID, ObjectID: object.ObjectID, ContentType: object.ContentType,
+		Width: int(object.Width), Height: int(object.Height),
+		Descriptor: StoredObjectDescriptor{SHA256: digest, ByteLength: object.ByteLength}, Locations: locations,
+	}, nil
+}
+
 func (repository *PostgresTorrentReadRepository) PublishedScreenshotSource(ctx context.Context, torrentID TorrentID, position int) (PublicScreenshotSource, error) {
 	if torrentID < 1 || position < 0 || position >= MaxTorrentScreenshots {
 		return PublicScreenshotSource{}, ErrTorrentReadInput
@@ -390,6 +560,52 @@ func (repository *PostgresTorrentReadRepository) PublishedFiles(ctx context.Cont
 		Limit:     limit,
 		Offset:    offset,
 	}, nil
+}
+
+func (repository *PostgresTorrentReadRepository) PendingReviewFiles(ctx context.Context, torrentID TorrentID, limit, offset int) (PublicFilePage, error) {
+	if torrentID < 1 || limit < 1 || limit > MaxTorrentFileLimit || offset < 0 || offset > 99999 {
+		return PublicFilePage{}, ErrTorrentReadInput
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return PublicFilePage{}, fmt.Errorf("begin pending review file read: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := torrentdb.New(tx)
+	target, err := queries.GetPendingReviewFileTarget(ctx, int64(torrentID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicFilePage{}, ErrTorrentReadNotFound
+	}
+	if err != nil {
+		return PublicFilePage{}, fmt.Errorf("get pending review file target: %w", err)
+	}
+	if target.ID != int64(torrentID) || target.FileCount < 1 || target.FileCount > 100000 {
+		return PublicFilePage{}, ErrTorrentReadInvariant
+	}
+	rows, err := queries.ListPublishedTorrentFiles(ctx, torrentdb.ListPublishedTorrentFilesParams{
+		TorrentID: target.ID, ResultLimit: int32(limit), ResultOffset: int32(offset),
+	})
+	if err != nil {
+		return PublicFilePage{}, fmt.Errorf("list pending review files: %w", err)
+	}
+	wantCount := 0
+	if offset < int(target.FileCount) {
+		wantCount = min(limit, int(target.FileCount)-offset)
+	}
+	if len(rows) != wantCount {
+		return PublicFilePage{}, ErrTorrentReadInvariant
+	}
+	items := make([]PublicFile, 0, len(rows))
+	for index, row := range rows {
+		if row.FileIndex != int32(offset+index) || strings.TrimSpace(row.DisplayPath) == "" || row.SizeBytes < 0 {
+			return PublicFilePage{}, ErrTorrentReadInvariant
+		}
+		items = append(items, PublicFile{Index: int(row.FileIndex), DisplayPath: row.DisplayPath, SizeBytes: row.SizeBytes, IsPadding: row.IsPadding})
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return PublicFilePage{}, fmt.Errorf("commit pending review file read: %w", err)
+	}
+	return PublicFilePage{TorrentID: torrentID, Items: items, Total: int(target.FileCount), Limit: limit, Offset: offset}, nil
 }
 
 func (repository *PostgresTorrentReadRepository) UserSubmissions(ctx context.Context, uploaderID uuid.UUID, limit int) (MySubmissionPage, error) {

@@ -1285,6 +1285,127 @@ MyTorrentReviewAssignmentPage:
       minimum: 0
       maximum: 9007199254740991
 
+MyTorrentReviewDetail:
+  allOf:
+    - $ref: "#/MyTorrentReviewAssignment"
+    - type: object
+      additionalProperties: false
+      required:
+        - anonymous
+        - facets
+        - external_identifiers
+        - payload_size_bytes
+        - padding_file_count
+        - screenshot_count
+        - piece_length_bytes
+        - piece_count
+        - description
+        - description_format
+        - media_info
+      properties:
+        anonymous:
+          type: boolean
+          description: 审核页仍显示已脱敏的上传者名称；此字段只说明发布后是否匿名。
+        facets:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/TorrentPublicFacet"
+        external_identifiers:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/TorrentExternalIdentifier"
+        payload_size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+        padding_file_count:
+          type: integer
+          minimum: 0
+          maximum: 100000
+        screenshot_count:
+          type: integer
+          minimum: 0
+          maximum: 6
+        piece_length_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+        piece_count:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+          maxLength: 4194304
+        description_format:
+          type: string
+          enum: [markdown, plain_text]
+        media_info:
+          type: string
+          maxLength: 16777216
+
+ReviewedTorrentReview:
+  allOf:
+    - $ref: "#/PendingTorrentReview"
+    - type: object
+      additionalProperties: false
+      required:
+        - vote_id
+        - round_id
+        - decision
+        - reason_code
+        - reason
+        - voted_at
+        - approve_count
+        - reject_count
+        - outcome
+      properties:
+        vote_id:
+          type: string
+          format: uuid
+        round_id:
+          type: string
+          format: uuid
+        decision:
+          type: string
+          enum: [approve, reject]
+        reason_code:
+          $ref: "#/TorrentReviewReasonCode"
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        voted_at:
+          type: string
+          format: date-time
+        approve_count:
+          type: integer
+          minimum: 0
+          maximum: 4
+        reject_count:
+          type: integer
+          minimum: 0
+          maximum: 4
+        outcome:
+          $ref: "#/TorrentReviewRoundOutcome"
+
+ReviewedTorrentReviewPage:
+  type: object
+  additionalProperties: false
+  required: [items, total]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/ReviewedTorrentReview"
+    total:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+
 TorrentReviewDecisionRequest:
   type: object
   additionalProperties: false

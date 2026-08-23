@@ -15,11 +15,12 @@ import (
 )
 
 type recordingRepository struct {
-	listLimit int32
-	page      PendingTorrentPage
-	command   DecideCommand
-	result    DecisionResult
-	err       error
+	listLimit  int32
+	page       PendingTorrentPage
+	assignment ReviewAssignment
+	command    DecideCommand
+	result     DecisionResult
+	err        error
 }
 
 func (repository *recordingRepository) ListPending(_ context.Context, limit int32) (PendingTorrentPage, error) {
@@ -31,6 +32,14 @@ func (repository *recordingRepository) ListAssignments(context.Context, uuid.UUI
 	return ReviewAssignmentPage{}, repository.err
 }
 
+func (repository *recordingRepository) GetAssignment(context.Context, uuid.UUID, torrents.TorrentID) (ReviewAssignment, error) {
+	return repository.assignment, repository.err
+}
+
+func (repository *recordingRepository) ListReviewed(context.Context, uuid.UUID, int32) (ReviewedTorrentPage, error) {
+	return ReviewedTorrentPage{}, repository.err
+}
+
 func (repository *recordingRepository) Decide(_ context.Context, command DecideCommand) (DecisionResult, error) {
 	repository.command = command
 	return repository.result, repository.err
@@ -40,14 +49,36 @@ func (repository *recordingRepository) Vote(context.Context, VoteCommand) (VoteR
 	return VoteResult{}, repository.err
 }
 
-type sessionAuthenticatorStub struct{}
-
-func (sessionAuthenticatorStub) CurrentSession(context.Context, string) (identity.WebSession, error) {
-	return identity.WebSession{}, nil
+type sessionAuthenticatorStub struct {
+	session identity.WebSession
 }
 
-func (sessionAuthenticatorStub) AuthenticateWrite(context.Context, string, string) (identity.WebSession, error) {
-	return identity.WebSession{}, nil
+func (stub sessionAuthenticatorStub) CurrentSession(context.Context, string) (identity.WebSession, error) {
+	return stub.session, nil
+}
+
+func (stub sessionAuthenticatorStub) AuthenticateWrite(context.Context, string, string) (identity.WebSession, error) {
+	return stub.session, nil
+}
+
+type reviewEvidenceReaderStub struct {
+	evidence torrents.PendingReviewEvidence
+}
+
+func (stub reviewEvidenceReaderStub) PendingReviewEvidence(context.Context, torrents.TorrentID) (torrents.PendingReviewEvidence, error) {
+	return stub.evidence, nil
+}
+
+func (reviewEvidenceReaderStub) PendingReviewFiles(context.Context, torrents.TorrentID, int, int) (torrents.PublicFilePage, error) {
+	return torrents.PublicFilePage{}, nil
+}
+
+func (reviewEvidenceReaderStub) PendingReviewCover(context.Context, torrents.TorrentID) (torrents.PublicCover, error) {
+	return torrents.PublicCover{}, nil
+}
+
+func (reviewEvidenceReaderStub) PendingReviewScreenshot(context.Context, torrents.TorrentID, int) (torrents.PublicScreenshot, error) {
+	return torrents.PublicScreenshot{}, nil
 }
 
 type entitlementCheckerStub struct{}
@@ -137,6 +168,34 @@ func TestServiceRejectsInvalidDecisionBeforeAuthorizationOrRepository(t *testing
 	}
 	if authorizer.request.Action != "" || repository.command.DecisionID != uuid.Nil {
 		t.Fatal("invalid input reached authorization or repository")
+	}
+}
+
+func TestServiceRefusesToComposeDifferentReviewEvidenceRevision(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 24, 1, 0, 0, 0, time.UTC)
+	reviewerID := uuid.New()
+	repository := &recordingRepository{assignment: ReviewAssignment{
+		PendingTorrent: PendingTorrent{ID: 42, Version: 3},
+		RequiredVotes:  RequiredReviewVotes, MaximumVotes: MaximumReviewVotes,
+	}}
+	authenticator := sessionAuthenticatorStub{session: identity.WebSession{User: identity.User{ID: reviewerID}}}
+	authorizer := &recordingAuthorizer{decision: allowedReviewDecision(now)}
+	service, err := NewService(
+		authenticator,
+		repository,
+		authorizer,
+		entitlementCheckerStub{},
+		func() time.Time { return now },
+		reviewEvidenceReaderStub{evidence: torrents.PendingReviewEvidence{ID: 42, Version: 4}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = service.GetAssignment(context.Background(), "session", 42)
+	if !errors.Is(err, ErrTorrentReviewNotFound) {
+		t.Fatalf("GetAssignment() error = %v", err)
 	}
 }
 

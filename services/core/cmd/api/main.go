@@ -594,7 +594,7 @@ func main() {
 		os.Exit(1)
 	}
 	torrentReviewService, err := review.NewService(
-		identityService, torrentReviewRepository, authorizationService, workgroupService, time.Now,
+		identityService, torrentReviewRepository, authorizationService, workgroupService, time.Now, torrentReadService,
 	)
 	if err != nil {
 		logger.Error("compose torrent review service", "error", err)

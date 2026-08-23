@@ -7829,6 +7829,243 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/torrent-reviews/history:
+    get:
+      operationId: listMyReviewedTorrentReviews
+      summary: 获取当前种审员已经提交的不可变审核票
+      tags:
+        - review
+      x-audience:
+        - web
+      x-owner: core-review
+      x-permission: torrent.review.vote
+      x-credential-audience: web-session
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: 只返回本人的审核票；因为判断已经提交，所以可显示当前赞成/反对分布和本轮结果。
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewedTorrentReviewPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/torrent-reviews/{torrent_id}:
+    get:
+      operationId: getMyTorrentReviewAssignment
+      summary: 获取当前种审员尚未投票种子的完整审核证据
+      tags:
+        - review
+      x-audience:
+        - web
+      x-owner: core-review
+      x-permission: torrent.review.vote
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/TorrentIDPathParameter'
+      responses:
+        '200':
+          description: 仅向具备有效种审组资格且尚未在本轮投票的成员返回；包含发布资料、 MediaInfo、截图数量和不可变 metainfo 摘要，但不包含其他审核员的票型。
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyTorrentReviewDetail'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/torrent-reviews/{torrent_id}/files:
+    get:
+      operationId: listMyTorrentReviewFiles
+      summary: 分页获取当前审核任务的不可变文件清单
+      tags:
+        - review
+      x-audience:
+        - web
+      x-owner: core-review
+      x-permission: torrent.review.vote
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/TorrentIDPathParameter'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 99999
+            default: 0
+      responses:
+        '200':
+          description: 当前待审提交按 metainfo 原始序号排序的文件清单。
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TorrentFilePage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/torrent-reviews/{torrent_id}/cover:
+    get:
+      operationId: getMyTorrentReviewCover
+      summary: 获取当前审核任务的封面
+      tags:
+        - review
+      x-audience:
+        - web
+      x-owner: core-review
+      x-permission: torrent.review.vote
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/TorrentIDPathParameter'
+      responses:
+        '200':
+          description: 经不可变长度与 SHA-256 证据校验的待审封面。
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+            ETag:
+              required: true
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/torrent-reviews/{torrent_id}/screenshots/{position}:
+    get:
+      operationId: getMyTorrentReviewScreenshot
+      summary: 按位置获取当前审核任务的截图
+      tags:
+        - review
+      x-audience:
+        - web
+      x-owner: core-review
+      x-permission: torrent.review.vote
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/TorrentIDPathParameter'
+        - name: position
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 5
+      responses:
+        '200':
+          description: 经不可变长度与 SHA-256 证据校验的待审截图。
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+            ETag:
+              required: true
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/me/torrent-reviews/{torrent_id}/votes:
     post:
       operationId: createMyTorrentReviewVote
@@ -15898,6 +16135,130 @@ components:
           maxItems: 50
           items:
             $ref: '#/components/schemas/PendingTorrentReview'
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+    MyTorrentReviewDetail:
+      allOf:
+        - $ref: '#/components/schemas/MyTorrentReviewAssignment'
+        - type: object
+          additionalProperties: false
+          required:
+            - anonymous
+            - facets
+            - external_identifiers
+            - payload_size_bytes
+            - padding_file_count
+            - screenshot_count
+            - piece_length_bytes
+            - piece_count
+            - description
+            - description_format
+            - media_info
+          properties:
+            anonymous:
+              type: boolean
+              description: 审核页仍显示已脱敏的上传者名称；此字段只说明发布后是否匿名。
+            facets:
+              type: array
+              maxItems: 50
+              items:
+                $ref: '#/components/schemas/TorrentPublicFacet'
+            external_identifiers:
+              type: array
+              maxItems: 5
+              items:
+                $ref: '#/components/schemas/TorrentExternalIdentifier'
+            payload_size_bytes:
+              type: integer
+              format: int64
+              minimum: 1
+            padding_file_count:
+              type: integer
+              minimum: 0
+              maximum: 100000
+            screenshot_count:
+              type: integer
+              minimum: 0
+              maximum: 6
+            piece_length_bytes:
+              type: integer
+              format: int64
+              minimum: 1
+            piece_count:
+              type: integer
+              minimum: 1
+            description:
+              type: string
+              maxLength: 4194304
+            description_format:
+              type: string
+              enum:
+                - markdown
+                - plain_text
+            media_info:
+              type: string
+              maxLength: 16777216
+    ReviewedTorrentReview:
+      allOf:
+        - $ref: '#/components/schemas/PendingTorrentReview'
+        - type: object
+          additionalProperties: false
+          required:
+            - vote_id
+            - round_id
+            - decision
+            - reason_code
+            - reason
+            - voted_at
+            - approve_count
+            - reject_count
+            - outcome
+          properties:
+            vote_id:
+              type: string
+              format: uuid
+            round_id:
+              type: string
+              format: uuid
+            decision:
+              type: string
+              enum:
+                - approve
+                - reject
+            reason_code:
+              $ref: '#/components/schemas/TorrentReviewReasonCode'
+            reason:
+              type: string
+              minLength: 10
+              maxLength: 1000
+            voted_at:
+              type: string
+              format: date-time
+            approve_count:
+              type: integer
+              minimum: 0
+              maximum: 4
+            reject_count:
+              type: integer
+              minimum: 0
+              maximum: 4
+            outcome:
+              $ref: '#/components/schemas/TorrentReviewRoundOutcome'
+    ReviewedTorrentReviewPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ReviewedTorrentReview'
         total:
           type: integer
           format: int64

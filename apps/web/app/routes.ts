@@ -44,6 +44,7 @@ export default [
   route("account/submissions", "routes/account.submissions.tsx"),
   route("review", "routes/legacy-review.tsx"),
   route("review/queue", "routes/review.queue.tsx"),
+  route("review/torrent/:torrentId", "routes/review.torrent.$torrentId.tsx"),
   route("account/bookmarks", "routes/account.bookmarks.tsx"),
   route("account/purchases", "routes/account.purchases.tsx"),
   route("account/promotions", "routes/account.promotions.tsx"),

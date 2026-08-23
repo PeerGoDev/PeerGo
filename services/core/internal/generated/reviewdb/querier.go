@@ -15,11 +15,13 @@ type Querier interface {
 	GetPendingTorrentReviewForUpdate(ctx context.Context, torrentID int64) (GetPendingTorrentReviewForUpdateRow, error)
 	GetRejectedTorrentForResubmissionForUpdate(ctx context.Context, torrentID int64) (GetRejectedTorrentForResubmissionForUpdateRow, error)
 	GetTorrentResubmissionByID(ctx context.Context, resubmissionID uuid.UUID) (GetTorrentResubmissionByIDRow, error)
+	GetTorrentReviewAssignment(ctx context.Context, arg GetTorrentReviewAssignmentParams) (GetTorrentReviewAssignmentRow, error)
 	GetTorrentReviewDecision(ctx context.Context, decisionID uuid.UUID) (GetTorrentReviewDecisionRow, error)
 	InsertPublishedTorrentCatalogProjection(ctx context.Context, arg InsertPublishedTorrentCatalogProjectionParams) error
 	InsertTorrentResubmission(ctx context.Context, arg InsertTorrentResubmissionParams) error
 	InsertTorrentReviewDecision(ctx context.Context, arg InsertTorrentReviewDecisionParams) error
 	ListPendingTorrentReviews(ctx context.Context, resultLimit int32) ([]ListPendingTorrentReviewsRow, error)
+	ListReviewedTorrentReviews(ctx context.Context, arg ListReviewedTorrentReviewsParams) ([]ListReviewedTorrentReviewsRow, error)
 	ListTorrentReviewAssignments(ctx context.Context, arg ListTorrentReviewAssignmentsParams) ([]ListTorrentReviewAssignmentsRow, error)
 	PublishReviewedTorrent(ctx context.Context, arg PublishReviewedTorrentParams) (PublishReviewedTorrentRow, error)
 	RejectReviewedTorrent(ctx context.Context, arg RejectReviewedTorrentParams) (RejectReviewedTorrentRow, error)
