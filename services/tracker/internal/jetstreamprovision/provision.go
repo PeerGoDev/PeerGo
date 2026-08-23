@@ -21,6 +21,7 @@ var (
 type Manager interface {
 	Get(context.Context, string) (jetstream.StreamConfig, error)
 	Create(context.Context, jetstream.StreamConfig) error
+	Update(context.Context, jetstream.StreamConfig) error
 }
 
 type NATSManager struct {
@@ -51,9 +52,14 @@ func (manager *NATSManager) Create(ctx context.Context, config jetstream.StreamC
 	return err
 }
 
-// Ensure creates a missing stream but refuses to mutate an existing stream.
-// Retention or discard changes can delete business evidence, so production
-// drift must be reviewed and applied as an explicit infrastructure change.
+func (manager *NATSManager) Update(ctx context.Context, config jetstream.StreamConfig) error {
+	_, err := manager.jetStream.UpdateStream(ctx, config)
+	return err
+}
+
+// Ensure creates a missing stream and permits only an in-place MaxAge change.
+// Every identity, subject, storage, capacity and deletion-control field still
+// fails closed as drift.
 func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig) (bool, error) {
 	if manager == nil || validate(desired) != nil {
 		return false, ErrConfig
@@ -61,7 +67,12 @@ func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig
 	current, err := manager.Get(ctx, desired.Name)
 	if err == nil {
 		if !equivalent(current, desired) {
-			return false, ErrDrift
+			if !maxAgeOnlyDrift(current, desired) {
+				return false, ErrDrift
+			}
+			if err := manager.Update(ctx, desired); err != nil {
+				return false, fmt.Errorf("update Tracker stream MaxAge: %w", err)
+			}
 		}
 		return false, nil
 	}
@@ -72,6 +83,11 @@ func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig
 		return false, fmt.Errorf("create Tracker announce stream: %w", err)
 	}
 	return true, nil
+}
+
+func maxAgeOnlyDrift(current, desired jetstream.StreamConfig) bool {
+	current.MaxAge = desired.MaxAge
+	return equivalent(current, desired)
 }
 
 func validate(config jetstream.StreamConfig) error {

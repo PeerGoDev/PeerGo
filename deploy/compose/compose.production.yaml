@@ -324,6 +324,11 @@ services:
     command: ["core-contribution-experience-worker"]
     depends_on: *core-migrated
 
+  core-storage-maintenance:
+    <<: *long-running
+    command: ["core-storage-maintenance"]
+    depends_on: *core-migrated
+
   core-progression-level-worker:
     <<: *long-running
     command: ["core-progression-level-worker"]

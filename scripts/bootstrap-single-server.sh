@@ -290,19 +290,19 @@ storage_cleanup_interval="$(bootstrap_or_existing \
 storage_terminal_retention="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_TERMINAL_RETENTION \
-    72h)"
+    3h)"
 storage_session_retention="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_SESSION_RETENTION \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_SESSION_RETENTION \
-    48h)"
+    12h)"
 storage_detail_retention="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_DETAIL_RETENTION \
-    720h)"
+    12h)"
 storage_anomaly_retention="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_ANOMALY_RETENTION \
-    4320h)"
+    720h)"
 storage_batch_size="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_BATCH_SIZE \
@@ -310,6 +310,26 @@ storage_batch_size="$(bootstrap_or_existing \
 storage_startup_timeout="$(bootstrap_or_existing \
     PEERGO_SETTLEMENT_STORAGE_STARTUP_TIMEOUT \
     PEERGO_BOOTSTRAP_SETTLEMENT_STORAGE_STARTUP_TIMEOUT \
+    15s)"
+core_storage_cleanup_interval="$(bootstrap_or_existing \
+    PEERGO_CORE_STORAGE_CLEANUP_INTERVAL \
+    PEERGO_BOOTSTRAP_CORE_STORAGE_CLEANUP_INTERVAL \
+    15s)"
+core_storage_detail_retention="$(bootstrap_or_existing \
+    PEERGO_CORE_STORAGE_DETAIL_RETENTION \
+    PEERGO_BOOTSTRAP_CORE_STORAGE_DETAIL_RETENTION \
+    12h)"
+core_storage_history_retention="$(bootstrap_or_existing \
+    PEERGO_CORE_STORAGE_HISTORY_RETENTION \
+    PEERGO_BOOTSTRAP_CORE_STORAGE_HISTORY_RETENTION \
+    720h)"
+core_storage_batch_size="$(bootstrap_or_existing \
+    PEERGO_CORE_STORAGE_BATCH_SIZE \
+    PEERGO_BOOTSTRAP_CORE_STORAGE_BATCH_SIZE \
+    10000)"
+core_storage_startup_timeout="$(bootstrap_or_existing \
+    PEERGO_CORE_STORAGE_STARTUP_TIMEOUT \
+    PEERGO_BOOTSTRAP_CORE_STORAGE_STARTUP_TIMEOUT \
     15s)"
 [[ "${core_traffic_concurrency}" =~ ^[1-9][0-9]?$ ]] &&
     ((10#${core_traffic_concurrency} <= 32)) ||
@@ -462,6 +482,11 @@ set_env PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION "${storage_detail_retention}"
 set_env PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION "${storage_anomaly_retention}"
 set_env PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE "${storage_batch_size}"
 set_env PEERGO_SETTLEMENT_STORAGE_STARTUP_TIMEOUT "${storage_startup_timeout}"
+set_env PEERGO_CORE_STORAGE_CLEANUP_INTERVAL "${core_storage_cleanup_interval}"
+set_env PEERGO_CORE_STORAGE_DETAIL_RETENTION "${core_storage_detail_retention}"
+set_env PEERGO_CORE_STORAGE_HISTORY_RETENTION "${core_storage_history_retention}"
+set_env PEERGO_CORE_STORAGE_BATCH_SIZE "${core_storage_batch_size}"
+set_env PEERGO_CORE_STORAGE_STARTUP_TIMEOUT "${core_storage_startup_timeout}"
 set_env PEERGO_SETTLEMENT_SEEDING_EVIDENCE_CLOSURE_DELAY "${seeding_evidence_closure_delay}"
 set_env PEERGO_SETTLEMENT_SEEDING_EVIDENCE_MAX_INTERVAL_CREDIT "${seeding_evidence_max_interval_credit}"
 

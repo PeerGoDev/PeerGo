@@ -183,12 +183,12 @@ make production-hnr-work-reconcile \
   CONFIRM_PEERGO_HNR_RECONCILE=RECONCILE_IRRELEVANT_HNR_WORK
 ```
 
-`settlement-storage-maintenance` 随生产 Compose 常驻，默认每 15 秒按 retention 索引、每类最多
-处理 10,000 行，不运行全表 `DELETE`。升级后它会渐进清理历史 v1 payload、已发布 outbox、终态
-work、冗余 swarm snapshot entries/chunks/inbox/headers 和已经汇总的 30 天前流量明细；小时
+`settlement-storage-maintenance` 随生产 Compose 常驻，默认每 15 秒、每类最多处理 10,000 行，
+不运行全表 `DELETE`。升级后它会渐进清理历史 v1 payload、已发布 outbox、终态 work、冗余
+swarm snapshot entries/chunks/inbox/headers 和已经汇总的 12 小时前流量明细；小时
 证据引用的 snapshot header 与每个路由 epoch 的最新水位保留。未发布事件、未结算 work、
 做种证据尚未闭合的 raw interval、活跃 H&R 需要的区间以及永久 UTC 日汇总均不会删除。有异常
-待核对的做种窗口会把 source 和选中快照明细随异常保留 180 天，补偿工具不会读到残缺依据。
+待核对的做种窗口会把 source 和选中快照明细随异常保留 30 天，补偿工具不会读到残缺依据。
 上线前保留数据库快照；上线后同时观察该进程日志、`pg_stat_user_tables.n_dead_tup`、autovacuum
 时间和 Tracker Ledger 卷使用量。普通 `VACUUM` 可按数据库运维策略执行，禁止在线运行会长时
 锁表并复制整表的 `VACUUM FULL`。DELETE 后物理文件不会立即缩小；目标是 autovacuum 回收并
@@ -198,6 +198,12 @@ snapshot_interval`；默认 `10000 / 15s` 可跟上约 20,000 个活跃 swarm �
 进程会持续输出 `batch saturated` 警告，并在每个仍然受 10,000 行上限保护的事务后以 1 秒
 间隔继续追赶，清空积压后自动恢复配置的稳态间隔。若长期无法退出饱和状态，应先降低快照
 频率或扩展专用 Ledger，而不是无限放大单次删除事务。
+
+`core-storage-maintenance` 同样随 Compose 常驻。Core 的用户总量和用户/种子总量永久保留，
+UTC 三小时流量汇总保留最近 30 天；它只在贡献经验游标已经消费对应 projection 后，分批删除
+超过 12 小时的逐事件 inbox、entry 和解释分段。新 inbox 只存 payload SHA-256，不再复制
+JetStream 已持有的完整 JSON。两类 DELETE
+都依赖普通 autovacuum 复用页，物理数据库文件不会在清理瞬间缩小。
 
 流量 outbox 与 Core 流量投影默认也各自在单进程内使用 4 条固定通道。对应参数为
 `PEERGO_SETTLEMENT_TRAFFIC_OUTBOX_CONCURRENCY` 和 `PEERGO_CORE_TRAFFIC_CONCURRENCY`，支持范围

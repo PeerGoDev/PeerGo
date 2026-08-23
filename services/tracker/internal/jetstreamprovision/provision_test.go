@@ -34,6 +34,18 @@ func TestEnsureRejectsExistingRetentionDrift(t *testing.T) {
 	}
 }
 
+func TestEnsureUpdatesOnlyMaxAge(t *testing.T) {
+	desired := provisionTestConfig()
+	current := desired
+	current.MaxAge = 7 * 24 * time.Hour
+	desired.MaxAge = 12 * time.Hour
+	manager := &provisionTestManager{current: current}
+	created, err := Ensure(context.Background(), manager, desired)
+	if err != nil || created || manager.updated.MaxAge != 12*time.Hour {
+		t.Fatalf("Ensure(MaxAge update) = %v, %v, updated=%+v", created, err, manager.updated)
+	}
+}
+
 func TestEnsureRejectsPersistenceAndRepublishDrift(t *testing.T) {
 	desired := provisionTestConfig()
 	for name, mutate := range map[string]func(*jetstream.StreamConfig){
@@ -88,6 +100,7 @@ func TestEnsureAcceptsServerOwnedMetadataButRejectsApplicationMetadataDrift(t *t
 type provisionTestManager struct {
 	current  jetstream.StreamConfig
 	created  jetstream.StreamConfig
+	updated  jetstream.StreamConfig
 	getError error
 }
 
@@ -97,6 +110,11 @@ func (manager *provisionTestManager) Get(context.Context, string) (jetstream.Str
 
 func (manager *provisionTestManager) Create(_ context.Context, config jetstream.StreamConfig) error {
 	manager.created = config
+	return nil
+}
+
+func (manager *provisionTestManager) Update(_ context.Context, config jetstream.StreamConfig) error {
+	manager.updated = config
 	return nil
 }
 

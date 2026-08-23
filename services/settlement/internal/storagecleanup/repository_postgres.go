@@ -69,7 +69,9 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	if result.SnapshotRuns, err = queries.StorageCleanupDeleteSnapshotRuns(ctx, ledgerdb.StorageCleanupDeleteSnapshotRunsParams{DetailBefore: detail, BatchSize: batch}); err != nil {
 		return result, cleanupError("delete redundant snapshot headers", err)
 	}
-	if result.SpeedObservations, err = queries.StorageCleanupDeleteSpeedObservations(ctx, ledgerdb.StorageCleanupDeleteSpeedObservationsParams{AnomalyBefore: anomaly, BatchSize: batch}); err != nil {
+	if result.SpeedObservations, err = queries.StorageCleanupDeleteSpeedObservations(ctx, ledgerdb.StorageCleanupDeleteSpeedObservationsParams{
+		DetailBefore: detail, AnomalyBefore: anomaly, BatchSize: batch,
+	}); err != nil {
 		return result, cleanupError("delete old speed observations", err)
 	}
 	if result.SeedingAnomalies, err = queries.StorageCleanupDeleteSeedingAnomalies(ctx, ledgerdb.StorageCleanupDeleteSeedingAnomaliesParams{AnomalyBefore: anomaly, BatchSize: batch}); err != nil {

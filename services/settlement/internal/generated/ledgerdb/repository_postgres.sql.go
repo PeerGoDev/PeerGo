@@ -4417,9 +4417,15 @@ const storageCleanupDeleteSpeedObservations = `-- name: StorageCleanupDeleteSpee
 WITH candidate AS (
     SELECT observation.interval_event_id
     FROM ledger.speed_observations AS observation
-    WHERE observation.observed_at < $1::timestamptz
+    WHERE (
+        observation.outcome = 'exceeded'
+        AND observation.observed_at < $1::timestamptz
+    ) OR (
+        observation.outcome <> 'exceeded'
+        AND observation.observed_at < $2::timestamptz
+    )
     ORDER BY observation.observed_at, observation.interval_event_id
-    LIMIT $2::integer
+    LIMIT $3::integer
     FOR UPDATE SKIP LOCKED
 )
 DELETE FROM ledger.speed_observations AS observation
@@ -4429,11 +4435,12 @@ WHERE observation.interval_event_id = candidate.interval_event_id
 
 type StorageCleanupDeleteSpeedObservationsParams struct {
 	AnomalyBefore pgtype.Timestamptz
+	DetailBefore  pgtype.Timestamptz
 	BatchSize     int32
 }
 
 func (q *Queries) StorageCleanupDeleteSpeedObservations(ctx context.Context, arg StorageCleanupDeleteSpeedObservationsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storageCleanupDeleteSpeedObservations, arg.AnomalyBefore, arg.BatchSize)
+	result, err := q.db.Exec(ctx, storageCleanupDeleteSpeedObservations, arg.AnomalyBefore, arg.DetailBefore, arg.BatchSize)
 	if err != nil {
 		return 0, err
 	}

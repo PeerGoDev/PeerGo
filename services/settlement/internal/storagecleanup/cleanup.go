@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	MinimumTerminalRetention = 72 * time.Hour
-	MinimumSessionRetention  = 48 * time.Hour
-	MinimumDetailRetention   = 30 * 24 * time.Hour
-	MinimumAnomalyRetention  = 180 * 24 * time.Hour
+	MinimumTerminalRetention = 3 * time.Hour
+	MinimumSessionRetention  = 12 * time.Hour
+	MinimumDetailRetention   = 12 * time.Hour
+	MinimumAnomalyRetention  = 30 * 24 * time.Hour
 	backlogRetryInterval     = time.Second
 )
 

@@ -109,7 +109,13 @@ WHERE source.window_start = candidate.window_start
 WITH candidate AS (
     SELECT observation.interval_event_id
     FROM ledger.speed_observations AS observation
-    WHERE observation.observed_at < sqlc.arg(anomaly_before)::timestamptz
+    WHERE (
+        observation.outcome = 'exceeded'
+        AND observation.observed_at < sqlc.arg(anomaly_before)::timestamptz
+    ) OR (
+        observation.outcome <> 'exceeded'
+        AND observation.observed_at < sqlc.arg(detail_before)::timestamptz
+    )
     ORDER BY observation.observed_at, observation.interval_event_id
     LIMIT sqlc.arg(batch_size)::integer
     FOR UPDATE SKIP LOCKED

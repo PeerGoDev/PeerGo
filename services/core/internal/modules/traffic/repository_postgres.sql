@@ -2,14 +2,12 @@
 INSERT INTO traffic.settlement_inbox (
     event_id,
     payload_sha256,
-    payload_json,
     occurred_at,
     received_at,
     applied_at
 ) VALUES (
     sqlc.arg(event_id)::uuid,
     sqlc.arg(payload_sha256)::bytea,
-    sqlc.arg(payload_json)::text,
     sqlc.arg(occurred_at)::timestamptz,
     sqlc.arg(received_at)::timestamptz,
     sqlc.arg(applied_at)::timestamptz
@@ -18,7 +16,7 @@ ON CONFLICT (event_id) DO NOTHING
 RETURNING event_id;
 
 -- name: GetTrafficSettlementInbox :one
-SELECT payload_sha256, payload_json
+SELECT payload_sha256
 FROM traffic.settlement_inbox
 WHERE event_id = sqlc.arg(event_id)::uuid;
 
@@ -163,7 +161,7 @@ WHERE user_id = sqlc.arg(user_id)::uuid;
 
 -- name: ListUserTrafficEntries :many
 SELECT
-    entry.settlement_id,
+    entry.rollup_id AS settlement_id,
     torrent.id AS torrent_id,
     torrent.title AS torrent_title,
     entry.interval_starts_at,
@@ -172,15 +170,13 @@ SELECT
     entry.raw_downloaded,
     entry.credited_uploaded,
     entry.charged_downloaded,
-    entry.occurred_at,
-    explanation.status AS explanation_status,
-    explanation.segment_count AS explanation_segment_count
-FROM traffic.user_traffic_entries AS entry
+    entry.last_occurred_at AS occurred_at,
+    NULL::text AS explanation_status,
+    NULL::integer AS explanation_segment_count
+FROM traffic.user_traffic_three_hour_rollups AS entry
 JOIN torrents.torrents AS torrent ON torrent.id = entry.torrent_id
-LEFT JOIN traffic.user_traffic_entry_explanations AS explanation
-  ON explanation.settlement_id = entry.settlement_id
 WHERE entry.user_id = sqlc.arg(user_id)::uuid
-ORDER BY entry.interval_ends_at DESC, entry.settlement_id DESC
+ORDER BY entry.interval_ends_at DESC, entry.bucket_start DESC, entry.rollup_id DESC
 LIMIT sqlc.arg(result_limit)::integer;
 
 -- name: ListUserTrafficExplanationSegments :many
@@ -196,6 +192,59 @@ SELECT
 FROM traffic.user_traffic_entry_segments
 WHERE settlement_id = ANY(sqlc.arg(settlement_ids)::uuid[])
 ORDER BY settlement_id, segment_index;
+
+-- name: ListTrafficProjectionCleanupCandidates :many
+SELECT entry.settlement_id
+FROM traffic.user_traffic_entries AS entry
+CROSS JOIN progression.contribution_upload_cursor AS cursor
+WHERE cursor.singleton = true
+  AND entry.applied_at < sqlc.arg(detail_before)::timestamptz
+  AND (
+      entry.raw_uploaded = 0
+      OR NOT EXISTS (
+          SELECT 1
+          FROM progression.contribution_experience_policy_revisions
+      )
+      OR entry.occurred_at < (
+          SELECT min(policy.effective_from)
+          FROM progression.contribution_experience_policy_revisions AS policy
+      )
+      OR entry.projection_sequence <= cursor.last_projection_sequence
+  )
+ORDER BY entry.applied_at, entry.projection_sequence
+LIMIT sqlc.arg(batch_size)::integer
+FOR UPDATE OF entry SKIP LOCKED;
+
+-- name: DeleteTrafficProjectionSegments :execrows
+DELETE FROM traffic.user_traffic_entry_segments
+WHERE settlement_id = ANY(sqlc.arg(settlement_ids)::uuid[]);
+
+-- name: DeleteTrafficProjectionExplanations :execrows
+DELETE FROM traffic.user_traffic_entry_explanations
+WHERE settlement_id = ANY(sqlc.arg(settlement_ids)::uuid[]);
+
+-- name: DeleteTrafficProjectionEntries :execrows
+DELETE FROM traffic.user_traffic_entries
+WHERE settlement_id = ANY(sqlc.arg(settlement_ids)::uuid[]);
+
+-- name: DeleteTrafficProjectionInbox :execrows
+DELETE FROM traffic.settlement_inbox
+WHERE event_id = ANY(sqlc.arg(settlement_ids)::uuid[]);
+
+-- name: DeleteTrafficHistoryRollups :execrows
+WITH candidate AS (
+    SELECT rollup.bucket_start, rollup.user_id, rollup.torrent_id
+    FROM traffic.user_traffic_three_hour_rollups AS rollup
+    WHERE rollup.bucket_start < sqlc.arg(history_before)::timestamptz
+    ORDER BY rollup.bucket_start, rollup.user_id, rollup.torrent_id
+    LIMIT sqlc.arg(batch_size)::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM traffic.user_traffic_three_hour_rollups AS rollup
+USING candidate
+WHERE rollup.bucket_start = candidate.bucket_start
+  AND rollup.user_id = candidate.user_id
+  AND rollup.torrent_id = candidate.torrent_id;
 
 -- name: GetHNRProjectionInbox :one
 SELECT payload_sha256, payload_json

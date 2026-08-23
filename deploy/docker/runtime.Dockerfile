@@ -26,6 +26,7 @@ RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-contribution-experience-worker ./services/core/cmd/contribution-experience-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-progression-level-worker ./services/core/cmd/progression-level-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-traffic-projector ./services/core/cmd/traffic-projector && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-storage-maintenance ./services/core/cmd/storage-maintenance && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-evidence-projector ./services/core/cmd/seeding-evidence-projector && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-hnr-projector ./services/core/cmd/hnr-projector && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-swarm-projector ./services/core/cmd/swarm-projector && \

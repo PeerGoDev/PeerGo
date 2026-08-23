@@ -11,8 +11,13 @@ import (
 )
 
 type Querier interface {
+	DeleteTrafficHistoryRollups(ctx context.Context, arg DeleteTrafficHistoryRollupsParams) (int64, error)
+	DeleteTrafficProjectionEntries(ctx context.Context, settlementIds []uuid.UUID) (int64, error)
+	DeleteTrafficProjectionExplanations(ctx context.Context, settlementIds []uuid.UUID) (int64, error)
+	DeleteTrafficProjectionInbox(ctx context.Context, settlementIds []uuid.UUID) (int64, error)
+	DeleteTrafficProjectionSegments(ctx context.Context, settlementIds []uuid.UUID) (int64, error)
 	GetHNRProjectionInbox(ctx context.Context, eventID uuid.UUID) (GetHNRProjectionInboxRow, error)
-	GetTrafficSettlementInbox(ctx context.Context, eventID uuid.UUID) (GetTrafficSettlementInboxRow, error)
+	GetTrafficSettlementInbox(ctx context.Context, eventID uuid.UUID) ([]byte, error)
 	GetUserHNRObligationForUpdate(ctx context.Context, obligationID uuid.UUID) (TrafficUserHnrObligation, error)
 	GetUserHNRSummary(ctx context.Context, userID uuid.UUID) (GetUserHNRSummaryRow, error)
 	GetUserTrafficTotals(ctx context.Context, userID uuid.UUID) (GetUserTrafficTotalsRow, error)
@@ -22,6 +27,7 @@ type Querier interface {
 	InsertUserTrafficEntry(ctx context.Context, arg InsertUserTrafficEntryParams) error
 	InsertUserTrafficExplanation(ctx context.Context, arg InsertUserTrafficExplanationParams) error
 	InsertUserTrafficExplanationSegment(ctx context.Context, arg InsertUserTrafficExplanationSegmentParams) error
+	ListTrafficProjectionCleanupCandidates(ctx context.Context, arg ListTrafficProjectionCleanupCandidatesParams) ([]uuid.UUID, error)
 	ListUserHNRObligations(ctx context.Context, arg ListUserHNRObligationsParams) ([]ListUserHNRObligationsRow, error)
 	ListUserTrafficEntries(ctx context.Context, arg ListUserTrafficEntriesParams) ([]ListUserTrafficEntriesRow, error)
 	ListUserTrafficExplanationSegments(ctx context.Context, settlementIds []uuid.UUID) ([]TrafficUserTrafficEntrySegment, error)

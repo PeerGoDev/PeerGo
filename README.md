@@ -1045,12 +1045,14 @@ Vault 数据访问只接受已签名的 `decision_id + case_id + field + subject
 当前首版已经在独立 `peergo_tracker` database 落地两个 schema：
 
 - `settlement.ingest_stream_cursors`：每个 announce stream 只保留一行 gap-free 高水位；`settlement.ingest_producer_cursors` 每个 Tracker 进程 epoch 只保留一行单调业务幂等水位。
-- `settlement.event_inbox`：仅承接切换前 v1 的完整 payload 兼容；超过 30 天且不再被 session/raw/cursor 引用后才允许分批删除，新 v2 不再逐条写入该表。
+- `settlement.event_inbox`：仅承接切换前 v1 的完整 payload 兼容；超过 12 小时且不再被 session/raw/cursor 引用后才允许分批删除，新 v2 不再逐条写入该表。
 - `settlement.session_states`：以 `user_id + torrent_id + one-way session_token` 保存最新可信绝对 counter、epoch、版本、事件时间和两类 control sequence；不保存 passkey、IP、port 或原始 peer ID。
-- `ledger.raw_session_intervals`：保存前后绝对值、精确原始 delta、完成跃迁、事件时刻和 v2 producer/source provenance；它不是已优惠/已计费结果，超过 30 天后只有在结算、做种证据和活跃 H&R 都不再引用时才可删除。
-- `ledger.traffic_daily_rollups`：按 UTC 日、用户和种子保存 raw/credited/charged 总量与结算数；数据库 insert trigger 保证新旧 Settlement 进程写入的新结算都与日汇总同事务提交，已有明细在迁移时回填，因此 30 天明细清理不会丢失长期账务总量。
+- `ledger.raw_session_intervals`：保存前后绝对值、精确原始 delta、完成跃迁、事件时刻和 v2 producer/source provenance；它不是已优惠/已计费结果，超过 12 小时后只有在结算、做种证据和活跃 H&R 都不再引用时才可删除。
+- `ledger.traffic_daily_rollups`：按 UTC 日、用户和种子保存 raw/credited/charged 总量与结算数；数据库 insert trigger 保证新旧 Settlement 进程写入的新结算都与日汇总同事务提交，已有明细在迁移时回填，因此 12 小时明细清理不会丢失长期账务总量。
 
-stream/producer cursor、session 行锁/单调迁移和可选 raw interval 在同一事务完成。session 首次出现只建 baseline；counter 回退或 stopped 后再次出现会递增 epoch 且不产生负 delta；非递增事件时间保留为 `out_of_order` 但不移动 baseline。`settlement-storage-maintenance` 默认每 15 秒、每类最多按索引处理 10,000 行：已发布 outbox/终态 work 保留至少 72 小时，过期 session 至少 48 小时，原始区间、流量分段、普通做种 source、快照传输明细和旧 v1 inbox 至少 30 天，异常与违规速度证据至少 180 天；异常窗口依赖的 source 与选中快照 entry 也随异常保留 180 天，保证补偿依据完整。小时证据引用的快照头和每个路由 epoch 的最新头不会清理。数据库 trigger 同时固化这些最短窗口，错误配置不能绕过；清理索引和更积极的 autovacuum 让死元组页尽快复用，禁止用 `VACUUM FULL` 或在线大事务换取表面磁盘下降。
+stream/producer cursor、session 行锁/单调迁移和可选 raw interval 在同一事务完成。session 首次出现只建 baseline；counter 回退或 stopped 后再次出现会递增 epoch 且不产生负 delta；非递增事件时间保留为 `out_of_order` 但不移动 baseline。`settlement-storage-maintenance` 默认每 15 秒、每类最多处理 10,000 行：已发布 outbox/终态 work 保留至少 3 小时，session、原始区间、流量分段、普通做种 source、快照传输明细和旧 v1 inbox 至少 12 小时；普通/VIP 豁免速度观察同样只留 12 小时，真正超限与做种异常保留 30 天。异常窗口依赖的 source 与选中快照 entry 随异常保留，小时证据引用的快照头和每个路由 epoch 的最新头不会清理。数据库 trigger 同时固化这些最短窗口，错误配置不能绕过；更积极的 autovacuum 让死元组页尽快复用，禁止用 `VACUUM FULL` 或在线大事务换取表面磁盘下降。
+
+Core 不再把每条最终流量事件当作长期历史：`traffic.user_totals` 与 `traffic.user_torrent_totals` 继续实时、永久保存，`traffic.user_traffic_three_hour_rollups` 按 UTC 三小时聚合最近 30 天的用户历史。逐事件 inbox、entry 和解释分段只作为重放及贡献经验 worker 的短暂交接，贡献游标确认消费且超过 12 小时后由 `core-storage-maintenance` 分批删除；新 inbox 只保存 SHA-256 幂等栅栏，不再复制完整 JSON。
 
 后续仍由该独立实例保存：
 

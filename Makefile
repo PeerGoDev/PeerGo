@@ -1,4 +1,4 @@
-.PHONY: generate format test check test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-storage-maintenance dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
+.PHONY: generate format test check test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-storage-maintenance dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-storage-maintenance dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
 .PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-seeding-reward-compensation-preview production-seeding-reward-compensation-apply production-hnr-work-reconcile production-traffic-pipeline-reconfigure
 
 # These values are synthetic and limited to the loopback-only local Compose
@@ -392,6 +392,16 @@ dev-core-traffic-projector:
 	PEERGO_CORE_TRAFFIC_SHUTDOWN_TIMEOUT="10s" \
 	go run ./services/core/cmd/traffic-projector
 
+dev-core-storage-maintenance:
+	PEERGO_ENV=development \
+	PEERGO_CORE_DATABASE_URL="$(CORE_DATABASE_URL)" \
+	PEERGO_CORE_STORAGE_CLEANUP_INTERVAL="15s" \
+	PEERGO_CORE_STORAGE_DETAIL_RETENTION="12h" \
+	PEERGO_CORE_STORAGE_HISTORY_RETENTION="720h" \
+	PEERGO_CORE_STORAGE_BATCH_SIZE="10000" \
+	PEERGO_CORE_STORAGE_STARTUP_TIMEOUT="10s" \
+	go run ./services/core/cmd/storage-maintenance
+
 # Closed hourly reward evidence has its own ordered durable. Core assembles and
 # verifies the complete projection before any calculation worker can see it.
 dev-core-seeding-evidence-consumer:
@@ -566,7 +576,7 @@ dev-tracker-stream:
 	PEERGO_TRACKER_ANNOUNCE_SUBJECT="$(LOCAL_TRACKER_ANNOUNCE_SUBJECT)" \
 	PEERGO_TRACKER_ANNOUNCE_STREAM_PROVISION_TIMEOUT="10s" \
 	PEERGO_TRACKER_ANNOUNCE_STREAM_MAX_BYTES="1073741824" \
-	PEERGO_TRACKER_ANNOUNCE_STREAM_MAX_AGE="168h" \
+	PEERGO_TRACKER_ANNOUNCE_STREAM_MAX_AGE="12h" \
 	PEERGO_TRACKER_ANNOUNCE_STREAM_DUPLICATE_WINDOW="10m" \
 	PEERGO_TRACKER_ANNOUNCE_STREAM_REPLICAS="1" \
 	go run ./services/tracker/cmd/jetstream-init
@@ -584,7 +594,7 @@ dev-tracker-swarm-stream:
 	PEERGO_TRACKER_SWARM_SNAPSHOT_SUBJECT="$(LOCAL_TRACKER_SWARM_SNAPSHOT_SUBJECT)" \
 	PEERGO_TRACKER_SWARM_STREAM_PROVISION_TIMEOUT="10s" \
 	PEERGO_TRACKER_SWARM_STREAM_MAX_BYTES="1073741824" \
-	PEERGO_TRACKER_SWARM_STREAM_MAX_AGE="24h" \
+	PEERGO_TRACKER_SWARM_STREAM_MAX_AGE="12h" \
 	PEERGO_TRACKER_SWARM_STREAM_DUPLICATE_WINDOW="10m" \
 	PEERGO_TRACKER_SWARM_STREAM_REPLICAS="1" \
 	go run ./services/tracker/cmd/swarm-stream-init
@@ -765,10 +775,10 @@ dev-settlement-storage-maintenance:
 	PEERGO_ENV=development \
 	PEERGO_TRACKER_DATABASE_URL="$(TRACKER_DATABASE_URL)" \
 	PEERGO_SETTLEMENT_STORAGE_CLEANUP_INTERVAL="15s" \
-	PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION="72h" \
-	PEERGO_SETTLEMENT_STORAGE_SESSION_RETENTION="48h" \
-	PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION="720h" \
-	PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION="4320h" \
+	PEERGO_SETTLEMENT_STORAGE_TERMINAL_RETENTION="3h" \
+	PEERGO_SETTLEMENT_STORAGE_SESSION_RETENTION="12h" \
+	PEERGO_SETTLEMENT_STORAGE_DETAIL_RETENTION="12h" \
+	PEERGO_SETTLEMENT_STORAGE_ANOMALY_RETENTION="720h" \
 	PEERGO_SETTLEMENT_STORAGE_BATCH_SIZE="10000" \
 	PEERGO_SETTLEMENT_STORAGE_STARTUP_TIMEOUT="10s" \
 	go run ./services/settlement/cmd/storage-maintenance
@@ -795,8 +805,8 @@ dev-settlement-policy-timeline:
 	PEERGO_TRACKER_DATABASE_URL="$(TRACKER_DATABASE_URL)" \
 	go run ./services/settlement/cmd/policy-timeline-append $(ARGS)
 
-# The final traffic stream is owned by Settlement. Existing stream drift is an
-# error; neither dispatcher nor Core projector can mutate it at runtime.
+# The final traffic stream is owned by Settlement. Its provisioner may update
+# only MaxAge; neither dispatcher nor Core projector can manage the stream.
 dev-settlement-traffic-stream:
 	PEERGO_ENV=development \
 	PEERGO_SETTLEMENT_NATS_URLS="$(LOCAL_TRACKER_NATS_URLS)" \
@@ -808,7 +818,7 @@ dev-settlement-traffic-stream:
 	PEERGO_SETTLEMENT_TRAFFIC_SUBJECT="$(LOCAL_SETTLEMENT_TRAFFIC_SUBJECT)" \
 	PEERGO_SETTLEMENT_TRAFFIC_STREAM_PROVISION_TIMEOUT="10s" \
 	PEERGO_SETTLEMENT_TRAFFIC_STREAM_MAX_BYTES="1073741824" \
-	PEERGO_SETTLEMENT_TRAFFIC_STREAM_MAX_AGE="168h" \
+	PEERGO_SETTLEMENT_TRAFFIC_STREAM_MAX_AGE="9h" \
 	PEERGO_SETTLEMENT_TRAFFIC_STREAM_DUPLICATE_WINDOW="10m" \
 	PEERGO_SETTLEMENT_TRAFFIC_STREAM_REPLICAS="1" \
 	go run ./services/settlement/cmd/traffic-stream-init

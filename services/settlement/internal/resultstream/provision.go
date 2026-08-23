@@ -22,6 +22,7 @@ var (
 type Manager interface {
 	Get(context.Context, string) (jetstream.StreamConfig, error)
 	Create(context.Context, jetstream.StreamConfig) error
+	Update(context.Context, jetstream.StreamConfig) error
 }
 
 type NATSManager struct{ js jetstream.JetStream }
@@ -50,9 +51,13 @@ func (manager *NATSManager) Create(ctx context.Context, config jetstream.StreamC
 	return err
 }
 
-// Ensure creates a missing stream but never mutates an existing one. An
-// operator must review retention or discard changes because drift can erase
-// replayable accounting projections.
+func (manager *NATSManager) Update(ctx context.Context, config jetstream.StreamConfig) error {
+	_, err := manager.js.UpdateStream(ctx, config)
+	return err
+}
+
+// Ensure creates a missing stream and permits only an in-place MaxAge change.
+// All other stream drift remains fail-closed.
 func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig) (bool, error) {
 	if manager == nil || validate(desired) != nil {
 		return false, ErrInput
@@ -60,7 +65,12 @@ func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig
 	current, err := manager.Get(ctx, desired.Name)
 	if err == nil {
 		if !equivalent(current, desired) {
-			return false, ErrDrift
+			if !maxAgeOnlyDrift(current, desired) {
+				return false, ErrDrift
+			}
+			if err := manager.Update(ctx, desired); err != nil {
+				return false, fmt.Errorf("update Settlement result stream MaxAge: %w", err)
+			}
 		}
 		return false, nil
 	}
@@ -71,6 +81,11 @@ func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig
 		return false, fmt.Errorf("create Settlement result stream: %w", err)
 	}
 	return true, nil
+}
+
+func maxAgeOnlyDrift(current, desired jetstream.StreamConfig) bool {
+	current.MaxAge = desired.MaxAge
+	return equivalent(current, desired)
 }
 
 func validate(config jetstream.StreamConfig) error {

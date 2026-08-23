@@ -12,6 +12,87 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteTrafficHistoryRollups = `-- name: DeleteTrafficHistoryRollups :execrows
+WITH candidate AS (
+    SELECT rollup.bucket_start, rollup.user_id, rollup.torrent_id
+    FROM traffic.user_traffic_three_hour_rollups AS rollup
+    WHERE rollup.bucket_start < $1::timestamptz
+    ORDER BY rollup.bucket_start, rollup.user_id, rollup.torrent_id
+    LIMIT $2::integer
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM traffic.user_traffic_three_hour_rollups AS rollup
+USING candidate
+WHERE rollup.bucket_start = candidate.bucket_start
+  AND rollup.user_id = candidate.user_id
+  AND rollup.torrent_id = candidate.torrent_id
+`
+
+type DeleteTrafficHistoryRollupsParams struct {
+	HistoryBefore pgtype.Timestamptz
+	BatchSize     int32
+}
+
+func (q *Queries) DeleteTrafficHistoryRollups(ctx context.Context, arg DeleteTrafficHistoryRollupsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTrafficHistoryRollups, arg.HistoryBefore, arg.BatchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteTrafficProjectionEntries = `-- name: DeleteTrafficProjectionEntries :execrows
+DELETE FROM traffic.user_traffic_entries
+WHERE settlement_id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteTrafficProjectionEntries(ctx context.Context, settlementIds []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTrafficProjectionEntries, settlementIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteTrafficProjectionExplanations = `-- name: DeleteTrafficProjectionExplanations :execrows
+DELETE FROM traffic.user_traffic_entry_explanations
+WHERE settlement_id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteTrafficProjectionExplanations(ctx context.Context, settlementIds []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTrafficProjectionExplanations, settlementIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteTrafficProjectionInbox = `-- name: DeleteTrafficProjectionInbox :execrows
+DELETE FROM traffic.settlement_inbox
+WHERE event_id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteTrafficProjectionInbox(ctx context.Context, settlementIds []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTrafficProjectionInbox, settlementIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteTrafficProjectionSegments = `-- name: DeleteTrafficProjectionSegments :execrows
+DELETE FROM traffic.user_traffic_entry_segments
+WHERE settlement_id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteTrafficProjectionSegments(ctx context.Context, settlementIds []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTrafficProjectionSegments, settlementIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getHNRProjectionInbox = `-- name: GetHNRProjectionInbox :one
 SELECT payload_sha256, payload_json
 FROM traffic.hnr_projection_inbox
@@ -31,21 +112,16 @@ func (q *Queries) GetHNRProjectionInbox(ctx context.Context, eventID uuid.UUID) 
 }
 
 const getTrafficSettlementInbox = `-- name: GetTrafficSettlementInbox :one
-SELECT payload_sha256, payload_json
+SELECT payload_sha256
 FROM traffic.settlement_inbox
 WHERE event_id = $1::uuid
 `
 
-type GetTrafficSettlementInboxRow struct {
-	PayloadSha256 []byte
-	PayloadJson   string
-}
-
-func (q *Queries) GetTrafficSettlementInbox(ctx context.Context, eventID uuid.UUID) (GetTrafficSettlementInboxRow, error) {
+func (q *Queries) GetTrafficSettlementInbox(ctx context.Context, eventID uuid.UUID) ([]byte, error) {
 	row := q.db.QueryRow(ctx, getTrafficSettlementInbox, eventID)
-	var i GetTrafficSettlementInboxRow
-	err := row.Scan(&i.PayloadSha256, &i.PayloadJson)
-	return i, err
+	var payload_sha256 []byte
+	err := row.Scan(&payload_sha256)
+	return payload_sha256, err
 }
 
 const getUserHNRObligationForUpdate = `-- name: GetUserHNRObligationForUpdate :one
@@ -221,17 +297,15 @@ const insertTrafficSettlementInbox = `-- name: InsertTrafficSettlementInbox :one
 INSERT INTO traffic.settlement_inbox (
     event_id,
     payload_sha256,
-    payload_json,
     occurred_at,
     received_at,
     applied_at
 ) VALUES (
     $1::uuid,
     $2::bytea,
-    $3::text,
+    $3::timestamptz,
     $4::timestamptz,
-    $5::timestamptz,
-    $6::timestamptz
+    $5::timestamptz
 )
 ON CONFLICT (event_id) DO NOTHING
 RETURNING event_id
@@ -240,7 +314,6 @@ RETURNING event_id
 type InsertTrafficSettlementInboxParams struct {
 	EventID       uuid.UUID
 	PayloadSha256 []byte
-	PayloadJson   string
 	OccurredAt    pgtype.Timestamptz
 	ReceivedAt    pgtype.Timestamptz
 	AppliedAt     pgtype.Timestamptz
@@ -250,7 +323,6 @@ func (q *Queries) InsertTrafficSettlementInbox(ctx context.Context, arg InsertTr
 	row := q.db.QueryRow(ctx, insertTrafficSettlementInbox,
 		arg.EventID,
 		arg.PayloadSha256,
-		arg.PayloadJson,
 		arg.OccurredAt,
 		arg.ReceivedAt,
 		arg.AppliedAt,
@@ -480,6 +552,54 @@ func (q *Queries) InsertUserTrafficExplanationSegment(ctx context.Context, arg I
 	return err
 }
 
+const listTrafficProjectionCleanupCandidates = `-- name: ListTrafficProjectionCleanupCandidates :many
+SELECT entry.settlement_id
+FROM traffic.user_traffic_entries AS entry
+CROSS JOIN progression.contribution_upload_cursor AS cursor
+WHERE cursor.singleton = true
+  AND entry.applied_at < $1::timestamptz
+  AND (
+      entry.raw_uploaded = 0
+      OR NOT EXISTS (
+          SELECT 1
+          FROM progression.contribution_experience_policy_revisions
+      )
+      OR entry.occurred_at < (
+          SELECT min(policy.effective_from)
+          FROM progression.contribution_experience_policy_revisions AS policy
+      )
+      OR entry.projection_sequence <= cursor.last_projection_sequence
+  )
+ORDER BY entry.applied_at, entry.projection_sequence
+LIMIT $2::integer
+FOR UPDATE OF entry SKIP LOCKED
+`
+
+type ListTrafficProjectionCleanupCandidatesParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) ListTrafficProjectionCleanupCandidates(ctx context.Context, arg ListTrafficProjectionCleanupCandidatesParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listTrafficProjectionCleanupCandidates, arg.DetailBefore, arg.BatchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var settlement_id uuid.UUID
+		if err := rows.Scan(&settlement_id); err != nil {
+			return nil, err
+		}
+		items = append(items, settlement_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserHNRObligations = `-- name: ListUserHNRObligations :many
 WITH projected AS (
     SELECT
@@ -633,7 +753,7 @@ func (q *Queries) ListUserHNRObligations(ctx context.Context, arg ListUserHNRObl
 
 const listUserTrafficEntries = `-- name: ListUserTrafficEntries :many
 SELECT
-    entry.settlement_id,
+    entry.rollup_id AS settlement_id,
     torrent.id AS torrent_id,
     torrent.title AS torrent_title,
     entry.interval_starts_at,
@@ -642,15 +762,13 @@ SELECT
     entry.raw_downloaded,
     entry.credited_uploaded,
     entry.charged_downloaded,
-    entry.occurred_at,
-    explanation.status AS explanation_status,
-    explanation.segment_count AS explanation_segment_count
-FROM traffic.user_traffic_entries AS entry
+    entry.last_occurred_at AS occurred_at,
+    NULL::text AS explanation_status,
+    NULL::integer AS explanation_segment_count
+FROM traffic.user_traffic_three_hour_rollups AS entry
 JOIN torrents.torrents AS torrent ON torrent.id = entry.torrent_id
-LEFT JOIN traffic.user_traffic_entry_explanations AS explanation
-  ON explanation.settlement_id = entry.settlement_id
 WHERE entry.user_id = $1::uuid
-ORDER BY entry.interval_ends_at DESC, entry.settlement_id DESC
+ORDER BY entry.interval_ends_at DESC, entry.bucket_start DESC, entry.rollup_id DESC
 LIMIT $2::integer
 `
 

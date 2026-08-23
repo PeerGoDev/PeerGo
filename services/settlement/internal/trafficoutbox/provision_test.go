@@ -25,14 +25,20 @@ func TestEnsureStreamCreatesAndChecksExistingConfig(t *testing.T) {
 		t.Fatalf("EnsureStream(existing) = %v, %v", created, err)
 	}
 	manager.current.MaxAge += time.Minute
+	if created, err := EnsureStream(context.Background(), manager, desired); err != nil || created || manager.updated.MaxAge != desired.MaxAge {
+		t.Fatalf("EnsureStream(MaxAge update) = %v, %v, updated=%+v", created, err, manager.updated)
+	}
+	manager.current = desired
+	manager.current.Discard = jetstream.DiscardOld
 	if _, err := EnsureStream(context.Background(), manager, desired); !errors.Is(err, ErrStreamDrift) {
-		t.Fatalf("EnsureStream(drift) error = %v", err)
+		t.Fatalf("EnsureStream(other drift) error = %v", err)
 	}
 }
 
 type fakeStreamManager struct {
 	current jetstream.StreamConfig
 	created jetstream.StreamConfig
+	updated jetstream.StreamConfig
 	getErr  error
 }
 
@@ -41,6 +47,10 @@ func (manager *fakeStreamManager) Get(context.Context, string) (jetstream.Stream
 }
 func (manager *fakeStreamManager) Create(_ context.Context, config jetstream.StreamConfig) error {
 	manager.created = config
+	return nil
+}
+func (manager *fakeStreamManager) Update(_ context.Context, config jetstream.StreamConfig) error {
+	manager.updated = config
 	return nil
 }
 

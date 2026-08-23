@@ -73,15 +73,15 @@ func (repository *PostgresRepository) Apply(ctx context.Context, payload []byte,
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := trafficdb.New(tx)
 	_, err = queries.InsertTrafficSettlementInbox(ctx, trafficdb.InsertTrafficSettlementInboxParams{
-		EventID: eventID, PayloadSha256: payloadDigest[:], PayloadJson: string(payload),
+		EventID: eventID, PayloadSha256: payloadDigest[:],
 		OccurredAt: trafficTimestamp(event.OccurredAt), ReceivedAt: trafficTimestamp(receivedAt), AppliedAt: trafficTimestamp(appliedAt),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		existing, getErr := queries.GetTrafficSettlementInbox(ctx, eventID)
+		existingDigest, getErr := queries.GetTrafficSettlementInbox(ctx, eventID)
 		if getErr != nil {
 			return ApplyResult{}, classifyDatabaseError("read duplicate Core traffic inbox event", getErr)
 		}
-		if !bytes.Equal(existing.PayloadSha256, payloadDigest[:]) || !bytes.Equal([]byte(existing.PayloadJson), payload) {
+		if !bytes.Equal(existingDigest, payloadDigest[:]) {
 			return ApplyResult{}, ErrConflict
 		}
 		if err := tx.Commit(ctx); err != nil {
@@ -189,8 +189,6 @@ func (repository *PostgresRepository) Overview(ctx context.Context, userID uuid.
 		return Overview{}, fmt.Errorf("list Core traffic entries: %w", err)
 	}
 	entries := make([]Entry, 0, len(rows))
-	entryIndexes := make(map[uuid.UUID]int, len(rows))
-	settlementIDs := make([]uuid.UUID, 0, len(rows))
 	for _, row := range rows {
 		if row.SettlementID == uuid.Nil || row.TorrentID < 1 || strings.TrimSpace(row.TorrentTitle) == "" ||
 			!row.IntervalStartsAt.Valid || !row.IntervalEndsAt.Valid || !row.OccurredAt.Valid ||
@@ -202,8 +200,6 @@ func (repository *PostgresRepository) Overview(ctx context.Context, userID uuid.
 		if err != nil {
 			return Overview{}, err
 		}
-		entryIndexes[row.SettlementID] = len(entries)
-		settlementIDs = append(settlementIDs, row.SettlementID)
 		entries = append(entries, Entry{
 			ID: row.SettlementID, TorrentID: row.TorrentID, TorrentTitle: row.TorrentTitle,
 			IntervalStartedAt: row.IntervalStartsAt.Time.UTC().Round(0),
@@ -212,26 +208,6 @@ func (repository *PostgresRepository) Overview(ctx context.Context, userID uuid.
 			CreditedUploaded: row.CreditedUploaded, ChargedDownloaded: row.ChargedDownloaded,
 			SettledAt: row.OccurredAt.Time.UTC().Round(0), Explanation: explanation,
 		})
-	}
-	if len(settlementIDs) > 0 {
-		segmentRows, err := queries.ListUserTrafficExplanationSegments(ctx, settlementIDs)
-		if err != nil {
-			return Overview{}, fmt.Errorf("list Core traffic explanation segments: %w", err)
-		}
-		for _, row := range segmentRows {
-			entryIndex, found := entryIndexes[row.SettlementID]
-			if !found || entries[entryIndex].Explanation.Status != ExplanationComplete ||
-				row.SegmentIndex != int32(len(entries[entryIndex].Explanation.Segments)) ||
-				!row.StartsAt.Valid || !row.EndsAt.Valid || !row.EndsAt.Time.After(row.StartsAt.Time) ||
-				row.RawUploaded < 0 || row.RawDownloaded < 0 || row.CreditedUploaded < 0 || row.ChargedDownloaded < 0 {
-				return Overview{}, ErrInvariant
-			}
-			entries[entryIndex].Explanation.Segments = append(entries[entryIndex].Explanation.Segments, ExplanationSegment{
-				Index: row.SegmentIndex, StartsAt: row.StartsAt.Time.UTC().Round(0), EndsAt: row.EndsAt.Time.UTC().Round(0),
-				RawUploaded: row.RawUploaded, RawDownloaded: row.RawDownloaded,
-				CreditedUploaded: row.CreditedUploaded, ChargedDownloaded: row.ChargedDownloaded,
-			})
-		}
 	}
 	for index := range entries {
 		if validateExplanationProjection(entries[index]) != nil {
