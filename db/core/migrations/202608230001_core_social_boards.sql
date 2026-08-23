@@ -36,6 +36,12 @@ INSERT INTO social.boards (
     ('media', '影音闲聊', '电影、剧集与音乐', 'clapperboard', 'blue', 30, true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('staff', '站务公告', '社区规则与站务通知', 'megaphone', 'violet', 40, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
+-- Historical rows must be assigned to the default board before board_id can
+-- become NOT NULL. The existing transition guard deliberately rejects any
+-- update that is not a versioned author edit, so remove it for this one-time
+-- backfill. A board-aware replacement is installed later in this transaction.
+DROP TRIGGER social_post_history_protected ON social.posts;
+
 ALTER TABLE social.posts
     ADD COLUMN board_id text,
     ADD COLUMN is_pinned boolean NOT NULL DEFAULT false,
@@ -305,8 +311,6 @@ FOR EACH ROW EXECUTE FUNCTION social.reject_social_administration_evidence_mutat
 -- The replacement additionally permits one versioned staff metadata change,
 -- move, hide, or restore while keeping author content and edit timestamps
 -- untouched.
-DROP TRIGGER social_post_history_protected ON social.posts;
-
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION social.protect_post_history()
 RETURNS trigger
