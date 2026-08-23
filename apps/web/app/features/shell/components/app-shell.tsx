@@ -11,11 +11,9 @@ import {
   AwardIcon,
   BookmarkIcon,
   ChartNoAxesCombinedIcon,
-  ChevronDownIcon,
   ClockAlertIcon,
   DownloadIcon,
   FileCheckIcon,
-  FolderClockIcon,
   GaugeIcon,
   GraduationCapIcon,
   HomeIcon,
@@ -48,11 +46,6 @@ import {
 import { Badge } from "~/components/ui/badge"
 import { Button } from "~/components/ui/button"
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "~/components/ui/collapsible"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -75,9 +68,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarSeparator,
@@ -111,12 +101,10 @@ type NavigationItem = {
 type NavigationGroup = {
   label: string
   items: NavigationItem[]
-  collapsible?: boolean
-  icon?: LucideIcon
 }
 
 const appNavigationButtonClass =
-  "h-10 justify-end gap-3 rounded-none px-4 group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center [&_svg]:size-5"
+  "relative h-10 justify-end gap-3 rounded-none border-r-4 border-transparent px-4 py-2.5 text-sm font-medium text-foreground transition-colors group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center [&_svg]:size-5 hover:bg-accent hover:text-foreground data-active:border-primary data-active:bg-transparent data-active:bg-gradient-to-r data-active:from-transparent data-active:to-border data-active:text-primary data-active:hover:bg-transparent data-active:hover:text-primary"
 
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -162,9 +150,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
   const canReadDownloadRestriction = capabilities.data?.items.some(
     (capability) => capability.action === "user.downloadrestriction.read.self"
-  )
-  const canReadTorrentSubmissions = capabilities.data?.items.some(
-    (capability) => capability.action === "torrent.submission.read.self"
   )
   const canReadTorrentBookmarks = capabilities.data?.items.some(
     (capability) => capability.action === "torrent.bookmark.read.self"
@@ -343,15 +328,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           },
         ]
       : []),
-    ...(canReadTorrentSubmissions
-      ? [
-          {
-            label: "我的上传",
-            to: "/account/submissions",
-            icon: FolderClockIcon,
-          },
-        ]
-      : []),
   ]
   // The account dropdown and sidebar share these capability-backed entries so
   // navigation cannot drift when a permission or route changes. The sidebar
@@ -409,14 +385,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         {
           label: "账户与成长",
           items: accountDataNavigationItems,
-          collapsible: true,
-          icon: CoinsIcon,
         },
         {
           label: "种子与订阅",
           items: torrentAccountNavigationItems,
-          collapsible: true,
-          icon: FolderClockIcon,
         },
         {
           label: "审核",
@@ -497,17 +469,17 @@ export function AppShell({ children }: { children: ReactNode }) {
       }
     >
       <Sidebar collapsible="icon">
-        <SidebarHeader className="h-[60px] justify-center gap-0 border-b px-4 py-0">
+        <SidebarHeader className="h-[60px] justify-end gap-0 border-b px-4 py-0">
           <Link
             to="/"
-            className="flex w-full min-w-0 items-baseline justify-end gap-1 outline-none group-data-[collapsible=icon]:justify-center focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            className="flex w-full min-w-0 items-baseline justify-end gap-1 outline-none group-data-[collapsible=icon]:justify-center hover:no-underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
-            <span className="font-heading text-xl font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            <span className="font-heading text-xl font-semibold group-data-[collapsible=icon]:hidden">
               {siteName}
             </span>
             <Badge
               variant="outline"
-              className="h-4 border-warning/40 bg-warning/10 px-1 text-[9px] text-warning-foreground uppercase group-data-[collapsible=icon]:hidden"
+              className="h-[14px] rounded border-amber-500/30 bg-amber-500/15 px-1 py-px text-[10px] leading-none font-medium tracking-wide text-amber-600 uppercase group-data-[collapsible=icon]:hidden dark:text-amber-400"
             >
               beta
             </Badge>
@@ -522,7 +494,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             .filter((group) => group.items.length > 0)
             .map((group, groupIndex) => (
               <div key={group.label}>
-                {groupIndex > 0 ? <SidebarSeparator /> : null}
+                {groupIndex > 0 ? (
+                  <SidebarSeparator className="mx-6 my-1.5" />
+                ) : null}
                 <AppNavigationGroup
                   group={group}
                   pathname={location.pathname}
@@ -533,7 +507,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </SidebarContent>
 
         <SidebarSeparator className="mx-0" />
-        <SidebarFooter className="gap-0 p-0">
+        <SidebarFooter className="gap-0 p-0 [&>button]:px-4">
           <SidebarCollapseControl />
           <Separator className="hidden group-data-[collapsible=icon]:hidden lg:block" />
           <div className="hidden p-3 text-right text-xs text-muted-foreground group-data-[collapsible=icon]:hidden lg:block">
@@ -737,75 +711,9 @@ function AppNavigationGroup({
   pathname: string
   hash: string
 }) {
-  if (group.collapsible) {
-    const active = group.items.some((item) =>
-      navigationItemIsActive(item.to, pathname, hash)
-    )
-    const GroupIcon = group.icon ?? UserIcon
-
-    return (
-      <SidebarGroup className="p-0">
-        <SidebarGroupContent>
-          <SidebarMenu>
-            <Collapsible defaultOpen={active} render={<SidebarMenuItem />}>
-              <CollapsibleTrigger
-                render={
-                  <SidebarMenuButton
-                    tooltip={group.label}
-                    variant="classic"
-                    className={appNavigationButtonClass}
-                  />
-                }
-              >
-                <ChevronDownIcon className="transition-transform group-data-[collapsible=icon]:hidden in-data-open:rotate-180" />
-                <span className="group-data-[collapsible=icon]:hidden">
-                  {group.label}
-                </span>
-                <GroupIcon />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub className="mx-0 gap-0 border-l-0 px-0 py-0">
-                  {group.items.map((item) => {
-                    const itemActive = navigationItemIsActive(
-                      item.to,
-                      pathname,
-                      hash
-                    )
-                    return (
-                      <SidebarMenuSubItem key={item.to}>
-                        <SidebarMenuSubButton
-                          render={<SidebarNavigationLink to={item.to} />}
-                          isActive={itemActive}
-                          className="h-9 translate-x-0 justify-end rounded-none border-r-2 border-transparent px-4 text-muted-foreground transition-colors data-active:border-primary data-active:bg-primary/10 data-active:text-primary"
-                        >
-                          <span>{item.label}</span>
-                          {item.badge ? (
-                            <Badge
-                              variant="secondary"
-                              className="min-w-5 justify-center px-1.5"
-                            >
-                              {item.badge}
-                            </Badge>
-                          ) : null}
-                          <item.icon />
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    )
-                  })}
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </Collapsible>
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-    )
-  }
-
   return (
     <SidebarGroup className="p-0">
-      <SidebarGroupLabel className="px-5 text-right group-data-[collapsible=icon]:sr-only">
-        {group.label}
-      </SidebarGroupLabel>
+      <SidebarGroupLabel className="sr-only">{group.label}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {group.items.map((item) => {

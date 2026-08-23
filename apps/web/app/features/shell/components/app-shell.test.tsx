@@ -196,17 +196,11 @@ describe("AppShell mobile navigation", () => {
       within(navigation).getByRole("link", { name: "勋章" })
     ).toHaveAttribute("href", "/medals")
     expect(
-      within(navigation).getByRole("button", { name: "账户与成长" })
-    ).toHaveAttribute("aria-expanded", "true")
+      within(navigation).queryByRole("button", { name: "账户与成长" })
+    ).not.toBeInTheDocument()
     expect(
       within(navigation).queryByRole("link", { name: "我的上传" })
     ).not.toBeInTheDocument()
-    await user.click(
-      within(navigation).getByRole("button", { name: "种子与订阅" })
-    )
-    expect(
-      within(navigation).getByRole("link", { name: "我的上传" })
-    ).toHaveAttribute("href", "/account/submissions")
     expect(
       within(navigation).getByRole("link", { name: "我的收藏" })
     ).toHaveAttribute("href", "/account/bookmarks")
@@ -255,10 +249,9 @@ describe("AppShell mobile navigation", () => {
       "href",
       "/account/hnr"
     )
-    expect(screen.getByRole("menuitem", { name: "我的上传" })).toHaveAttribute(
-      "href",
-      "/account/submissions"
-    )
+    expect(
+      screen.queryByRole("menuitem", { name: "我的上传" })
+    ).not.toBeInTheDocument()
     expect(screen.getByRole("menuitem", { name: "我的收藏" })).toHaveAttribute(
       "href",
       "/account/bookmarks"
