@@ -1396,7 +1396,11 @@ INSERT INTO workgroups.memberships (
 		return Membership{}, fmt.Errorf("lock approved workgroup membership: %w", err)
 	}
 	if membership.Status == MembershipActive {
-		return Membership{}, ErrMembershipAlreadyActive
+		// A membership can be restored independently (for example, by the
+		// audited PtYes reviewer migration) while an earlier application is
+		// still pending. Approving that application should close its workflow
+		// without rewriting the membership's provenance or entitlement timeline.
+		return membership, nil
 	}
 	from := membership.Status
 	if _, err := tx.Exec(ctx, `
