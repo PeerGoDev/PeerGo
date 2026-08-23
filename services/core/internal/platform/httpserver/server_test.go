@@ -811,6 +811,46 @@ func (unavailableSocialPostService) DeleteMyPost(context.Context, string, string
 	return identity.ErrSessionNotFound
 }
 
+func (unavailableSocialPostService) Overview(context.Context, string) (social.CommunityOverview, error) {
+	return social.CommunityOverview{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) UploadMedia(context.Context, string, string, []byte) (social.PostMedia, error) {
+	return social.PostMedia{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) ReadMedia(context.Context, string, uuid.UUID) (social.MediaObject, error) {
+	return social.MediaObject{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) SetLike(context.Context, string, string, uuid.UUID, bool) (social.InteractionState, error) {
+	return social.InteractionState{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) SetRepost(context.Context, string, string, uuid.UUID, bool) (social.InteractionState, error) {
+	return social.InteractionState{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) SetFollow(context.Context, string, string, string, bool) (social.FollowState, error) {
+	return social.FollowState{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) Vote(context.Context, string, string, uuid.UUID, uuid.UUID) (social.Poll, error) {
+	return social.Poll{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) ClaimRedPacket(context.Context, string, string, uuid.UUID, uuid.UUID) (social.RedPacketClaim, error) {
+	return social.RedPacketClaim{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) ListManagedBoards(context.Context, authz.StaffActor) ([]social.Board, error) {
+	return nil, authz.ErrForbidden
+}
+func (unavailableSocialPostService) CreateManagedBoard(context.Context, authz.StaffActor, social.CreateBoardInput) (social.Board, error) {
+	return social.Board{}, authz.ErrForbidden
+}
+func (unavailableSocialPostService) UpdateManagedBoard(context.Context, authz.StaffActor, social.UpdateBoardInput) (social.Board, error) {
+	return social.Board{}, authz.ErrForbidden
+}
+func (unavailableSocialPostService) ListManagedPosts(context.Context, authz.StaffActor, social.PostListQuery) (social.PostPage, error) {
+	return social.PostPage{}, authz.ErrForbidden
+}
+func (unavailableSocialPostService) ModeratePost(context.Context, authz.StaffActor, social.ModeratePostInput) (social.Post, error) {
+	return social.Post{}, authz.ErrForbidden
+}
+
 func (unavailableCommentService) UpdateMyComment(context.Context, string, string, social.UpdateCommentInput) (social.Comment, error) {
 	return social.Comment{}, identity.ErrSessionNotFound
 }

@@ -8,6 +8,11 @@ import {
   PencilIcon,
   Repeat2Icon,
   Trash2Icon,
+  GiftIcon,
+  PinIcon,
+  SparklesIcon,
+  UserPlusIcon,
+  UserCheckIcon,
 } from "lucide-react"
 
 import {
@@ -23,6 +28,7 @@ import {
 } from "~/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
 import { Button } from "~/components/ui/button"
+import { Badge } from "~/components/ui/badge"
 import { Separator } from "~/components/ui/separator"
 import {
   DropdownMenu,
@@ -36,6 +42,11 @@ import { ContentTipDialog } from "~/features/economy/components/content-tip-dial
 import {
   type SocialPost,
   useDeleteSocialPost,
+  useClaimSocialRedPacket,
+  useSocialFollow,
+  useSocialPollVote,
+  useSocialPostLike,
+  useSocialPostRepost,
   useUpdateSocialPost,
 } from "~/features/social/api/posts.queries"
 import { formatRelativeTime } from "~/features/torrent/model/format"
@@ -66,7 +77,14 @@ export function SocialPostCard({
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const updatePost = useUpdateSocialPost(post.id)
   const deletePost = useDeleteSocialPost()
+  const likePost = useSocialPostLike()
+  const repostPost = useSocialPostRepost()
+  const follow = useSocialFollow()
+  const vote = useSocialPollVote()
+  const claimPacket = useClaimSocialRedPacket()
   const isOwner = currentUserId === post.author.id
+  const topics = post.topics ?? []
+  const media = post.media ?? []
 
   async function saveEdit() {
     if (!csrfToken || !draft.trim()) return
@@ -165,48 +183,243 @@ export function SocialPostCard({
               {post.edited_at ? <span>· 已编辑</span> : null}
             </div>
           </div>
+          {post.board ? (
+            <Badge variant="outline" className="border-primary/20 text-primary">
+              {post.board.name}
+            </Badge>
+          ) : null}
         </div>
 
-        {isOwner ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon-sm" aria-label="动态操作" />
+        <div className="flex items-center gap-1">
+          {!isOwner && csrfToken ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                follow.mutate({
+                  username: post.author.username,
+                  active: !post.author.followed_by_me,
+                  csrfToken,
+                })
               }
+              disabled={follow.isPending}
             >
-              <MoreHorizontalIcon data-icon="inline-start" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
-              <DropdownMenuItem
-                onClick={() => {
-                  setDraft(post.content)
-                  setEditing(true)
-                }}
+              {post.author.followed_by_me ? (
+                <UserCheckIcon data-icon="inline-start" />
+              ) : (
+                <UserPlusIcon data-icon="inline-start" />
+              )}
+              {post.author.followed_by_me ? "已关注" : "关注"}
+            </Button>
+          ) : null}
+          {isOwner ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="动态操作"
+                  />
+                }
               >
-                <PencilIcon />
-                编辑
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => setConfirmDelete(true)}
-              >
-                <Trash2Icon />
-                删除
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
+                <MoreHorizontalIcon data-icon="inline-start" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-32">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setDraft(post.content)
+                    setEditing(true)
+                  }}
+                >
+                  <PencilIcon />
+                  编辑
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <Trash2Icon />
+                  删除
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
       </div>
 
       {content}
+
+      {topics.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {topics.map((topic) => (
+            <Badge key={topic} variant="secondary">
+              #{topic}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+
+      {media.length > 0 ? (
+        <div
+          className={cn(
+            "mt-3 grid gap-2 overflow-hidden rounded-md",
+            media.length === 1 ? "grid-cols-1" : "grid-cols-2"
+          )}
+        >
+          {media.map((item) => (
+            <a
+              key={item.id}
+              href={item.url}
+              target="_blank"
+              rel="noreferrer"
+              className="overflow-hidden rounded-md bg-muted"
+            >
+              <img
+                src={item.url}
+                alt="动态图片"
+                loading="lazy"
+                className={cn(
+                  "w-full object-cover",
+                  media.length === 1 ? "max-h-[420px]" : "aspect-video"
+                )}
+              />
+            </a>
+          ))}
+        </div>
+      ) : null}
+
+      {post.poll ? (
+        <div className="mt-3 space-y-2 rounded-md border bg-muted/20 p-3">
+          <p className="text-sm font-medium">{post.poll.question}</p>
+          {post.poll.options.map((option) => {
+            const percent =
+              post.poll && post.poll.total_votes > 0
+                ? Math.round((option.vote_count * 100) / post.poll.total_votes)
+                : 0
+            const selected = post.poll?.selected_option_id === option.id
+            return (
+              <Button
+                key={option.id}
+                type="button"
+                variant={selected ? "secondary" : "outline"}
+                className="relative w-full justify-between overflow-hidden"
+                disabled={!csrfToken || post.poll?.closed || vote.isPending}
+                onClick={() =>
+                  csrfToken &&
+                  vote.mutate({
+                    postId: post.id,
+                    optionId: option.id,
+                    csrfToken,
+                  })
+                }
+              >
+                <span
+                  className="absolute inset-y-0 left-0 bg-primary/10"
+                  style={{ width: `${percent}%` }}
+                />
+                <span className="relative">{option.label}</span>
+                <span className="relative text-muted-foreground">
+                  {percent}%
+                </span>
+              </Button>
+            )
+          })}
+          <p className="text-xs text-muted-foreground">
+            {post.poll.total_votes} 人参与{post.poll.closed ? " · 已结束" : ""}
+          </p>
+        </div>
+      ) : null}
+
+      {post.red_packet ? (
+        <div className="mt-3 flex items-center justify-between rounded-md border border-primary/20 bg-primary/5 p-3">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <GiftIcon className="size-4" />
+            </span>
+            <div>
+              <p className="text-sm font-medium">魔力值红包</p>
+              <p className="text-xs text-muted-foreground">
+                剩余 {post.red_packet.remaining_amount} /{" "}
+                {post.red_packet.total_amount} ·{" "}
+                {post.red_packet.remaining_claims} 份
+              </p>
+            </div>
+          </div>
+          {post.red_packet.claimed_by_me ? (
+            <Badge variant="secondary">
+              已领 {post.red_packet.my_claim_amount}
+            </Badge>
+          ) : !isOwner ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() =>
+                csrfToken &&
+                claimPacket.mutate({
+                  postId: post.id,
+                  csrfToken,
+                  idempotencyKey: crypto.randomUUID(),
+                })
+              }
+              disabled={
+                !csrfToken ||
+                post.red_packet.remaining_claims === 0 ||
+                claimPacket.isPending
+              }
+            >
+              {claimPacket.isPending ? (
+                <Spinner data-icon="inline-start" />
+              ) : null}
+              领取
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {post.pinned || post.featured ? (
+        <div className="mt-2 flex gap-1">
+          {post.pinned ? (
+            <Badge variant="outline">
+              <PinIcon />
+              置顶
+            </Badge>
+          ) : null}
+          {post.featured ? (
+            <Badge variant="outline">
+              <SparklesIcon />
+              精华
+            </Badge>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-3">
         <Separator />
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <UnavailablePostAction label="点赞" title="动态点赞尚未开放">
+            <Button
+              type="button"
+              variant="ghost"
+              size="default"
+              className={cn(
+                "h-9 gap-1.5 border-0 px-3",
+                post.liked_by_me && "text-primary"
+              )}
+              onClick={() =>
+                csrfToken &&
+                likePost.mutate({
+                  postId: post.id,
+                  active: !post.liked_by_me,
+                  csrfToken,
+                })
+              }
+              disabled={!csrfToken || likePost.isPending}
+            >
               <HeartIcon data-icon="inline-start" />
-            </UnavailablePostAction>
+              {(post.like_count ?? 0) > 0 ? post.like_count : "点赞"}
+            </Button>
             {linkToDetail ? (
               <Button
                 render={<Link to={`/social/post/${post.id}`} />}
@@ -224,9 +437,27 @@ export function SocialPostCard({
                 {post.comment_count > 0 ? post.comment_count : "评论"}
               </span>
             )}
-            <UnavailablePostAction label="转发" title="动态转发尚未开放">
+            <Button
+              type="button"
+              variant="ghost"
+              size="default"
+              className={cn(
+                "h-9 gap-1.5 border-0 px-3",
+                post.reposted_by_me && "text-primary"
+              )}
+              onClick={() =>
+                csrfToken &&
+                repostPost.mutate({
+                  postId: post.id,
+                  active: !post.reposted_by_me,
+                  csrfToken,
+                })
+              }
+              disabled={!csrfToken || repostPost.isPending}
+            >
               <Repeat2Icon data-icon="inline-start" />
-            </UnavailablePostAction>
+              {(post.repost_count ?? 0) > 0 ? post.repost_count : "转发"}
+            </Button>
             {!isOwner ? (
               <ContentTipDialog
                 target={{ kind: "post", postId: post.id, title: post.content }}

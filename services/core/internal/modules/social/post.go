@@ -1,8 +1,10 @@
 package social
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -28,13 +30,16 @@ var (
 	ErrPostVersionConflict     = errors.New("social post version conflicts with current state")
 	ErrPostIdempotencyConflict = errors.New("social post idempotency key was reused with different input")
 	ErrPostInvariant           = errors.New("social post projection violates persisted invariants")
+	ErrSocialBoardUnavailable  = errors.New("social board is unavailable")
+	ErrSocialCommunityConflict = errors.New("social community state conflicts with current state")
 )
 
 type PostState string
 
 const (
-	PostVisible       PostState = "visible"
-	PostAuthorDeleted PostState = "author_deleted"
+	PostVisible         PostState = "visible"
+	PostAuthorDeleted   PostState = "author_deleted"
+	PostModeratorHidden PostState = "moderator_hidden"
 )
 
 type PostSort string
@@ -42,12 +47,21 @@ type PostSort string
 const (
 	PostNewest PostSort = "newest"
 	PostOldest PostSort = "oldest"
+	PostHot    PostSort = "hot"
+)
+
+type FeedKind string
+
+const (
+	FeedDiscover  FeedKind = "discover"
+	FeedFollowing FeedKind = "following"
 )
 
 type PostAuthor struct {
-	ID          uuid.UUID
-	Username    string
-	DisplayName string
+	ID           uuid.UUID
+	Username     string
+	DisplayName  string
+	FollowedByMe bool
 }
 
 // Post is the public dynamic-feed projection. Internal IDs, request digests,
@@ -59,6 +73,17 @@ type Post struct {
 	State        PostState
 	Version      int64
 	CommentCount int64
+	LikeCount    int64
+	RepostCount  int64
+	LikedByMe    bool
+	RepostedByMe bool
+	Board        Board
+	Pinned       bool
+	Featured     bool
+	Topics       []string
+	Media        []PostMedia
+	Poll         *Poll
+	RedPacket    *RedPacket
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	EditedAt     *time.Time
@@ -70,6 +95,7 @@ type PostPage struct {
 	Limit  int
 	Offset int
 	Sort   PostSort
+	Feed   FeedKind
 }
 
 // PostListQuery is shared by the feed and member-profile projection. An empty
@@ -80,11 +106,20 @@ type PostListQuery struct {
 	Limit          int
 	Offset         int
 	AuthorUsername string
+	ViewerID       uuid.UUID
+	Feed           FeedKind
+	BoardID        string
+	FeaturedOnly   bool
+	Topic          string
 }
 
 type CreatePostInput struct {
 	RequestID uuid.UUID
 	Body      string
+	BoardID   string
+	MediaIDs  []uuid.UUID
+	Poll      *CreatePollInput
+	RedPacket *CreateRedPacketInput
 }
 
 type UpdatePostInput struct {
@@ -103,6 +138,11 @@ type createPostCommand struct {
 	RequestID        uuid.UUID
 	AuthorID         uuid.UUID
 	Body             string
+	BoardID          string
+	MediaIDs         []uuid.UUID
+	Poll             *CreatePollInput
+	RedPacket        *CreateRedPacketInput
+	Topics           []string
 	CreateBodySHA256 [sha256.Size]byte
 	CreatedAt        time.Time
 }
@@ -156,12 +196,19 @@ func NewPostService(authenticator PostSessionAuthenticator, authorizer authz.Aut
 
 func (service *PostService) List(ctx context.Context, cookieToken string, query PostListQuery) (PostPage, error) {
 	query.AuthorUsername = strings.TrimSpace(query.AuthorUsername)
-	if !validPostSort(query.Sort) || query.Limit < 1 || query.Limit > MaxPostLimit || query.Offset < 0 || query.Offset > MaxPostOffset || utf8.RuneCountInString(query.AuthorUsername) > 64 {
+	query.BoardID = strings.TrimSpace(query.BoardID)
+	query.Topic = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(query.Topic, "#")))
+	if query.Feed == "" {
+		query.Feed = FeedDiscover
+	}
+	if !validPostSort(query.Sort) || !validFeedKind(query.Feed) || query.Limit < 1 || query.Limit > MaxPostLimit || query.Offset < 0 || query.Offset > MaxPostOffset || utf8.RuneCountInString(query.AuthorUsername) > 64 || utf8.RuneCountInString(query.BoardID) > 64 || utf8.RuneCountInString(query.Topic) > 40 {
 		return PostPage{}, ErrPostInput
 	}
-	if _, err := service.authorizeRead(ctx, cookieToken); err != nil {
+	viewerID, err := service.authorizeRead(ctx, cookieToken)
+	if err != nil {
 		return PostPage{}, err
 	}
+	query.ViewerID = viewerID
 	items, total, err := service.repository.List(ctx, query)
 	if err != nil {
 		return PostPage{}, err
@@ -174,14 +221,15 @@ func (service *PostService) List(ctx context.Context, cookieToken string, query 
 			return PostPage{}, ErrPostInvariant
 		}
 	}
-	return PostPage{Items: items, Total: total, Limit: query.Limit, Offset: query.Offset, Sort: query.Sort}, nil
+	return PostPage{Items: items, Total: total, Limit: query.Limit, Offset: query.Offset, Sort: query.Sort, Feed: query.Feed}, nil
 }
 
 func (service *PostService) FindVisible(ctx context.Context, cookieToken string, postID uuid.UUID) (Post, error) {
 	if postID == uuid.Nil {
 		return Post{}, ErrPostInput
 	}
-	if _, err := service.authorizeRead(ctx, cookieToken); err != nil {
+	viewerID, err := service.authorizeRead(ctx, cookieToken)
+	if err != nil {
 		return Post{}, err
 	}
 	post, err := service.repository.FindVisible(ctx, postID)
@@ -191,12 +239,24 @@ func (service *PostService) FindVisible(ctx context.Context, cookieToken string,
 	if validatePersistedPost(post) != nil || post.ID != postID || post.State != PostVisible {
 		return Post{}, ErrPostInvariant
 	}
+	if community, ok := service.repository.(CommunityRepository); ok {
+		posts, enrichErr := community.EnrichPosts(ctx, viewerID, []Post{post}, service.now().UTC())
+		if enrichErr != nil {
+			return Post{}, enrichErr
+		}
+		post = posts[0]
+	}
 	return post, nil
 }
 
 func (service *PostService) Create(ctx context.Context, cookieToken, csrfToken string, input CreatePostInput) (Post, error) {
 	body, err := normalizePostBody(input.Body)
-	if err != nil || input.RequestID == uuid.Nil {
+	boardID := strings.TrimSpace(input.BoardID)
+	if boardID == "" {
+		boardID = "general"
+	}
+	validationNow := service.now().UTC()
+	if err != nil || input.RequestID == uuid.Nil || !validBoardID(boardID) || len(input.MediaIDs) > MaxPostMedia || validateCreatePoll(input.Poll, validationNow) != nil || validateCreateRedPacket(input.RedPacket) != nil {
 		return Post{}, ErrPostInput
 	}
 	authorID, now, err := service.authorizeWrite(ctx, cookieToken, csrfToken, authz.ActionSocialPostCreateSelf)
@@ -205,13 +265,22 @@ func (service *PostService) Create(ctx context.Context, cookieToken, csrfToken s
 	}
 	post, err := service.repository.Create(ctx, createPostCommand{
 		PublicID: uuid.New(), RequestID: input.RequestID, AuthorID: authorID, Body: body,
-		CreateBodySHA256: sha256.Sum256([]byte(body)), CreatedAt: now,
+		BoardID: boardID, MediaIDs: append([]uuid.UUID(nil), input.MediaIDs...), Poll: input.Poll,
+		RedPacket: input.RedPacket, Topics: extractTopics(body),
+		CreateBodySHA256: createPostInputSHA256(body, boardID, input.MediaIDs, input.Poll, input.RedPacket), CreatedAt: now,
 	})
 	if err != nil {
 		return Post{}, err
 	}
 	if validatePersistedPost(post) != nil || post.Author.ID != authorID || post.State != PostVisible {
 		return Post{}, ErrPostInvariant
+	}
+	if community, ok := service.repository.(CommunityRepository); ok {
+		posts, enrichErr := community.EnrichPosts(ctx, authorID, []Post{post}, now)
+		if enrichErr != nil {
+			return Post{}, enrichErr
+		}
+		post = posts[0]
 	}
 	return post, nil
 }
@@ -233,6 +302,13 @@ func (service *PostService) UpdateMyPost(ctx context.Context, cookieToken, csrfT
 	}
 	if validatePersistedPost(post) != nil || post.ID != input.PostID || post.Author.ID != authorID || post.State != PostVisible {
 		return Post{}, ErrPostInvariant
+	}
+	if community, ok := service.repository.(CommunityRepository); ok {
+		posts, enrichErr := community.EnrichPosts(ctx, authorID, []Post{post}, now)
+		if enrichErr != nil {
+			return Post{}, enrichErr
+		}
+		post = posts[0]
 	}
 	return post, nil
 }
@@ -260,6 +336,58 @@ func (service *PostService) authorizeRead(ctx context.Context, cookieToken strin
 		return uuid.Nil, err
 	}
 	return session.User.ID, nil
+}
+
+func createPostInputSHA256(body, boardID string, mediaIDs []uuid.UUID, poll *CreatePollInput, redPacket *CreateRedPacketInput) [sha256.Size]byte {
+	type canonicalPoll struct {
+		Question string   `json:"question"`
+		Options  []string `json:"options"`
+		ClosesAt string   `json:"closes_at,omitempty"`
+	}
+	type canonicalRedPacket struct {
+		TotalAmount int64 `json:"total_amount"`
+		ClaimCount  int   `json:"claim_count"`
+	}
+	type canonicalInput struct {
+		Body      string              `json:"body"`
+		BoardID   string              `json:"board_id"`
+		MediaIDs  []string            `json:"media_ids"`
+		Poll      *canonicalPoll      `json:"poll,omitempty"`
+		RedPacket *canonicalRedPacket `json:"red_packet,omitempty"`
+	}
+	canonical := canonicalInput{Body: body, BoardID: boardID, MediaIDs: make([]string, 0, len(mediaIDs))}
+	for _, mediaID := range mediaIDs {
+		canonical.MediaIDs = append(canonical.MediaIDs, mediaID.String())
+	}
+	if poll != nil {
+		canonical.Poll = &canonicalPoll{Question: strings.TrimSpace(poll.Question), Options: make([]string, 0, len(poll.Options))}
+		for _, option := range poll.Options {
+			canonical.Poll.Options = append(canonical.Poll.Options, strings.TrimSpace(option))
+		}
+		if poll.ClosesAt != nil {
+			canonical.Poll.ClosesAt = poll.ClosesAt.UTC().Format(time.RFC3339Nano)
+		}
+	}
+	if redPacket != nil {
+		canonical.RedPacket = &canonicalRedPacket{TotalAmount: redPacket.TotalAmount, ClaimCount: redPacket.ClaimCount}
+	}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		panic("canonical social post input cannot fail to encode: " + err.Error())
+	}
+	return sha256.Sum256(payload)
+}
+
+func createPostDigestMatches(stored []byte, command createPostCommand) bool {
+	if bytes.Equal(stored, command.CreateBodySHA256[:]) {
+		return true
+	}
+	// Posts created before boards and attachments existed stored a digest of the
+	// body only. Preserve retry compatibility for that exact legacy shape while
+	// still rejecting a reused request ID that adds any new feature.
+	legacyShape := command.BoardID == "general" && len(command.MediaIDs) == 0 && command.Poll == nil && command.RedPacket == nil
+	legacyDigest := sha256.Sum256([]byte(command.Body))
+	return legacyShape && bytes.Equal(stored, legacyDigest[:])
 }
 
 func (service *PostService) authorizeWrite(ctx context.Context, cookieToken, csrfToken string, action authz.Action) (uuid.UUID, time.Time, error) {
@@ -319,5 +447,9 @@ func validatePersistedPost(post Post) error {
 }
 
 func validPostSort(sort PostSort) bool {
-	return sort == PostNewest || sort == PostOldest
+	return sort == PostNewest || sort == PostOldest || sort == PostHot
+}
+
+func validFeedKind(feed FeedKind) bool {
+	return feed == FeedDiscover || feed == FeedFollowing
 }

@@ -1,12 +1,12 @@
 package social
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
+	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -15,17 +15,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/peergo/peergo/services/core/internal/generated/socialdb"
+	"github.com/peergo/peergo/services/core/internal/modules/economy"
 )
 
 type PostgresPostRepository struct {
-	pool *pgxpool.Pool
+	pool    *pgxpool.Pool
+	economy *economy.PostgresRepository
 }
 
 func NewPostgresPostRepository(pool *pgxpool.Pool) (*PostgresPostRepository, error) {
 	if pool == nil {
 		return nil, errors.New("social post database is required")
 	}
-	return &PostgresPostRepository{pool: pool}, nil
+	ledger, err := economy.NewPostgresRepository(pool)
+	if err != nil {
+		return nil, err
+	}
+	return &PostgresPostRepository{pool: pool, economy: ledger}, nil
 }
 
 // List keeps total and rows in one repeatable-read snapshot so offset bounds
@@ -40,7 +46,10 @@ func (repository *PostgresPostRepository) List(ctx context.Context, query PostLi
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := socialdb.New(tx)
-	total, err := queries.CountVisiblePosts(ctx, query.AuthorUsername)
+	total, err := queries.CountVisiblePosts(ctx, socialdb.CountVisiblePostsParams{
+		AuthorUsername: query.AuthorUsername, BoardID: query.BoardID, FeaturedOnly: query.FeaturedOnly,
+		Topic: query.Topic, FeedKind: string(query.Feed), ViewerID: query.ViewerID,
+	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("count social posts: %w", err)
 	}
@@ -48,7 +57,9 @@ func (repository *PostgresPostRepository) List(ctx context.Context, query PostLi
 		return nil, 0, ErrPostInvariant
 	}
 	rows, err := queries.ListVisiblePosts(ctx, socialdb.ListVisiblePostsParams{
-		AuthorUsername: query.AuthorUsername, SortOrder: string(query.Sort), ResultLimit: int32(query.Limit), ResultOffset: int32(query.Offset),
+		AuthorUsername: query.AuthorUsername, BoardID: query.BoardID, FeaturedOnly: query.FeaturedOnly,
+		Topic: query.Topic, FeedKind: string(query.Feed), ViewerID: query.ViewerID,
+		SortOrder: string(query.Sort), ResultLimit: int32(query.Limit), ResultOffset: int32(query.Offset),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("list social posts: %w", err)
@@ -63,6 +74,10 @@ func (repository *PostgresPostRepository) List(ctx context.Context, query PostLi
 			return nil, 0, conversionErr
 		}
 		items = append(items, post)
+	}
+	items, err = repository.enrichPosts(ctx, tx, query.ViewerID, items, time.Now().UTC())
+	if err != nil {
+		return nil, 0, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, 0, fmt.Errorf("commit social post list: %w", err)
@@ -89,8 +104,8 @@ func (repository *PostgresPostRepository) FindVisible(ctx context.Context, postI
 
 func (repository *PostgresPostRepository) Create(ctx context.Context, command createPostCommand) (Post, error) {
 	normalizedBody, bodyErr := normalizePostBody(command.Body)
-	if command.PublicID == uuid.Nil || command.RequestID == uuid.Nil || command.AuthorID == uuid.Nil || command.CreatedAt.IsZero() ||
-		bodyErr != nil || normalizedBody != command.Body || command.CreateBodySHA256 != sha256.Sum256([]byte(command.Body)) {
+	if command.PublicID == uuid.Nil || command.RequestID == uuid.Nil || command.AuthorID == uuid.Nil || command.CreatedAt.IsZero() || !validBoardID(command.BoardID) ||
+		bodyErr != nil || normalizedBody != command.Body || command.CreateBodySHA256 != createPostInputSHA256(command.Body, command.BoardID, command.MediaIDs, command.Poll, command.RedPacket) {
 		return Post{}, ErrPostInput
 	}
 	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -106,7 +121,7 @@ func (repository *PostgresPostRepository) Create(ctx context.Context, command cr
 		if conversionErr != nil {
 			return Post{}, conversionErr
 		}
-		if !bytes.Equal(existing.CreateBodySha256, command.CreateBodySHA256[:]) {
+		if !createPostDigestMatches(existing.CreateBodySha256, command) {
 			return Post{}, ErrPostIdempotencyConflict
 		}
 		if err := tx.Commit(ctx); err != nil {
@@ -118,7 +133,7 @@ func (repository *PostgresPostRepository) Create(ctx context.Context, command cr
 	}
 	inserted, err := queries.InsertPost(ctx, socialdb.InsertPostParams{
 		PublicID: command.PublicID, AuthorID: command.AuthorID, CreateRequestID: command.RequestID,
-		CreateBodySha256: command.CreateBodySHA256[:], Body: command.Body, CreatedAt: timestamp(command.CreatedAt),
+		CreateBodySha256: command.CreateBodySHA256[:], BoardID: command.BoardID, Body: command.Body, CreatedAt: timestamp(command.CreatedAt),
 	})
 	if err != nil {
 		return Post{}, fmt.Errorf("insert social post: %w", err)
@@ -133,8 +148,21 @@ func (repository *PostgresPostRepository) Create(ctx context.Context, command cr
 	if err != nil {
 		return Post{}, err
 	}
-	if inserted == 0 && !bytes.Equal(row.CreateBodySha256, command.CreateBodySHA256[:]) {
+	if inserted == 0 && !createPostDigestMatches(row.CreateBodySha256, command) {
 		return Post{}, ErrPostIdempotencyConflict
+	}
+	if inserted == 1 {
+		if err := repository.attachPostFeatures(ctx, tx, row.PostInternalID, command); err != nil {
+			return Post{}, err
+		}
+	} else if strings.TrimSpace(command.BoardID) != "" {
+		var existingBoard string
+		if err := tx.QueryRow(ctx, `SELECT board_id FROM social.posts WHERE id = $1`, row.PostInternalID).Scan(&existingBoard); err != nil {
+			return Post{}, err
+		}
+		if existingBoard != command.BoardID {
+			return Post{}, ErrPostIdempotencyConflict
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return Post{}, fmt.Errorf("commit social post create: %w", err)
@@ -192,6 +220,14 @@ func (repository *PostgresPostRepository) Update(ctx context.Context, command up
 	}
 	if affected != 1 {
 		return Post{}, ErrPostVersionConflict
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM social.post_topics WHERE post_id = $1`, currentRow.PostInternalID); err != nil {
+		return Post{}, fmt.Errorf("replace social post topics: %w", err)
+	}
+	for _, topic := range extractTopics(command.Body) {
+		if _, err := tx.Exec(ctx, `INSERT INTO social.post_topics (post_id, topic, display_topic) VALUES ($1, $2, $3)`, currentRow.PostInternalID, strings.ToLower(topic), topic); err != nil {
+			return Post{}, fmt.Errorf("replace social post topics: %w", err)
+		}
 	}
 	updatedRow, err := queries.FindVisiblePost(ctx, command.PostID)
 	if err != nil {

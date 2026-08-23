@@ -81,11 +81,22 @@ CapabilityAction:
     - site.display.update
     - site.registration.manage.read
     - site.registration.update
+    - social.board.create
+    - social.board.manage.read
+    - social.board.update
+    - social.follow.write.self
+    - social.media.create.self
+    - social.poll.vote.self
     - social.post.comment.create.self
     - social.post.create.self
     - social.post.delete.self
+    - social.post.like.self
+    - social.post.manage.read
+    - social.post.moderate
     - social.post.read
+    - social.post.repost.self
     - social.post.update.self
+    - social.redpacket.claim.self
     - social.report.read
     - social.report.resolve
     - staff.credential.enroll.self

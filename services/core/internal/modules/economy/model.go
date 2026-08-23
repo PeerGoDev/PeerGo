@@ -21,15 +21,17 @@ var (
 type TransactionType string
 
 const (
-	TransactionSeedingReward  TransactionType = "seeding_reward"
-	TransactionActivityReward TransactionType = "activity_reward"
-	TransactionTorrentBuy     TransactionType = "torrent_purchase"
-	TransactionPromotionBuy   TransactionType = "promotion_product_purchase"
-	TransactionMedalBuy       TransactionType = "medal_purchase"
-	TransactionMemberGift     TransactionType = "member_gift"
-	TransactionTip            TransactionType = "tip"
-	TransactionRefund         TransactionType = "refund"
-	TransactionAdjustment     TransactionType = "adjustment"
+	TransactionSeedingReward        TransactionType = "seeding_reward"
+	TransactionActivityReward       TransactionType = "activity_reward"
+	TransactionTorrentBuy           TransactionType = "torrent_purchase"
+	TransactionPromotionBuy         TransactionType = "promotion_product_purchase"
+	TransactionMedalBuy             TransactionType = "medal_purchase"
+	TransactionMemberGift           TransactionType = "member_gift"
+	TransactionTip                  TransactionType = "tip"
+	TransactionSocialRedPacketFund  TransactionType = "social_red_packet_fund"
+	TransactionSocialRedPacketClaim TransactionType = "social_red_packet_claim"
+	TransactionRefund               TransactionType = "refund"
+	TransactionAdjustment           TransactionType = "adjustment"
 )
 
 var (

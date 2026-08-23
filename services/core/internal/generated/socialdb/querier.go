@@ -18,7 +18,7 @@ type Querier interface {
 	CountCommentModerationCaseReports(ctx context.Context, caseID int64) (int64, error)
 	CountComments(ctx context.Context, arg CountCommentsParams) (int64, error)
 	CountOpenCommentModerationCases(ctx context.Context) (int64, error)
-	CountVisiblePosts(ctx context.Context, authorUsername string) (int64, error)
+	CountVisiblePosts(ctx context.Context, arg CountVisiblePostsParams) (int64, error)
 	CreateCommentModerationCase(ctx context.Context, arg CreateCommentModerationCaseParams) (CreateCommentModerationCaseRow, error)
 	CreateCommentThread(ctx context.Context, arg CreateCommentThreadParams) (int64, error)
 	FindAnnouncementCommentThreadByAnnouncementID(ctx context.Context, announcementID string) (FindAnnouncementCommentThreadByAnnouncementIDRow, error)

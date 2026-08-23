@@ -94,11 +94,22 @@ const (
 	ActionSiteRead                                Action = "site.read"
 	ActionSiteRegistrationManageRead              Action = "site.registration.manage.read"
 	ActionSiteRegistrationUpdate                  Action = "site.registration.update"
+	ActionSocialBoardCreate                       Action = "social.board.create"
+	ActionSocialBoardManageRead                   Action = "social.board.manage.read"
+	ActionSocialBoardUpdate                       Action = "social.board.update"
+	ActionSocialFollowWriteSelf                   Action = "social.follow.write.self"
+	ActionSocialMediaCreateSelf                   Action = "social.media.create.self"
+	ActionSocialPollVoteSelf                      Action = "social.poll.vote.self"
 	ActionSocialPostCommentCreateSelf             Action = "social.post.comment.create.self"
 	ActionSocialPostCreateSelf                    Action = "social.post.create.self"
 	ActionSocialPostDeleteSelf                    Action = "social.post.delete.self"
+	ActionSocialPostLikeSelf                      Action = "social.post.like.self"
+	ActionSocialPostManageRead                    Action = "social.post.manage.read"
+	ActionSocialPostModerate                      Action = "social.post.moderate"
 	ActionSocialPostRead                          Action = "social.post.read"
+	ActionSocialPostRepostSelf                    Action = "social.post.repost.self"
 	ActionSocialPostUpdateSelf                    Action = "social.post.update.self"
+	ActionSocialRedPacketClaimSelf                Action = "social.redpacket.claim.self"
 	ActionSocialReportRead                        Action = "social.report.read"
 	ActionSocialReportResolve                     Action = "social.report.resolve"
 	ActionStaffCredentialEnrollSelf               Action = "staff.credential.enroll.self"
@@ -612,12 +623,42 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
+		Action: ActionSocialBoardCreate, Description: "创建动态圈板块", Risk: RiskMedium,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialBoardManageRead, Description: "读取动态圈板块管理视图", Risk: RiskMedium,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialBoardUpdate, Description: "更新或停用动态圈板块", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialFollowWriteSelf, Description: "关注或取消关注其他成员", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialMediaCreateSelf, Description: "上传动态图片", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialPollVoteSelf, Description: "参与动态投票", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
 		Action: ActionSocialPostCommentCreateSelf, Description: "在可见动态下发表评论", Risk: RiskLow,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionSocialPostCreateSelf, Description: "发布公开纯文本动态", Risk: RiskLow,
+		Action: ActionSocialPostCreateSelf, Description: "向动态圈板块发布动态", Risk: RiskLow,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},
@@ -627,12 +668,37 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
+		Action: ActionSocialPostLikeSelf, Description: "点赞或取消点赞动态", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialPostManageRead, Description: "读取动态圈内容管理视图", Risk: RiskMedium,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialPostModerate, Description: "移动、置顶、加精、隐藏或恢复动态", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
 		Action: ActionSocialPostRead, Description: "读取公开动态圈", Risk: RiskLow,
 		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},
 	{
+		Action: ActionSocialPostRepostSelf, Description: "转发或取消转发动态", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
 		Action: ActionSocialPostUpdateSelf, Description: "编辑自己的动态", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialRedPacketClaimSelf, Description: "领取动态红包", Risk: RiskMedium,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},

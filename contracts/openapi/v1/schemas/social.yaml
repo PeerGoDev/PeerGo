@@ -1,133 +1,305 @@
+SocialBoardIcon:
+  type: string
+  enum: [messages-square, coffee, folder-open, clapperboard, megaphone, sparkles, gamepad-2, circle-help]
+
+SocialBoardTone:
+  type: string
+  enum: [coral, green, blue, violet, amber, slate]
+
+SocialBoard:
+  type: object
+  additionalProperties: false
+  required: [id, name, description, icon, tone, display_order, enabled, allow_member_posts, post_count, version]
+  properties:
+    id: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,63}$" }
+    name: { type: string, minLength: 1, maxLength: 40 }
+    description: { type: string, maxLength: 120 }
+    icon: { $ref: "#/SocialBoardIcon" }
+    tone: { $ref: "#/SocialBoardTone" }
+    display_order: { type: integer, minimum: 0, maximum: 1000000 }
+    enabled: { type: boolean }
+    allow_member_posts: { type: boolean }
+    post_count: { type: integer, format: int64, minimum: 0 }
+    version: { type: integer, format: int64, minimum: 1 }
+
+SocialTopic:
+  type: object
+  additionalProperties: false
+  required: [name, post_count]
+  properties:
+    name: { type: string, minLength: 1, maxLength: 40 }
+    post_count: { type: integer, format: int64, minimum: 1 }
+
+SocialCommunityOverview:
+  type: object
+  additionalProperties: false
+  required: [boards, hot_topics]
+  properties:
+    boards:
+      type: array
+      items: { $ref: "#/SocialBoard" }
+    hot_topics:
+      type: array
+      items: { $ref: "#/SocialTopic" }
+
 SocialPostAuthor:
   type: object
   additionalProperties: false
-  required: [id, username, display_name]
+  required: [id, username, display_name, followed_by_me]
   properties:
-    id:
+    id: { type: string, format: uuid }
+    username: { type: string, minLength: 1, maxLength: 64 }
+    display_name: { type: string, minLength: 1, maxLength: 80 }
+    followed_by_me: { type: boolean }
+
+SocialPostMedia:
+  type: object
+  additionalProperties: false
+  required: [id, content_type, width, height, url]
+  properties:
+    id: { type: string, format: uuid }
+    content_type:
       type: string
-      format: uuid
-    username:
-      type: string
-      minLength: 1
-      maxLength: 64
-    display_name:
-      type: string
-      minLength: 1
-      maxLength: 80
+      enum: [image/jpeg, image/png, image/webp]
+    width: { type: integer, minimum: 1, maximum: 16384 }
+    height: { type: integer, minimum: 1, maximum: 16384 }
+    url: { type: string, minLength: 1, maxLength: 256 }
+
+SocialPollOption:
+  type: object
+  additionalProperties: false
+  required: [id, label, vote_count]
+  properties:
+    id: { type: string, format: uuid }
+    label: { type: string, minLength: 1, maxLength: 80 }
+    vote_count: { type: integer, format: int64, minimum: 0 }
+
+SocialPoll:
+  type: object
+  additionalProperties: false
+  required: [question, options, total_votes, closed]
+  properties:
+    question: { type: string, minLength: 1, maxLength: 120 }
+    options:
+      type: array
+      minItems: 2
+      maxItems: 6
+      items: { $ref: "#/SocialPollOption" }
+    total_votes: { type: integer, format: int64, minimum: 0 }
+    selected_option_id: { type: string, format: uuid, nullable: true }
+    closes_at: { type: string, format: date-time, nullable: true }
+    closed: { type: boolean }
+
+SocialRedPacket:
+  type: object
+  additionalProperties: false
+  required: [total_amount, claim_count, remaining_amount, remaining_claims, claimed_by_me]
+  properties:
+    total_amount: { type: integer, format: int64, minimum: 1 }
+    claim_count: { type: integer, minimum: 1 }
+    remaining_amount: { type: integer, format: int64, minimum: 0 }
+    remaining_claims: { type: integer, minimum: 0 }
+    claimed_by_me: { type: boolean }
+    my_claim_amount: { type: integer, format: int64, minimum: 1, nullable: true }
 
 SocialPost:
   type: object
   additionalProperties: false
-  required:
-    - id
-    - author
-    - content
-    - version
-    - comment_count
-    - created_at
-    - updated_at
+  required: [id, author, board, content, version, comment_count, like_count, repost_count, liked_by_me, reposted_by_me, pinned, featured, topics, media, created_at, updated_at]
   properties:
-    id:
-      type: string
-      format: uuid
-    author:
-      $ref: "#/SocialPostAuthor"
-    content:
-      type: string
-      minLength: 1
-      maxLength: 2000
-    version:
-      type: integer
-      format: int64
-      minimum: 1
-    comment_count:
-      type: integer
-      format: int64
-      minimum: 0
-    created_at:
-      type: string
-      format: date-time
-    updated_at:
-      type: string
-      format: date-time
-    edited_at:
-      type: string
-      format: date-time
-      nullable: true
+    id: { type: string, format: uuid }
+    author: { $ref: "#/SocialPostAuthor" }
+    board: { $ref: "#/SocialBoard" }
+    content: { type: string, minLength: 1, maxLength: 2000 }
+    version: { type: integer, format: int64, minimum: 1 }
+    comment_count: { type: integer, format: int64, minimum: 0 }
+    like_count: { type: integer, format: int64, minimum: 0 }
+    repost_count: { type: integer, format: int64, minimum: 0 }
+    liked_by_me: { type: boolean }
+    reposted_by_me: { type: boolean }
+    pinned: { type: boolean }
+    featured: { type: boolean }
+    hidden: { type: boolean }
+    topics:
+      type: array
+      items: { type: string, minLength: 1, maxLength: 40 }
+    media:
+      type: array
+      maxItems: 9
+      items: { $ref: "#/SocialPostMedia" }
+    poll: { $ref: "#/SocialPoll", nullable: true }
+    red_packet: { $ref: "#/SocialRedPacket", nullable: true }
+    created_at: { type: string, format: date-time }
+    updated_at: { type: string, format: date-time }
+    edited_at: { type: string, format: date-time, nullable: true }
 
 SocialPostSort:
   type: string
-  enum: [newest, oldest]
+  enum: [newest, oldest, hot]
+
+SocialFeedKind:
+  type: string
+  enum: [discover, following]
 
 SocialPostPage:
   type: object
   additionalProperties: false
-  required: [items, total, limit, offset, sort]
+  required: [items, total, limit, offset, sort, feed]
   properties:
     items:
       type: array
-      items:
-        $ref: "#/SocialPost"
-    total:
-      type: integer
-      format: int64
-      minimum: 0
-    limit:
-      type: integer
-      minimum: 1
-      maximum: 50
-    offset:
-      type: integer
-      minimum: 0
-      maximum: 99999
-    sort:
-      $ref: "#/SocialPostSort"
+      items: { $ref: "#/SocialPost" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 50 }
+    offset: { type: integer, minimum: 0, maximum: 99999 }
+    sort: { $ref: "#/SocialPostSort" }
+    feed: { $ref: "#/SocialFeedKind" }
+
+CreateSocialPollRequest:
+  type: object
+  additionalProperties: false
+  required: [question, options]
+  properties:
+    question: { type: string, minLength: 1, maxLength: 120 }
+    options:
+      type: array
+      minItems: 2
+      maxItems: 6
+      items: { type: string, minLength: 1, maxLength: 80 }
+    closes_at: { type: string, format: date-time, nullable: true }
+
+CreateSocialRedPacketRequest:
+  type: object
+  additionalProperties: false
+  required: [total_amount, claim_count]
+  properties:
+    total_amount: { type: integer, format: int64, minimum: 1, maximum: 1000000 }
+    claim_count: { type: integer, minimum: 1, maximum: 100 }
 
 CreateSocialPostRequest:
   type: object
   additionalProperties: false
-  required: [content]
+  required: [content, board_id]
   properties:
-    content:
-      type: string
-      minLength: 1
-      maxLength: 2000
+    content: { type: string, minLength: 1, maxLength: 2000 }
+    board_id: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,63}$" }
+    media_ids:
+      type: array
+      maxItems: 9
+      uniqueItems: true
+      items: { type: string, format: uuid }
+    poll: { $ref: "#/CreateSocialPollRequest", nullable: true }
+    red_packet: { $ref: "#/CreateSocialRedPacketRequest", nullable: true }
 
 UpdateSocialPostRequest:
   type: object
   additionalProperties: false
   required: [content, expected_version]
   properties:
-    content:
-      type: string
-      minLength: 1
-      maxLength: 2000
-    expected_version:
-      type: integer
-      format: int64
-      minimum: 1
+    content: { type: string, minLength: 1, maxLength: 2000 }
+    expected_version: { type: integer, format: int64, minimum: 1 }
+
+SocialMediaUploadRequest:
+  type: object
+  additionalProperties: false
+  required: [image]
+  properties:
+    image: { type: string, format: binary }
+
+SocialInteractionState:
+  type: object
+  additionalProperties: false
+  required: [active, count]
+  properties:
+    active: { type: boolean }
+    count: { type: integer, format: int64, minimum: 0 }
+
+SocialFollowState:
+  type: object
+  additionalProperties: false
+  required: [username, following]
+  properties:
+    username: { type: string, minLength: 1, maxLength: 64 }
+    following: { type: boolean }
+
+SocialPollVoteRequest:
+  type: object
+  additionalProperties: false
+  required: [option_id]
+  properties:
+    option_id: { type: string, format: uuid }
+
+SocialRedPacketClaim:
+  type: object
+  additionalProperties: false
+  required: [amount, remaining_amount, remaining_claims, replayed]
+  properties:
+    amount: { type: integer, format: int64, minimum: 1 }
+    remaining_amount: { type: integer, format: int64, minimum: 0 }
+    remaining_claims: { type: integer, minimum: 0 }
+    replayed: { type: boolean }
+
+ManagedSocialBoard:
+  allOf:
+    - $ref: "#/SocialBoard"
+    - type: object
+      additionalProperties: false
+      required: [created_at, updated_at]
+      properties:
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+CreateManagedSocialBoardRequest:
+  type: object
+  additionalProperties: false
+  required: [id, name, description, icon, tone, display_order, enabled, allow_member_posts, reason]
+  properties:
+    id: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,63}$" }
+    name: { type: string, minLength: 1, maxLength: 40 }
+    description: { type: string, maxLength: 120 }
+    icon: { $ref: "#/SocialBoardIcon" }
+    tone: { $ref: "#/SocialBoardTone" }
+    display_order: { type: integer, minimum: 0, maximum: 1000000 }
+    enabled: { type: boolean }
+    allow_member_posts: { type: boolean }
+    reason: { type: string, minLength: 10, maxLength: 500 }
+
+UpdateManagedSocialBoardRequest:
+  type: object
+  additionalProperties: false
+  required: [name, description, icon, tone, display_order, enabled, allow_member_posts, expected_version, reason]
+  properties:
+    name: { type: string, minLength: 1, maxLength: 40 }
+    description: { type: string, maxLength: 120 }
+    icon: { $ref: "#/SocialBoardIcon" }
+    tone: { $ref: "#/SocialBoardTone" }
+    display_order: { type: integer, minimum: 0, maximum: 1000000 }
+    enabled: { type: boolean }
+    allow_member_posts: { type: boolean }
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    reason: { type: string, minLength: 10, maxLength: 500 }
+
+ModerateSocialPostRequest:
+  type: object
+  additionalProperties: false
+  required: [board_id, pinned, featured, hidden, expected_version, reason]
+  properties:
+    board_id: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,63}$" }
+    pinned: { type: boolean }
+    featured: { type: boolean }
+    hidden: { type: boolean }
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    reason: { type: string, minLength: 10, maxLength: 500 }
 
 SocialPostCommentPage:
   type: object
   additionalProperties: false
   required: [post_id, items, total, limit, offset]
   properties:
-    post_id:
-      type: string
-      format: uuid
+    post_id: { type: string, format: uuid }
     items:
       type: array
-      items:
-        $ref: "./comments.yaml#/Comment"
-    total:
-      type: integer
-      format: int64
-      minimum: 0
-    limit:
-      type: integer
-      minimum: 1
-      maximum: 50
-    offset:
-      type: integer
-      minimum: 0
-      maximum: 99999
+      items: { $ref: "./comments.yaml#/Comment" }
+    total: { type: integer, format: int64, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 50 }
+    offset: { type: integer, minimum: 0, maximum: 99999 }

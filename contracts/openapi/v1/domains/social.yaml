@@ -22,6 +22,25 @@ SocialPostsPath:
           minLength: 1
           maxLength: 64
         description: 只读取指定成员仍然可见的动态；省略时读取完整成员动态流。
+      - name: feed
+        in: query
+        required: false
+        schema:
+          $ref: "../schemas/social.yaml#/SocialFeedKind"
+      - name: board_id
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+      - name: featured_only
+        in: query
+        required: false
+        schema: { type: boolean, default: false }
+      - name: topic
+        in: query
+        required: false
+        schema: { type: string, minLength: 1, maxLength: 40 }
       - name: limit
         in: query
         required: false
@@ -57,7 +76,7 @@ SocialPostsPath:
         $ref: "../responses.yaml#/ProblemResponse"
   post:
     operationId: createSocialPost
-    summary: 发布一条公开纯文本动态
+    summary: 向指定板块发布含图片、投票或红包的动态
     tags: [social]
     x-audience: [web]
     x-owner: core-social
@@ -286,3 +305,403 @@ SocialPostIDPathParameter:
   schema:
     type: string
     format: uuid
+
+SocialCommunityOverviewPath:
+  get:
+    operationId: getSocialCommunityOverview
+    summary: 获取启用板块及近期热门话题
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.read
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 动态圈导航数据。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialCommunityOverview" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialMediaPath:
+  post:
+    operationId: uploadSocialMedia
+    summary: 上传一张待发布的动态图片
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.media.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema: { $ref: "../schemas/social.yaml#/SocialMediaUploadRequest" }
+    responses:
+      "201":
+        description: 图片已校验并进入待发布状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialPostMedia" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "413": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialMediaObjectPath:
+  get:
+    operationId: getSocialMedia
+    summary: 读取已发布的动态图片
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.read
+    x-credential-audience: web-session
+    parameters:
+      - name: media_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    responses:
+      "200":
+        description: 原始图片字节。
+        headers:
+          ETag: { schema: { type: string } }
+          Cache-Control: { schema: { type: string } }
+        content:
+          image/jpeg: { schema: { type: string, format: binary } }
+          image/png: { schema: { type: string, format: binary } }
+          image/webp: { schema: { type: string, format: binary } }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialPostLikePath:
+  parameters:
+    - $ref: "#/SocialPostIDPathParameter"
+    - $ref: "./identity.yaml#/WebCSRFHeader"
+  put:
+    operationId: likeSocialPost
+    summary: 点赞动态
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.like.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前点赞状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialInteractionState" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  delete:
+    operationId: unlikeSocialPost
+    summary: 取消点赞动态
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.like.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前点赞状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialInteractionState" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialPostRepostPath:
+  parameters:
+    - $ref: "#/SocialPostIDPathParameter"
+    - $ref: "./identity.yaml#/WebCSRFHeader"
+  put:
+    operationId: repostSocialPost
+    summary: 转发动态
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.repost.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前转发状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialInteractionState" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  delete:
+    operationId: unrepostSocialPost
+    summary: 取消转发动态
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.repost.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前转发状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialInteractionState" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialFollowPath:
+  parameters:
+    - name: username
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 64 }
+    - $ref: "./identity.yaml#/WebCSRFHeader"
+  put:
+    operationId: followSocialMember
+    summary: 关注成员
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.follow.write.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前关注状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialFollowState" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  delete:
+    operationId: unfollowSocialMember
+    summary: 取消关注成员
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.follow.write.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前关注状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialFollowState" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialPollVotePath:
+  put:
+    operationId: voteSocialPoll
+    summary: 选择或更改动态投票选项
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.poll.vote.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/SocialPostIDPathParameter"
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/social.yaml#/SocialPollVoteRequest" }
+    responses:
+      "200":
+        description: 更新后的投票。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialPoll" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialRedPacketClaimPath:
+  post:
+    operationId: claimSocialRedPacket
+    summary: 领取动态红包
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.redpacket.claim.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/SocialPostIDPathParameter"
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+      - $ref: "./identity.yaml#/IdempotencyKeyHeader"
+    responses:
+      "200":
+        description: 领取结果；重复请求返回原结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialRedPacketClaim" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedSocialBoardsPath:
+  get:
+    operationId: listManagedSocialBoards
+    summary: 获取包含停用板块的管理视图
+    tags: [social]
+    x-audience: [staff]
+    x-owner: core-social
+    x-permission: social.board.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 全部板块。
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: "../schemas/social.yaml#/ManagedSocialBoard" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: createManagedSocialBoard
+    summary: 创建动态圈板块
+    tags: [social]
+    x-audience: [staff]
+    x-owner: core-social
+    x-permission: social.board.create
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "./authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/social.yaml#/CreateManagedSocialBoardRequest" }
+    responses:
+      "201":
+        description: 已创建板块。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/ManagedSocialBoard" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedSocialBoardPath:
+  put:
+    operationId: updateManagedSocialBoard
+    summary: 更新、排序或停用动态圈板块
+    tags: [social]
+    x-audience: [staff]
+    x-owner: core-social
+    x-permission: social.board.update
+    x-credential-audience: staff-session
+    parameters:
+      - name: board_id
+        in: path
+        required: true
+        schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,63}$" }
+      - $ref: "./authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/social.yaml#/UpdateManagedSocialBoardRequest" }
+    responses:
+      "200":
+        description: 已保存板块。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/ManagedSocialBoard" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedSocialPostsPath:
+  get:
+    operationId: listManagedSocialPosts
+    summary: 分页读取动态圈内容管理视图
+    tags: [social]
+    x-audience: [staff]
+    x-owner: core-social
+    x-permission: social.post.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 99999, default: 0 }
+      - name: board_id
+        in: query
+        schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,63}$" }
+    responses:
+      "200":
+        description: 动态管理分页。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialPostPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedSocialPostPath:
+  put:
+    operationId: moderateSocialPost
+    summary: 移动、置顶、加精、隐藏或恢复动态
+    tags: [social]
+    x-audience: [staff]
+    x-owner: core-social
+    x-permission: social.post.moderate
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/SocialPostIDPathParameter"
+      - $ref: "./authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/social.yaml#/ModerateSocialPostRequest" }
+    responses:
+      "200":
+        description: 已保存动态管理状态。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialPost" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

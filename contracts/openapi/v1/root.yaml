@@ -286,6 +286,30 @@ paths:
     $ref: "./domains/social.yaml#/SocialPostPath"
   /api/v1/social/posts/{post_id}/comments:
     $ref: "./domains/social.yaml#/SocialPostCommentsPath"
+  /api/v1/social/overview:
+    $ref: "./domains/social.yaml#/SocialCommunityOverviewPath"
+  /api/v1/social/media:
+    $ref: "./domains/social.yaml#/SocialMediaPath"
+  /api/v1/social/media/{media_id}:
+    $ref: "./domains/social.yaml#/SocialMediaObjectPath"
+  /api/v1/social/posts/{post_id}/like:
+    $ref: "./domains/social.yaml#/SocialPostLikePath"
+  /api/v1/social/posts/{post_id}/repost:
+    $ref: "./domains/social.yaml#/SocialPostRepostPath"
+  /api/v1/social/users/{username}/follow:
+    $ref: "./domains/social.yaml#/SocialFollowPath"
+  /api/v1/social/posts/{post_id}/poll-vote:
+    $ref: "./domains/social.yaml#/SocialPollVotePath"
+  /api/v1/social/posts/{post_id}/red-packet/claims:
+    $ref: "./domains/social.yaml#/SocialRedPacketClaimPath"
+  /api/v1/admin/social/boards:
+    $ref: "./domains/social.yaml#/ManagedSocialBoardsPath"
+  /api/v1/admin/social/boards/{board_id}:
+    $ref: "./domains/social.yaml#/ManagedSocialBoardPath"
+  /api/v1/admin/social/posts:
+    $ref: "./domains/social.yaml#/ManagedSocialPostsPath"
+  /api/v1/admin/social/posts/{post_id}:
+    $ref: "./domains/social.yaml#/ManagedSocialPostPath"
   /api/v1/admin/social/comment-moderation-cases:
     $ref: "./domains/comments.yaml#/CommentModerationCasesPath"
   /api/v1/admin/social/comment-moderation-cases/{case_id}/decisions:
@@ -716,18 +740,60 @@ components:
       $ref: "./schemas/comments.yaml#/CommentModerationDecisionResult"
     SocialPostAuthor:
       $ref: "./schemas/social.yaml#/SocialPostAuthor"
+    SocialBoardIcon:
+      $ref: "./schemas/social.yaml#/SocialBoardIcon"
+    SocialBoardTone:
+      $ref: "./schemas/social.yaml#/SocialBoardTone"
+    SocialBoard:
+      $ref: "./schemas/social.yaml#/SocialBoard"
+    SocialTopic:
+      $ref: "./schemas/social.yaml#/SocialTopic"
+    SocialCommunityOverview:
+      $ref: "./schemas/social.yaml#/SocialCommunityOverview"
+    SocialPostMedia:
+      $ref: "./schemas/social.yaml#/SocialPostMedia"
+    SocialPollOption:
+      $ref: "./schemas/social.yaml#/SocialPollOption"
+    SocialPoll:
+      $ref: "./schemas/social.yaml#/SocialPoll"
+    SocialRedPacket:
+      $ref: "./schemas/social.yaml#/SocialRedPacket"
     SocialPost:
       $ref: "./schemas/social.yaml#/SocialPost"
     SocialPostSort:
       $ref: "./schemas/social.yaml#/SocialPostSort"
+    SocialFeedKind:
+      $ref: "./schemas/social.yaml#/SocialFeedKind"
     SocialPostPage:
       $ref: "./schemas/social.yaml#/SocialPostPage"
     CreateSocialPostRequest:
       $ref: "./schemas/social.yaml#/CreateSocialPostRequest"
+    CreateSocialPollRequest:
+      $ref: "./schemas/social.yaml#/CreateSocialPollRequest"
+    CreateSocialRedPacketRequest:
+      $ref: "./schemas/social.yaml#/CreateSocialRedPacketRequest"
     UpdateSocialPostRequest:
       $ref: "./schemas/social.yaml#/UpdateSocialPostRequest"
     SocialPostCommentPage:
       $ref: "./schemas/social.yaml#/SocialPostCommentPage"
+    SocialMediaUploadRequest:
+      $ref: "./schemas/social.yaml#/SocialMediaUploadRequest"
+    SocialInteractionState:
+      $ref: "./schemas/social.yaml#/SocialInteractionState"
+    SocialFollowState:
+      $ref: "./schemas/social.yaml#/SocialFollowState"
+    SocialPollVoteRequest:
+      $ref: "./schemas/social.yaml#/SocialPollVoteRequest"
+    SocialRedPacketClaim:
+      $ref: "./schemas/social.yaml#/SocialRedPacketClaim"
+    ManagedSocialBoard:
+      $ref: "./schemas/social.yaml#/ManagedSocialBoard"
+    CreateManagedSocialBoardRequest:
+      $ref: "./schemas/social.yaml#/CreateManagedSocialBoardRequest"
+    UpdateManagedSocialBoardRequest:
+      $ref: "./schemas/social.yaml#/UpdateManagedSocialBoardRequest"
+    ModerateSocialPostRequest:
+      $ref: "./schemas/social.yaml#/ModerateSocialPostRequest"
     PendingTorrentReview:
       $ref: "./schemas/torrents.yaml#/PendingTorrentReview"
     PendingTorrentReviewPage:

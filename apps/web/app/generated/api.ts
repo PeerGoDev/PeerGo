@@ -2428,7 +2428,7 @@ export interface paths {
         /** 分页读取成员可见的公开动态 */
         get: operations["listSocialPosts"];
         put?: never;
-        /** 发布一条公开纯文本动态 */
+        /** 向指定板块发布含图片、投票或红包的动态 */
         post: operations["createSocialPost"];
         delete?: never;
         options?: never;
@@ -2473,6 +2473,231 @@ export interface paths {
         put?: never;
         /** 在可见动态下发表评论或回复 */
         post: operations["createSocialPostComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取启用板块及近期热门话题 */
+        get: operations["getSocialCommunityOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 上传一张待发布的动态图片 */
+        post: operations["uploadSocialMedia"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/media/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取已发布的动态图片 */
+        get: operations["getSocialMedia"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/posts/{post_id}/like": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** 点赞动态 */
+        put: operations["likeSocialPost"];
+        post?: never;
+        /** 取消点赞动态 */
+        delete: operations["unlikeSocialPost"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/posts/{post_id}/repost": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** 转发动态 */
+        put: operations["repostSocialPost"];
+        post?: never;
+        /** 取消转发动态 */
+        delete: operations["unrepostSocialPost"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/users/{username}/follow": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** 关注成员 */
+        put: operations["followSocialMember"];
+        post?: never;
+        /** 取消关注成员 */
+        delete: operations["unfollowSocialMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/posts/{post_id}/poll-vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 选择或更改动态投票选项 */
+        put: operations["voteSocialPoll"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/posts/{post_id}/red-packet/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 领取动态红包 */
+        post: operations["claimSocialRedPacket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/social/boards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取包含停用板块的管理视图 */
+        get: operations["listManagedSocialBoards"];
+        put?: never;
+        /** 创建动态圈板块 */
+        post: operations["createManagedSocialBoard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/social/boards/{board_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 更新、排序或停用动态圈板块 */
+        put: operations["updateManagedSocialBoard"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/social/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 分页读取动态圈内容管理视图 */
+        get: operations["listManagedSocialPosts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/social/posts/{post_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 移动、置顶、加精、隐藏或恢复动态 */
+        put: operations["moderateSocialPost"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3698,7 +3923,7 @@ export interface components {
             expected_state_version: number;
         };
         /** @enum {string} */
-        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.post.comment.create.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.read" | "social.post.update.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.vip.manage" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
+        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.vip.manage" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
         CapabilityScope: {
             /** @enum {string} */
             type: "site" | "category";
@@ -4997,16 +5222,96 @@ export interface components {
             id: string;
             username: string;
             display_name: string;
+            followed_by_me: boolean;
+        };
+        /** @enum {string} */
+        SocialBoardIcon: "messages-square" | "coffee" | "folder-open" | "clapperboard" | "megaphone" | "sparkles" | "gamepad-2" | "circle-help";
+        /** @enum {string} */
+        SocialBoardTone: "coral" | "green" | "blue" | "violet" | "amber" | "slate";
+        SocialBoard: {
+            id: string;
+            name: string;
+            description: string;
+            icon: components["schemas"]["SocialBoardIcon"];
+            tone: components["schemas"]["SocialBoardTone"];
+            display_order: number;
+            enabled: boolean;
+            allow_member_posts: boolean;
+            /** Format: int64 */
+            post_count: number;
+            /** Format: int64 */
+            version: number;
+        };
+        SocialTopic: {
+            name: string;
+            /** Format: int64 */
+            post_count: number;
+        };
+        SocialCommunityOverview: {
+            boards: components["schemas"]["SocialBoard"][];
+            hot_topics: components["schemas"]["SocialTopic"][];
+        };
+        SocialPostMedia: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            content_type: "image/jpeg" | "image/png" | "image/webp";
+            width: number;
+            height: number;
+            url: string;
+        };
+        SocialPollOption: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** Format: int64 */
+            vote_count: number;
+        };
+        SocialPoll: {
+            question: string;
+            options: components["schemas"]["SocialPollOption"][];
+            /** Format: int64 */
+            total_votes: number;
+            /** Format: uuid */
+            selected_option_id?: string | null;
+            /** Format: date-time */
+            closes_at?: string | null;
+            closed: boolean;
+        };
+        SocialRedPacket: {
+            /** Format: int64 */
+            total_amount: number;
+            claim_count: number;
+            /** Format: int64 */
+            remaining_amount: number;
+            remaining_claims: number;
+            claimed_by_me: boolean;
+            /** Format: int64 */
+            my_claim_amount?: number | null;
         };
         SocialPost: {
             /** Format: uuid */
             id: string;
             author: components["schemas"]["SocialPostAuthor"];
+            board: components["schemas"]["SocialBoard"];
             content: string;
             /** Format: int64 */
             version: number;
             /** Format: int64 */
             comment_count: number;
+            /** Format: int64 */
+            like_count: number;
+            /** Format: int64 */
+            repost_count: number;
+            liked_by_me: boolean;
+            reposted_by_me: boolean;
+            pinned: boolean;
+            featured: boolean;
+            hidden?: boolean;
+            topics: string[];
+            media: components["schemas"]["SocialPostMedia"][];
+            poll?: components["schemas"]["SocialPoll"];
+            red_packet?: components["schemas"]["SocialRedPacket"];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -5015,7 +5320,9 @@ export interface components {
             edited_at?: string | null;
         };
         /** @enum {string} */
-        SocialPostSort: "newest" | "oldest";
+        SocialPostSort: "newest" | "oldest" | "hot";
+        /** @enum {string} */
+        SocialFeedKind: "discover" | "following";
         SocialPostPage: {
             items: components["schemas"]["SocialPost"][];
             /** Format: int64 */
@@ -5023,9 +5330,25 @@ export interface components {
             limit: number;
             offset: number;
             sort: components["schemas"]["SocialPostSort"];
+            feed: components["schemas"]["SocialFeedKind"];
         };
         CreateSocialPostRequest: {
             content: string;
+            board_id: string;
+            media_ids?: string[];
+            poll?: components["schemas"]["CreateSocialPollRequest"];
+            red_packet?: components["schemas"]["CreateSocialRedPacketRequest"];
+        };
+        CreateSocialPollRequest: {
+            question: string;
+            options: string[];
+            /** Format: date-time */
+            closes_at?: string | null;
+        };
+        CreateSocialRedPacketRequest: {
+            /** Format: int64 */
+            total_amount: number;
+            claim_count: number;
         };
         UpdateSocialPostRequest: {
             content: string;
@@ -5040,6 +5363,69 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+        };
+        SocialMediaUploadRequest: {
+            /** Format: binary */
+            image: string;
+        };
+        SocialInteractionState: {
+            active: boolean;
+            /** Format: int64 */
+            count: number;
+        };
+        SocialFollowState: {
+            username: string;
+            following: boolean;
+        };
+        SocialPollVoteRequest: {
+            /** Format: uuid */
+            option_id: string;
+        };
+        SocialRedPacketClaim: {
+            /** Format: int64 */
+            amount: number;
+            /** Format: int64 */
+            remaining_amount: number;
+            remaining_claims: number;
+            replayed: boolean;
+        };
+        ManagedSocialBoard: components["schemas"]["SocialBoard"] & {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CreateManagedSocialBoardRequest: {
+            id: string;
+            name: string;
+            description: string;
+            icon: components["schemas"]["SocialBoardIcon"];
+            tone: components["schemas"]["SocialBoardTone"];
+            display_order: number;
+            enabled: boolean;
+            allow_member_posts: boolean;
+            reason: string;
+        };
+        UpdateManagedSocialBoardRequest: {
+            name: string;
+            description: string;
+            icon: components["schemas"]["SocialBoardIcon"];
+            tone: components["schemas"]["SocialBoardTone"];
+            display_order: number;
+            enabled: boolean;
+            allow_member_posts: boolean;
+            /** Format: int64 */
+            expected_version: number;
+            reason: string;
+        };
+        ModerateSocialPostRequest: {
+            board_id: string;
+            pinned: boolean;
+            featured: boolean;
+            hidden: boolean;
+            /** Format: int64 */
+            expected_version: number;
+            reason: string;
         };
         PendingTorrentReview: {
             /** Format: int64 */
@@ -13523,6 +13909,10 @@ export interface operations {
                 sort?: components["schemas"]["SocialPostSort"];
                 /** @description 只读取指定成员仍然可见的动态；省略时读取完整成员动态流。 */
                 author_username?: string;
+                feed?: components["schemas"]["SocialFeedKind"];
+                board_id?: string;
+                featured_only?: boolean;
+                topic?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -13749,6 +14139,495 @@ export interface operations {
             404: components["responses"]["ProblemResponse"];
             409: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getSocialCommunityOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 动态圈导航数据。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialCommunityOverview"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    uploadSocialMedia: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["SocialMediaUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description 图片已校验并进入待发布状态。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialPostMedia"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            413: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getSocialMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 原始图片字节。 */
+            200: {
+                headers: {
+                    ETag?: string;
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    likeSocialPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前点赞状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialInteractionState"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    unlikeSocialPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前点赞状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialInteractionState"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    repostSocialPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前转发状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialInteractionState"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    unrepostSocialPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前转发状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialInteractionState"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    followSocialMember: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前关注状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialFollowState"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    unfollowSocialMember: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前关注状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialFollowState"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    voteSocialPoll: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SocialPollVoteRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新后的投票。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialPoll"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    claimSocialRedPacket: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 领取结果；重复请求返回原结果。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialRedPacketClaim"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listManagedSocialBoards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 全部板块。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedSocialBoard"][];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    createManagedSocialBoard: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateManagedSocialBoardRequest"];
+            };
+        };
+        responses: {
+            /** @description 已创建板块。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedSocialBoard"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    updateManagedSocialBoard: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                board_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateManagedSocialBoardRequest"];
+            };
+        };
+        responses: {
+            /** @description 已保存板块。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedSocialBoard"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listManagedSocialPosts: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                board_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 动态管理分页。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialPostPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    moderateSocialPost: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModerateSocialPostRequest"];
+            };
+        };
+        responses: {
+            /** @description 已保存动态管理状态。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialPost"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };

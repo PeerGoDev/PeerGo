@@ -17,6 +17,7 @@ import {
   ShoppingBagIcon,
   UserRoundIcon,
   UsersRoundIcon,
+  MessageCircleMoreIcon,
 } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
@@ -105,6 +106,12 @@ const quickActions: Array<{
     to: "/staff/content/comments",
     icon: MessageSquareWarningIcon,
     action: "social.report.read",
+  },
+  {
+    label: "动态圈管理",
+    to: "/staff/content/social",
+    icon: MessageCircleMoreIcon,
+    action: "social.board.manage.read",
   },
   {
     label: "分类管理",

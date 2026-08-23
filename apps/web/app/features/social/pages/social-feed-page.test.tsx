@@ -74,7 +74,7 @@ describe("SocialFeedPage", () => {
     expect(screen.getByLabelText("动态正文")).toHaveClass("rounded-none")
     expect(
       screen.getByRole("button", { name: "添加图片 (0/9)" })
-    ).toHaveAttribute("aria-disabled", "true")
+    ).not.toHaveAttribute("aria-disabled")
     expect(
       screen.getByRole("button", { name: "添加图片 (0/9)" })
     ).not.toBeDisabled()
@@ -82,26 +82,23 @@ describe("SocialFeedPage", () => {
     expect(screen.getByText("公开")).toHaveClass("hidden", "sm:flex")
     expect(screen.getByRole("button", { name: "发布" })).toHaveClass("px-3")
     expect(screen.getByRole("tablist", { name: "动态流筛选" })).toBeVisible()
-    expect(screen.getByRole("tab", { name: "关注" })).toHaveAttribute(
-      "aria-disabled",
-      "true"
+    expect(screen.getByRole("tab", { name: "关注" })).not.toHaveAttribute(
+      "aria-disabled"
     )
     expect(screen.getByRole("tab", { name: "关注" })).not.toBeDisabled()
     expect(screen.getByRole("tab", { name: "发现" })).toHaveAttribute(
       "aria-selected",
       "true"
     )
-    expect(screen.getByRole("tab", { name: "热门" })).toHaveAttribute(
-      "aria-disabled",
-      "true"
+    expect(screen.getByRole("tab", { name: "热门" })).not.toHaveAttribute(
+      "aria-disabled"
     )
     expect(screen.getByRole("tab", { name: "热门" })).not.toBeDisabled()
     expect(screen.getByRole("tabpanel", { name: "发现" })).toBeVisible()
     expect(screen.getByText(/欢迎来到.*动态圈/)).toBeVisible()
     expect(screen.getByText("#PeerGo")).toBeVisible()
-    expect(screen.getByRole("button", { name: "点赞" })).toHaveAttribute(
-      "aria-disabled",
-      "true"
+    expect(screen.getByRole("button", { name: "点赞" })).not.toHaveAttribute(
+      "aria-disabled"
     )
     expect(screen.getByRole("button", { name: "点赞" })).not.toBeDisabled()
     expect(screen.getByText("2").closest("a")).toHaveAttribute(

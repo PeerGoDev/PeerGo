@@ -6600,6 +6600,30 @@ paths:
             minLength: 1
             maxLength: 64
           description: 只读取指定成员仍然可见的动态；省略时读取完整成员动态流。
+        - name: feed
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/SocialFeedKind'
+        - name: board_id
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        - name: featured_only
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: topic
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 40
         - name: limit
           in: query
           required: false
@@ -6635,7 +6659,7 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
     post:
       operationId: createSocialPost
-      summary: 发布一条公开纯文本动态
+      summary: 向指定板块发布含图片、投票或红包的动态
       tags:
         - social
       x-audience:
@@ -6864,6 +6888,550 @@ paths:
         '409':
           $ref: '#/components/responses/ProblemResponse'
         '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/overview:
+    get:
+      operationId: getSocialCommunityOverview
+      summary: 获取启用板块及近期热门话题
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.post.read
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 动态圈导航数据。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialCommunityOverview'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/media:
+    post:
+      operationId: uploadSocialMedia
+      summary: 上传一张待发布的动态图片
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.media.create.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SocialMediaUploadRequest'
+      responses:
+        '201':
+          description: 图片已校验并进入待发布状态。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialPostMedia'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '413':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/media/{media_id}:
+    get:
+      operationId: getSocialMedia
+      summary: 读取已发布的动态图片
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.post.read
+      x-credential-audience: web-session
+      parameters:
+        - name: media_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 原始图片字节。
+          headers:
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/posts/{post_id}/like:
+    parameters:
+      - $ref: '#/components/parameters/SocialPostIDPathParameter'
+      - $ref: '#/components/parameters/WebCSRFHeader'
+    put:
+      operationId: likeSocialPost
+      summary: 点赞动态
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.post.like.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 当前点赞状态。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialInteractionState'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    delete:
+      operationId: unlikeSocialPost
+      summary: 取消点赞动态
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.post.like.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 当前点赞状态。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialInteractionState'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/posts/{post_id}/repost:
+    parameters:
+      - $ref: '#/components/parameters/SocialPostIDPathParameter'
+      - $ref: '#/components/parameters/WebCSRFHeader'
+    put:
+      operationId: repostSocialPost
+      summary: 转发动态
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.post.repost.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 当前转发状态。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialInteractionState'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    delete:
+      operationId: unrepostSocialPost
+      summary: 取消转发动态
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.post.repost.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 当前转发状态。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialInteractionState'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/users/{username}/follow:
+    parameters:
+      - name: username
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+      - $ref: '#/components/parameters/WebCSRFHeader'
+    put:
+      operationId: followSocialMember
+      summary: 关注成员
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.follow.write.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 当前关注状态。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialFollowState'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    delete:
+      operationId: unfollowSocialMember
+      summary: 取消关注成员
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.follow.write.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 当前关注状态。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialFollowState'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/posts/{post_id}/poll-vote:
+    put:
+      operationId: voteSocialPoll
+      summary: 选择或更改动态投票选项
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.poll.vote.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/SocialPostIDPathParameter'
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SocialPollVoteRequest'
+      responses:
+        '200':
+          description: 更新后的投票。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialPoll'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/posts/{post_id}/red-packet/claims:
+    post:
+      operationId: claimSocialRedPacket
+      summary: 领取动态红包
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.redpacket.claim.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/SocialPostIDPathParameter'
+        - $ref: '#/components/parameters/WebCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      responses:
+        '200':
+          description: 领取结果；重复请求返回原结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialRedPacketClaim'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/social/boards:
+    get:
+      operationId: listManagedSocialBoards
+      summary: 获取包含停用板块的管理视图
+      tags:
+        - social
+      x-audience:
+        - staff
+      x-owner: core-social
+      x-permission: social.board.manage.read
+      x-credential-audience: staff-session
+      responses:
+        '200':
+          description: 全部板块。
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagedSocialBoard'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    post:
+      operationId: createManagedSocialBoard
+      summary: 创建动态圈板块
+      tags:
+        - social
+      x-audience:
+        - staff
+      x-owner: core-social
+      x-permission: social.board.create
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManagedSocialBoardRequest'
+      responses:
+        '201':
+          description: 已创建板块。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedSocialBoard'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/social/boards/{board_id}:
+    put:
+      operationId: updateManagedSocialBoard
+      summary: 更新、排序或停用动态圈板块
+      tags:
+        - social
+      x-audience:
+        - staff
+      x-owner: core-social
+      x-permission: social.board.update
+      x-credential-audience: staff-session
+      parameters:
+        - name: board_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateManagedSocialBoardRequest'
+      responses:
+        '200':
+          description: 已保存板块。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedSocialBoard'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/social/posts:
+    get:
+      operationId: listManagedSocialPosts
+      summary: 分页读取动态圈内容管理视图
+      tags:
+        - social
+      x-audience:
+        - staff
+      x-owner: core-social
+      x-permission: social.post.manage.read
+      x-credential-audience: staff-session
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 99999
+            default: 0
+        - name: board_id
+          in: query
+          schema:
+            type: string
+            pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+      responses:
+        '200':
+          description: 动态管理分页。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialPostPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/social/posts/{post_id}:
+    put:
+      operationId: moderateSocialPost
+      summary: 移动、置顶、加精、隐藏或恢复动态
+      tags:
+        - social
+      x-audience:
+        - staff
+      x-owner: core-social
+      x-permission: social.post.moderate
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/SocialPostIDPathParameter'
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerateSocialPostRequest'
+      responses:
+        '200':
+          description: 已保存动态管理状态。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialPost'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
@@ -10311,11 +10879,22 @@ components:
         - site.display.update
         - site.registration.manage.read
         - site.registration.update
+        - social.board.create
+        - social.board.manage.read
+        - social.board.update
+        - social.follow.write.self
+        - social.media.create.self
+        - social.poll.vote.self
         - social.post.comment.create.self
         - social.post.create.self
         - social.post.delete.self
+        - social.post.like.self
+        - social.post.manage.read
+        - social.post.moderate
         - social.post.read
+        - social.post.repost.self
         - social.post.update.self
+        - social.redpacket.claim.self
         - social.report.read
         - social.report.resolve
         - staff.credential.enroll.self
@@ -14199,6 +14778,7 @@ components:
         - id
         - username
         - display_name
+        - followed_by_me
       properties:
         id:
           type: string
@@ -14211,15 +14791,235 @@ components:
           type: string
           minLength: 1
           maxLength: 80
+        followed_by_me:
+          type: boolean
+    SocialBoardIcon:
+      type: string
+      enum:
+        - messages-square
+        - coffee
+        - folder-open
+        - clapperboard
+        - megaphone
+        - sparkles
+        - gamepad-2
+        - circle-help
+    SocialBoardTone:
+      type: string
+      enum:
+        - coral
+        - green
+        - blue
+        - violet
+        - amber
+        - slate
+    SocialBoard:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - icon
+        - tone
+        - display_order
+        - enabled
+        - allow_member_posts
+        - post_count
+        - version
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        description:
+          type: string
+          maxLength: 120
+        icon:
+          $ref: '#/components/schemas/SocialBoardIcon'
+        tone:
+          $ref: '#/components/schemas/SocialBoardTone'
+        display_order:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        enabled:
+          type: boolean
+        allow_member_posts:
+          type: boolean
+        post_count:
+          type: integer
+          format: int64
+          minimum: 0
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+    SocialTopic:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - post_count
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        post_count:
+          type: integer
+          format: int64
+          minimum: 1
+    SocialCommunityOverview:
+      type: object
+      additionalProperties: false
+      required:
+        - boards
+        - hot_topics
+      properties:
+        boards:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialBoard'
+        hot_topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialTopic'
+    SocialPostMedia:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - content_type
+        - width
+        - height
+        - url
+      properties:
+        id:
+          type: string
+          format: uuid
+        content_type:
+          type: string
+          enum:
+            - image/jpeg
+            - image/png
+            - image/webp
+        width:
+          type: integer
+          minimum: 1
+          maximum: 16384
+        height:
+          type: integer
+          minimum: 1
+          maximum: 16384
+        url:
+          type: string
+          minLength: 1
+          maxLength: 256
+    SocialPollOption:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - label
+        - vote_count
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        vote_count:
+          type: integer
+          format: int64
+          minimum: 0
+    SocialPoll:
+      type: object
+      additionalProperties: false
+      required:
+        - question
+        - options
+        - total_votes
+        - closed
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 120
+        options:
+          type: array
+          minItems: 2
+          maxItems: 6
+          items:
+            $ref: '#/components/schemas/SocialPollOption'
+        total_votes:
+          type: integer
+          format: int64
+          minimum: 0
+        selected_option_id:
+          type: string
+          format: uuid
+          nullable: true
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed:
+          type: boolean
+    SocialRedPacket:
+      type: object
+      additionalProperties: false
+      required:
+        - total_amount
+        - claim_count
+        - remaining_amount
+        - remaining_claims
+        - claimed_by_me
+      properties:
+        total_amount:
+          type: integer
+          format: int64
+          minimum: 1
+        claim_count:
+          type: integer
+          minimum: 1
+        remaining_amount:
+          type: integer
+          format: int64
+          minimum: 0
+        remaining_claims:
+          type: integer
+          minimum: 0
+        claimed_by_me:
+          type: boolean
+        my_claim_amount:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
     SocialPost:
       type: object
       additionalProperties: false
       required:
         - id
         - author
+        - board
         - content
         - version
         - comment_count
+        - like_count
+        - repost_count
+        - liked_by_me
+        - reposted_by_me
+        - pinned
+        - featured
+        - topics
+        - media
         - created_at
         - updated_at
       properties:
@@ -14228,6 +15028,8 @@ components:
           format: uuid
         author:
           $ref: '#/components/schemas/SocialPostAuthor'
+        board:
+          $ref: '#/components/schemas/SocialBoard'
         content:
           type: string
           minLength: 1
@@ -14240,6 +15042,41 @@ components:
           type: integer
           format: int64
           minimum: 0
+        like_count:
+          type: integer
+          format: int64
+          minimum: 0
+        repost_count:
+          type: integer
+          format: int64
+          minimum: 0
+        liked_by_me:
+          type: boolean
+        reposted_by_me:
+          type: boolean
+        pinned:
+          type: boolean
+        featured:
+          type: boolean
+        hidden:
+          type: boolean
+        topics:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 40
+        media:
+          type: array
+          maxItems: 9
+          items:
+            $ref: '#/components/schemas/SocialPostMedia'
+        poll:
+          $ref: '#/components/schemas/SocialPoll'
+          nullable: true
+        red_packet:
+          $ref: '#/components/schemas/SocialRedPacket'
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -14255,6 +15092,12 @@ components:
       enum:
         - newest
         - oldest
+        - hot
+    SocialFeedKind:
+      type: string
+      enum:
+        - discover
+        - following
     SocialPostPage:
       type: object
       additionalProperties: false
@@ -14264,6 +15107,7 @@ components:
         - limit
         - offset
         - sort
+        - feed
       properties:
         items:
           type: array
@@ -14283,16 +15127,74 @@ components:
           maximum: 99999
         sort:
           $ref: '#/components/schemas/SocialPostSort'
+        feed:
+          $ref: '#/components/schemas/SocialFeedKind'
     CreateSocialPostRequest:
       type: object
       additionalProperties: false
       required:
         - content
+        - board_id
       properties:
         content:
           type: string
           minLength: 1
           maxLength: 2000
+        board_id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        media_ids:
+          type: array
+          maxItems: 9
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        poll:
+          $ref: '#/components/schemas/CreateSocialPollRequest'
+          nullable: true
+        red_packet:
+          $ref: '#/components/schemas/CreateSocialRedPacketRequest'
+          nullable: true
+    CreateSocialPollRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - question
+        - options
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 120
+        options:
+          type: array
+          minItems: 2
+          maxItems: 6
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+    CreateSocialRedPacketRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - total_amount
+        - claim_count
+      properties:
+        total_amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000
+        claim_count:
+          type: integer
+          minimum: 1
+          maximum: 100
     UpdateSocialPostRequest:
       type: object
       additionalProperties: false
@@ -14337,6 +15239,196 @@ components:
           type: integer
           minimum: 0
           maximum: 99999
+    SocialMediaUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - image
+      properties:
+        image:
+          type: string
+          format: binary
+    SocialInteractionState:
+      type: object
+      additionalProperties: false
+      required:
+        - active
+        - count
+      properties:
+        active:
+          type: boolean
+        count:
+          type: integer
+          format: int64
+          minimum: 0
+    SocialFollowState:
+      type: object
+      additionalProperties: false
+      required:
+        - username
+        - following
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        following:
+          type: boolean
+    SocialPollVoteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - option_id
+      properties:
+        option_id:
+          type: string
+          format: uuid
+    SocialRedPacketClaim:
+      type: object
+      additionalProperties: false
+      required:
+        - amount
+        - remaining_amount
+        - remaining_claims
+        - replayed
+      properties:
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+        remaining_amount:
+          type: integer
+          format: int64
+          minimum: 0
+        remaining_claims:
+          type: integer
+          minimum: 0
+        replayed:
+          type: boolean
+    ManagedSocialBoard:
+      allOf:
+        - $ref: '#/components/schemas/SocialBoard'
+        - type: object
+          additionalProperties: false
+          required:
+            - created_at
+            - updated_at
+          properties:
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+    CreateManagedSocialBoardRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - icon
+        - tone
+        - display_order
+        - enabled
+        - allow_member_posts
+        - reason
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        description:
+          type: string
+          maxLength: 120
+        icon:
+          $ref: '#/components/schemas/SocialBoardIcon'
+        tone:
+          $ref: '#/components/schemas/SocialBoardTone'
+        display_order:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        enabled:
+          type: boolean
+        allow_member_posts:
+          type: boolean
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+    UpdateManagedSocialBoardRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - description
+        - icon
+        - tone
+        - display_order
+        - enabled
+        - allow_member_posts
+        - expected_version
+        - reason
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        description:
+          type: string
+          maxLength: 120
+        icon:
+          $ref: '#/components/schemas/SocialBoardIcon'
+        tone:
+          $ref: '#/components/schemas/SocialBoardTone'
+        display_order:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        enabled:
+          type: boolean
+        allow_member_posts:
+          type: boolean
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+    ModerateSocialPostRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - board_id
+        - pinned
+        - featured
+        - hidden
+        - expected_version
+        - reason
+      properties:
+        board_id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        pinned:
+          type: boolean
+        featured:
+          type: boolean
+        hidden:
+          type: boolean
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
     PendingTorrentReview:
       type: object
       additionalProperties: false

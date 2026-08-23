@@ -13,6 +13,37 @@ import { ApiProblemError } from "~/shared/api/problem"
 export type SocialPost = components["schemas"]["SocialPost"]
 export type SocialPostPage = components["schemas"]["SocialPostPage"]
 export type SocialPostSort = components["schemas"]["SocialPostSort"]
+export type SocialFeedKind = components["schemas"]["SocialFeedKind"]
+export type SocialBoard = components["schemas"]["SocialBoard"]
+export type SocialCommunityOverview =
+  components["schemas"]["SocialCommunityOverview"]
+export type CreateSocialPollRequest =
+  components["schemas"]["CreateSocialPollRequest"]
+export type CreateSocialRedPacketRequest =
+  components["schemas"]["CreateSocialRedPacketRequest"]
+
+export type SocialFeedFilters = {
+  authorUsername?: string
+  feed?: SocialFeedKind
+  boardId?: string
+  featuredOnly?: boolean
+  topic?: string
+  enabled?: boolean
+}
+
+function normalizeSocialFilters(filters: SocialFeedFilters): SocialFeedFilters {
+  return {
+    ...(filters.authorUsername
+      ? { authorUsername: filters.authorUsername }
+      : {}),
+    ...(filters.feed && filters.feed !== "discover"
+      ? { feed: filters.feed }
+      : {}),
+    ...(filters.boardId ? { boardId: filters.boardId } : {}),
+    ...(filters.featuredOnly ? { featuredOnly: true } : {}),
+    ...(filters.topic ? { topic: filters.topic } : {}),
+  }
+}
 
 export const socialPostKeys = {
   all: ["social", "posts"] as const,
@@ -20,13 +51,19 @@ export const socialPostKeys = {
     sort: SocialPostSort,
     limit: number,
     offset: number,
-    authorUsername?: string
-  ) =>
-    [
+    filtersOrAuthor: SocialFeedFilters | string = {}
+  ) => {
+    const rawFilters =
+      typeof filtersOrAuthor === "string"
+        ? { authorUsername: filtersOrAuthor }
+        : filtersOrAuthor
+    const filters = normalizeSocialFilters(rawFilters)
+    return [
       ...socialPostKeys.all,
       "page",
-      { sort, limit, offset, authorUsername: authorUsername ?? null },
-    ] as const,
+      { sort, limit, offset, ...filters },
+    ] as const
+  },
   detail: (postId: string) =>
     [...socialPostKeys.all, "detail", postId] as const,
   infinite: (sort: SocialPostSort, limit: number, authorUsername: string) =>
@@ -35,14 +72,16 @@ export const socialPostKeys = {
       "infinite",
       { sort, limit, authorUsername },
     ] as const,
+  overview: () => ["social", "overview"] as const,
 }
 
 async function fetchSocialPosts(
   sort: SocialPostSort,
   limit: number,
   offset: number,
-  authorUsername?: string
+  filters: SocialFeedFilters = {}
 ): Promise<SocialPostPage> {
+  filters = normalizeSocialFilters(filters)
   const { data, error, response } = await apiClient.GET(
     "/api/v1/social/posts",
     {
@@ -51,7 +90,11 @@ async function fetchSocialPosts(
           sort,
           limit,
           offset,
-          author_username: authorUsername,
+          author_username: filters.authorUsername,
+          feed: filters.feed,
+          board_id: filters.boardId,
+          featured_only: filters.featuredOnly,
+          topic: filters.topic,
         },
       },
     }
@@ -66,11 +109,16 @@ export function socialPostsQueryOptions(
   sort: SocialPostSort,
   limit: number,
   offset: number,
-  authorUsername?: string
+  filtersOrAuthor: SocialFeedFilters | string = {}
 ) {
+  const rawFilters =
+    typeof filtersOrAuthor === "string"
+      ? { authorUsername: filtersOrAuthor }
+      : filtersOrAuthor
+  const filters = normalizeSocialFilters(rawFilters)
   return queryOptions({
-    queryKey: socialPostKeys.page(sort, limit, offset, authorUsername),
-    queryFn: () => fetchSocialPosts(sort, limit, offset, authorUsername),
+    queryKey: socialPostKeys.page(sort, limit, offset, filters),
+    queryFn: () => fetchSocialPosts(sort, limit, offset, filters),
     staleTime: 15_000,
     retry: false,
   })
@@ -98,10 +146,14 @@ export function useSocialPosts(
   sort: SocialPostSort,
   limit: number,
   offset: number,
-  options: { authorUsername?: string; enabled?: boolean } = {}
+  optionsOrAuthor: SocialFeedFilters | string = {}
 ) {
+  const options =
+    typeof optionsOrAuthor === "string"
+      ? { authorUsername: optionsOrAuthor }
+      : optionsOrAuthor
   return useQuery({
-    ...socialPostsQueryOptions(sort, limit, offset, options.authorUsername),
+    ...socialPostsQueryOptions(sort, limit, offset, options),
     enabled: options.enabled ?? true,
   })
 }
@@ -119,7 +171,7 @@ export function useInfiniteSocialPosts(
   return useInfiniteQuery({
     queryKey: socialPostKeys.infinite(sort, limit, authorUsername),
     queryFn: ({ pageParam }) =>
-      fetchSocialPosts(sort, limit, pageParam, authorUsername),
+      fetchSocialPosts(sort, limit, pageParam, { authorUsername }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
       const nextOffset = lastPage.offset + lastPage.items.length
@@ -136,6 +188,10 @@ export function useCreateSocialPost() {
   return useMutation({
     mutationFn: async (input: {
       content: string
+      boardId: string
+      mediaIds?: string[]
+      poll?: CreateSocialPollRequest
+      redPacket?: CreateSocialRedPacketRequest
       csrfToken: string
       idempotencyKey: string
     }): Promise<SocialPost> => {
@@ -148,7 +204,13 @@ export function useCreateSocialPost() {
               "Idempotency-Key": input.idempotencyKey,
             },
           },
-          body: { content: input.content },
+          body: {
+            content: input.content,
+            board_id: input.boardId,
+            media_ids: input.mediaIds,
+            poll: input.poll,
+            red_packet: input.redPacket,
+          },
         }
       )
       if (!response.ok || !data) {
@@ -158,6 +220,175 @@ export function useCreateSocialPost() {
     },
     onSuccess: async (post) => {
       queryClient.setQueryData(socialPostKeys.detail(post.id), post)
+      await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
+    },
+  })
+}
+
+export function useSocialCommunityOverview() {
+  return useQuery({
+    queryKey: socialPostKeys.overview(),
+    queryFn: async (): Promise<SocialCommunityOverview> => {
+      const { data, error, response } = await apiClient.GET(
+        "/api/v1/social/overview"
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useUploadSocialMedia() {
+  return useMutation({
+    mutationFn: async (input: { file: File; csrfToken: string }) => {
+      const body = new FormData()
+      body.append("image", input.file)
+      const { data, error, response } = await apiClient.POST(
+        "/api/v1/social/media",
+        {
+          params: { header: { "X-CSRF-Token": input.csrfToken } },
+          body: { image: "" },
+          bodySerializer: () => body,
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+  })
+}
+
+function usePostInteraction(kind: "like" | "repost") {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      postId: string
+      active: boolean
+      csrfToken: string
+    }) => {
+      const path =
+        kind === "like"
+          ? "/api/v1/social/posts/{post_id}/like"
+          : "/api/v1/social/posts/{post_id}/repost"
+      const request = {
+        params: {
+          path: { post_id: input.postId },
+          header: { "X-CSRF-Token": input.csrfToken },
+        },
+      } as const
+      const result = input.active
+        ? await apiClient.PUT(path, request)
+        : await apiClient.DELETE(path, request)
+      if (!result.response.ok || !result.data) {
+        throw new ApiProblemError(result.response.status, result.error)
+      }
+      return result.data
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
+    },
+  })
+}
+
+export function useSocialPostLike() {
+  return usePostInteraction("like")
+}
+
+export function useSocialPostRepost() {
+  return usePostInteraction("repost")
+}
+
+export function useSocialFollow() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      username: string
+      active: boolean
+      csrfToken: string
+    }) => {
+      const request = {
+        params: {
+          path: { username: input.username },
+          header: { "X-CSRF-Token": input.csrfToken },
+        },
+      } as const
+      const result = input.active
+        ? await apiClient.PUT("/api/v1/social/users/{username}/follow", request)
+        : await apiClient.DELETE(
+            "/api/v1/social/users/{username}/follow",
+            request
+          )
+      if (!result.response.ok || !result.data) {
+        throw new ApiProblemError(result.response.status, result.error)
+      }
+      return result.data
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
+    },
+  })
+}
+
+export function useSocialPollVote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      postId: string
+      optionId: string
+      csrfToken: string
+    }) => {
+      const { data, error, response } = await apiClient.PUT(
+        "/api/v1/social/posts/{post_id}/poll-vote",
+        {
+          params: {
+            path: { post_id: input.postId },
+            header: { "X-CSRF-Token": input.csrfToken },
+          },
+          body: { option_id: input.optionId },
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
+    },
+  })
+}
+
+export function useClaimSocialRedPacket() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      postId: string
+      csrfToken: string
+      idempotencyKey: string
+    }) => {
+      const { data, error, response } = await apiClient.POST(
+        "/api/v1/social/posts/{post_id}/red-packet/claims",
+        {
+          params: {
+            path: { post_id: input.postId },
+            header: {
+              "X-CSRF-Token": input.csrfToken,
+              "Idempotency-Key": input.idempotencyKey,
+            },
+          },
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
     },
   })

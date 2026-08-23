@@ -35,6 +35,7 @@ import {
   RssIcon,
   MedalIcon,
   RocketIcon,
+  MessageCircleMoreIcon,
 } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
@@ -288,6 +289,12 @@ const contentNavigation = [
     to: "/staff/content/comments",
     icon: MessageSquareWarningIcon,
     action: "social.report.read" as const,
+  },
+  {
+    label: "动态圈管理",
+    to: "/staff/content/social",
+    icon: MessageCircleMoreIcon,
+    action: "social.board.manage.read" as const,
   },
   {
     label: "分类管理",

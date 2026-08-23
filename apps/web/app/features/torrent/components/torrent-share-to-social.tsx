@@ -84,6 +84,7 @@ export function TorrentShareToSocial({
     try {
       await createPost.mutateAsync({
         content: postContent,
+        boardId: "resources",
         csrfToken: session.data.csrf_token,
         idempotencyKey: requestId.current,
       })

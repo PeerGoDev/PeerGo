@@ -376,6 +376,19 @@ type SocialPostService interface {
 	Create(context.Context, string, string, social.CreatePostInput) (social.Post, error)
 	UpdateMyPost(context.Context, string, string, social.UpdatePostInput) (social.Post, error)
 	DeleteMyPost(context.Context, string, string, social.DeletePostInput) error
+	Overview(context.Context, string) (social.CommunityOverview, error)
+	UploadMedia(context.Context, string, string, []byte) (social.PostMedia, error)
+	ReadMedia(context.Context, string, uuid.UUID) (social.MediaObject, error)
+	SetLike(context.Context, string, string, uuid.UUID, bool) (social.InteractionState, error)
+	SetRepost(context.Context, string, string, uuid.UUID, bool) (social.InteractionState, error)
+	SetFollow(context.Context, string, string, string, bool) (social.FollowState, error)
+	Vote(context.Context, string, string, uuid.UUID, uuid.UUID) (social.Poll, error)
+	ClaimRedPacket(context.Context, string, string, uuid.UUID, uuid.UUID) (social.RedPacketClaim, error)
+	ListManagedBoards(context.Context, authz.StaffActor) ([]social.Board, error)
+	CreateManagedBoard(context.Context, authz.StaffActor, social.CreateBoardInput) (social.Board, error)
+	UpdateManagedBoard(context.Context, authz.StaffActor, social.UpdateBoardInput) (social.Board, error)
+	ListManagedPosts(context.Context, authz.StaffActor, social.PostListQuery) (social.PostPage, error)
+	ModeratePost(context.Context, authz.StaffActor, social.ModeratePostInput) (social.Post, error)
 }
 
 // CommentModerationService keeps the public reporter and staff moderator

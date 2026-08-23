@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	generated "github.com/peergo/peergo/services/core/internal/generated/api"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
@@ -30,6 +32,9 @@ func (h *Handler) ListSocialPosts(ctx context.Context, request generated.ListSoc
 	}
 	page, err := h.socialPosts.List(ctx, sessionTokenFromContext(ctx), social.PostListQuery{
 		Sort: sort, Limit: limit, Offset: offset, AuthorUsername: authorUsername,
+		Feed:    social.FeedKind(valueOrDefault(request.Params.Feed, generated.Discover)),
+		BoardID: optionalString(request.Params.BoardId), FeaturedOnly: request.Params.FeaturedOnly != nil && *request.Params.FeaturedOnly,
+		Topic: optionalString(request.Params.Topic),
 	})
 	switch {
 	case errors.Is(err, social.ErrPostInput):
@@ -71,11 +76,15 @@ func (h *Handler) CreateSocialPost(ctx context.Context, request generated.Create
 		return generated.CreateSocialPost400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, nil
 	}
 	post, err := h.socialPosts.Create(ctx, sessionTokenFromContext(ctx), string(request.Params.XCSRFToken), social.CreatePostInput{
-		RequestID: request.Params.IdempotencyKey, Body: request.Body.Content,
+		RequestID: request.Params.IdempotencyKey, Body: request.Body.Content, BoardID: request.Body.BoardId,
+		MediaIDs: optionalUUIDs(request.Body.MediaIds), Poll: createPollInput(request.Body.Poll), RedPacket: createRedPacketInput(request.Body.RedPacket),
 	})
 	switch {
 	case errors.Is(err, social.ErrPostInput):
 		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_social_post", "无法发布动态", "动态正文需为 1 到 2000 个字符。")
+		return generated.CreateSocialPost400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, nil
+	case errors.Is(err, social.ErrSocialMediaInvalid), errors.Is(err, social.ErrSocialMediaNotFound):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_social_media", "无法发布动态", "图片不存在、已被使用或不属于当前账号，请重新上传。")
 		return generated.CreateSocialPost400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, nil
 	case errors.Is(err, identity.ErrSessionNotFound):
 		problem := newProblemFromContext(ctx, http.StatusUnauthorized, "session_required", "需要登录", "请重新登录后发布动态。")
@@ -88,6 +97,12 @@ func (h *Handler) CreateSocialPost(ctx context.Context, request generated.Create
 		return generated.CreateSocialPost403ApplicationProblemPlusJSONResponse(problem), nil
 	case errors.Is(err, social.ErrPostIdempotencyConflict):
 		problem := newProblemFromContext(ctx, http.StatusConflict, "idempotency_conflict", "请求标识已被使用", "请保留正文并重新发起发布。")
+		return generated.CreateSocialPost409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, social.ErrSocialBoardUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "social_board_unavailable", "板块不可发布", "该板块已停用或不接受成员发布，请选择其他板块。")
+		return generated.CreateSocialPost409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, social.ErrSocialInsufficientMagic):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "social_red_packet_balance_insufficient", "魔力值不足", "当前余额不足以发放这个红包，请调整金额后重试。")
 		return generated.CreateSocialPost409ApplicationProblemPlusJSONResponse(problem), nil
 	case err != nil:
 		return nil, err
@@ -156,13 +171,67 @@ func socialPostPageDTO(page social.PostPage) generated.SocialPostPage {
 	for _, item := range page.Items {
 		items = append(items, socialPostDTO(item))
 	}
-	return generated.SocialPostPage{Items: items, Total: page.Total, Limit: page.Limit, Offset: page.Offset, Sort: generated.SocialPostSort(page.Sort)}
+	return generated.SocialPostPage{Items: items, Total: page.Total, Limit: page.Limit, Offset: page.Offset, Sort: generated.SocialPostSort(page.Sort), Feed: generated.SocialFeedKind(page.Feed)}
 }
 
 func socialPostDTO(post social.Post) generated.SocialPost {
 	return generated.SocialPost{
-		Id: post.ID, Author: generated.SocialPostAuthor{Id: post.Author.ID, Username: post.Author.Username, DisplayName: post.Author.DisplayName},
-		Content: post.Body, Version: post.Version, CommentCount: post.CommentCount,
+		Id: post.ID, Author: generated.SocialPostAuthor{Id: post.Author.ID, Username: post.Author.Username, DisplayName: post.Author.DisplayName, FollowedByMe: post.Author.FollowedByMe},
+		Board: socialBoardDTO(post.Board), Content: post.Body, Version: post.Version, CommentCount: post.CommentCount,
+		LikeCount: post.LikeCount, RepostCount: post.RepostCount, LikedByMe: post.LikedByMe, RepostedByMe: post.RepostedByMe,
+		Pinned: post.Pinned, Featured: post.Featured, Hidden: boolPointer(post.State == social.PostModeratorHidden), Topics: post.Topics, Media: socialMediaDTOs(post.Media), Poll: socialPollDTO(post.Poll), RedPacket: socialRedPacketDTO(post.RedPacket),
 		CreatedAt: post.CreatedAt, UpdatedAt: post.UpdatedAt, EditedAt: post.EditedAt,
 	}
+}
+
+func valueOrDefault[T comparable](value *T, fallback T) T {
+	if value == nil {
+		return fallback
+	}
+	return *value
+}
+func boolPointer(value bool) *bool { return &value }
+func optionalUUIDs(value *[]uuid.UUID) []uuid.UUID {
+	if value == nil {
+		return nil
+	}
+	return append([]uuid.UUID(nil), (*value)...)
+}
+func createPollInput(value *generated.CreateSocialPollRequest) *social.CreatePollInput {
+	if value == nil {
+		return nil
+	}
+	return &social.CreatePollInput{Question: value.Question, Options: append([]string(nil), value.Options...), ClosesAt: value.ClosesAt}
+}
+func createRedPacketInput(value *generated.CreateSocialRedPacketRequest) *social.CreateRedPacketInput {
+	if value == nil {
+		return nil
+	}
+	return &social.CreateRedPacketInput{TotalAmount: value.TotalAmount, ClaimCount: value.ClaimCount}
+}
+func socialBoardDTO(board social.Board) generated.SocialBoard {
+	return generated.SocialBoard{Id: board.ID, Name: board.Name, Description: board.Description, Icon: generated.SocialBoardIcon(board.Icon), Tone: generated.SocialBoardTone(board.Tone), DisplayOrder: board.DisplayOrder, Enabled: board.Enabled, AllowMemberPosts: board.AllowMemberPosts, PostCount: board.PostCount, Version: board.Version}
+}
+func socialMediaDTOs(media []social.PostMedia) []generated.SocialPostMedia {
+	result := make([]generated.SocialPostMedia, 0, len(media))
+	for _, item := range media {
+		result = append(result, generated.SocialPostMedia{Id: item.ID, ContentType: generated.SocialPostMediaContentType(item.ContentType), Width: item.Width, Height: item.Height, Url: item.URL})
+	}
+	return result
+}
+func socialPollDTO(poll *social.Poll) *generated.SocialPoll {
+	if poll == nil {
+		return nil
+	}
+	options := make([]generated.SocialPollOption, 0, len(poll.Options))
+	for _, option := range poll.Options {
+		options = append(options, generated.SocialPollOption{Id: option.ID, Label: option.Label, VoteCount: option.VoteCount})
+	}
+	return &generated.SocialPoll{Question: poll.Question, Options: options, TotalVotes: poll.TotalVotes, SelectedOptionId: poll.SelectedOptionID, ClosesAt: poll.ClosesAt, Closed: poll.Closed}
+}
+func socialRedPacketDTO(packet *social.RedPacket) *generated.SocialRedPacket {
+	if packet == nil {
+		return nil
+	}
+	return &generated.SocialRedPacket{TotalAmount: packet.TotalAmount, ClaimCount: packet.ClaimCount, RemainingAmount: packet.RemainingAmount, RemainingClaims: packet.RemainingClaims, ClaimedByMe: packet.ClaimedByMe, MyClaimAmount: packet.MyClaimAmount}
 }

@@ -7,6 +7,8 @@ import {
   SparklesIcon,
   TrendingUpIcon,
   UsersIcon,
+  LayoutGridIcon,
+  CheckIcon,
 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
@@ -25,6 +27,8 @@ import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import { useMyNotificationSummary } from "~/features/notification/api/notifications.queries"
 import {
   type SocialPostSort,
+  type SocialFeedKind,
+  useSocialCommunityOverview,
   useSocialPosts,
 } from "~/features/social/api/posts.queries"
 import { PostComposer } from "~/features/social/components/post-composer"
@@ -37,10 +41,20 @@ const pageSize = 20
 
 export function SocialFeedPage() {
   const [sort, setSort] = React.useState<SocialPostSort>("newest")
+  const [feed, setFeed] = React.useState<SocialFeedKind>("discover")
+  const [boardId, setBoardId] = React.useState("")
+  const [featuredOnly, setFeaturedOnly] = React.useState(false)
+  const [topic, setTopic] = React.useState("")
   const [offset, setOffset] = React.useState(0)
   const session = useWebSession()
   const capabilities = useCapabilities(session.data?.user.id)
-  const posts = useSocialPosts(sort, pageSize, offset)
+  const overview = useSocialCommunityOverview()
+  const posts = useSocialPosts(sort, pageSize, offset, {
+    feed,
+    boardId: boardId || undefined,
+    featuredOnly,
+    topic: topic || undefined,
+  })
   const actions = React.useMemo(
     () => new Set(capabilities.data?.items.map((item) => item.action) ?? []),
     [capabilities.data?.items]
@@ -53,7 +67,10 @@ export function SocialFeedPage() {
   )
   const unreadNotifications = notificationSummary.data?.unread_count ?? 0
 
-  React.useEffect(() => setOffset(0), [sort])
+  React.useEffect(
+    () => setOffset(0),
+    [sort, feed, boardId, featuredOnly, topic]
+  )
 
   return (
     <PageLayout className="max-w-[944px] gap-0">
@@ -102,6 +119,7 @@ export function SocialFeedPage() {
             <PostComposer
               csrfToken={session.data.csrf_token}
               canPost={canPost}
+              boards={overview.data?.boards ?? []}
             />
           ) : null}
 
@@ -113,10 +131,17 @@ export function SocialFeedPage() {
             <button
               type="button"
               role="tab"
-              aria-disabled="true"
-              aria-selected="false"
-              title="关注 Feed 将在关注关系上线后开放"
-              className="flex items-center justify-center gap-2 rounded-md text-muted-foreground"
+              aria-selected={feed === "following"}
+              onClick={() => {
+                setFeed("following")
+                if (sort === "hot") setSort("newest")
+              }}
+              className={cn(
+                "flex items-center justify-center gap-2 rounded-md",
+                feed === "following"
+                  ? "bg-background font-medium text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              )}
             >
               <UsersIcon className="size-4" />
               关注
@@ -124,8 +149,17 @@ export function SocialFeedPage() {
             <button
               type="button"
               role="tab"
-              aria-selected="true"
-              className="flex items-center justify-center gap-2 rounded-md bg-background font-medium text-foreground shadow-sm"
+              aria-selected={feed === "discover" && sort !== "hot"}
+              onClick={() => {
+                setFeed("discover")
+                if (sort === "hot") setSort("newest")
+              }}
+              className={cn(
+                "flex items-center justify-center gap-2 rounded-md",
+                feed === "discover" && sort !== "hot"
+                  ? "bg-background font-medium text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              )}
             >
               <SparklesIcon className="size-4" />
               发现
@@ -133,10 +167,17 @@ export function SocialFeedPage() {
             <button
               type="button"
               role="tab"
-              aria-disabled="true"
-              aria-selected="false"
-              title="热门 Feed 将在互动排序上线后开放"
-              className="flex items-center justify-center gap-2 rounded-md text-muted-foreground"
+              aria-selected={sort === "hot"}
+              onClick={() => {
+                setFeed("discover")
+                setSort("hot")
+              }}
+              className={cn(
+                "flex items-center justify-center gap-2 rounded-md",
+                sort === "hot"
+                  ? "bg-background font-medium text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              )}
             >
               <TrendingUpIcon className="size-4" />
               热门
@@ -148,7 +189,45 @@ export function SocialFeedPage() {
             role="tabpanel"
             aria-label="发现"
           >
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={<Button variant="outline" size="sm" />}
+                  >
+                    <LayoutGridIcon data-icon="inline-start" />
+                    {overview.data?.boards.find((board) => board.id === boardId)
+                      ?.name ?? "全部板块"}
+                    <ChevronDownIcon data-icon="inline-end" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-40">
+                    <DropdownMenuItem onClick={() => setBoardId("")}>
+                      {!boardId ? <CheckIcon /> : <span className="size-4" />}
+                      全部板块
+                    </DropdownMenuItem>
+                    {overview.data?.boards.map((board) => (
+                      <DropdownMenuItem
+                        key={board.id}
+                        onClick={() => setBoardId(board.id)}
+                      >
+                        {boardId === board.id ? (
+                          <CheckIcon />
+                        ) : (
+                          <span className="size-4" />
+                        )}
+                        {board.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant={featuredOnly ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setFeaturedOnly((value) => !value)}
+                >
+                  只看精华
+                </Button>
+              </div>
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
@@ -159,7 +238,11 @@ export function SocialFeedPage() {
                     />
                   }
                 >
-                  {sort === "newest" ? "最新" : "最早"}
+                  {sort === "newest"
+                    ? "最新"
+                    : sort === "oldest"
+                      ? "最早"
+                      : "热门"}
                   <ChevronDownIcon data-icon="inline-end" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-24">
@@ -168,6 +251,9 @@ export function SocialFeedPage() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setSort("oldest")}>
                     最早
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSort("hot")}>
+                    热门
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -234,12 +320,63 @@ export function SocialFeedPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
+                <LayoutGridIcon />
+                社区板块
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {overview.data?.boards.map((board) => (
+                <button
+                  key={board.id}
+                  type="button"
+                  onClick={() =>
+                    setBoardId(board.id === boardId ? "" : board.id)
+                  }
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted",
+                    board.id === boardId && "bg-muted font-medium"
+                  )}
+                >
+                  <span>{board.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {board.post_count.toLocaleString()}
+                  </span>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <TrendingUpIcon />
                 热门话题
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">暂无热门话题</p>
+              {overview.data?.hot_topics.length ? (
+                <div className="space-y-1">
+                  {overview.data.hot_topics.map((item) => (
+                    <button
+                      key={item.name}
+                      type="button"
+                      onClick={() =>
+                        setTopic(item.name === topic ? "" : item.name)
+                      }
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted",
+                        item.name === topic && "bg-muted font-medium"
+                      )}
+                    >
+                      <span>#{item.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {item.post_count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">暂无热门话题</p>
+              )}
             </CardContent>
           </Card>
         </aside>

@@ -17,15 +17,44 @@ SELECT count(*)::bigint
 FROM social.posts AS post
 JOIN identity.users AS author
     ON author.id = post.author_id
+JOIN social.boards AS board
+    ON board.id = post.board_id
 WHERE post.state = 'visible'
+  AND board.enabled
   AND (
     $1::text = ''
     OR lower(author.username) = lower($1::text)
   )
+  AND ($2::text = '' OR post.board_id = $2::text)
+  AND (NOT $3::boolean OR post.is_featured)
+  AND ($4::text = '' OR EXISTS (
+      SELECT 1 FROM social.post_topics AS topic_binding
+      WHERE topic_binding.post_id = post.id AND topic_binding.topic = $4::text
+  ))
+  AND ($5::text <> 'following' OR EXISTS (
+      SELECT 1 FROM social.follows AS follow
+      WHERE follow.follower_id = $6::uuid AND follow.followee_id = post.author_id
+  ))
 `
 
-func (q *Queries) CountVisiblePosts(ctx context.Context, authorUsername string) (int64, error) {
-	row := q.db.QueryRow(ctx, countVisiblePosts, authorUsername)
+type CountVisiblePostsParams struct {
+	AuthorUsername string
+	BoardID        string
+	FeaturedOnly   bool
+	Topic          string
+	FeedKind       string
+	ViewerID       uuid.UUID
+}
+
+func (q *Queries) CountVisiblePosts(ctx context.Context, arg CountVisiblePostsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countVisiblePosts,
+		arg.AuthorUsername,
+		arg.BoardID,
+		arg.FeaturedOnly,
+		arg.Topic,
+		arg.FeedKind,
+		arg.ViewerID,
+	)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -119,6 +148,8 @@ SELECT
 FROM social.posts AS post
 JOIN identity.users AS author
     ON author.id = post.author_id
+JOIN social.boards AS board
+    ON board.id = post.board_id
 LEFT JOIN social.post_comment_threads AS binding
     ON binding.post_id = post.id
 LEFT JOIN LATERAL (
@@ -128,6 +159,7 @@ LEFT JOIN LATERAL (
 ) AS comment_count ON true
 WHERE post.public_id = $1::uuid
   AND post.state = 'visible'
+  AND board.enabled
 `
 
 type FindVisiblePostRow struct {
@@ -170,7 +202,8 @@ INSERT INTO social.posts (
     public_id,
     author_id,
     create_request_id,
-    create_body_sha256,
+	create_body_sha256,
+	board_id,
     body,
     body_format,
     state,
@@ -181,13 +214,14 @@ INSERT INTO social.posts (
     $1::uuid,
     $2::uuid,
     $3::uuid,
-    $4::bytea,
-    $5::text,
+	$4::bytea,
+	$5::text,
+    $6::text,
     'plain_text',
     'visible',
     1,
-    $6::timestamptz,
-    $6::timestamptz
+    $7::timestamptz,
+    $7::timestamptz
 )
 ON CONFLICT (author_id, create_request_id) DO NOTHING
 `
@@ -197,6 +231,7 @@ type InsertPostParams struct {
 	AuthorID         uuid.UUID
 	CreateRequestID  uuid.UUID
 	CreateBodySha256 []byte
+	BoardID          string
 	Body             string
 	CreatedAt        pgtype.Timestamptz
 }
@@ -207,6 +242,7 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (int64, 
 		arg.AuthorID,
 		arg.CreateRequestID,
 		arg.CreateBodySha256,
+		arg.BoardID,
 		arg.Body,
 		arg.CreatedAt,
 	)
@@ -272,6 +308,8 @@ SELECT
 FROM social.posts AS post
 JOIN identity.users AS author
     ON author.id = post.author_id
+JOIN social.boards AS board
+    ON board.id = post.board_id
 LEFT JOIN social.post_comment_threads AS binding
     ON binding.post_id = post.id
 LEFT JOIN LATERAL (
@@ -280,21 +318,45 @@ LEFT JOIN LATERAL (
     WHERE comment.thread_id = binding.thread_id
 ) AS comment_count ON true
 WHERE post.state = 'visible'
+  AND board.enabled
   AND (
     $1::text = ''
     OR lower(author.username) = lower($1::text)
   )
+  AND ($2::text = '' OR post.board_id = $2::text)
+  AND (NOT $3::boolean OR post.is_featured)
+  AND ($4::text = '' OR EXISTS (
+      SELECT 1 FROM social.post_topics AS topic_binding
+      WHERE topic_binding.post_id = post.id AND topic_binding.topic = $4::text
+  ))
+  AND ($5::text <> 'following' OR EXISTS (
+      SELECT 1 FROM social.follows AS follow
+      WHERE follow.follower_id = $6::uuid AND follow.followee_id = post.author_id
+  ))
 ORDER BY
-    CASE WHEN $2::text = 'oldest' THEN post.created_at END ASC,
-    CASE WHEN $2::text = 'oldest' THEN post.id END ASC,
-    CASE WHEN $2::text = 'newest' THEN post.created_at END DESC,
-    CASE WHEN $2::text = 'newest' THEN post.id END DESC
-LIMIT $4::integer
-OFFSET $3::integer
+    post.is_pinned DESC,
+    CASE WHEN $7::text = 'hot' THEN
+      COALESCE((SELECT count(*) FROM social.post_likes WHERE post_id = post.id), 0) * 2
+      + COALESCE((SELECT count(*) FROM social.post_reposts WHERE post_id = post.id), 0) * 3
+      + COALESCE(comment_count.value, 0)
+    END DESC,
+    CASE WHEN $7::text = 'oldest' THEN post.created_at END ASC,
+    CASE WHEN $7::text = 'oldest' THEN post.id END ASC,
+    CASE WHEN $7::text = 'newest' THEN post.created_at END DESC,
+    CASE WHEN $7::text = 'newest' THEN post.id END DESC,
+    post.created_at DESC,
+    post.id DESC
+LIMIT $9::integer
+OFFSET $8::integer
 `
 
 type ListVisiblePostsParams struct {
 	AuthorUsername string
+	BoardID        string
+	FeaturedOnly   bool
+	Topic          string
+	FeedKind       string
+	ViewerID       uuid.UUID
 	SortOrder      string
 	ResultOffset   int32
 	ResultLimit    int32
@@ -318,6 +380,11 @@ type ListVisiblePostsRow struct {
 func (q *Queries) ListVisiblePosts(ctx context.Context, arg ListVisiblePostsParams) ([]ListVisiblePostsRow, error) {
 	rows, err := q.db.Query(ctx, listVisiblePosts,
 		arg.AuthorUsername,
+		arg.BoardID,
+		arg.FeaturedOnly,
+		arg.Topic,
+		arg.FeedKind,
+		arg.ViewerID,
 		arg.SortOrder,
 		arg.ResultOffset,
 		arg.ResultLimit,
