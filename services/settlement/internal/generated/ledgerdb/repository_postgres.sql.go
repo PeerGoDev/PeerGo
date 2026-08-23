@@ -4161,10 +4161,11 @@ func (q *Queries) StorageCleanupDeleteSeedingEvidenceOutbox(ctx context.Context,
 }
 
 const storageCleanupDeleteSeedingSources = `-- name: StorageCleanupDeleteSeedingSources :execrows
-WITH eligible_windows AS MATERIALIZED (
+WITH eligible_window AS MATERIALIZED (
     -- Evidence windows are one row per hour. Select from that compact ledger
     -- first so retained anomalous hours do not force every source row in those
-    -- hours to be scanned again on each cleanup pass.
+    -- hours to be scanned again on each cleanup pass. Processing one eligible
+    -- hour at a time also forces a narrow primary-key prefix scan.
     SELECT evidence_window.window_start
     FROM ledger.seeding_evidence_windows AS evidence_window
     WHERE evidence_window.window_start < $1::timestamptz
@@ -4179,15 +4180,18 @@ WITH eligible_windows AS MATERIALIZED (
           WHERE anomaly.window_start = evidence_window.window_start
       )
     ORDER BY evidence_window.window_start
-    LIMIT 256
+    LIMIT 1
 ), candidate AS (
     SELECT source.window_start, source.user_id, source.torrent_id, source.interval_event_id
-    FROM ledger.seeding_evidence_sources AS source
-    INNER JOIN eligible_windows
-        ON eligible_windows.window_start = source.window_start
-    ORDER BY source.window_start, source.user_id, source.torrent_id, source.interval_event_id
-    LIMIT $2::integer
-    FOR UPDATE OF source SKIP LOCKED
+    FROM eligible_window
+    CROSS JOIN LATERAL (
+        SELECT source.window_start, source.user_id, source.torrent_id, source.interval_event_id
+        FROM ledger.seeding_evidence_sources AS source
+        WHERE source.window_start = eligible_window.window_start
+        ORDER BY source.user_id, source.torrent_id, source.interval_event_id
+        LIMIT $2::integer
+        FOR UPDATE OF source SKIP LOCKED
+    ) AS source
 )
 DELETE FROM ledger.seeding_evidence_sources AS source
 USING candidate
