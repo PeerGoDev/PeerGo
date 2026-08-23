@@ -42,26 +42,28 @@ describe("TorrentTable", () => {
     expect(screen.getByText("Example Release")).toBeInTheDocument()
     const table = screen.getByRole("table")
     expect(table).toHaveClass("block", "min-w-0")
-    expect(table.querySelector("thead")).toHaveClass("sr-only")
+    expect(table.closest("[data-slot=card]")).toHaveClass("hidden", "md:flex")
+    expect(table.querySelector("thead")).toHaveClass("block", "bg-muted")
+    expect(screen.getByText("名称").closest("tr")).toHaveClass(
+      "grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px]"
+    )
     expect(screen.getByText("Example Release").closest("tr")).toHaveClass(
-      "min-h-[108px]",
       "border-t!",
       "border-b-0!",
-      "py-3"
+      "py-2"
     )
+    expect(screen.getByText("Example Release")).not.toHaveClass("text-base")
     expect(screen.getByText("免费")).toBeInTheDocument()
-    expect(screen.getByLabelText("做种数 12，下载数 3")).toBeVisible()
+    expect(screen.getByLabelText("做种数 / 下载数 / 完成数")).toBeVisible()
     expect(screen.getByText("1")).toBeVisible()
     expect(screen.getByText("GB")).toHaveClass("text-success-foreground")
     expect(screen.queryByText("统计延迟")).not.toBeInTheDocument()
-    expect(screen.getByLabelText("做种数 12，下载数 3")).toHaveTextContent(
-      "123"
-    )
+    expect(screen.getByTitle("做种数")).toHaveTextContent("12")
     const downloadButton = screen.getByRole("button", {
       name: "下载“Example Release”的种子文件",
     })
     expect(downloadButton).toHaveAttribute("aria-disabled", "false")
-    expect(downloadButton).toHaveClass("size-7", "border-0", "p-1.5")
+    expect(downloadButton).toHaveClass("size-[22px]", "border-0", "p-1")
 
     fireEvent.error(screen.getByRole("img", { name: "Example Release封面" }))
     expect(
@@ -137,7 +139,9 @@ describe("TorrentTable", () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByLabelText("尚无 Tracker 统计")).toHaveTextContent("——")
+    expect(screen.getByLabelText("尚无 Tracker 统计")).toHaveTextContent(
+      "— / — / —"
+    )
   })
 
   it("obscures a migrated 9kg thumbnail without adding a label to the dense row", () => {

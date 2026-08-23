@@ -119,15 +119,16 @@ describe("TorrentDetailPage", () => {
       name: "Final Release 2026封面",
     })
     expect(cover).toBeVisible()
-    expect(cover).toHaveClass("size-full", "object-cover")
-    expect(cover.parentElement).toHaveClass("h-40", "w-32")
+    expect(cover).toHaveClass("h-auto", "max-h-56", "w-full", "object-contain")
+    expect(cover.parentElement).not.toHaveClass("h-56")
     expect(screen.getByText("PeerGo 发布者")).toBeVisible()
     expect(screen.getByText("PeerGo 发布者").closest("dl")).toHaveClass(
-      "justify-end"
+      "justify-start"
     )
     expect(screen.getAllByText("免费").length).toBeGreaterThan(0)
     expect(screen.getByText("2026-08-13")).toBeVisible()
     expect(screen.getByText("2026-08-13").parentElement).toHaveClass(
+      "text-xs",
       "font-semibold",
       "opacity-70"
     )
@@ -212,11 +213,18 @@ describe("TorrentDetailPage", () => {
     ).toHaveClass("text-base", "font-semibold")
     expect(screen.getByText("Final.Release.2026/movie.mkv")).toBeVisible()
     expect(screen.getByText("填充")).toBeVisible()
-    expect(
-      screen.getByRole("button", {
-        name: "下载“Final Release 2026”的种子文件",
-      })
-    ).toBeEnabled()
+    const downloadButton = screen.getByRole("button", {
+      name: "下载“Final Release 2026”的种子文件",
+    })
+    expect(downloadButton).toBeEnabled()
+    const desktopDownloadActions = downloadButton.closest(
+      "[data-slot=torrent-download-actions]"
+    )
+    expect(desktopDownloadActions).toHaveClass("h-10", "w-full")
+    expect(desktopDownloadActions?.parentElement).toHaveClass(
+      "w-[156px]",
+      "max-md:w-full"
+    )
     const copyDownloadAddress = screen.getByRole("button", {
       name: "复制“Final Release 2026”的下载地址",
     })
@@ -318,8 +326,8 @@ describe("TorrentDetailPage", () => {
     expect(fallbackCover).toHaveClass("[&_svg]:size-7")
     expect(fallbackCover).not.toHaveClass("min-h-56")
     expect(fallbackCover.parentElement).toHaveClass(
-      "h-40",
-      "w-32",
+      "h-36",
+      "md:h-56",
       "self-start"
     )
     expect(

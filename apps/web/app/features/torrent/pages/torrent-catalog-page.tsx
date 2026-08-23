@@ -307,11 +307,26 @@ export function TorrentCatalogPage() {
         {torrents.data && torrents.data.items.length > 0 ? (
           <>
             {view === "list" ? (
-              <TorrentTable
-                torrents={torrents.data.items}
-                bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
-              />
+              <>
+                <TorrentTable
+                  torrents={torrents.data.items}
+                  bookmarkControls={bookmarkControls}
+                  adultCoversVisible={adultCoversVisible}
+                  sort={sort}
+                  onSortChange={(nextSort) =>
+                    updateFilters({
+                      sort:
+                        nextSort === "published_desc" ? undefined : nextSort,
+                    })
+                  }
+                />
+                <TorrentCards
+                  torrents={torrents.data.items}
+                  poster={false}
+                  bookmarkControls={bookmarkControls}
+                  adultCoversVisible={adultCoversVisible}
+                />
+              </>
             ) : (
               <TorrentCards
                 torrents={torrents.data.items}

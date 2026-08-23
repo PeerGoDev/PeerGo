@@ -146,11 +146,19 @@ export function HomePage() {
         {torrents.data && torrents.data.items.length > 0 && (
           <>
             {view === "list" && (
-              <TorrentTable
-                torrents={torrents.data.items}
-                bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
-              />
+              <>
+                <TorrentTable
+                  torrents={torrents.data.items}
+                  bookmarkControls={bookmarkControls}
+                  adultCoversVisible={adultCoversVisible}
+                />
+                <TorrentCards
+                  torrents={torrents.data.items}
+                  poster={false}
+                  bookmarkControls={bookmarkControls}
+                  adultCoversVisible={adultCoversVisible}
+                />
+              </>
             )}
             {view === "poster" && (
               <TorrentCards
