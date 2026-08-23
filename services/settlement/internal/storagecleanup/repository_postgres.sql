@@ -401,18 +401,29 @@ WITH candidate AS (
     FROM settlement.event_inbox AS inbox
     WHERE inbox.processed_at < sqlc.arg(detail_before)::timestamptz
       AND inbox.outcome <> 'processing'
-      AND NOT EXISTS (
-          SELECT 1 FROM settlement.ingest_stream_cursors AS cursor
+      AND (
+          SELECT true FROM settlement.ingest_stream_cursors AS cursor
           WHERE cursor.last_event_id = inbox.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM settlement.session_states AS state
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM settlement.session_states AS state
           WHERE state.last_event_id = inbox.event_id
-      )
-      AND NOT EXISTS (
-          SELECT 1 FROM ledger.raw_session_intervals AS raw
-          WHERE raw.event_id = inbox.event_id OR raw.previous_event_id = inbox.event_id
-      )
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      -- Keep these as two independent probes. Combining the predicates with
+      -- OR makes PostgreSQL hash the complete raw interval ledger instead of
+      -- using its primary-key and previous-event indexes.
+      AND (
+          SELECT true FROM ledger.raw_session_intervals AS raw
+          WHERE raw.event_id = inbox.event_id
+          LIMIT 1 OFFSET 0
+      ) IS NULL
+      AND (
+          SELECT true FROM ledger.raw_session_intervals AS raw
+          WHERE raw.previous_event_id = inbox.event_id
+          LIMIT 1 OFFSET 0
+      ) IS NULL
     ORDER BY inbox.processed_at, inbox.event_id
     LIMIT sqlc.arg(batch_size)::integer
     FOR UPDATE SKIP LOCKED
