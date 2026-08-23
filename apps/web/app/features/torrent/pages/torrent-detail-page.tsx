@@ -171,41 +171,52 @@ function TorrentDetailContent({
   return (
     <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
       <CardContent className="p-6">
-        <div className="mb-2 flex items-start justify-between gap-4 max-sm:flex-col max-sm:gap-2">
+        <div className="mb-3 flex items-start justify-between gap-4 max-sm:flex-col max-sm:gap-2">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold break-all max-sm:text-base">
+            <h1 className="text-xl leading-7 font-bold break-words max-sm:text-base max-sm:leading-6">
               {detail.title}
             </h1>
           </div>
-          <div className="flex shrink-0 items-center justify-end gap-1.5 max-sm:justify-start md:min-w-[178px]">
-            <TorrentManageShortcut
-              torrentId={detail.id}
-              torrentTitle={detail.title}
-              userId={userId}
-            />
-            <TorrentReportDialog
-              torrentId={detail.id}
-              torrentTitle={detail.title}
-              compact
-            />
+          <div className="flex shrink-0 items-center justify-end gap-1.5 max-sm:justify-start">
             <TorrentBookmarkButton
               torrentId={detail.id}
               torrentName={detail.title}
               controls={bookmarkControls}
               iconVariant="outline"
               iconSize="icon"
+              className="size-9"
+            />
+            <TorrentReportDialog
+              torrentId={detail.id}
+              torrentTitle={detail.title}
+              compact
+            />
+            <ContentTipDialog
+              target={{
+                kind: "torrent",
+                torrentId: detail.id,
+                title: detail.title,
+              }}
+              userId={userId}
+              csrfToken={csrfToken}
+              buttonVariant="outline"
+              buttonSize="icon"
+              className="size-9"
+              iconOnly
+            />
+            <TorrentManageShortcut
+              torrentId={detail.id}
+              torrentTitle={detail.title}
+              userId={userId}
             />
           </div>
         </div>
 
-        <div className="flex min-w-0 gap-4 max-md:flex-wrap max-md:gap-3">
+        <div className="flex min-w-0 gap-4 max-sm:items-start">
           <div
             className={cn(
-              "relative w-32 shrink-0 self-start overflow-hidden rounded-lg border bg-muted max-sm:w-24 md:w-40",
-              // Migrated images are intentionally absent. Preserve the same
-              // desktop cover slot as PtYes so the statistics rail and the
-              // following MediaInfo card do not jump upward for legacy rows.
-              detail.screenshot_count === 0 && "h-36 md:h-56"
+              "relative h-40 w-32 shrink-0 self-start overflow-hidden rounded-lg border bg-muted max-sm:h-32 max-sm:w-24",
+              detail.screenshot_count === 0 && "bg-muted"
             )}
           >
             <Badge className="absolute top-1 left-1 z-10 rounded-sm px-1.5 py-0.5 text-xs font-normal">
@@ -215,15 +226,17 @@ function TorrentDetailContent({
               torrentId={detail.id}
               title={detail.title}
               available={detail.screenshot_count > 0}
-              className="h-auto max-h-56 w-full object-contain max-sm:max-h-40"
+              className="size-full object-cover"
               fallbackClassName="bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-300 px-2 text-center text-xs text-neutral-500 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 dark:text-neutral-400 [&_svg]:size-7"
               fallbackLabel="暂无封面"
             />
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-2 max-md:basis-[55%]">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
             {detail.subtitle ? (
-              <p className="text-sm text-muted-foreground">{detail.subtitle}</p>
+              <p className="text-sm leading-5 text-muted-foreground">
+                {detail.subtitle}
+              </p>
             ) : null}
 
             <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -305,81 +318,69 @@ function TorrentDetailContent({
                 ))}
               </dl>
             ) : null}
-          </div>
 
-          <div className="flex w-[156px] shrink-0 flex-col gap-2 self-start max-md:w-full">
-            <TorrentDownloadButton
-              torrentId={detail.id}
-              torrentName={detail.title}
-              purchaseAware
-              showLabel
-              showCopyAction
-              className="h-10 w-full"
-            />
-            <TorrentPromotionProductDialog
-              torrentId={detail.id}
-              torrentTitle={detail.title}
-            />
-            <ContentTipDialog
-              target={{
-                kind: "torrent",
-                torrentId: detail.id,
-                title: detail.title,
-              }}
-              userId={userId}
-              csrfToken={csrfToken}
-              buttonVariant="outline"
-              buttonSize="default"
-              className="h-9 w-full"
-            />
+            <div className="mt-auto flex min-h-[30px] flex-wrap items-center gap-2">
+              <TorrentSticky stickyUntil={detail.sticky_until} />
+              {promotionLabel ? (
+                <div className="inline-flex h-[26px] items-center gap-1.5 rounded-sm border border-destructive/20 bg-destructive/10 px-2.5 text-xs font-semibold text-destructive">
+                  <ZapIcon className="size-3.5" />
+                  <span>{promotionLabel}</span>
+                  {detail.promotion_ends_at ? (
+                    <span className="ml-0.5 font-semibold opacity-70">
+                      至{" "}
+                      <time dateTime={detail.promotion_ends_at}>
+                        {formatCompactDate(detail.promotion_ends_at)}
+                      </time>
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-x-4 gap-y-2 max-md:flex-wrap">
-          <div className="flex items-center gap-2">
-            <TorrentSticky stickyUntil={detail.sticky_until} />
-            {promotionLabel ? (
-              <div className="inline-flex h-[30px] items-center gap-1.5 rounded-sm border border-destructive/20 bg-destructive/10 px-3 text-sm font-semibold text-destructive">
-                <ZapIcon className="size-3.5" />
-                <span>{promotionLabel}</span>
-                {detail.promotion_ends_at ? (
-                  <span className="ml-1 text-xs font-semibold opacity-70">
-                    至{" "}
-                    <time dateTime={detail.promotion_ends_at}>
-                      {formatCompactDate(detail.promotion_ends_at)}
-                    </time>
+        <TorrentDownloadButton
+          torrentId={detail.id}
+          torrentName={detail.title}
+          purchaseAware
+          showLabel
+          showCopyAction
+          className="mt-3 h-10 w-full"
+        />
+
+        <div className="mt-2 [&_button]:border-warning/50 [&_button]:text-warning-foreground [&_button]:hover:bg-warning/10">
+          <TorrentPromotionProductDialog
+            torrentId={detail.id}
+            torrentTitle={detail.title}
+          />
+        </div>
+
+        <div className="mt-3 flex min-w-0 flex-wrap items-center justify-between gap-x-5 gap-y-1 text-sm">
+          <TorrentSwarmOverview
+            torrentId={detail.id}
+            compact
+            showFreshness={false}
+            className="w-auto"
+          />
+          <dl className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 max-md:justify-start">
+            <InlineDetailFact
+              label="上传者"
+              value={
+                detail.anonymous ? (
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    <EyeOffIcon className="size-3.5" />
+                    匿名
                   </span>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 max-md:w-full max-md:flex-col max-md:items-start md:min-w-[678px]">
-            <TorrentSwarmOverview
-              torrentId={detail.id}
-              compact
-              showFreshness={false}
-              className="w-auto"
+                ) : (
+                  detail.uploader_display_name
+                )
+              }
             />
-            <dl className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1 text-sm">
-              <InlineDetailFact
-                label="上传者"
-                value={
-                  detail.anonymous ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <EyeOffIcon className="size-3.5" />
-                      匿名
-                    </span>
-                  ) : (
-                    detail.uploader_display_name
-                  )
-                }
-              />
-              <InlineDetailFact
-                label="上传时间"
-                value={`${formatCompactDateTime(detail.published_at)} (${formatTimeAgo(detail.published_at)})`}
-              />
-            </dl>
-          </div>
+            <InlineDetailFact
+              label="上传时间"
+              value={`${formatCompactDateTime(detail.published_at)} (${formatTimeAgo(detail.published_at)})`}
+            />
+          </dl>
         </div>
       </CardContent>
     </Card>

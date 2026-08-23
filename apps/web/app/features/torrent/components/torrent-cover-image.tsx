@@ -14,6 +14,7 @@ export function TorrentCoverImage({
   blurredBackground = false,
   obscured = false,
   showObscuredLabel = false,
+  obscuredLabel = "NSFW · 18+",
   available = true,
 }: {
   torrentId: number
@@ -24,6 +25,7 @@ export function TorrentCoverImage({
   blurredBackground?: boolean
   obscured?: boolean
   showObscuredLabel?: boolean
+  obscuredLabel?: string
   available?: boolean
 }) {
   const [failed, setFailed] = React.useState(false)
@@ -74,7 +76,7 @@ export function TorrentCoverImage({
       />
       {obscured && showObscuredLabel ? (
         <span className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-black/70 px-2 py-1 text-[11px] font-semibold whitespace-nowrap text-white shadow-sm">
-          NSFW · 18+
+          {obscuredLabel}
         </span>
       ) : null}
     </>

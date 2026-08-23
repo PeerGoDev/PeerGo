@@ -41,9 +41,11 @@ export function TorrentPromotion({
 export function TorrentSticky({
   stickyUntil,
   className,
+  iconOnly = false,
 }: {
   stickyUntil: string | null
   className?: string
+  iconOnly?: boolean
 }) {
   if (!stickyUntil) {
     return null
@@ -59,7 +61,7 @@ export function TorrentSticky({
       title={`置顶至 ${new Date(stickyUntil).toLocaleString("zh-CN")}`}
     >
       <PinIcon data-icon="inline-start" />
-      置顶
+      {iconOnly ? <span className="sr-only">置顶</span> : "置顶"}
     </Badge>
   )
 }

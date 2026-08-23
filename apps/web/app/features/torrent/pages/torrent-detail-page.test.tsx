@@ -119,16 +119,15 @@ describe("TorrentDetailPage", () => {
       name: "Final Release 2026封面",
     })
     expect(cover).toBeVisible()
-    expect(cover).toHaveClass("h-auto", "max-h-56", "w-full", "object-contain")
-    expect(cover.parentElement).not.toHaveClass("h-56")
+    expect(cover).toHaveClass("size-full", "object-cover")
+    expect(cover.parentElement).toHaveClass("h-40", "w-32")
     expect(screen.getByText("PeerGo 发布者")).toBeVisible()
     expect(screen.getByText("PeerGo 发布者").closest("dl")).toHaveClass(
-      "justify-start"
+      "justify-end"
     )
     expect(screen.getAllByText("免费").length).toBeGreaterThan(0)
     expect(screen.getByText("2026-08-13")).toBeVisible()
     expect(screen.getByText("2026-08-13").parentElement).toHaveClass(
-      "text-xs",
       "font-semibold",
       "opacity-70"
     )
@@ -319,8 +318,8 @@ describe("TorrentDetailPage", () => {
     expect(fallbackCover).toHaveClass("[&_svg]:size-7")
     expect(fallbackCover).not.toHaveClass("min-h-56")
     expect(fallbackCover.parentElement).toHaveClass(
-      "h-36",
-      "md:h-56",
+      "h-40",
+      "w-32",
       "self-start"
     )
     expect(
