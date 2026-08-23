@@ -55,6 +55,13 @@ describe("SocialPostCard", () => {
       </MemoryRouter>
     )
 
+    const metadata = screen
+      .getByText("生活茶馆")
+      .closest('[data-slot="social-post-metadata"]')
+    expect(metadata).toContainElement(
+      screen.getByRole("link", { name: "演示用户" })
+    )
+    expect(metadata?.querySelector("[title]")).toBeInTheDocument()
     const paragraph = screen
       .getByRole("button", { name: "展开全文" })
       .closest("p")

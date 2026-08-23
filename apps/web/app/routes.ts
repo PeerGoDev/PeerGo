@@ -60,6 +60,7 @@ export default [
     "routes/staff.content.announcements.tsx"
   ),
   route("staff/content/comments", "routes/staff.content.comments.tsx"),
+  route("staff/content/social", "routes/staff.content.social.tsx"),
   route("staff/content/torrents", "routes/staff.content.torrents.tsx"),
   route(
     "staff/content/torrent-reviews",

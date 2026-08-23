@@ -186,8 +186,8 @@ export function PostComposer({
   }
 
   return (
-    <form onSubmit={submit} className="rounded-lg border bg-card p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+    <form onSubmit={submit} className="rounded-lg border bg-card p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
         <span>发布到</span>
         <Select
           items={postingBoards.map((board) => ({
@@ -218,7 +218,7 @@ export function PostComposer({
         onChange={(event) => changeContent(event.target.value)}
         placeholder="分享你的想法..."
         aria-label="动态正文"
-        className="min-h-[92px] resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
+        className="min-h-[68px] resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
         disabled={createPost.isPending || !canPost}
       />
 
@@ -354,9 +354,9 @@ export function PostComposer({
         </Alert>
       ) : null}
 
-      <div className="mt-3">
+      <div className="mt-2">
         <Separator />
-        <div className="mt-3 flex min-w-0 items-center justify-between gap-2">
+        <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-0.5 text-muted-foreground sm:gap-1">
             <input
               ref={fileInput}

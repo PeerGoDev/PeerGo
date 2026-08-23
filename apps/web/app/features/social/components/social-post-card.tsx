@@ -157,40 +157,54 @@ export function SocialPostCard({
     <article
       className={cn(
         "relative overflow-hidden rounded-lg border bg-card",
-        compact ? "p-3" : "p-4"
+        compact ? "p-3" : "px-4 py-3"
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Link to={`/user/${encodeURIComponent(post.author.username)}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <Link
+            to={`/user/${encodeURIComponent(post.author.username)}`}
+            className="shrink-0"
+          >
             <UserAvatar
               username={post.author.username}
               displayName={post.author.display_name}
-              className="size-10"
+              className="size-8"
             />
           </Link>
-          <div className="min-w-0">
+          <div
+            data-slot="social-post-metadata"
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1"
+          >
             <Link
               to={`/user/${encodeURIComponent(post.author.username)}`}
-              className="block truncate text-base hover:text-primary hover:underline hover:underline-offset-4"
+              className="min-w-0 truncate text-sm font-medium hover:text-primary hover:underline hover:underline-offset-4"
             >
               {post.author.display_name}
             </Link>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span title={formatDateTime(post.created_at)}>
-                {formatRelativeTime(post.created_at)}
+            <span
+              className="shrink-0 text-xs text-muted-foreground"
+              title={formatDateTime(post.created_at)}
+            >
+              {formatRelativeTime(post.created_at)}
+            </span>
+            {post.edited_at ? (
+              <span className="shrink-0 text-xs text-muted-foreground">
+                · 已编辑
               </span>
-              {post.edited_at ? <span>· 已编辑</span> : null}
-            </div>
+            ) : null}
+            {post.board ? (
+              <Badge
+                variant="outline"
+                className="h-5 shrink-0 border-primary/20 px-1.5 text-[11px] leading-none text-primary"
+              >
+                {post.board.name}
+              </Badge>
+            ) : null}
           </div>
-          {post.board ? (
-            <Badge variant="outline" className="border-primary/20 text-primary">
-              {post.board.name}
-            </Badge>
-          ) : null}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {!isOwner && csrfToken ? (
             <Button
               type="button"
@@ -395,9 +409,9 @@ export function SocialPostCard({
         </div>
       ) : null}
 
-      <div className="mt-3">
+      <div className="mt-2">
         <Separator />
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-1">
             <Button
               type="button"
@@ -535,7 +549,7 @@ function PostContent({
     <p
       className={cn(
         "leading-6 break-words whitespace-pre-wrap",
-        compact ? "mt-2 text-sm" : "mt-3 text-base"
+        compact ? "mt-2 text-sm" : "mt-2 text-[15px]"
       )}
     >
       {renderPostContent(visibleContent)}

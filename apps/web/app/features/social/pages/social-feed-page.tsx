@@ -277,7 +277,7 @@ export function SocialFeedPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
                 {posts.data.items.map((post) => (
                   <SocialPostCard
                     key={post.id}
