@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const PolicyVersion = "2026-08-23.1"
+const PolicyVersion = "2026-08-24.1"
 
 var ErrForbidden = errors.New("authorization denied")
 

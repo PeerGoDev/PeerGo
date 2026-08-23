@@ -132,6 +132,10 @@ type CreatePostInput struct {
 	RedPacket *CreateRedPacketInput
 }
 
+type BoardPostingPolicy struct {
+	AllowMemberPosts bool
+}
+
 type UpdatePostInput struct {
 	PostID          uuid.UUID
 	ExpectedVersion int64
@@ -144,17 +148,18 @@ type DeletePostInput struct {
 }
 
 type createPostCommand struct {
-	PublicID         uuid.UUID
-	RequestID        uuid.UUID
-	AuthorID         uuid.UUID
-	Body             string
-	BoardID          string
-	MediaIDs         []uuid.UUID
-	Poll             *CreatePollInput
-	RedPacket        *CreateRedPacketInput
-	Topics           []string
-	CreateBodySHA256 [sha256.Size]byte
-	CreatedAt        time.Time
+	PublicID               uuid.UUID
+	RequestID              uuid.UUID
+	AuthorID               uuid.UUID
+	Body                   string
+	BoardID                string
+	MediaIDs               []uuid.UUID
+	Poll                   *CreatePollInput
+	RedPacket              *CreateRedPacketInput
+	Topics                 []string
+	CanPostRestrictedBoard bool
+	CreateBodySHA256       [sha256.Size]byte
+	CreatedAt              time.Time
 }
 
 type updatePostCommand struct {
@@ -175,6 +180,7 @@ type deletePostCommand struct {
 type PostRepository interface {
 	List(context.Context, PostListQuery) ([]Post, int64, error)
 	FindVisible(context.Context, uuid.UUID) (Post, error)
+	ResolveBoardPostingPolicy(context.Context, string) (BoardPostingPolicy, error)
 	Create(context.Context, createPostCommand) (Post, error)
 	Update(context.Context, updatePostCommand) (Post, error)
 	Delete(context.Context, deletePostCommand) error
@@ -273,10 +279,21 @@ func (service *PostService) Create(ctx context.Context, cookieToken, csrfToken s
 	if err != nil {
 		return Post{}, err
 	}
+	postingPolicy, err := service.repository.ResolveBoardPostingPolicy(ctx, boardID)
+	if err != nil {
+		return Post{}, err
+	}
+	canPostRestrictedBoard := false
+	if !postingPolicy.AllowMemberPosts {
+		if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, authorID, authz.ActionSocialPostCreateRestrictedSelf, now); err != nil {
+			return Post{}, err
+		}
+		canPostRestrictedBoard = true
+	}
 	post, err := service.repository.Create(ctx, createPostCommand{
 		PublicID: uuid.New(), RequestID: input.RequestID, AuthorID: authorID, Body: body,
 		BoardID: boardID, MediaIDs: append([]uuid.UUID(nil), input.MediaIDs...), Poll: input.Poll,
-		RedPacket: input.RedPacket, Topics: extractTopics(body),
+		RedPacket: input.RedPacket, Topics: extractTopics(body), CanPostRestrictedBoard: canPostRestrictedBoard,
 		CreateBodySHA256: createPostInputSHA256(body, boardID, input.MediaIDs, input.Poll, input.RedPacket), CreatedAt: now,
 	})
 	if err != nil {

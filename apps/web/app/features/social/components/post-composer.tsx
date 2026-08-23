@@ -44,13 +44,17 @@ type LocalMedia = { id: string; url: string; previewUrl: string }
 export function PostComposer({
   csrfToken,
   canPost,
+  canPostRestrictedBoards,
   boards,
 }: {
   csrfToken: string
   canPost: boolean
+  canPostRestrictedBoards: boolean
   boards: SocialBoard[]
 }) {
-  const postingBoards = boards.filter((board) => board.allow_member_posts)
+  const postingBoards = boards.filter(
+    (board) => board.allow_member_posts || canPostRestrictedBoards
+  )
   const [content, setContent] = React.useState("")
   const [boardId, setBoardId] = React.useState(postingBoards[0]?.id ?? "")
   const [media, setMedia] = React.useState<LocalMedia[]>([])
@@ -191,7 +195,9 @@ export function PostComposer({
         <span>发布到</span>
         <Select
           items={postingBoards.map((board) => ({
-            label: board.name,
+            label: board.allow_member_posts
+              ? board.name
+              : `${board.name}（管理团队）`,
             value: board.id,
           }))}
           value={boardId}
@@ -204,7 +210,9 @@ export function PostComposer({
             <SelectGroup>
               {postingBoards.map((board) => (
                 <SelectItem key={board.id} value={board.id}>
-                  {board.name}
+                  {board.allow_member_posts
+                    ? board.name
+                    : `${board.name}（管理团队）`}
                 </SelectItem>
               ))}
             </SelectGroup>

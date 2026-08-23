@@ -477,7 +477,7 @@ func (repository *PostgresPostRepository) ClaimRedPacket(ctx context.Context, cl
 
 func (repository *PostgresPostRepository) attachPostFeatures(ctx context.Context, tx pgx.Tx, postInternalID int64, command createPostCommand) error {
 	var allowed bool
-	if err := tx.QueryRow(ctx, `SELECT enabled AND allow_member_posts FROM social.boards WHERE id=$1 FOR SHARE`, command.BoardID).Scan(&allowed); errors.Is(err, pgx.ErrNoRows) || err == nil && !allowed {
+	if err := tx.QueryRow(ctx, `SELECT enabled AND (allow_member_posts OR $2) FROM social.boards WHERE id=$1 FOR SHARE`, command.BoardID, command.CanPostRestrictedBoard).Scan(&allowed); errors.Is(err, pgx.ErrNoRows) || err == nil && !allowed {
 		return ErrSocialBoardUnavailable
 	} else if err != nil {
 		return err

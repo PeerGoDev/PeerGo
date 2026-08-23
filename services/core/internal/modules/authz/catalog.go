@@ -101,6 +101,7 @@ const (
 	ActionSocialMediaCreateSelf                   Action = "social.media.create.self"
 	ActionSocialPollVoteSelf                      Action = "social.poll.vote.self"
 	ActionSocialPostCommentCreateSelf             Action = "social.post.comment.create.self"
+	ActionSocialPostCreateRestrictedSelf          Action = "social.post.create.restricted.self"
 	ActionSocialPostCreateSelf                    Action = "social.post.create.self"
 	ActionSocialPostDeleteSelf                    Action = "social.post.delete.self"
 	ActionSocialPostLikeSelf                      Action = "social.post.like.self"
@@ -655,6 +656,11 @@ var permissionCatalog = []PermissionDefinition{
 	},
 	{
 		Action: ActionSocialPostCommentCreateSelf, Description: "在可见动态下发表评论", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionSocialPostCreateRestrictedSelf, Description: "向仅限管理团队的动态圈板块发布动态", Risk: RiskMedium,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},

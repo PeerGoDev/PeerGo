@@ -88,6 +88,7 @@ CapabilityAction:
     - social.media.create.self
     - social.poll.vote.self
     - social.post.comment.create.self
+    - social.post.create.restricted.self
     - social.post.create.self
     - social.post.delete.self
     - social.post.like.self

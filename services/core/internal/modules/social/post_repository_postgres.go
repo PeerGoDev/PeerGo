@@ -102,6 +102,19 @@ func (repository *PostgresPostRepository) FindVisible(ctx context.Context, postI
 	)
 }
 
+func (repository *PostgresPostRepository) ResolveBoardPostingPolicy(ctx context.Context, boardID string) (BoardPostingPolicy, error) {
+	if !validBoardID(boardID) {
+		return BoardPostingPolicy{}, ErrPostInput
+	}
+	var policy BoardPostingPolicy
+	if err := repository.pool.QueryRow(ctx, `SELECT allow_member_posts FROM social.boards WHERE id = $1 AND enabled`, boardID).Scan(&policy.AllowMemberPosts); errors.Is(err, pgx.ErrNoRows) {
+		return BoardPostingPolicy{}, ErrSocialBoardUnavailable
+	} else if err != nil {
+		return BoardPostingPolicy{}, fmt.Errorf("resolve social board posting policy: %w", err)
+	}
+	return policy, nil
+}
+
 func (repository *PostgresPostRepository) Create(ctx context.Context, command createPostCommand) (Post, error) {
 	normalizedBody, bodyErr := normalizePostBody(command.Body)
 	if command.PublicID == uuid.Nil || command.RequestID == uuid.Nil || command.AuthorID == uuid.Nil || command.CreatedAt.IsZero() || !validBoardID(command.BoardID) ||

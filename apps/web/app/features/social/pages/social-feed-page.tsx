@@ -60,6 +60,9 @@ export function SocialFeedPage() {
     [capabilities.data?.items]
   )
   const canPost = actions.has("social.post.create.self")
+  const canPostRestrictedBoards = actions.has(
+    "social.post.create.restricted.self"
+  )
   const canReadNotifications = actions.has("notification.read.self")
   const notificationSummary = useSocialNotificationSummary(
     session.data?.user.id,
@@ -119,6 +122,7 @@ export function SocialFeedPage() {
             <PostComposer
               csrfToken={session.data.csrf_token}
               canPost={canPost}
+              canPostRestrictedBoards={canPostRestrictedBoards}
               boards={overview.data?.boards ?? []}
             />
           ) : null}

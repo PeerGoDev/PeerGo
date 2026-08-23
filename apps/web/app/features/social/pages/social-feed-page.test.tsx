@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
 import { describe, expect, it } from "vitest"
 
@@ -11,7 +12,8 @@ import { SocialFeedPage } from "~/features/social/pages/social-feed-page"
 const userId = "0198f20a-6da8-7e51-9c64-111111111111"
 
 describe("SocialFeedPage", () => {
-  it("renders the PtYes-compatible feed frame with real post data", () => {
+  it("renders the PtYes-compatible feed frame and lets administrators select restricted boards", async () => {
+    const user = userEvent.setup()
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     })
@@ -29,12 +31,47 @@ describe("SocialFeedPage", () => {
       policy_version: "test",
       items: [
         {
+          action: "social.post.create.restricted.self",
+          description: "发布管理团队动态",
+          scope: { type: "site", id: "site" },
+          expires_at: "2026-08-14T08:00:00Z",
+        },
+        {
           action: "social.post.create.self",
           description: "发布动态",
           scope: { type: "site", id: "site" },
           expires_at: "2026-08-14T08:00:00Z",
         },
       ],
+    })
+    queryClient.setQueryData(socialPostKeys.overview(), {
+      boards: [
+        {
+          id: "general",
+          name: "生活茶馆",
+          description: "日常交流",
+          icon: "coffee",
+          tone: "coral",
+          display_order: 10,
+          enabled: true,
+          allow_member_posts: true,
+          post_count: 1,
+          version: 1,
+        },
+        {
+          id: "staff",
+          name: "站务公告",
+          description: "社区规则与站务通知",
+          icon: "megaphone",
+          tone: "violet",
+          display_order: 40,
+          enabled: true,
+          allow_member_posts: false,
+          post_count: 0,
+          version: 1,
+        },
+      ],
+      hot_topics: [],
     })
     queryClient.setQueryData(socialPostKeys.page("newest", 20, 0), {
       items: [
@@ -67,6 +104,10 @@ describe("SocialFeedPage", () => {
     )
 
     expect(screen.getByRole("heading", { name: "动态圈" })).toBeVisible()
+    await user.click(screen.getByRole("combobox", { name: "发布板块" }))
+    expect(
+      await screen.findByRole("option", { name: "站务公告（管理团队）" })
+    ).toBeVisible()
     expect(screen.getByLabelText("动态正文")).toHaveAttribute(
       "placeholder",
       "分享你的想法..."

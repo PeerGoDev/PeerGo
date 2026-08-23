@@ -2,6 +2,7 @@ package social
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -33,11 +34,15 @@ func (fixture *postAuthenticatorFixture) AuthenticateWrite(_ context.Context, co
 }
 
 type postAuthorizerFixture struct {
-	requests []authz.Request
+	requests      []authz.Request
+	deniedActions map[authz.Action]bool
 }
 
 func (fixture *postAuthorizerFixture) Authorize(_ context.Context, request authz.Request) (authz.Decision, error) {
 	fixture.requests = append(fixture.requests, request)
+	if fixture.deniedActions[request.Action] {
+		return authz.Decision{}, authz.ErrForbidden
+	}
 	return authz.Decision{
 		ID: uuid.New(), Allow: true, Reason: authz.ReasonAllowed, PolicyVersion: "test",
 		GrantID: uuid.New(), GrantVersion: 1, RoleID: "member", MandateID: uuid.New(),
@@ -51,6 +56,7 @@ type postRepositoryFixture struct {
 	listQuery     PostListQuery
 	created       Post
 	createCommand createPostCommand
+	postingPolicy *BoardPostingPolicy
 }
 
 func (fixture *postRepositoryFixture) List(_ context.Context, query PostListQuery) ([]Post, int64, error) {
@@ -65,6 +71,13 @@ func (fixture *postRepositoryFixture) FindVisible(_ context.Context, id uuid.UUI
 		}
 	}
 	return Post{}, ErrPostNotFound
+}
+
+func (fixture *postRepositoryFixture) ResolveBoardPostingPolicy(_ context.Context, _ string) (BoardPostingPolicy, error) {
+	if fixture.postingPolicy == nil {
+		return BoardPostingPolicy{AllowMemberPosts: true}, nil
+	}
+	return *fixture.postingPolicy, nil
 }
 
 func (fixture *postRepositoryFixture) Create(_ context.Context, command createPostCommand) (Post, error) {
@@ -121,5 +134,47 @@ func TestPostServiceRejectsInvalidInputBeforeAuthentication(t *testing.T) {
 	}
 	if authenticator.readCalls != 0 || authenticator.writeCalls != 0 {
 		t.Fatalf("invalid input authenticated: %+v", authenticator)
+	}
+}
+
+func TestPostServiceRequiresRestrictedBoardCapability(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 24, 3, 0, 0, 0, time.UTC)
+	userID, postID := uuid.New(), uuid.New()
+	post := Post{
+		ID: postID, Author: PostAuthor{ID: userID, Username: "admin", DisplayName: "管理员"},
+		Body: "站务通知", State: PostVisible, Version: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	authenticator := &postAuthenticatorFixture{session: identity.WebSession{User: identity.User{ID: userID}}}
+	policy := BoardPostingPolicy{AllowMemberPosts: false}
+	deniedAuthorizer := &postAuthorizerFixture{deniedActions: map[authz.Action]bool{
+		authz.ActionSocialPostCreateRestrictedSelf: true,
+	}}
+	deniedRepository := &postRepositoryFixture{created: post, postingPolicy: &policy}
+	deniedService, err := NewPostService(authenticator, deniedAuthorizer, deniedRepository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = deniedService.Create(context.Background(), "cookie", "csrf", CreatePostInput{
+		RequestID: uuid.New(), Body: "站务通知", BoardID: "staff",
+	})
+	if !errors.Is(err, authz.ErrForbidden) || deniedRepository.createCommand.PublicID != uuid.Nil {
+		t.Fatalf("Create(restricted member) command=%+v error=%v", deniedRepository.createCommand, err)
+	}
+	if len(deniedAuthorizer.requests) != 2 || deniedAuthorizer.requests[1].Action != authz.ActionSocialPostCreateRestrictedSelf {
+		t.Fatalf("Create(restricted member) decisions=%+v", deniedAuthorizer.requests)
+	}
+
+	privilegedAuthorizer := &postAuthorizerFixture{}
+	privilegedRepository := &postRepositoryFixture{created: post, postingPolicy: &policy}
+	privilegedService, err := NewPostService(authenticator, privilegedAuthorizer, privilegedRepository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := privilegedService.Create(context.Background(), "cookie", "csrf", CreatePostInput{
+		RequestID: uuid.New(), Body: "站务通知", BoardID: "staff",
+	})
+	if err != nil || created.ID != postID || !privilegedRepository.createCommand.CanPostRestrictedBoard {
+		t.Fatalf("Create(restricted administrator) post=%+v command=%+v error=%v", created, privilegedRepository.createCommand, err)
 	}
 }
