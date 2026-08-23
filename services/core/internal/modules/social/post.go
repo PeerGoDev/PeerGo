@@ -58,10 +58,20 @@ const (
 )
 
 type PostAuthor struct {
-	ID           uuid.UUID
-	Username     string
-	DisplayName  string
-	FollowedByMe bool
+	ID                uuid.UUID
+	Username          string
+	DisplayName       string
+	FollowedByMe      bool
+	Online            bool
+	VIP               bool
+	SiteAdministrator bool
+	Medals            []AuthorMedal
+}
+
+type AuthorMedal struct {
+	ID        int64
+	Name      string
+	ImagePath *string
 }
 
 // Post is the public dynamic-feed projection. Internal IDs, request digests,

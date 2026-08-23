@@ -120,6 +120,7 @@ export function socialPostsQueryOptions(
     queryKey: socialPostKeys.page(sort, limit, offset, filters),
     queryFn: () => fetchSocialPosts(sort, limit, offset, filters),
     staleTime: 15_000,
+    refetchInterval: 60_000,
     retry: false,
   })
 }
@@ -138,6 +139,7 @@ export function socialPostQueryOptions(postId: string) {
       return data
     },
     staleTime: 15_000,
+    refetchInterval: 60_000,
     retry: false,
   })
 }
@@ -178,6 +180,7 @@ export function useInfiniteSocialPosts(
       return nextOffset < lastPage.total ? nextOffset : undefined
     },
     staleTime: 15_000,
+    refetchInterval: 60_000,
     retry: false,
     enabled,
   })

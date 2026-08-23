@@ -169,6 +169,7 @@ export function SocialPostCard({
             <UserAvatar
               username={post.author.username}
               displayName={post.author.display_name}
+              online={post.author.online}
               className="size-8"
             />
           </Link>
@@ -176,12 +177,52 @@ export function SocialPostCard({
             data-slot="social-post-metadata"
             className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1"
           >
-            <Link
-              to={`/user/${encodeURIComponent(post.author.username)}`}
-              className="min-w-0 truncate text-sm font-medium hover:text-primary hover:underline hover:underline-offset-4"
-            >
-              {post.author.display_name}
-            </Link>
+            <div className="flex max-w-full min-w-0 items-center gap-1.5">
+              <Link
+                to={`/user/${encodeURIComponent(post.author.username)}`}
+                className={cn(
+                  "min-w-0 truncate text-sm font-semibold hover:underline hover:underline-offset-4",
+                  post.author.administrator
+                    ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent hover:opacity-80"
+                    : post.author.vip
+                      ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                      : "hover:text-primary"
+                )}
+              >
+                {post.author.display_name}
+              </Link>
+              {post.author.administrator ? (
+                <Badge className="h-4 shrink-0 border-0 bg-gradient-to-r from-fuchsia-500/15 via-primary/15 to-amber-500/15 px-1.5 text-[10px] font-semibold text-fuchsia-700 shadow-none dark:text-fuchsia-300">
+                  管理员
+                </Badge>
+              ) : null}
+              {post.author.vip ? (
+                <Badge className="h-4 shrink-0 border border-amber-400/40 bg-amber-400/10 px-1.5 text-[10px] font-bold text-amber-700 shadow-none dark:text-amber-300">
+                  VIP
+                </Badge>
+              ) : null}
+              {(post.author.medals ?? []).map((medal) => (
+                <span
+                  key={medal.id}
+                  className="flex size-4 shrink-0 items-center justify-center"
+                  title={medal.name}
+                  aria-label={`勋章：${medal.name}`}
+                >
+                  {medal.image_path ? (
+                    <img
+                      src={medal.image_path}
+                      alt=""
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    <SparklesIcon
+                      className="size-3.5 text-amber-500"
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+              ))}
+            </div>
             <span
               className="shrink-0 text-xs text-muted-foreground"
               title={formatDateTime(post.created_at)}

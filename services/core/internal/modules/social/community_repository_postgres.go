@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/peergo/peergo/contracts/go/authzcontractv1"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/economy"
 )
@@ -72,17 +73,85 @@ SELECT board.id, board.name, board.description, board.icon, board.tone,
        (SELECT count(*)::bigint FROM social.post_reposts WHERE post_id = source.id),
        EXISTS (SELECT 1 FROM social.post_likes WHERE post_id = source.id AND user_id = $2),
        EXISTS (SELECT 1 FROM social.post_reposts WHERE post_id = source.id AND user_id = $2),
-       EXISTS (SELECT 1 FROM social.follows WHERE follower_id = $2 AND followee_id = source.author_id)
+       EXISTS (SELECT 1 FROM social.follows WHERE follower_id = $2 AND followee_id = source.author_id),
+       EXISTS (
+           SELECT 1
+           FROM identity.sessions AS session
+           JOIN identity.users AS users ON users.id = session.user_id
+           WHERE session.user_id = source.author_id
+             AND session.audience = 'web'
+             AND session.revoked_at IS NULL
+             AND session.expires_at > $3
+             AND session.last_seen_at >= $3 - interval '15 minutes'
+             AND users.status = 'active'
+             AND NOT EXISTS (
+                 SELECT 1
+                 FROM identity.account_restrictions AS restriction
+                 WHERE restriction.user_id = users.id
+                   AND restriction.kind = 'account_access'
+                   AND restriction.revoked_at IS NULL
+                   AND restriction.starts_at <= $3
+                   AND restriction.expires_at > $3
+             )
+       ),
+       COALESCE(access.vip_enabled AND (access.vip_until IS NULL OR access.vip_until > $3), false),
+       EXISTS (
+           SELECT 1
+           FROM authz.grants AS grant_record
+           JOIN governance.mandates AS mandate
+             ON mandate.id = grant_record.mandate_id
+            AND mandate.subject_id = grant_record.subject_id
+           WHERE grant_record.subject_id = source.author_id
+             AND grant_record.role_id = 'site_admin'
+             AND grant_record.scope_type = $4
+             AND grant_record.scope_id = $5
+             AND grant_record.revoked_at IS NULL
+             AND grant_record.valid_from <= $3
+             AND $3 < grant_record.valid_until
+             AND mandate.status = 'active'
+             AND mandate.starts_at <= $3
+             AND $3 < mandate.ends_at
+       )
 FROM social.posts AS source
 JOIN social.boards AS board ON board.id = source.board_id
-WHERE source.public_id = $1`, post.ID, viewerID).Scan(
+LEFT JOIN identity.user_access_states AS access ON access.user_id = source.author_id
+WHERE source.public_id = $1`, post.ID, viewerID, now, authzcontractv1.SiteScopeType, authzcontractv1.SiteScopeID).Scan(
 			&post.Board.ID, &post.Board.Name, &post.Board.Description, &post.Board.Icon, &post.Board.Tone,
 			&post.Board.DisplayOrder, &post.Board.Enabled, &post.Board.AllowMemberPosts, &post.Board.Version, &post.Board.PostCount,
 			&post.Pinned, &post.Featured, &post.LikeCount, &post.RepostCount, &post.LikedByMe, &post.RepostedByMe, &post.Author.FollowedByMe,
+			&post.Author.Online, &post.Author.VIP, &post.Author.SiteAdministrator,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("enrich social post: %w", err)
 		}
+
+		medalRows, err := db.Query(ctx, `
+SELECT definition.id, definition.name,
+       COALESCE(definition.image_small_path, definition.image_large_path)
+FROM economy.user_medals AS holding
+JOIN economy.medal_definitions AS definition ON definition.id = holding.medal_id
+WHERE holding.user_id = $1
+  AND definition.display_on_page
+  AND (holding.expires_at IS NULL OR holding.expires_at > $2)
+  AND (definition.is_workgroup OR holding.state = 'wearing')
+ORDER BY holding.priority DESC, definition.priority DESC, definition.id`, post.Author.ID, now)
+		if err != nil {
+			return nil, fmt.Errorf("list social author medals: %w", err)
+		}
+		post.Author.Medals = []AuthorMedal{}
+		for medalRows.Next() {
+			var medal AuthorMedal
+			if err := medalRows.Scan(&medal.ID, &medal.Name, &medal.ImagePath); err != nil {
+				medalRows.Close()
+				return nil, err
+			}
+			post.Author.Medals = append(post.Author.Medals, medal)
+		}
+		if err := medalRows.Err(); err != nil {
+			medalRows.Close()
+			return nil, err
+		}
+		medalRows.Close()
 
 		mediaRows, err := db.Query(ctx, `
 SELECT media.id, media.content_type, media.width, media.height

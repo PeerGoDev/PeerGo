@@ -5223,6 +5223,10 @@ export interface components {
             username: string;
             display_name: string;
             followed_by_me: boolean;
+            online: boolean;
+            vip: boolean;
+            administrator: boolean;
+            medals: components["schemas"]["SocialAuthorMedal"][];
         };
         /** @enum {string} */
         SocialBoardIcon: "messages-square" | "coffee" | "folder-open" | "clapperboard" | "megaphone" | "sparkles" | "gamepad-2" | "circle-help";
@@ -7516,6 +7520,12 @@ export interface components {
         };
         /** @enum {string} */
         PromotionType: "free" | "double_upload" | "double_upload_free" | "half_download" | "double_upload_half_download" | "thirty_percent_download";
+        SocialAuthorMedal: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            image_path?: string | null;
+        };
         MyTorrentReviewAssignment: components["schemas"]["PendingTorrentReview"] & {
             /** @description 当前总票数；投票前不暴露赞成与反对分布。 */
             votes_cast: number;

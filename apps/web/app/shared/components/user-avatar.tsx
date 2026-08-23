@@ -1,6 +1,11 @@
 import type { ComponentProps } from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar"
+import {
+  Avatar,
+  AvatarBadge,
+  AvatarFallback,
+  AvatarImage,
+} from "~/components/ui/avatar"
 import { cn } from "~/lib/utils"
 import { useAvatarRevision } from "~/shared/components/avatar-revision"
 
@@ -24,12 +29,14 @@ export function UserAvatar({
   colorSeed,
   className,
   fallbackClassName,
+  online = false,
   ...props
 }: Omit<ComponentProps<typeof Avatar>, "children"> & {
   username: string
   displayName: string
   colorSeed?: string
   fallbackClassName?: string
+  online?: boolean
 }) {
   const identity = displayName.trim() || username.trim()
   const revision = useAvatarRevision(username)
@@ -46,6 +53,13 @@ export function UserAvatar({
       >
         {avatarInitial(identity)}
       </AvatarFallback>
+      {online ? (
+        <AvatarBadge
+          className="bg-emerald-500 shadow-[0_0_6px_color-mix(in_oklab,var(--color-emerald-500)_70%,transparent)]"
+          title="在线"
+          aria-label={`${identity}在线`}
+        />
+      ) : null}
     </Avatar>
   )
 }

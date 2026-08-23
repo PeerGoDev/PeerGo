@@ -27,6 +27,7 @@ export const siteInfoQueryOptions = queryOptions({
   },
   staleTime: 30_000,
   refetchInterval: 60_000,
+  refetchIntervalInBackground: true,
 })
 
 export const latestAnnouncementQueryOptions = queryOptions({

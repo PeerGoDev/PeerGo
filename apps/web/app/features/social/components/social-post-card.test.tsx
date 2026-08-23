@@ -22,6 +22,16 @@ describe("SocialPostCard", () => {
                 username: "demo",
                 display_name: "演示用户",
                 followed_by_me: false,
+                online: true,
+                vip: true,
+                administrator: true,
+                medals: [
+                  {
+                    id: 7,
+                    name: "首批成员",
+                    image_path: "/uploads/medals/founding.webp",
+                  },
+                ],
               },
               board: {
                 id: "general",
@@ -61,6 +71,13 @@ describe("SocialPostCard", () => {
     expect(metadata).toContainElement(
       screen.getByRole("link", { name: "演示用户" })
     )
+    expect(screen.getByRole("link", { name: "演示用户" })).toHaveClass(
+      "bg-gradient-to-r"
+    )
+    expect(screen.getByText("管理员")).toBeVisible()
+    expect(screen.getByText("VIP")).toBeVisible()
+    expect(screen.getByLabelText("勋章：首批成员")).toBeVisible()
+    expect(screen.getByLabelText("演示用户在线")).toBeVisible()
     expect(metadata?.querySelector("[title]")).toBeInTheDocument()
     const paragraph = screen
       .getByRole("button", { name: "展开全文" })
@@ -88,6 +105,10 @@ describe("SocialPostCard", () => {
                 username: "demo",
                 display_name: "演示用户",
                 followed_by_me: false,
+                online: false,
+                vip: false,
+                administrator: false,
+                medals: [],
               },
               board: {
                 id: "resources",

@@ -557,6 +557,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <Badge
                       variant="secondary"
                       className="hidden gap-1.5 rounded-full md:inline-flex"
+                      title="最近 15 分钟内活跃的真实用户数"
                     >
                       <span className="size-1.5 rounded-full bg-success" />
                       {siteInfo.data.online_users} 在线

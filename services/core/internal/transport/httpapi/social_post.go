@@ -176,12 +176,24 @@ func socialPostPageDTO(page social.PostPage) generated.SocialPostPage {
 
 func socialPostDTO(post social.Post) generated.SocialPost {
 	return generated.SocialPost{
-		Id: post.ID, Author: generated.SocialPostAuthor{Id: post.Author.ID, Username: post.Author.Username, DisplayName: post.Author.DisplayName, FollowedByMe: post.Author.FollowedByMe},
+		Id: post.ID, Author: generated.SocialPostAuthor{
+			Id: post.Author.ID, Username: post.Author.Username, DisplayName: post.Author.DisplayName,
+			FollowedByMe: post.Author.FollowedByMe, Online: post.Author.Online, Vip: post.Author.VIP,
+			Administrator: post.Author.SiteAdministrator, Medals: socialAuthorMedalDTOs(post.Author.Medals),
+		},
 		Board: socialBoardDTO(post.Board), Content: post.Body, Version: post.Version, CommentCount: post.CommentCount,
 		LikeCount: post.LikeCount, RepostCount: post.RepostCount, LikedByMe: post.LikedByMe, RepostedByMe: post.RepostedByMe,
 		Pinned: post.Pinned, Featured: post.Featured, Hidden: boolPointer(post.State == social.PostModeratorHidden), Topics: post.Topics, Media: socialMediaDTOs(post.Media), Poll: socialPollDTO(post.Poll), RedPacket: socialRedPacketDTO(post.RedPacket),
 		CreatedAt: post.CreatedAt, UpdatedAt: post.UpdatedAt, EditedAt: post.EditedAt,
 	}
+}
+
+func socialAuthorMedalDTOs(medals []social.AuthorMedal) []generated.SocialAuthorMedal {
+	items := make([]generated.SocialAuthorMedal, 0, len(medals))
+	for _, medal := range medals {
+		items = append(items, generated.SocialAuthorMedal{Id: medal.ID, Name: medal.Name, ImagePath: medal.ImagePath})
+	}
+	return items
 }
 
 func valueOrDefault[T comparable](value *T, fallback T) T {

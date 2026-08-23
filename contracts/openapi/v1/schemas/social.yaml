@@ -42,15 +42,30 @@ SocialCommunityOverview:
       type: array
       items: { $ref: "#/SocialTopic" }
 
+SocialAuthorMedal:
+  type: object
+  additionalProperties: false
+  required: [id, name]
+  properties:
+    id: { type: integer, format: int64, minimum: 1 }
+    name: { type: string, minLength: 1, maxLength: 100 }
+    image_path: { type: string, nullable: true, maxLength: 2048 }
+
 SocialPostAuthor:
   type: object
   additionalProperties: false
-  required: [id, username, display_name, followed_by_me]
+  required: [id, username, display_name, followed_by_me, online, vip, administrator, medals]
   properties:
     id: { type: string, format: uuid }
     username: { type: string, minLength: 1, maxLength: 64 }
     display_name: { type: string, minLength: 1, maxLength: 80 }
     followed_by_me: { type: boolean }
+    online: { type: boolean }
+    vip: { type: boolean }
+    administrator: { type: boolean }
+    medals:
+      type: array
+      items: { $ref: "#/SocialAuthorMedal" }
 
 SocialPostMedia:
   type: object
