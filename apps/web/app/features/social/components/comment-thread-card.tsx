@@ -13,6 +13,7 @@ import {
   RefreshCwIcon,
   ReplyIcon,
   SendIcon,
+  SparklesIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -85,6 +86,7 @@ import { cn } from "~/lib/utils"
 
 const commentPageSize = 20
 const maxCommentCharacters = 2_000
+const collapsedCommentLength = 180
 
 type ReplyTarget = Pick<Comment, "id" | "author">
 
@@ -112,17 +114,20 @@ export function CommentThreadCard({
     "newest" | "oldest"
   >("newest")
   const [draft, setDraft] = React.useState("")
+  const [replyDraft, setReplyDraft] = React.useState("")
   const [replyTarget, setReplyTarget] = React.useState<ReplyTarget>()
   const [editingCommentId, setEditingCommentId] = React.useState<string>()
   const [deleteTarget, setDeleteTarget] = React.useState<Comment>()
   const [reportTarget, setReportTarget] = React.useState<Comment>()
   const createRequestId = React.useRef<string>(undefined)
+  const replyRequestId = React.useRef<string>(undefined)
   const socialSortInitialized = React.useRef(false)
 
   const comments = useComments(target, commentPageSize, offset)
   const session = useWebSession()
   const capabilities = useCapabilities(session.data?.user.id)
   const createComment = useCreateComment(target)
+  const createReply = useCreateComment(target)
   const updateComment = useUpdateComment(target)
   const deleteComment = useDeleteComment(target)
 
@@ -175,12 +180,30 @@ export function CommentThreadCard({
     setReplyTarget({ id: comment.id, author: comment.author })
     setEditingCommentId(undefined)
     updateComment.reset()
-    resetCreateAttempt()
+    if (socialAppearance) {
+      setReplyDraft("")
+      replyRequestId.current = undefined
+      createReply.reset()
+    } else {
+      resetCreateAttempt()
+    }
   }
 
   function cancelReply() {
     setReplyTarget(undefined)
-    resetCreateAttempt()
+    if (socialAppearance) {
+      setReplyDraft("")
+      replyRequestId.current = undefined
+      createReply.reset()
+    } else {
+      resetCreateAttempt()
+    }
+  }
+
+  function changeReplyDraft(value: string) {
+    setReplyDraft(value)
+    replyRequestId.current = undefined
+    createReply.reset()
   }
 
   async function submitComment(event: React.FormEvent<HTMLFormElement>) {
@@ -195,7 +218,7 @@ export function CommentThreadCard({
         csrfToken: session.data.csrf_token,
         idempotencyKey: createRequestId.current,
         body: draft,
-        parentCommentId: replyTarget?.id,
+        parentCommentId: socialAppearance ? undefined : replyTarget?.id,
       })
       setDraft("")
       setReplyTarget(undefined)
@@ -206,6 +229,34 @@ export function CommentThreadCard({
       setOffset(lastPageOffset(totalBeforeCreate + 1, commentPageSize))
     } catch {
       // Keep the request UUID while the unchanged draft remains retryable.
+    }
+  }
+
+  async function submitSocialReply(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (
+      !session.data ||
+      !canCreate ||
+      !replyTarget ||
+      !validCommentBody(replyDraft)
+    ) {
+      return
+    }
+    replyRequestId.current ??= globalThis.crypto.randomUUID()
+    const totalBeforeCreate = comments.data?.total ?? 0
+    try {
+      await createReply.mutateAsync({
+        csrfToken: session.data.csrf_token,
+        idempotencyKey: replyRequestId.current,
+        body: replyDraft,
+        parentCommentId: replyTarget.id,
+      })
+      setReplyDraft("")
+      setReplyTarget(undefined)
+      replyRequestId.current = undefined
+      setOffset(lastPageOffset(totalBeforeCreate + 1, commentPageSize))
+    } catch {
+      // Keep the request UUID while the unchanged reply remains retryable.
     }
   }
 
@@ -349,7 +400,7 @@ export function CommentThreadCard({
                     : "anonymous"
             }
             draft={draft}
-            replyTarget={replyTarget}
+            replyTarget={socialAppearance ? undefined : replyTarget}
             pending={createComment.isPending}
             error={createComment.error}
             compact={
@@ -491,14 +542,26 @@ export function CommentThreadCard({
                     torrentAppearance={torrentAppearance}
                     socialAppearance={socialAppearance}
                     editing={editingCommentId === comment.id}
+                    replying={
+                      socialAppearance && replyTarget?.id === comment.id
+                    }
+                    replyDraft={replyDraft}
+                    replyPending={createReply.isPending}
+                    replyError={createReply.error}
                     updatePending={updateComment.isPending}
                     updateError={updateComment.error}
                     csrfToken={session.data?.csrf_token}
                     currentUserId={session.data?.user.id}
                     onReply={() => beginReply(comment)}
+                    onReplyDraftChange={changeReplyDraft}
+                    onCancelReply={cancelReply}
+                    onSubmitReply={submitSocialReply}
                     onBeginEdit={() => {
                       setEditingCommentId(comment.id)
                       setReplyTarget(undefined)
+                      setReplyDraft("")
+                      replyRequestId.current = undefined
+                      createReply.reset()
                       updateComment.reset()
                     }}
                     onCancelEdit={() => {
@@ -834,11 +897,18 @@ function CommentRow({
   torrentAppearance = false,
   socialAppearance = false,
   editing,
+  replying,
+  replyDraft,
+  replyPending,
+  replyError,
   updatePending,
   updateError,
   csrfToken,
   currentUserId,
   onReply,
+  onReplyDraftChange,
+  onCancelReply,
+  onSubmitReply,
   onBeginEdit,
   onCancelEdit,
   onUpdate,
@@ -857,11 +927,18 @@ function CommentRow({
   torrentAppearance?: boolean
   socialAppearance?: boolean
   editing: boolean
+  replying: boolean
+  replyDraft: string
+  replyPending: boolean
+  replyError: Error | null
   updatePending: boolean
   updateError: Error | null
   csrfToken?: string
   currentUserId?: string
   onReply: () => void
+  onReplyDraftChange: (value: string) => void
+  onCancelReply: () => void
+  onSubmitReply: (event: React.FormEvent<HTMLFormElement>) => void
   onBeginEdit: () => void
   onCancelEdit: () => void
   onUpdate: (body: string) => Promise<void>
@@ -961,10 +1038,12 @@ function CommentRow({
   )
   return (
     <article
+      id={`comment-${comment.id}`}
       className={cn(
+        "scroll-mt-24 transition-colors target:rounded-lg target:bg-primary/5 target:ring-1 target:ring-primary/20",
         isReply
           ? socialAppearance
-            ? "ml-10 flex gap-3 py-3"
+            ? "ml-8 flex gap-3 border-l-2 border-muted px-3 py-3 sm:ml-11"
             : cn(
                 "ml-8 flex gap-3 border-l-2 px-3 sm:ml-11",
                 torrentAppearance ? "py-0" : "py-4"
@@ -974,17 +1053,67 @@ function CommentRow({
         cardAppearance && isReply && "bg-muted/30"
       )}
     >
-      <UserAvatar
-        username={comment.author.display_name}
-        displayName={comment.author.display_name}
-        colorSeed={comment.author.id}
-        loadImage={false}
-        size={torrentAppearance ? "default" : isReply ? "sm" : "default"}
-        className={cn(torrentAppearance && (isReply ? "size-8" : "size-10"))}
-      />
+      <Link
+        to={`/user/${encodeURIComponent(comment.author.username)}`}
+        className="h-fit shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <UserAvatar
+          username={comment.author.username}
+          displayName={comment.author.display_name}
+          colorSeed={comment.author.id}
+          online={comment.author.online}
+          size={torrentAppearance ? "default" : isReply ? "sm" : "default"}
+          className={cn(torrentAppearance && (isReply ? "size-8" : "size-10"))}
+        />
+      </Link>
       <div className="min-w-0 flex-1">
         <header className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="font-medium">{comment.author.display_name}</span>
+          <span className="flex max-w-full min-w-0 flex-wrap items-center gap-1.5">
+            <Link
+              to={`/user/${encodeURIComponent(comment.author.username)}`}
+              className={cn(
+                "min-w-0 truncate font-semibold hover:underline hover:underline-offset-4",
+                comment.author.administrator
+                  ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent hover:opacity-80"
+                  : comment.author.vip
+                    ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                    : "hover:text-primary"
+              )}
+            >
+              {comment.author.display_name}
+            </Link>
+            {comment.author.administrator ? (
+              <Badge className="h-4 shrink-0 border-0 bg-gradient-to-r from-fuchsia-500/15 via-primary/15 to-amber-500/15 px-1.5 text-[10px] font-semibold text-fuchsia-700 shadow-none dark:text-fuchsia-300">
+                管理员
+              </Badge>
+            ) : null}
+            {comment.author.vip ? (
+              <Badge className="h-4 shrink-0 border border-amber-400/40 bg-amber-400/10 px-1.5 text-[10px] font-bold text-amber-700 shadow-none dark:text-amber-300">
+                VIP
+              </Badge>
+            ) : null}
+            {(comment.author.medals ?? []).map((medal) => (
+              <span
+                key={medal.id}
+                className="flex size-4 shrink-0 items-center justify-center"
+                title={medal.name}
+                aria-label={`勋章：${medal.name}`}
+              >
+                {medal.image_path ? (
+                  <img
+                    src={medal.image_path}
+                    alt=""
+                    className="max-h-full max-w-full object-contain"
+                  />
+                ) : (
+                  <SparklesIcon
+                    className="size-3.5 text-amber-500"
+                    aria-hidden="true"
+                  />
+                )}
+              </span>
+            ))}
+          </span>
           {isReply ? (
             <span className="text-xs text-muted-foreground">
               回复 {parent ? `@${parent.author.display_name}` : "一条早先评论"}
@@ -1021,11 +1150,115 @@ function CommentRow({
           <CommentBody
             comment={comment}
             compactLineHeight={torrentAppearance}
+            collapsible={socialAppearance}
           />
         )}
         {socialAppearance && !editing ? actions : null}
+        {socialAppearance && replying && visible && !editing ? (
+          <InlineReplyComposer
+            comment={comment}
+            draft={replyDraft}
+            pending={replyPending}
+            error={replyError}
+            onDraftChange={onReplyDraftChange}
+            onCancel={onCancelReply}
+            onSubmit={onSubmitReply}
+          />
+        ) : null}
       </div>
     </article>
+  )
+}
+
+function InlineReplyComposer({
+  comment,
+  draft,
+  pending,
+  error,
+  onDraftChange,
+  onCancel,
+  onSubmit,
+}: {
+  comment: Comment
+  draft: string
+  pending: boolean
+  error: Error | null
+  onDraftChange: (value: string) => void
+  onCancel: () => void
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
+}) {
+  const count = characterCount(draft)
+  const invalid = count > maxCommentCharacters
+  const fieldId = `reply-comment-${comment.id}`
+  return (
+    <form
+      className="mt-2 rounded-lg border bg-muted/30 p-3"
+      onSubmit={onSubmit}
+    >
+      <Field data-invalid={invalid || undefined} className="gap-2">
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <FieldLabel
+            htmlFor={fieldId}
+            className="flex min-w-0 items-center gap-1.5 font-normal"
+          >
+            <ReplyIcon className="size-3.5 shrink-0" />
+            <span className="truncate">
+              回复 <strong>@{comment.author.display_name}</strong>
+            </span>
+          </FieldLabel>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="取消回复"
+            disabled={pending}
+            onClick={onCancel}
+          >
+            <XIcon />
+          </Button>
+        </div>
+        <Textarea
+          id={fieldId}
+          value={draft}
+          rows={3}
+          maxLength={maxCommentCharacters + 1}
+          aria-invalid={invalid || undefined}
+          placeholder={`回复 @${comment.author.display_name}…`}
+          disabled={pending}
+          autoFocus
+          className="min-h-[76px] resize-y bg-background"
+          onChange={(event) => onDraftChange(event.target.value)}
+        />
+        <div className="flex items-center justify-between gap-3">
+          <FieldDescription className="text-xs">
+            {count}/{maxCommentCharacters}
+          </FieldDescription>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={onCancel}
+            >
+              取消
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={pending || !validCommentBody(draft)}
+            >
+              {pending ? <Spinner data-icon="inline-start" /> : null}
+              回复
+            </Button>
+          </div>
+        </div>
+        {invalid ? <FieldError>回复不能超过 2000 个字符。</FieldError> : null}
+        {error ? (
+          <FieldError>{commentErrorMessage(error, "create")}</FieldError>
+        ) : null}
+      </Field>
+    </form>
   )
 }
 
@@ -1109,10 +1342,23 @@ function CommentEditForm({
 function CommentBody({
   comment,
   compactLineHeight = false,
+  collapsible = false,
 }: {
   comment: Comment
   compactLineHeight?: boolean
+  collapsible?: boolean
 }) {
+  const [expanded, setExpanded] = React.useState(false)
+  const characters = Array.from(comment.body)
+  const shouldCollapse =
+    collapsible && characters.length > collapsedCommentLength
+  const visibleBody =
+    shouldCollapse && !expanded
+      ? characters.slice(0, collapsedCommentLength).join("")
+      : comment.body
+
+  React.useEffect(() => setExpanded(false), [comment.body])
+
   if (comment.state === "author_deleted") {
     return (
       <p className="mt-1 text-sm text-muted-foreground italic">
@@ -1135,7 +1381,21 @@ function CommentBody({
           compactLineHeight ? "leading-5" : "leading-relaxed"
         )}
       >
-        {comment.body}
+        {visibleBody}
+        {shouldCollapse && !expanded ? (
+          <span className="text-muted-foreground">...</span>
+        ) : null}
+        {shouldCollapse ? (
+          <Button
+            type="button"
+            variant="link"
+            size="xs"
+            className="ml-1 h-auto p-0 align-baseline text-xs"
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? "收起" : "展开"}
+          </Button>
+        ) : null}
       </p>
       {comment.body_format === "legacy_bbcode" ? (
         <span className="w-fit text-xs text-muted-foreground">
@@ -1175,8 +1435,6 @@ function validCommentBody(value: string) {
 // to their parent. Sort top-level threads as units so choosing “最新” never
 // moves a reply above the comment it belongs to.
 function orderedComments(comments: Comment[], order: "newest" | "oldest") {
-  if (order === "oldest") return comments
-
   const commentIds = new Set(comments.map((comment) => comment.id))
   const commentsByParent = new Map<string, Comment[]>()
   const roots: Comment[] = []
@@ -1194,10 +1452,31 @@ function orderedComments(comments: Comment[], order: "newest" | "oldest") {
     replies.push(comment)
     commentsByParent.set(comment.parent_comment_id, replies)
   }
+  roots.sort((left, right) =>
+    order === "newest"
+      ? right.created_at.localeCompare(left.created_at)
+      : left.created_at.localeCompare(right.created_at)
+  )
+  for (const replies of commentsByParent.values()) {
+    replies.sort((left, right) =>
+      left.created_at.localeCompare(right.created_at)
+    )
+  }
 
-  return roots
-    .reverse()
-    .flatMap((root) => [root, ...(commentsByParent.get(root.id) ?? [])])
+  const ordered: Comment[] = []
+  const visited = new Set<string>()
+  function appendThread(comment: Comment) {
+    if (visited.has(comment.id)) return
+    visited.add(comment.id)
+    ordered.push(comment)
+    for (const reply of commentsByParent.get(comment.id) ?? []) {
+      appendThread(reply)
+    }
+  }
+  for (const root of roots) appendThread(root)
+  // Malformed historic cycles must remain visible instead of disappearing.
+  for (const comment of comments) appendThread(comment)
+  return ordered
 }
 
 function characterCount(value: string) {

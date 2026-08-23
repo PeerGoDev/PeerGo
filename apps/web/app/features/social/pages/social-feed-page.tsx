@@ -24,13 +24,13 @@ import {
 import { Skeleton } from "~/components/ui/skeleton"
 import { useWebSession } from "~/features/auth/api/session.mutations"
 import { useCapabilities } from "~/features/authz/api/capabilities.queries"
-import { useMyNotificationSummary } from "~/features/notification/api/notifications.queries"
 import {
   type SocialPostSort,
   type SocialFeedKind,
   useSocialCommunityOverview,
   useSocialPosts,
 } from "~/features/social/api/posts.queries"
+import { useSocialNotificationSummary } from "~/features/social/api/social-notifications.queries"
 import { PostComposer } from "~/features/social/components/post-composer"
 import { SocialPostCard } from "~/features/social/components/social-post-card"
 import { ApiProblemError } from "~/shared/api/problem"
@@ -61,7 +61,7 @@ export function SocialFeedPage() {
   )
   const canPost = actions.has("social.post.create.self")
   const canReadNotifications = actions.has("notification.read.self")
-  const notificationSummary = useMyNotificationSummary(
+  const notificationSummary = useSocialNotificationSummary(
     session.data?.user.id,
     canReadNotifications
   )
@@ -79,7 +79,7 @@ export function SocialFeedPage() {
         <div className="flex items-center gap-2">
           {canReadNotifications ? (
             <Button
-              render={<Link to="/notifications" />}
+              render={<Link to="/social/notifications" />}
               nativeButton={false}
               variant="ghost"
               size="icon"

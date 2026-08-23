@@ -290,6 +290,14 @@ paths:
     $ref: "./domains/social.yaml#/SocialPostPath"
   /api/v1/social/posts/{post_id}/comments:
     $ref: "./domains/social.yaml#/SocialPostCommentsPath"
+  /api/v1/social/notifications:
+    $ref: "./domains/social.yaml#/SocialNotificationsPath"
+  /api/v1/social/notifications/summary:
+    $ref: "./domains/social.yaml#/SocialNotificationSummaryPath"
+  /api/v1/social/notifications/read-all:
+    $ref: "./domains/social.yaml#/SocialNotificationReadAllPath"
+  /api/v1/social/notifications/{notification_id}/read:
+    $ref: "./domains/social.yaml#/SocialNotificationPath"
   /api/v1/social/overview:
     $ref: "./domains/social.yaml#/SocialCommunityOverviewPath"
   /api/v1/social/media:

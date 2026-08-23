@@ -2516,6 +2516,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/social/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 分页读取当前成员的动态圈互动通知 */
+        get: operations["listSocialNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/notifications/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取当前成员的动态圈未读互动数 */
+        get: operations["getSocialNotificationSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 把当前成员已有的动态圈互动通知全部标为已读 */
+        put: operations["markAllSocialNotificationsRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** 把当前成员的一条动态圈互动通知标为已读 */
+        put: operations["markSocialNotificationRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/social/overview": {
         parameters: {
             query?: never;
@@ -5150,7 +5220,12 @@ export interface components {
         CommentAuthor: {
             /** Format: uuid */
             id: string;
+            username: string;
             display_name: string;
+            online: boolean;
+            vip: boolean;
+            administrator: boolean;
+            medals: components["schemas"]["CommentAuthorMedal"][];
         };
         Comment: {
             /** Format: uuid */
@@ -7529,6 +7604,12 @@ export interface components {
             login_enabled: boolean;
             password_recovery_enabled: boolean;
         };
+        CommentAuthorMedal: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            image_path?: string | null;
+        };
         CategoryWithCount: {
             id: string;
             name: string;
@@ -7640,6 +7721,48 @@ export interface components {
             id: number;
             name: string;
             image_path?: string | null;
+        };
+        /** @enum {string} */
+        SocialNotificationCategory: "all" | "replies" | "likes" | "follows";
+        /** @enum {string} */
+        SocialNotificationKind: "follow" | "post_like" | "post_repost" | "post_comment" | "comment_reply";
+        SocialNotification: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["SocialNotificationKind"];
+            actor: components["schemas"]["SocialPostAuthor"];
+            /** Format: uuid */
+            post_id?: string | null;
+            /** Format: uuid */
+            comment_id?: string | null;
+            post_preview?: string;
+            comment_preview?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            read_at: string | null;
+        };
+        SocialNotificationPage: {
+            items: components["schemas"]["SocialNotification"][];
+            total: number;
+            unread_count: number;
+            limit: number;
+            offset: number;
+        };
+        SocialNotificationSummary: {
+            unread_count: number;
+        };
+        SocialNotificationReadAllReceipt: {
+            updated_count: number;
+            /** Format: date-time */
+            read_at: string;
+        };
+        SocialNotificationReadReceipt: {
+            /** Format: uuid */
+            notification_id: string;
+            /** Format: date-time */
+            read_at: string;
+            already_read: boolean;
         };
         MyTorrentReviewAssignment: components["schemas"]["PendingTorrentReview"] & {
             /** @description 当前总票数；投票前不暴露赞成与反对分布。 */
@@ -14332,6 +14455,117 @@ export interface operations {
             403: components["responses"]["ProblemResponse"];
             404: components["responses"]["ProblemResponse"];
             409: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listSocialNotifications: {
+        parameters: {
+            query?: {
+                category?: components["schemas"]["SocialNotificationCategory"];
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 与站内消息分离的动态圈互动通知分页。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialNotificationPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getSocialNotificationSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 动态圈独立未读数。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialNotificationSummary"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    markAllSocialNotificationsRead: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 批量已读回执。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialNotificationReadAllReceipt"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    markSocialNotificationRead: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 幂等的已读回执。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialNotificationReadReceipt"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };

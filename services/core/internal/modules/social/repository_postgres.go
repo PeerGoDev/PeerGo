@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/peergo/peergo/contracts/go/authzcontractv1"
 	"github.com/peergo/peergo/services/core/internal/generated/socialdb"
 )
 
@@ -85,6 +86,9 @@ func (repository *PostgresCommentRepository) List(ctx context.Context, target Co
 		}
 		items = append(items, comment)
 	}
+	if err := repository.enrichCommentAuthors(ctx, tx, items, time.Now().UTC()); err != nil {
+		return nil, 0, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, 0, fmt.Errorf("commit comment list: %w", err)
 	}
@@ -118,6 +122,11 @@ func (repository *PostgresCommentRepository) Create(ctx context.Context, command
 		if !sameCreateRequest(existing, comment, command) {
 			return Comment{}, ErrCommentIdempotencyConflict
 		}
+		comments := []Comment{comment}
+		if err := repository.enrichCommentAuthors(ctx, tx, comments, command.CreatedAt); err != nil {
+			return Comment{}, err
+		}
+		comment = comments[0]
 		if err := tx.Commit(ctx); err != nil {
 			return Comment{}, fmt.Errorf("commit replayed comment create: %w", err)
 		}
@@ -175,6 +184,11 @@ func (repository *PostgresCommentRepository) Create(ctx context.Context, command
 		if !sameCreateRequest(existing, comment, command) {
 			return Comment{}, ErrCommentIdempotencyConflict
 		}
+		comments := []Comment{comment}
+		if err := repository.enrichCommentAuthors(ctx, tx, comments, command.CreatedAt); err != nil {
+			return Comment{}, err
+		}
+		comment = comments[0]
 		if err := tx.Commit(ctx); err != nil {
 			return Comment{}, fmt.Errorf("commit concurrent comment replay: %w", err)
 		}
@@ -189,6 +203,14 @@ func (repository *PostgresCommentRepository) Create(ctx context.Context, command
 	if err != nil {
 		return Comment{}, err
 	}
+	if err := repository.projectCommentNotification(ctx, tx, command, row.CommentInternalID); err != nil {
+		return Comment{}, err
+	}
+	comments := []Comment{comment}
+	if err := repository.enrichCommentAuthors(ctx, tx, comments, command.CreatedAt); err != nil {
+		return Comment{}, err
+	}
+	comment = comments[0]
 	if err := tx.Commit(ctx); err != nil {
 		return Comment{}, fmt.Errorf("commit comment create: %w", err)
 	}
@@ -227,6 +249,11 @@ func (repository *PostgresCommentRepository) Update(ctx context.Context, command
 		return Comment{}, ErrCommentTargetNotFound
 	}
 	if current.Body == command.Body && (current.Version == command.ExpectedVersion || current.Version == command.ExpectedVersion+1) {
+		comments := []Comment{current}
+		if err := repository.enrichCommentAuthors(ctx, tx, comments, command.UpdatedAt); err != nil {
+			return Comment{}, err
+		}
+		current = comments[0]
 		if err := tx.Commit(ctx); err != nil {
 			return Comment{}, fmt.Errorf("commit repeated comment update: %w", err)
 		}
@@ -267,6 +294,11 @@ func (repository *PostgresCommentRepository) Update(ctx context.Context, command
 	if err != nil {
 		return Comment{}, err
 	}
+	comments := []Comment{updated}
+	if err := repository.enrichCommentAuthors(ctx, tx, comments, command.UpdatedAt); err != nil {
+		return Comment{}, err
+	}
+	updated = comments[0]
 	if err := tx.Commit(ctx); err != nil {
 		return Comment{}, fmt.Errorf("commit comment update: %w", err)
 	}
@@ -530,6 +562,124 @@ func commentFromFields(
 		return Comment{}, err
 	}
 	return comment, nil
+}
+
+func (repository *PostgresCommentRepository) enrichCommentAuthors(ctx context.Context, db communityDB, comments []Comment, now time.Time) error {
+	profiles := make(map[uuid.UUID]CommentAuthor, len(comments))
+	for index := range comments {
+		authorID := comments[index].Author.ID
+		profile, ok := profiles[authorID]
+		if !ok {
+			profile = CommentAuthor{ID: authorID, Medals: []AuthorMedal{}}
+			err := db.QueryRow(ctx, `
+SELECT users.username, users.display_name,
+       EXISTS (
+           SELECT 1
+           FROM identity.sessions AS session
+           WHERE session.user_id = users.id
+             AND session.audience = 'web'
+             AND session.revoked_at IS NULL
+             AND session.expires_at > $2
+             AND session.last_seen_at >= $2 - interval '15 minutes'
+             AND users.status = 'active'
+             AND NOT EXISTS (
+                 SELECT 1
+                 FROM identity.account_restrictions AS restriction
+                 WHERE restriction.user_id = users.id
+                   AND restriction.kind = 'account_access'
+                   AND restriction.revoked_at IS NULL
+                   AND restriction.starts_at <= $2
+                   AND restriction.expires_at > $2
+             )
+       ),
+       COALESCE(access.vip_enabled AND (access.vip_until IS NULL OR access.vip_until > $2), false),
+       EXISTS (
+           SELECT 1
+           FROM authz.grants AS grant_record
+           JOIN governance.mandates AS mandate
+             ON mandate.id = grant_record.mandate_id
+            AND mandate.subject_id = grant_record.subject_id
+           WHERE grant_record.subject_id = users.id
+             AND grant_record.role_id = 'site_admin'
+             AND grant_record.scope_type = $3
+             AND grant_record.scope_id = $4
+             AND grant_record.revoked_at IS NULL
+             AND grant_record.valid_from <= $2
+             AND $2 < grant_record.valid_until
+             AND mandate.status = 'active'
+             AND mandate.starts_at <= $2
+             AND $2 < mandate.ends_at
+       )
+FROM identity.users AS users
+LEFT JOIN identity.user_access_states AS access ON access.user_id = users.id
+WHERE users.id = $1`, authorID, now, authzcontractv1.SiteScopeType, authzcontractv1.SiteScopeID).Scan(
+				&profile.Username, &profile.DisplayName, &profile.Online, &profile.VIP, &profile.SiteAdministrator,
+			)
+			if err != nil {
+				return fmt.Errorf("read comment author profile: %w", err)
+			}
+
+			rows, err := db.Query(ctx, `
+SELECT definition.id, definition.name,
+       COALESCE(definition.image_small_path, definition.image_large_path)
+FROM economy.user_medals AS holding
+JOIN economy.medal_definitions AS definition ON definition.id = holding.medal_id
+WHERE holding.user_id = $1
+  AND definition.display_on_page
+  AND (holding.expires_at IS NULL OR holding.expires_at > $2)
+  AND (definition.is_workgroup OR holding.state = 'wearing')
+ORDER BY holding.priority DESC, definition.priority DESC, definition.id`, authorID, now)
+			if err != nil {
+				return fmt.Errorf("list comment author medals: %w", err)
+			}
+			for rows.Next() {
+				var medal AuthorMedal
+				if err := rows.Scan(&medal.ID, &medal.Name, &medal.ImagePath); err != nil {
+					rows.Close()
+					return fmt.Errorf("scan comment author medal: %w", err)
+				}
+				profile.Medals = append(profile.Medals, medal)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return fmt.Errorf("list comment author medals: %w", err)
+			}
+			rows.Close()
+			profiles[authorID] = profile
+		}
+		comments[index].Author = profile
+	}
+	return nil
+}
+
+func (repository *PostgresCommentRepository) projectCommentNotification(ctx context.Context, tx pgx.Tx, command createCommentCommand, commentInternalID int64) error {
+	if command.Target.Kind != CommentTargetPost {
+		return nil
+	}
+	var postInternalID int64
+	var recipientID uuid.UUID
+	kind := SocialNotificationPostComment
+	if command.ParentCommentID == nil {
+		err := tx.QueryRow(ctx, `SELECT post.id,post.author_id FROM social.posts AS post WHERE post.public_id=$1`, command.Target.PostPublicID).Scan(&postInternalID, &recipientID)
+		if err != nil {
+			return fmt.Errorf("read social post notification recipient: %w", err)
+		}
+	} else {
+		kind = SocialNotificationCommentReply
+		err := tx.QueryRow(ctx, `
+SELECT post.id,parent.author_id
+FROM social.posts AS post
+JOIN social.post_comment_threads AS binding ON binding.post_id=post.id
+JOIN social.comments AS parent ON parent.thread_id=binding.thread_id AND parent.public_id=$2
+WHERE post.public_id=$1`, command.Target.PostPublicID, *command.ParentCommentID).Scan(&postInternalID, &recipientID)
+		if err != nil {
+			return fmt.Errorf("read social reply notification recipient: %w", err)
+		}
+	}
+	if recipientID == command.AuthorID {
+		return nil
+	}
+	return upsertSocialInteractionNotification(ctx, tx, uuid.New(), recipientID, command.AuthorID, kind, &postInternalID, &commentInternalID, command.CreatedAt)
 }
 
 func sameCreateRequest(row socialdb.FindCommentByCreateRequestRow, comment Comment, command createCommentCommand) bool {

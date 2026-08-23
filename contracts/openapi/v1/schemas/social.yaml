@@ -117,6 +117,66 @@ SocialRedPacket:
     claimed_by_me: { type: boolean }
     my_claim_amount: { type: integer, format: int64, minimum: 1, nullable: true }
 
+SocialNotificationKind:
+  type: string
+  enum: [follow, post_like, post_repost, post_comment, comment_reply]
+
+SocialNotificationCategory:
+  type: string
+  enum: [all, replies, likes, follows]
+
+SocialNotification:
+  type: object
+  additionalProperties: false
+  required: [id, kind, actor, created_at, read_at]
+  properties:
+    id: { type: string, format: uuid }
+    kind: { $ref: "#/SocialNotificationKind" }
+    actor: { $ref: "#/SocialPostAuthor" }
+    post_id: { type: string, format: uuid, nullable: true }
+    comment_id: { type: string, format: uuid, nullable: true }
+    post_preview: { type: string, maxLength: 160 }
+    comment_preview: { type: string, maxLength: 160 }
+    created_at: { type: string, format: date-time }
+    read_at: { type: string, format: date-time, nullable: true }
+
+SocialNotificationPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, unread_count, limit, offset]
+  properties:
+    items:
+      type: array
+      items: { $ref: "#/SocialNotification" }
+    total: { type: integer, minimum: 0 }
+    unread_count: { type: integer, minimum: 0 }
+    limit: { type: integer, minimum: 1, maximum: 50 }
+    offset: { type: integer, minimum: 0, maximum: 99999 }
+
+SocialNotificationSummary:
+  type: object
+  additionalProperties: false
+  required: [unread_count]
+  properties:
+    unread_count: { type: integer, minimum: 0 }
+
+SocialNotificationReadReceipt:
+  type: object
+  additionalProperties: false
+  required: [notification_id, read_at, already_read]
+  properties:
+    notification_id: { type: string, format: uuid }
+    read_at: { type: string, format: date-time }
+    already_read: { type: boolean }
+
+SocialNotificationReadAllReceipt:
+  type: object
+  additionalProperties: false
+  required: [updated_count, read_at]
+  properties:
+    updated_count: { type: integer, minimum: 0 }
+    read_at: { type: string, format: date-time }
+
 SocialPost:
   type: object
   additionalProperties: false

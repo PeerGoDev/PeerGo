@@ -18,6 +18,18 @@ const userId = "0198f20a-6da8-7e51-9c64-111111111111"
 const rootCommentId = "0198f20a-6da8-7e51-9c64-333333333333"
 const target = torrentCommentTarget(torrentId)
 
+function commentAuthor(id: string, username: string, displayName: string) {
+  return {
+    id,
+    username,
+    display_name: displayName,
+    online: false,
+    vip: false,
+    administrator: false,
+    medals: [],
+  }
+}
+
 describe("TorrentCommentsCard", () => {
   it("renders compact threaded comments and exposes owned actions", async () => {
     const user = userEvent.setup()
@@ -134,7 +146,7 @@ function commentPage(): CommentPage {
     items: [
       {
         id: rootCommentId,
-        author: { id: userId, display_name: "北岸" },
+        author: commentAuthor(userId, "north-shore", "北岸"),
         body: "这份资源已经校验。",
         body_format: "plain_text",
         state: "visible",
@@ -145,10 +157,11 @@ function commentPage(): CommentPage {
       {
         id: "0198f20a-6da8-7e51-9c64-444444444444",
         parent_comment_id: rootCommentId,
-        author: {
-          id: "0198f20a-6da8-7e51-9c64-555555555555",
-          display_name: "海风",
-        },
+        author: commentAuthor(
+          "0198f20a-6da8-7e51-9c64-555555555555",
+          "sea-breeze",
+          "海风"
+        ),
         body: "",
         body_format: "plain_text",
         state: "author_deleted",
@@ -158,10 +171,11 @@ function commentPage(): CommentPage {
       },
       {
         id: "0198f20a-6da8-7e51-9c64-666666666666",
-        author: {
-          id: "0198f20a-6da8-7e51-9c64-777777777777",
-          display_name: "灯塔",
-        },
+        author: commentAuthor(
+          "0198f20a-6da8-7e51-9c64-777777777777",
+          "lighthouse",
+          "灯塔"
+        ),
         body: "这是一条可由当前成员举报的公开评论。",
         body_format: "plain_text",
         state: "visible",

@@ -282,7 +282,8 @@ func (repository *PostgresPostRepository) SetInteraction(ctx context.Context, us
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	var internalID int64
-	err = tx.QueryRow(ctx, `SELECT post.id FROM social.posts AS post JOIN social.boards AS board ON board.id=post.board_id WHERE post.public_id=$1 AND post.state='visible' AND board.enabled`, postID).Scan(&internalID)
+	var authorID uuid.UUID
+	err = tx.QueryRow(ctx, `SELECT post.id,post.author_id FROM social.posts AS post JOIN social.boards AS board ON board.id=post.board_id WHERE post.public_id=$1 AND post.state='visible' AND board.enabled`, postID).Scan(&internalID, &authorID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return InteractionState{}, ErrPostNotFound
 	}
@@ -290,7 +291,15 @@ func (repository *PostgresPostRepository) SetInteraction(ctx context.Context, us
 		return InteractionState{}, err
 	}
 	if active {
-		_, err = tx.Exec(ctx, `INSERT INTO `+table+` (post_id,user_id,created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, internalID, userID, now)
+		var tag pgconn.CommandTag
+		tag, err = tx.Exec(ctx, `INSERT INTO `+table+` (post_id,user_id,created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, internalID, userID, now)
+		if err == nil && tag.RowsAffected() == 1 && userID != authorID {
+			notificationKind := SocialNotificationPostLike
+			if kind == "repost" {
+				notificationKind = SocialNotificationPostRepost
+			}
+			err = upsertSocialInteractionNotification(ctx, tx, uuid.New(), authorID, userID, notificationKind, &internalID, nil, now)
+		}
 	} else {
 		_, err = tx.Exec(ctx, `DELETE FROM `+table+` WHERE post_id=$1 AND user_id=$2`, internalID, userID)
 	}
@@ -308,9 +317,14 @@ func (repository *PostgresPostRepository) SetInteraction(ctx context.Context, us
 }
 
 func (repository *PostgresPostRepository) SetFollow(ctx context.Context, followerID uuid.UUID, username string, active bool, now time.Time) (FollowState, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return FollowState{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 	var followeeID uuid.UUID
 	var canonical string
-	err := repository.pool.QueryRow(ctx, `SELECT id, username FROM identity.users WHERE lower(username)=lower($1) AND account_state='active'`, username).Scan(&followeeID, &canonical)
+	err = tx.QueryRow(ctx, `SELECT id, username FROM identity.users WHERE lower(username)=lower($1) AND account_state='active'`, username).Scan(&followeeID, &canonical)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return FollowState{}, ErrSocialMemberNotFound
 	}
@@ -321,11 +335,21 @@ func (repository *PostgresPostRepository) SetFollow(ctx context.Context, followe
 		return FollowState{}, ErrSocialSelfFollow
 	}
 	if active {
-		_, err = repository.pool.Exec(ctx, `INSERT INTO social.follows (follower_id,followee_id,created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, followerID, followeeID, now)
+		var tag pgconn.CommandTag
+		tag, err = tx.Exec(ctx, `INSERT INTO social.follows (follower_id,followee_id,created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, followerID, followeeID, now)
+		if err == nil && tag.RowsAffected() == 1 {
+			err = upsertSocialInteractionNotification(ctx, tx, uuid.New(), followeeID, followerID, SocialNotificationFollow, nil, nil, now)
+		}
 	} else {
-		_, err = repository.pool.Exec(ctx, `DELETE FROM social.follows WHERE follower_id=$1 AND followee_id=$2`, followerID, followeeID)
+		_, err = tx.Exec(ctx, `DELETE FROM social.follows WHERE follower_id=$1 AND followee_id=$2`, followerID, followeeID)
 	}
-	return FollowState{Username: canonical, Following: active}, err
+	if err != nil {
+		return FollowState{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return FollowState{}, err
+	}
+	return FollowState{Username: canonical, Following: active}, nil
 }
 
 func (repository *PostgresPostRepository) Vote(ctx context.Context, voterID, postID, optionID uuid.UUID, now time.Time) (Poll, error) {

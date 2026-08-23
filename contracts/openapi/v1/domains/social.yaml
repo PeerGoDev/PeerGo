@@ -297,6 +297,112 @@ SocialPostCommentsPath:
       default:
         $ref: "../responses.yaml#/ProblemResponse"
 
+SocialNotificationsPath:
+  get:
+    operationId: listSocialNotifications
+    summary: 分页读取当前成员的动态圈互动通知
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: notification.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: category
+        in: query
+        required: false
+        schema:
+          $ref: "../schemas/social.yaml#/SocialNotificationCategory"
+      - name: limit
+        in: query
+        required: false
+        schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      - name: offset
+        in: query
+        required: false
+        schema: { type: integer, minimum: 0, maximum: 99999, default: 0 }
+    responses:
+      "200":
+        description: 与站内消息分离的动态圈互动通知分页。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialNotificationPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialNotificationSummaryPath:
+  get:
+    operationId: getSocialNotificationSummary
+    summary: 读取当前成员的动态圈未读互动数
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: notification.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 动态圈独立未读数。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialNotificationSummary" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialNotificationPath:
+  parameters:
+    - name: notification_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  put:
+    operationId: markSocialNotificationRead
+    summary: 把当前成员的一条动态圈互动通知标为已读
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: notification.read.state.write.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+    responses:
+      "200":
+        description: 幂等的已读回执。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialNotificationReadReceipt" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialNotificationReadAllPath:
+  put:
+    operationId: markAllSocialNotificationsRead
+    summary: 把当前成员已有的动态圈互动通知全部标为已读
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: notification.read.state.write.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+    responses:
+      "200":
+        description: 批量已读回执。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialNotificationReadAllReceipt" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
 SocialPostIDPathParameter:
   name: post_id
   in: path

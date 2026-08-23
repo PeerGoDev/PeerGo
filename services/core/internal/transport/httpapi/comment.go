@@ -251,12 +251,30 @@ func announcementCommentPageDTO(page social.CommentPage) generated.AnnouncementC
 }
 
 func commentDTO(comment social.Comment) generated.Comment {
+	medals := make([]generated.CommentAuthorMedal, 0, len(comment.Author.Medals))
+	for _, medal := range comment.Author.Medals {
+		medals = append(medals, generated.CommentAuthorMedal{
+			Id: medal.ID, Name: medal.Name, ImagePath: medal.ImagePath,
+		})
+	}
+	username := comment.Author.Username
+	if username == "" {
+		// Test fixtures and pre-enrichment internal projections may only carry a
+		// display name. Production repository reads always provide the canonical
+		// username, while this fallback keeps the public contract valid.
+		username = comment.Author.ID.String()
+	}
 	return generated.Comment{
 		Id:              comment.ID,
 		ParentCommentId: comment.ParentCommentID,
 		Author: generated.CommentAuthor{
-			Id:          comment.Author.ID,
-			DisplayName: comment.Author.DisplayName,
+			Id:            comment.Author.ID,
+			Username:      username,
+			DisplayName:   comment.Author.DisplayName,
+			Online:        comment.Author.Online,
+			Vip:           comment.Author.VIP,
+			Administrator: comment.Author.SiteAdministrator,
+			Medals:        medals,
 		},
 		Body:       comment.Body,
 		BodyFormat: generated.CommentBodyFormat(comment.BodyFormat),

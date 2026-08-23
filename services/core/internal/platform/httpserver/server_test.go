@@ -835,6 +835,18 @@ func (unavailableSocialPostService) Vote(context.Context, string, string, uuid.U
 func (unavailableSocialPostService) ClaimRedPacket(context.Context, string, string, uuid.UUID, uuid.UUID) (social.RedPacketClaim, error) {
 	return social.RedPacketClaim{}, identity.ErrSessionNotFound
 }
+func (unavailableSocialPostService) ListNotifications(context.Context, string, social.SocialNotificationQuery) (social.SocialNotificationPage, error) {
+	return social.SocialNotificationPage{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) NotificationSummary(context.Context, string) (social.SocialNotificationSummary, error) {
+	return social.SocialNotificationSummary{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) MarkNotificationRead(context.Context, string, string, uuid.UUID) (social.SocialNotificationReadReceipt, error) {
+	return social.SocialNotificationReadReceipt{}, identity.ErrSessionNotFound
+}
+func (unavailableSocialPostService) MarkAllNotificationsRead(context.Context, string, string) (social.SocialNotificationReadAllReceipt, error) {
+	return social.SocialNotificationReadAllReceipt{}, identity.ErrSessionNotFound
+}
 func (unavailableSocialPostService) ListManagedBoards(context.Context, authz.StaffActor) ([]social.Board, error) {
 	return nil, authz.ErrForbidden
 }

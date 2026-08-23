@@ -16,6 +16,18 @@ import { SocialPostDetailPage } from "~/features/social/pages/social-post-detail
 const postId = "0198f20a-6da8-7e51-9c64-222222222222"
 const userId = "0198f20a-6da8-7e51-9c64-111111111111"
 
+function commentAuthor() {
+  return {
+    id: userId,
+    username: "demo",
+    display_name: "演示用户",
+    online: true,
+    vip: false,
+    administrator: false,
+    medals: [],
+  }
+}
+
 describe("SocialPostDetailPage", () => {
   it("renders the PtYes-compatible detail and flat comment frame", () => {
     const queryClient = new QueryClient({
@@ -73,7 +85,7 @@ describe("SocialPostDetailPage", () => {
         items: [
           {
             id: "0198f20a-6da8-7e51-9c64-333333333333",
-            author: { id: userId, display_name: "演示用户" },
+            author: commentAuthor(),
             body: "欢迎来到新的动态讨论。",
             body_format: "plain_text",
             state: "visible",
@@ -84,7 +96,7 @@ describe("SocialPostDetailPage", () => {
           {
             id: "0198f20a-6da8-7e51-9c64-444444444444",
             parent_comment_id: "0198f20a-6da8-7e51-9c64-333333333333",
-            author: { id: userId, display_name: "演示用户" },
+            author: commentAuthor(),
             body: "这是楼中楼回复。",
             body_format: "plain_text",
             state: "visible",
@@ -95,7 +107,7 @@ describe("SocialPostDetailPage", () => {
           {
             id: "0198f20a-6da8-7e51-9c64-555555555555",
             parent_comment_id: "0198f20a-6da8-7e51-9c64-000000000000",
-            author: { id: userId, display_name: "演示用户" },
+            author: commentAuthor(),
             body: "父评论不在当前页的回复。",
             body_format: "plain_text",
             state: "visible",
@@ -166,13 +178,21 @@ describe("SocialPostDetailPage", () => {
     expect(within(comments).getByText("父评论不在当前页的回复。")).toBeVisible()
     expect(
       within(comments).getByText("这是楼中楼回复。").closest("article")
-    ).toHaveClass("ml-10", "py-3")
+    ).toHaveClass("ml-8", "py-3", "border-l-2", "sm:ml-11")
     expect(
       within(comments).getByText("这是楼中楼回复。").closest("article")
-    ).not.toHaveClass("border-l-2")
+    ).toHaveAttribute("id", "comment-0198f20a-6da8-7e51-9c64-444444444444")
     expect(
       within(comments).getAllByRole("button", { name: "回复" })
     ).toHaveLength(3)
+    const rootArticle = within(comments)
+      .getByText("欢迎来到新的动态讨论。")
+      .closest("article")!
+    fireEvent.click(within(rootArticle).getByRole("button", { name: "回复" }))
+    expect(
+      within(rootArticle).getByPlaceholderText("回复 @演示用户…")
+    ).toHaveClass("min-h-[76px]", "resize-y")
+    expect(screen.getAllByLabelText("演示用户在线").length).toBeGreaterThan(0)
   })
 
   it("uses the PtYes-sized empty comment state", () => {

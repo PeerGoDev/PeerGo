@@ -17,6 +17,7 @@ export default [
   route("announcements", "routes/announcements.tsx"),
   route("notifications", "routes/notifications.tsx"),
   route("social", "routes/social.tsx"),
+  route("social/notifications", "routes/social.notifications.tsx"),
   route("social/post/:postId", "routes/social.post.$postId.tsx"),
   route("social/user/:username", "routes/social.user.$username.tsx"),
   route("messages", "routes/legacy-messages.tsx"),

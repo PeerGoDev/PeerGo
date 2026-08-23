@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -58,7 +59,7 @@ func TestPostgresCommentRepositoryPreservesThreadHistoryAndOwnedWrites(t *testin
 		t.Fatalf("Create(root) comment=%+v error=%v", root, err)
 	}
 	replayed, err := repository.Create(ctx, rootCommand)
-	if err != nil || replayed != root {
+	if err != nil || !reflect.DeepEqual(replayed, root) {
 		t.Fatalf("Create(root replay) comment=%+v error=%v", replayed, err)
 	}
 	changedReplay := rootCommand

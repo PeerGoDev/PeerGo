@@ -176,15 +176,19 @@ func socialPostPageDTO(page social.PostPage) generated.SocialPostPage {
 
 func socialPostDTO(post social.Post) generated.SocialPost {
 	return generated.SocialPost{
-		Id: post.ID, Author: generated.SocialPostAuthor{
-			Id: post.Author.ID, Username: post.Author.Username, DisplayName: post.Author.DisplayName,
-			FollowedByMe: post.Author.FollowedByMe, Online: post.Author.Online, Vip: post.Author.VIP,
-			Administrator: post.Author.SiteAdministrator, Medals: socialAuthorMedalDTOs(post.Author.Medals),
-		},
+		Id: post.ID, Author: socialPostAuthorDTO(post.Author),
 		Board: socialBoardDTO(post.Board), Content: post.Body, Version: post.Version, CommentCount: post.CommentCount,
 		LikeCount: post.LikeCount, RepostCount: post.RepostCount, LikedByMe: post.LikedByMe, RepostedByMe: post.RepostedByMe,
 		Pinned: post.Pinned, Featured: post.Featured, Hidden: boolPointer(post.State == social.PostModeratorHidden), Topics: post.Topics, Media: socialMediaDTOs(post.Media), Poll: socialPollDTO(post.Poll), RedPacket: socialRedPacketDTO(post.RedPacket),
 		CreatedAt: post.CreatedAt, UpdatedAt: post.UpdatedAt, EditedAt: post.EditedAt,
+	}
+}
+
+func socialPostAuthorDTO(author social.PostAuthor) generated.SocialPostAuthor {
+	return generated.SocialPostAuthor{
+		Id: author.ID, Username: author.Username, DisplayName: author.DisplayName,
+		FollowedByMe: author.FollowedByMe, Online: author.Online, Vip: author.VIP,
+		Administrator: author.SiteAdministrator, Medals: socialAuthorMedalDTOs(author.Medals),
 	}
 }
 

@@ -50,8 +50,13 @@ const (
 )
 
 type CommentAuthor struct {
-	ID          uuid.UUID
-	DisplayName string
+	ID                uuid.UUID
+	Username          string
+	DisplayName       string
+	Online            bool
+	VIP               bool
+	SiteAdministrator bool
+	Medals            []AuthorMedal
 }
 
 type CommentTargetKind string

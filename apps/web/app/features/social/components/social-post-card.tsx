@@ -2,6 +2,8 @@ import * as React from "react"
 import { Link } from "react-router"
 import {
   CircleAlertIcon,
+  CheckCircleIcon,
+  ClockIcon,
   HeartIcon,
   MessageCircleIcon,
   MoreHorizontalIcon,
@@ -451,48 +453,114 @@ export function SocialPostCard({
       ) : null}
 
       {post.red_packet ? (
-        <div className="mt-3 flex items-center justify-between rounded-md border border-primary/20 bg-primary/5 p-3">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <GiftIcon className="size-4" />
-            </span>
-            <div>
-              <p className="text-sm font-medium">魔力值红包</p>
-              <p className="text-xs text-muted-foreground">
-                剩余 {post.red_packet.remaining_amount} /{" "}
-                {post.red_packet.total_amount} ·{" "}
-                {post.red_packet.remaining_claims} 份
-              </p>
+        <div
+          className={cn(
+            "relative mt-3 overflow-hidden rounded-xl text-white shadow-sm",
+            post.red_packet.remaining_claims === 0
+              ? "bg-gradient-to-br from-slate-400 to-slate-500"
+              : "bg-gradient-to-br from-[#f15b45] via-[#e94738] to-[#d7322f]"
+          )}
+        >
+          <span className="pointer-events-none absolute -top-14 -right-10 size-40 rounded-full border-[24px] border-white/5" />
+          <span className="pointer-events-none absolute -bottom-20 -left-12 size-44 rounded-full bg-black/5" />
+          <div className="relative p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white/20 shadow-inner ring-1 ring-white/25">
+                  <GiftIcon className="size-6" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold sm:text-base">
+                    {post.author.display_name} 的红包
+                  </p>
+                  <p className="mt-0.5 text-sm text-white/80">
+                    恭喜发财，大吉大利
+                  </p>
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-2xl leading-none font-bold tabular-nums">
+                  {post.red_packet.total_amount.toLocaleString("zh-CN")}
+                </p>
+                <p className="mt-1 text-xs text-white/75">魔力值</p>
+              </div>
+            </div>
+
+            {claimPacket.error ? (
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm ring-1 ring-white/10">
+                <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  {claimPacket.error instanceof ApiProblemError
+                    ? claimPacket.error.message
+                    : "红包暂时未能拆开，请稍后重试。"}
+                </span>
+              </div>
+            ) : null}
+
+            {claimPacket.data ? (
+              <div className="mt-3 rounded-lg bg-white/20 px-3 py-2.5 text-center ring-1 ring-white/15">
+                <p className="text-sm text-white/85">恭喜你拆到</p>
+                <p className="mt-0.5 text-lg font-bold">
+                  {claimPacket.data.amount.toLocaleString("zh-CN")} 魔力值
+                </p>
+              </div>
+            ) : post.red_packet.claimed_by_me ? (
+              <div className="mt-3 flex items-center justify-between rounded-lg bg-white/15 px-3 py-2.5 ring-1 ring-white/10">
+                <span className="flex items-center gap-1.5 text-sm text-white/85">
+                  <CheckCircleIcon className="size-4" />
+                  你已领取
+                </span>
+                <strong className="text-lg">
+                  {post.red_packet.my_claim_amount?.toLocaleString("zh-CN")}{" "}
+                  魔力值
+                </strong>
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 text-sm text-white/80">
+                {post.red_packet.remaining_claims === 0 ? (
+                  <CheckCircleIcon className="size-4" />
+                ) : (
+                  <ClockIcon className="size-4" />
+                )}
+                <span>
+                  {post.red_packet.remaining_claims === 0
+                    ? "已抢完"
+                    : `${post.red_packet.claim_count - post.red_packet.remaining_claims}/${post.red_packet.claim_count} 已领取`}
+                  {post.red_packet.remaining_claims > 0
+                    ? ` · 剩余 ${post.red_packet.remaining_amount.toLocaleString("zh-CN")}`
+                    : ""}
+                </span>
+              </div>
+              {!post.red_packet.claimed_by_me && !claimPacket.data ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="border-0 bg-amber-300 px-5 font-semibold text-red-950 shadow-sm hover:bg-amber-200"
+                  onClick={() => {
+                    if (!csrfToken) return
+                    claimPacket.reset()
+                    claimPacket.mutate({
+                      postId: post.id,
+                      csrfToken,
+                      idempotencyKey: crypto.randomUUID(),
+                    })
+                  }}
+                  disabled={
+                    !csrfToken ||
+                    post.red_packet.remaining_claims === 0 ||
+                    claimPacket.isPending
+                  }
+                >
+                  {claimPacket.isPending ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : null}
+                  {post.red_packet.remaining_claims === 0 ? "已抢完" : "拆红包"}
+                </Button>
+              ) : null}
             </div>
           </div>
-          {post.red_packet.claimed_by_me ? (
-            <Badge variant="secondary">
-              已领 {post.red_packet.my_claim_amount}
-            </Badge>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() =>
-                csrfToken &&
-                claimPacket.mutate({
-                  postId: post.id,
-                  csrfToken,
-                  idempotencyKey: crypto.randomUUID(),
-                })
-              }
-              disabled={
-                !csrfToken ||
-                post.red_packet.remaining_claims === 0 ||
-                claimPacket.isPending
-              }
-            >
-              {claimPacket.isPending ? (
-                <Spinner data-icon="inline-start" />
-              ) : null}
-              领取
-            </Button>
-          )}
         </div>
       ) : null}
 

@@ -212,7 +212,10 @@ describe("SocialPostCard", () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByRole("button", { name: "领取" })).toBeEnabled()
+    expect(screen.getByText("红包发送者 的红包")).toBeVisible()
+    expect(screen.getByText("恭喜发财，大吉大利")).toBeVisible()
+    expect(screen.getByText("0/5 已领取 · 剩余 100")).toBeVisible()
+    expect(screen.getByRole("button", { name: "拆红包" })).toBeEnabled()
   })
 
   it("shows quick pin and delete actions to a social moderator", async () => {
