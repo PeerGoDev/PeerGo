@@ -251,7 +251,11 @@ export function AccountSecurityPage() {
           ) : sessions.data ? (
             <SessionTable
               items={sessions.data.items}
-              pendingId={revokeSession.variables?.sessionId}
+              pendingId={
+                revokeSession.isPending
+                  ? revokeSession.variables?.sessionId
+                  : undefined
+              }
               onRevoke={handleRevoke}
             />
           ) : null}

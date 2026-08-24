@@ -106,7 +106,7 @@ export function SocialPostCard({
         className="min-h-28 resize-y"
         aria-label="编辑动态正文"
       />
-      {updatePost.error ? (
+      {updatePost.isError ? (
         <ProblemAlert title="编辑失败" error={updatePost.error} />
       ) : null}
       <div className="flex justify-end gap-2">
@@ -259,7 +259,7 @@ export function SocialPostCard({
               删除后动态将不再公开，且不能恢复。评论审核证据仍会保留。
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {deletePost.error ? (
+          {deletePost.isError ? (
             <ProblemAlert title="删除失败" error={deletePost.error} />
           ) : null}
           <AlertDialogFooter>

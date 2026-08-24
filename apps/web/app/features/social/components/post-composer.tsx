@@ -70,7 +70,7 @@ export function PostComposer({
         />
       </div>
 
-      {createPost.error ? (
+      {createPost.isError ? (
         <Alert variant="destructive" className="mt-3">
           <AlertTitle>发布失败</AlertTitle>
           <AlertDescription>

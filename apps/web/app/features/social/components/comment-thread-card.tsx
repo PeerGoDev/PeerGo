@@ -351,7 +351,7 @@ export function CommentThreadCard({
             draft={draft}
             replyTarget={replyTarget}
             pending={createComment.isPending}
-            error={createComment.error}
+            error={createComment.isError ? createComment.error : null}
             compact={
               torrentAppearance || announcementAppearance || socialAppearance
             }

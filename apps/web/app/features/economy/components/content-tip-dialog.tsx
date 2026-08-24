@@ -28,6 +28,7 @@ import { Input } from "~/components/ui/input"
 import { Skeleton } from "~/components/ui/skeleton"
 import { Spinner } from "~/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group"
+import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import {
   type ContentTipTarget,
   useContentTipOverview,
@@ -64,6 +65,12 @@ export function ContentTipDialog({
   const overview = useContentTipOverview(userId, open)
   const economy = useEconomyOverview(open ? userId : undefined)
   const mutation = useCreateContentTip(userId)
+  const capabilities = useCapabilities(userId)
+  const canTip = Boolean(
+    capabilities.data?.items.some(
+      (capability) => capability.action === "economy.contenttip.create.self"
+    )
+  )
 
   if (!userId || !csrfToken) return null
 
@@ -116,6 +123,7 @@ export function ContentTipDialog({
         size={buttonSize}
         className={cn(className, iconOnly && "border-0")}
         aria-label={iconOnly ? "打赏" : undefined}
+        disabled={!canTip}
         onClick={() => setOpen(true)}
       >
         <GiftIcon data-icon="inline-start" />
@@ -259,7 +267,7 @@ export function ContentTipDialog({
               <Button
                 form="content-tip-form"
                 type="submit"
-                disabled={mutation.isPending || economy.isPending}
+                disabled={mutation.isPending || economy.isPending || !canTip}
               >
                 {mutation.isPending ? (
                   <Spinner data-icon="inline-start" />

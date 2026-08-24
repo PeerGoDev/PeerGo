@@ -148,6 +148,18 @@ function invitationQueryClient(overview: InvitationOverview) {
         scope: { type: "site", id: "peergo" },
         expires_at: "2026-09-17T12:00:00Z",
       },
+      {
+        action: "invitation.issue.self",
+        description: "生成邀请码",
+        scope: { type: "site", id: "peergo" },
+        expires_at: "2026-09-17T12:00:00Z",
+      },
+      {
+        action: "invitation.revoke.self",
+        description: "撤销邀请码",
+        scope: { type: "site", id: "peergo" },
+        expires_at: "2026-09-17T12:00:00Z",
+      },
     ],
   })
   queryClient.setQueryData(invitationKeys.page(userId, 20, 0), overview)
