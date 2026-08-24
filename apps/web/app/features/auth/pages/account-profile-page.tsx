@@ -103,8 +103,9 @@ function ProfileEditor({
     })
   }
 
-  const mutationError =
-    mutation.error instanceof ApiProblemError
+  const mutationError = !mutation.isError
+    ? ""
+    : mutation.error instanceof ApiProblemError
       ? mutation.error.message
       : mutation.error
         ? "保存失败，请稍后重试"

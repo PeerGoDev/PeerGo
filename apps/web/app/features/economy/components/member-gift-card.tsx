@@ -1,4 +1,4 @@
-import { type FormEvent, useMemo, useState } from "react"
+import { type FormEvent, useMemo, useRef, useState } from "react"
 import {
   CircleAlertIcon,
   CircleCheckIcon,
@@ -36,6 +36,7 @@ import {
   TableRow,
 } from "~/components/ui/table"
 import { Textarea } from "~/components/ui/textarea"
+import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import {
   useCreateMemberGift,
   useMemberGiftOverview,
@@ -59,6 +60,13 @@ export function MemberGiftCard({
   const [amount, setAmount] = useState("")
   const [message, setMessage] = useState("")
   const [validationError, setValidationError] = useState("")
+  const requestId = useRef<string | undefined>(undefined)
+  const capabilities = useCapabilities(userId)
+  const canGift = Boolean(
+    capabilities.data?.items.some(
+      (capability) => capability.action === "economy.membergift.create.self"
+    )
+  )
 
   const feePreview = useMemo(() => {
     if (!overview.data || !positiveInteger(amount)) return null
@@ -118,16 +126,19 @@ export function MemberGiftCard({
       setValidationError(error)
       return
     }
+    const idempotencyKey = requestId.current ?? globalThis.crypto.randomUUID()
+    requestId.current = idempotencyKey
     mutation.mutate(
       {
         csrfToken,
-        idempotencyKey: globalThis.crypto.randomUUID(),
+        idempotencyKey,
         recipientNumericId,
         amount,
         message: message.trim(),
       },
       {
         onSuccess: () => {
+          requestId.current = undefined
           setRecipientNumericId("")
           setAmount("")
           setMessage("")
@@ -178,9 +189,10 @@ export function MemberGiftCard({
                   <Input
                     id="member-gift-recipient"
                     value={recipientNumericId}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      requestId.current = undefined
                       setRecipientNumericId(event.target.value.trim())
-                    }
+                    }}
                     inputMode="numeric"
                     pattern="[0-9]*"
                     autoComplete="off"
@@ -198,7 +210,10 @@ export function MemberGiftCard({
                   <Input
                     id="member-gift-amount"
                     value={amount}
-                    onChange={(event) => setAmount(event.target.value.trim())}
+                    onChange={(event) => {
+                      requestId.current = undefined
+                      setAmount(event.target.value.trim())
+                    }}
                     inputMode="numeric"
                     pattern="[0-9]*"
                     autoComplete="off"
@@ -219,7 +234,10 @@ export function MemberGiftCard({
                   <Textarea
                     id="member-gift-message"
                     value={message}
-                    onChange={(event) => setMessage(event.target.value)}
+                    onChange={(event) => {
+                      requestId.current = undefined
+                      setMessage(event.target.value)
+                    }}
                     rows={3}
                     maxLength={200}
                     placeholder="写一句简短说明…"
@@ -249,7 +267,7 @@ export function MemberGiftCard({
                     </AlertDescription>
                   </Alert>
                 ) : null}
-                <Button type="submit" disabled={mutation.isPending}>
+                <Button type="submit" disabled={mutation.isPending || !canGift}>
                   {mutation.isPending ? (
                     <Spinner data-icon="inline-start" />
                   ) : (

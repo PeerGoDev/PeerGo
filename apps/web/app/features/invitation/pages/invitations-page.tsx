@@ -95,6 +95,16 @@ export function InvitationsPage() {
       (capability) => capability.action === "invitation.read.self"
     )
   )
+  const canIssue = Boolean(
+    capabilities.data?.items.some(
+      (capability) => capability.action === "invitation.issue.self"
+    )
+  )
+  const canRevoke = Boolean(
+    capabilities.data?.items.some(
+      (capability) => capability.action === "invitation.revoke.self"
+    )
+  )
   const [offset, setOffset] = React.useState(0)
   const overview = useQuery({
     ...invitationOverviewQueryOptions(session.data?.user.id, pageSize, offset),
@@ -220,7 +230,8 @@ export function InvitationsPage() {
           <InvitationSummary
             eligibility={overview.data.eligibility}
             issuePending={issue.isPending}
-            issueError={issue.error}
+            issueError={issue.isError ? issue.error : null}
+            canIssue={canIssue}
             onIssue={() => void handleIssue()}
           />
           <InvitationNetwork network={overview.data.network} />
@@ -229,6 +240,7 @@ export function InvitationsPage() {
             total={overview.data.total}
             offset={offset}
             revokePending={revoke.isPending}
+            canRevoke={canRevoke}
             onRevoke={setRevokeTarget}
             onPrevious={() =>
               setOffset((value) => Math.max(0, value - pageSize))
@@ -325,11 +337,13 @@ function InvitationSummary({
   eligibility,
   issuePending,
   issueError,
+  canIssue,
   onIssue,
 }: {
   eligibility: import("~/features/invitation/api/invitations.queries").InvitationOverview["eligibility"]
   issuePending: boolean
   issueError: Error | null
+  canIssue: boolean
   onIssue: () => void
 }) {
   return (
@@ -365,7 +379,7 @@ function InvitationSummary({
           <CardAction>
             <Button
               onClick={onIssue}
-              disabled={!eligibility.eligible || issuePending}
+              disabled={!eligibility.eligible || issuePending || !canIssue}
             >
               {issuePending ? (
                 <Spinner data-icon="inline-start" />
@@ -540,6 +554,7 @@ function InvitationHistory({
   total,
   offset,
   revokePending,
+  canRevoke,
   onRevoke,
   onPrevious,
   onNext,
@@ -548,6 +563,7 @@ function InvitationHistory({
   total: number
   offset: number
   revokePending: boolean
+  canRevoke: boolean
   onRevoke: (item: MemberInvitation) => void
   onPrevious: () => void
   onNext: () => void
@@ -592,7 +608,7 @@ function InvitationHistory({
                       <Button
                         size="sm"
                         variant="ghost"
-                        disabled={revokePending}
+                        disabled={revokePending || !canRevoke}
                         onClick={() => onRevoke(item)}
                       >
                         撤销
@@ -678,11 +694,19 @@ function CopyField({
   copied: boolean
   onCopy: () => void
 }) {
+  const inputId = React.useId()
   return (
     <div className="grid gap-1.5">
-      <label className="text-sm font-medium">{label}</label>
+      <label className="text-sm font-medium" htmlFor={inputId}>
+        {label}
+      </label>
       <div className="flex gap-2">
-        <Input value={value} readOnly className="font-mono text-xs" />
+        <Input
+          id={inputId}
+          value={value}
+          readOnly
+          className="font-mono text-xs"
+        />
         <Button variant="outline" size="icon" onClick={onCopy}>
           {copied ? <CheckIcon /> : <ClipboardIcon />}
           <span className="sr-only">复制{label}</span>

@@ -186,7 +186,7 @@ export function SocialPostCard({
         className="min-h-28 resize-y"
         aria-label="编辑动态正文"
       />
-      {updatePost.error ? (
+      {updatePost.isError ? (
         <ProblemAlert title="编辑失败" error={updatePost.error} />
       ) : null}
       <div className="flex justify-end gap-2">

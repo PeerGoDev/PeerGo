@@ -402,7 +402,7 @@ export function CommentThreadCard({
             draft={draft}
             replyTarget={socialAppearance ? undefined : replyTarget}
             pending={createComment.isPending}
-            error={createComment.error}
+            error={createComment.isError ? createComment.error : null}
             compact={
               torrentAppearance || announcementAppearance || socialAppearance
             }
