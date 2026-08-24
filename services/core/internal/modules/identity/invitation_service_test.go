@@ -50,7 +50,7 @@ func (stub *invitationRepositoryStub) Overview(context.Context, uuid.UUID, time.
 
 func (stub *invitationRepositoryStub) Issue(_ context.Context, command IssueInvitationCommand) (MemberInvitation, error) {
 	stub.command = command
-	return MemberInvitation{ID: command.ID, Status: InvitationStatusAvailable, CreatedAt: command.OccurredAt, ExpiresAt: command.OccurredAt.Add(7 * 24 * time.Hour)}, nil
+	return MemberInvitation{ID: command.ID, Source: InvitationRecordMember, Status: InvitationStatusAvailable, CreatedAt: command.OccurredAt, ExpiresAt: command.OccurredAt.Add(7 * 24 * time.Hour)}, nil
 }
 
 func (stub *invitationRepositoryStub) Revoke(context.Context, RevokeInvitationCommand) (MemberInvitation, error) {
@@ -65,7 +65,7 @@ func TestInvitationOverviewExplainsAccountAgeBlocker(t *testing.T) {
 		MemberInvitesEnabled: true, InviteValidDays: 7, MaxInvitesPerMember: 5,
 		MinimumInviteAccountAgeDays: 30, MinimumInviteLevel: 2,
 		Status: "active", EmailVerified: true, CreatedAt: now.Add(-10 * 24 * time.Hour),
-		CurrentLevel: 3, UsedInvites: 1,
+		CurrentLevel: 3, UsedInvites: 1, RemainingInvites: 4,
 	}}
 	authorizer := &invitationAuthorizerStub{}
 	service, err := NewInvitationService(

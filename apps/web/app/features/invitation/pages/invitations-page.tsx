@@ -3,18 +3,18 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "react-router"
 import {
   CheckIcon,
+  ChevronRightIcon,
   CircleAlertIcon,
   ClipboardIcon,
-  Clock3Icon,
   CoinsIcon,
   GitForkIcon,
+  GiftIcon,
   KeyRoundIcon,
   LogInIcon,
   RefreshCwIcon,
   ShieldXIcon,
   TicketIcon,
   Trash2Icon,
-  UserRoundCheckIcon,
   UsersRoundIcon,
 } from "lucide-react"
 
@@ -84,6 +84,7 @@ import { requestErrorDescription } from "~/shared/api/problem"
 import { PageHeader, PageLayout } from "~/shared/components/page-layout"
 import { formatDateTime } from "~/shared/formatters/date-time"
 import { formatInteger } from "~/shared/formatters/integer"
+import { cn } from "~/lib/utils"
 
 const pageSize = 20
 
@@ -106,6 +107,9 @@ export function InvitationsPage() {
   const [revokeTarget, setRevokeTarget] = React.useState<MemberInvitation>()
   const [copied, setCopied] = React.useState<"token" | "link">()
   const [copyError, setCopyError] = React.useState("")
+  const [activeTab, setActiveTab] = React.useState<
+    "invites" | "tree" | "harem" | "chain"
+  >("invites")
 
   async function handleIssue() {
     if (!session.data) return
@@ -143,7 +147,7 @@ export function InvitationsPage() {
     <PageLayout>
       <PageHeader
         title="邀请"
-        description="签发一次性邀请码，并查看自己已经使用的邀请名额。"
+        description="管理可用邀请、邀请码历史、邀请树和上家邀请链。"
       />
 
       {(session.isPending ||
@@ -217,24 +221,41 @@ export function InvitationsPage() {
 
       {session.data && overview.data && (
         <>
-          <InvitationSummary
-            eligibility={overview.data.eligibility}
-            issuePending={issue.isPending}
-            issueError={issue.error}
-            onIssue={() => void handleIssue()}
-          />
-          <InvitationNetwork network={overview.data.network} />
-          <InvitationHistory
-            items={overview.data.items}
-            total={overview.data.total}
-            offset={offset}
-            revokePending={revoke.isPending}
-            onRevoke={setRevokeTarget}
-            onPrevious={() =>
-              setOffset((value) => Math.max(0, value - pageSize))
-            }
-            onNext={() => setOffset((value) => value + pageSize)}
-          />
+          <InvitationStats overview={overview.data} />
+          <InvitationTabs active={activeTab} onChange={setActiveTab} />
+          {activeTab === "invites" ? (
+            <>
+              <InvitationSummary
+                eligibility={overview.data.eligibility}
+                issuePending={issue.isPending}
+                issueError={issue.error}
+                onIssue={() => void handleIssue()}
+              />
+              <InvitationHistory
+                items={overview.data.items}
+                total={overview.data.total}
+                offset={offset}
+                revokePending={revoke.isPending}
+                onRevoke={setRevokeTarget}
+                onPrevious={() =>
+                  setOffset((value) => Math.max(0, value - pageSize))
+                }
+                onNext={() => setOffset((value) => value + pageSize)}
+              />
+            </>
+          ) : null}
+          {activeTab === "tree" ? (
+            <InvitationTree network={overview.data.network} />
+          ) : null}
+          {activeTab === "harem" ? (
+            <InvitationHarem network={overview.data.network} />
+          ) : null}
+          {activeTab === "chain" ? (
+            <InvitationChain
+              currentUsername={session.data.user.username}
+              network={overview.data.network}
+            />
+          ) : null}
         </>
       )}
 
@@ -299,7 +320,7 @@ export function InvitationsPage() {
             </AlertDialogMedia>
             <AlertDialogTitle>撤销这个邀请码？</AlertDialogTitle>
             <AlertDialogDescription>
-              撤销后邀请码立即失效并释放一个名额，此操作不能恢复。
+              撤销后邀请码立即失效，并返还一个可用邀请名额。此操作不能恢复。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -321,6 +342,80 @@ export function InvitationsPage() {
   )
 }
 
+type InvitationOverview =
+  import("~/features/invitation/api/invitations.queries").InvitationOverview
+
+function InvitationStats({ overview }: { overview: InvitationOverview }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <SummaryCard
+        icon={TicketIcon}
+        label="剩余邀请"
+        value={formatInteger(overview.eligibility.remaining_invites)}
+      />
+      <SummaryCard
+        icon={UsersRoundIcon}
+        label="总邀请人数"
+        value={formatInteger(overview.network.direct_count)}
+      />
+      <SummaryCard
+        icon={GitForkIcon}
+        label="后宫总人数"
+        value={formatInteger(overview.network.total_descendants)}
+      />
+      <SummaryCard
+        icon={CoinsIcon}
+        label="历史后宫奖励"
+        value={formatInteger(overview.network.harem_reward.amount)}
+        tone="text-purple-600"
+      />
+      <SummaryCard
+        icon={GiftIcon}
+        label="历史邀请奖励"
+        value={formatInteger(overview.network.invitation_reward.amount)}
+        tone="text-emerald-600"
+      />
+    </div>
+  )
+}
+
+function InvitationTabs({
+  active,
+  onChange,
+}: {
+  active: "invites" | "tree" | "harem" | "chain"
+  onChange: (tab: "invites" | "tree" | "harem" | "chain") => void
+}) {
+  const tabs = [
+    { id: "invites" as const, label: "邀请码", icon: KeyRoundIcon },
+    { id: "tree" as const, label: "邀请树", icon: UsersRoundIcon },
+    { id: "harem" as const, label: "后宫", icon: GiftIcon },
+    { id: "chain" as const, label: "邀请链", icon: ChevronRightIcon },
+  ]
+  return (
+    <div className="flex gap-1 overflow-x-auto border-b" role="tablist">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={active === tab.id}
+          onClick={() => onChange(tab.id)}
+          className={cn(
+            "-mb-px flex min-h-11 items-center gap-2 border-b-2 px-4 text-sm whitespace-nowrap transition-colors",
+            active === tab.id
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <tab.icon className="size-4" />
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function InvitationSummary({
   eligibility,
   issuePending,
@@ -334,31 +429,15 @@ function InvitationSummary({
 }) {
   return (
     <div className="grid gap-4">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard
-          icon={TicketIcon}
-          label="可用名额"
-          value={`${eligibility.remaining_invites} / ${eligibility.max_invites_per_member}`}
-        />
-        <SummaryCard
-          icon={Clock3Icon}
-          label="邀请码有效期"
-          value={`${eligibility.invite_valid_days} 天`}
-        />
-        <SummaryCard
-          icon={UserRoundCheckIcon}
-          label="当前资格"
-          value={eligibility.eligible ? "可以签发" : "暂不可签发"}
-        />
-      </div>
-
       <Card>
         <CardHeader>
           <div>
             <CardTitle>生成邀请码</CardTitle>
             <CardDescription>
-              需要邮箱已验证、账户正常、注册满{" "}
-              {eligibility.minimum_account_age_days} 天并达到 Lv.
+              当前剩余 {formatInteger(eligibility.remaining_invites)} 个名额，
+              邀请码有效期 {eligibility.invite_valid_days} 天。需要邮箱已验证、
+              账户正常、注册满 {eligibility.minimum_account_age_days} 天并达到
+              Lv.
               {eligibility.minimum_level}。
             </CardDescription>
           </div>
@@ -401,7 +480,7 @@ function InvitationSummary({
   )
 }
 
-function InvitationNetwork({
+function InvitationHarem({
   network,
 }: {
   network: import("~/features/invitation/api/invitations.queries").InvitationOverview["network"]
@@ -410,9 +489,9 @@ function InvitationNetwork({
     <Card>
       <CardHeader>
         <div>
-          <CardTitle>后宫与邀请关系</CardTitle>
+          <CardTitle>后宫与历史奖励</CardTitle>
           <CardDescription>
-            展示直属成员、邀请链规模和从 Rousi 继承的历史奖励。
+            展示后宫规模，以及从 Rousi 继承且已经计入期初余额的奖励。
           </CardDescription>
         </div>
       </CardHeader>
@@ -457,59 +536,147 @@ function InvitationNetwork({
           </Alert>
         )}
 
-        {network.direct_members.length ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>直属成员</TableHead>
-                <TableHead>用户 ID</TableHead>
-                <TableHead>来源</TableHead>
-                <TableHead className="text-right">建立时间</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {network.direct_members.map((member) => (
-                <TableRow key={member.numeric_id}>
-                  <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <span>{member.display_name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        @{member.username}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="tabular-nums">
-                    {formatInteger(member.numeric_id)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {member.source === "legacy_import"
-                        ? "Rousi 继承"
-                        : "PeerGo 邀请"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {formatDateTime(member.established_at)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <InvitationMembersTable members={network.direct_members} />
+      </CardContent>
+    </Card>
+  )
+}
+
+function InvitationTree({
+  network,
+}: {
+  network: InvitationOverview["network"]
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>邀请树</CardTitle>
+          <CardDescription>
+            当前直属成员 {formatInteger(network.direct_count)} 人，全部后代共{" "}
+            {formatInteger(network.total_descendants)} 人。
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <InvitationMembersTable members={network.direct_members} />
+      </CardContent>
+    </Card>
+  )
+}
+
+function InvitationChain({
+  currentUsername,
+  network,
+}: {
+  currentUsername: string
+  network: InvitationOverview["network"]
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>邀请链（上家）</CardTitle>
+          <CardDescription>
+            从你开始，依次展示直属上家直到邀请根节点。
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {network.ancestor_members.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="px-3 py-2 text-sm">{currentUsername}（你）</Badge>
+            {network.ancestor_members.map((member) => (
+              <React.Fragment key={member.numeric_id}>
+                <ChevronRightIcon className="size-4 text-muted-foreground" />
+                <div className="rounded-lg border px-3 py-2">
+                  <p className="text-sm font-medium">{member.display_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    @{member.username} ·{" "}
+                    {member.source === "legacy_import"
+                      ? "Rousi 继承"
+                      : "PeerGo 邀请"}
+                  </p>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
         ) : (
-          <Empty className="min-h-36">
+          <Empty className="min-h-40">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <UsersRoundIcon />
+                <GitForkIcon />
               </EmptyMedia>
-              <EmptyTitle>还没有直属成员</EmptyTitle>
+              <EmptyTitle>没有上家邀请链</EmptyTitle>
               <EmptyDescription>
-                通过你的邀请码完成注册后，邀请关系会显示在这里。
+                该账户由开放注册或系统邀请创建。
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function InvitationMembersTable({
+  members,
+}: {
+  members: InvitationOverview["network"]["direct_members"]
+}) {
+  if (!members.length) {
+    return (
+      <Empty className="min-h-36">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <UsersRoundIcon />
+          </EmptyMedia>
+          <EmptyTitle>还没有直属成员</EmptyTitle>
+          <EmptyDescription>
+            通过你的邀请码完成注册后，邀请关系会显示在这里。
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>直属成员</TableHead>
+          <TableHead>用户 ID</TableHead>
+          <TableHead>来源</TableHead>
+          <TableHead className="text-right">建立时间</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {members.map((member) => (
+          <TableRow key={member.numeric_id}>
+            <TableCell>
+              <div className="flex flex-col gap-0.5">
+                <span>{member.display_name}</span>
+                <span className="text-xs text-muted-foreground">
+                  @{member.username}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell className="tabular-nums">
+              {formatInteger(member.numeric_id)}
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline">
+                {member.source === "legacy_import"
+                  ? "Rousi 继承"
+                  : "PeerGo 邀请"}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-right text-muted-foreground">
+              {formatDateTime(member.established_at)}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }
 
@@ -564,47 +731,47 @@ function InvitationHistory({
       </CardHeader>
       <CardContent className="px-0">
         {items.length ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-6">状态</TableHead>
-                <TableHead>受邀用户</TableHead>
-                <TableHead>生成时间</TableHead>
-                <TableHead>有效期至</TableHead>
-                <TableHead className="pr-6 text-right">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="pl-6">
+          <div className="grid gap-3 px-6 pb-2">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className={cn(
+                  "flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between",
+                  item.status === "used" && "bg-muted/40"
+                )}
+              >
+                <div className="grid gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <InvitationStatusBadge status={item.status} />
-                  </TableCell>
-                  <TableCell>{item.invitee_username ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDateTime(item.created_at)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
+                    {item.invitee_username ? (
+                      <span className="text-sm font-medium">
+                        已被 {item.invitee_username} 使用
+                      </span>
+                    ) : null}
+                    <Badge variant="outline">
+                      {item.source === "legacy_import"
+                        ? "Rousi 继承"
+                        : "PeerGo"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    创建于 {formatDateTime(item.created_at)} · 有效期至{" "}
                     {formatDateTime(item.expires_at)}
-                  </TableCell>
-                  <TableCell className="pr-6 text-right">
-                    {item.status === "available" ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={revokePending}
-                        onClick={() => onRevoke(item)}
-                      >
-                        撤销
-                      </Button>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </p>
+                </div>
+                {item.status === "available" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={revokePending}
+                    onClick={() => onRevoke(item)}
+                  >
+                    撤销并返还名额
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
         ) : (
           <Empty className="min-h-44 rounded-none border-0">
             <EmptyHeader>
@@ -647,10 +814,12 @@ function SummaryCard({
   icon: Icon,
   label,
   value,
+  tone,
 }: {
   icon: typeof TicketIcon
   label: string
   value: string
+  tone?: string
 }) {
   return (
     <Card className="py-4">
@@ -660,7 +829,9 @@ function SummaryCard({
         </div>
         <div>
           <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-lg font-semibold tabular-nums">{value}</p>
+          <p className={cn("text-lg font-semibold tabular-nums", tone)}>
+            {value}
+          </p>
         </div>
       </CardContent>
     </Card>
@@ -738,7 +909,7 @@ function blockerDescription(
     return `当前 Lv.${eligibility.current_level}，需要达到 Lv.${eligibility.minimum_level}。`
   }
   if (blocker === "quota_exhausted") {
-    return "已成功邀请和当前有效邀请码已经占满名额；过期或撤销未使用的邀请码会释放名额。"
+    return "当前没有剩余邀请名额。生成邀请码会立即消耗一个名额；仅撤销未使用的邀请码会返还，过期不会自动返还。"
   }
   if (blocker === "email_unverified") {
     return "完成登录邮箱验证后即可重新检查邀请资格。"

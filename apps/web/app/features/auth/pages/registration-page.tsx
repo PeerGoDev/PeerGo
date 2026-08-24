@@ -39,7 +39,7 @@ import {
   type RegistrationFormErrors,
   type RegistrationFormField,
 } from "~/features/auth/model/registration-form"
-import { opaqueTokenPattern } from "~/features/auth/model/opaque-token"
+import { invitationTokenPattern } from "~/features/auth/model/invitation-token"
 import { useSiteInfo } from "~/features/site/api/site.queries"
 import { ApiProblemError, requestErrorDescription } from "~/shared/api/problem"
 
@@ -51,10 +51,10 @@ export function RegistrationPage() {
   const createRegistration = useCreateRegistration()
   const [errors, setErrors] = React.useState<RegistrationFormErrors>({})
   const [invitationToken, setInvitationToken] = React.useState(() =>
-    opaqueTokenPattern.test(linkedInvitation) ? linkedInvitation : ""
+    invitationTokenPattern.test(linkedInvitation) ? linkedInvitation : ""
   )
   const [invitationStepComplete, setInvitationStepComplete] = React.useState(
-    () => opaqueTokenPattern.test(linkedInvitation)
+    () => invitationTokenPattern.test(linkedInvitation)
   )
   const [humanVerificationToken, setHumanVerificationToken] = React.useState("")
   const [humanVerificationResetKey, setHumanVerificationResetKey] =
@@ -419,8 +419,8 @@ function InvitationRegistrationStep({
 
   function handleContinue(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!opaqueTokenPattern.test(invitationToken.trim())) {
-      setError("请输入有效的 43 位邀请凭证")
+    if (!invitationTokenPattern.test(invitationToken.trim())) {
+      setError("请输入有效的邀请码")
       const control = event.currentTarget.elements.namedItem("invitationToken")
       if (control instanceof HTMLElement) control.focus()
       return

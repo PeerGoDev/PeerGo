@@ -26,6 +26,13 @@ const (
 	InvitationStatusRevoked   InvitationStatus = "revoked"
 )
 
+type InvitationRecordSource string
+
+const (
+	InvitationRecordMember       InvitationRecordSource = "member"
+	InvitationRecordLegacyImport InvitationRecordSource = "legacy_import"
+)
+
 type InvitationEligibilityBlocker string
 
 const (
@@ -53,6 +60,7 @@ var (
 // insertion and cannot be recovered by subsequent reads.
 type MemberInvitation struct {
 	ID              uuid.UUID
+	Source          InvitationRecordSource
 	Status          InvitationStatus
 	InviteeUsername *string
 	CreatedAt       time.Time
@@ -110,6 +118,7 @@ type HistoricalInvitationReward struct {
 
 type InvitationNetwork struct {
 	DirectMembers    []InvitedMember
+	AncestorMembers  []InvitedMember
 	DirectCount      int
 	TotalDescendants int
 	HaremReward      HistoricalInvitationReward
@@ -133,6 +142,7 @@ type invitationIssuerSnapshot struct {
 	CurrentLevel                int
 	AccountRestricted           bool
 	UsedInvites                 int
+	RemainingInvites            int
 }
 
 type IssueInvitationCommand struct {

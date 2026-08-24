@@ -26,7 +26,8 @@ describe("InvitationsPage", () => {
     renderPage(queryClient)
 
     expect(await screen.findByRole("heading", { name: "邀请" })).toBeVisible()
-    expect(screen.getByText("5 / 5")).toBeVisible()
+    expect(screen.getByText("剩余邀请")).toBeVisible()
+    expect(screen.getByText("5")).toBeVisible()
     expect(screen.getByText("成员邀请暂未开放")).toBeVisible()
     expect(screen.getByRole("button", { name: "生成邀请码" })).toBeDisabled()
   })
@@ -37,6 +38,7 @@ describe("InvitationsPage", () => {
     const rawToken = "A".repeat(43)
     const issuedInvitation = {
       id: invitationId,
+      source: "member" as const,
       status: "available" as const,
       created_at: "2026-08-17T12:00:00Z",
       expires_at: "2026-08-24T12:00:00Z",
@@ -78,6 +80,7 @@ describe("InvitationsPage", () => {
   })
 
   it("shows migrated invitation relationships without crediting legacy rewards again", async () => {
+    const user = userEvent.setup()
     const queryClient = invitationQueryClient({
       ...eligibleOverview,
       network: {
@@ -92,6 +95,7 @@ describe("InvitationsPage", () => {
             established_at: "2026-06-01T08:00:00Z",
           },
         ],
+        ancestor_members: [],
         harem_reward: {
           amount: "12345",
           source_rows: 88,
@@ -107,7 +111,8 @@ describe("InvitationsPage", () => {
 
     renderPage(queryClient)
 
-    expect(await screen.findByText("后宫与邀请关系")).toBeVisible()
+    await user.click(await screen.findByRole("tab", { name: "后宫" }))
+    expect(await screen.findByText("后宫与历史奖励")).toBeVisible()
     expect(screen.getByText("12,345 魔力值")).toBeVisible()
     expect(screen.getByText("旧站成员")).toBeVisible()
     expect(screen.getByText("Rousi 继承")).toBeVisible()
@@ -172,6 +177,7 @@ const disabledOverview: InvitationOverview = {
   items: [],
   network: {
     direct_members: [],
+    ancestor_members: [],
     direct_count: 0,
     total_descendants: 0,
     harem_reward: { amount: "0", source_rows: 0 },

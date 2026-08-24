@@ -3,7 +3,7 @@ import { z } from "zod"
 import type { components } from "~/generated/api"
 import { emailAddressSchema } from "~/features/auth/model/email-address"
 import { newPasswordSchema } from "~/features/auth/model/new-password"
-import { opaqueTokenPattern } from "~/features/auth/model/opaque-token"
+import { invitationTokenPattern } from "~/features/auth/model/invitation-token"
 
 export type RegistrationMode = components["schemas"]["RegistrationMode"]
 
@@ -61,12 +61,12 @@ export function registrationFormSchema(
       if (
         (normalizedPolicy.mode === "invite" ||
           value.invitationToken.length > 0) &&
-        !opaqueTokenPattern.test(value.invitationToken)
+        !invitationTokenPattern.test(value.invitationToken)
       ) {
         context.addIssue({
           code: "custom",
           path: ["invitationToken"],
-          message: "请输入有效的 43 位邀请凭证",
+          message: "请输入有效的邀请码",
         })
       }
     })

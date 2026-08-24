@@ -94,7 +94,7 @@ describe("RegistrationPage", () => {
     await user.type(screen.getByLabelText("邀请凭证"), "invalid")
     await user.click(screen.getByRole("button", { name: "验证邀请凭证" }))
 
-    expect(screen.getByText("请输入有效的 43 位邀请凭证")).toBeVisible()
+    expect(screen.getByText("请输入有效的邀请码")).toBeVisible()
     expect(screen.getByLabelText("邀请凭证")).toHaveFocus()
 
     await user.clear(screen.getByLabelText("邀请凭证"))

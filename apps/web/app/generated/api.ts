@@ -3797,7 +3797,7 @@ export interface components {
             /** Format: email */
             email: string;
             password: string;
-            /** @description 邀请注册时必填；开放注册时可选，提供后仍会校验、消费并记录邀请关系。 */
+            /** @description 邀请注册时必填；同时兼容 PeerGo 的 43 位凭证与迁移期内仍有效的 Rousi 64 位凭证。 */
             invitation_token?: string;
             /** @description 当前注册政策启用人机验证时，由浏览器小组件签发的一次性令牌。 */
             human_verification_token?: string;
@@ -6660,6 +6660,8 @@ export interface components {
         MemberInvitation: {
             /** Format: uuid */
             id: string;
+            /** @enum {string} */
+            source: "member" | "legacy_import";
             status: components["schemas"]["InvitationStatus"];
             invitee_username?: string;
             /** Format: date-time */
@@ -6694,6 +6696,8 @@ export interface components {
         };
         InvitationNetwork: {
             direct_members: components["schemas"]["InvitedMember"][];
+            /** @description 从直属上家开始，按距离由近到远排列的邀请链。 */
+            ancestor_members: components["schemas"]["InvitedMember"][];
             direct_count: number;
             total_descendants: number;
             harem_reward: components["schemas"]["HistoricalInvitationReward"];

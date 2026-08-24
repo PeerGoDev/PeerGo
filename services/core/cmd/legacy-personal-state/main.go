@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/peergo/peergo/services/core/internal/legacyinvites"
 	"github.com/peergo/peergo/services/core/internal/legacypersonalstate"
 )
 
@@ -65,6 +66,14 @@ func main() {
 		logger.Info("legacy personal state progress", "phase", item.Phase, "processed", item.Processed, "expected", item.Expected)
 	}
 	var result legacypersonalstate.Result
+	invitationConfig := legacyinvites.Config{
+		RunID: config.RunID, SnapshotSHA256: config.SnapshotSHA256,
+		MappingVersion: config.MappingVersion, ImportedAt: config.ImportedAt,
+	}
+	invitationProgress := func(item legacyinvites.Progress) {
+		logger.Info("legacy invitation inventory progress", "phase", item.Phase, "processed", item.Processed, "expected", item.Expected)
+	}
+	var invitationResult legacyinvites.Result
 	if *action == "verify" {
 		result, err = legacypersonalstate.Verify(ctx, source, core, importConfig)
 	} else {
@@ -72,6 +81,15 @@ func main() {
 	}
 	if err != nil {
 		logger.Error("legacy personal state operation failed", "action", *action, "error", err)
+		os.Exit(1)
+	}
+	if *action == "verify" {
+		invitationResult, err = legacyinvites.Verify(ctx, source, core, invitationConfig)
+	} else {
+		invitationResult, err = legacyinvites.Import(ctx, source, core, invitationConfig, invitationProgress)
+	}
+	if err != nil {
+		logger.Error("legacy invitation inventory operation failed", "action", *action, "error", err)
 		os.Exit(1)
 	}
 	logger.Info("legacy personal state operation completed",
@@ -87,7 +105,14 @@ func main() {
 		"harem_reward_users", result.HaremRewardUsers,
 		"invite_reward_source_rows", result.InvitationRewardSourceRows,
 		"invite_reward_users", result.InvitationRewardUsers,
+		"invitation_balance_source_rows", invitationResult.BalanceSourceRows,
+		"invitation_balance_total", invitationResult.BalanceTotal,
+		"positive_invitation_balance_users", invitationResult.PositiveBalanceUsers,
+		"invitation_code_source_rows", invitationResult.InvitationSourceRows,
+		"claimed_invitation_code_rows", invitationResult.ClaimedInvitationRows,
+		"active_legacy_invitation_tokens", invitationResult.ImportedActiveTokens,
 		"duplicate", result.Duplicate,
+		"invitation_inventory_duplicate", invitationResult.Duplicate,
 	)
 }
 

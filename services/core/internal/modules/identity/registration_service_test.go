@@ -1,9 +1,11 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -113,6 +115,22 @@ func TestRegistrationServiceCompletesNormalizedInviteRegistration(t *testing.T) 
 	}
 	if result.UserID == uuid.Nil || result.Username != "new_member" || !result.EmailVerificationRequired || !result.CompletedAt.Equal(now) {
 		t.Fatalf("Register() result = %+v", result)
+	}
+}
+
+func TestNormalizeRegistrationInputAcceptsLegacyInvitationToken(t *testing.T) {
+	token := "a1" + strings.Repeat("0", 62)
+	_, digest, err := normalizeRegistrationInput(RegistrationInput{
+		ID: uuid.New(), Username: "legacy_member", DisplayName: "旧站成员",
+		Email: "legacy@example.com", Password: "PeerGo-member-2026!",
+		InvitationToken: token,
+	})
+	if err != nil {
+		t.Fatalf("normalizeRegistrationInput() error = %v", err)
+	}
+	want := sha256.Sum256([]byte(token))
+	if !bytes.Equal(digest, want[:]) {
+		t.Fatal("legacy invitation token was not reduced to its digest")
 	}
 }
 

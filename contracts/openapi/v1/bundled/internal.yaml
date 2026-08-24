@@ -10477,9 +10477,9 @@ components:
         invitation_token:
           type: string
           minLength: 43
-          maxLength: 43
-          pattern: ^[A-Za-z0-9_-]{43}$
-          description: 邀请注册时必填；开放注册时可选，提供后仍会校验、消费并记录邀请关系。
+          maxLength: 64
+          pattern: ^([A-Za-z0-9_-]{43}|[0-9a-f]{64})$
+          description: 邀请注册时必填；同时兼容 PeerGo 的 43 位凭证与迁移期内仍有效的 Rousi 64 位凭证。
           writeOnly: true
         human_verification_token:
           type: string
@@ -18849,11 +18849,11 @@ components:
         used_invites:
           type: integer
           minimum: 0
-          maximum: 100
+          maximum: 1000000
         remaining_invites:
           type: integer
           minimum: 0
-          maximum: 100
+          maximum: 1000000
         minimum_account_age_days:
           type: integer
           minimum: 0
@@ -18884,6 +18884,7 @@ components:
       additionalProperties: false
       required:
         - id
+        - source
         - status
         - created_at
         - expires_at
@@ -18891,6 +18892,11 @@ components:
         id:
           type: string
           format: uuid
+        source:
+          type: string
+          enum:
+            - member
+            - legacy_import
         status:
           $ref: '#/components/schemas/InvitationStatus'
         invitee_username:
@@ -18967,6 +18973,7 @@ components:
       additionalProperties: false
       required:
         - direct_members
+        - ancestor_members
         - direct_count
         - total_descendants
         - harem_reward
@@ -18975,6 +18982,12 @@ components:
         direct_members:
           type: array
           maxItems: 100
+          items:
+            $ref: '#/components/schemas/InvitedMember'
+        ancestor_members:
+          type: array
+          maxItems: 32
+          description: 从直属上家开始，按距离由近到远排列的邀请链。
           items:
             $ref: '#/components/schemas/InvitedMember'
         direct_count:

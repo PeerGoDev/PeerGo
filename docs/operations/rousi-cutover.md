@@ -131,8 +131,10 @@ make rousi-restore-production-personal-state \
 
 该入口只允许已有 `reconciled` run，重哈希 SQL dump 并复用原始三包 manifest；随后连续执行
 两次幂等导入、一次只读验证和完整 migration status gate。成功凭证写入
-`personal-state-reconciled.env`。它不会恢复旧邀请码 token，也不会生成魔力值交易：后宫及
-一次性邀请奖励已包含在用户期初余额中，只保存精确历史合计，防止二次发放。
+`personal-state-reconciled.env`。该流程恢复每名用户的可用邀请期初值和完整邀请码历史；只把
+切换时仍有效且未领取的旧 token 以 SHA-256 摘要写入注册凭证，已领取/过期 token 与旧邀请
+邮箱都不会保留。它不会生成魔力值交易：后宫及一次性邀请奖励已包含在用户期初余额中，
+只保存精确历史合计，防止二次发放。
 
 ## 4. 启动、管理员和最终激活
 

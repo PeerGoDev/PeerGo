@@ -15,7 +15,10 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 )
 
-var registrationUsernamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{2,31}$`)
+var (
+	registrationUsernamePattern       = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{2,31}$`)
+	legacyRegistrationInvitationToken = regexp.MustCompile(`^[0-9a-f]{64}$`)
+)
 
 type RegistrationRepository interface {
 	PublicRegistrationPolicy(context.Context) (RegistrationPublicPolicy, error)
@@ -183,7 +186,7 @@ func normalizeRegistrationInput(input RegistrationInput) (RegistrationInput, []b
 	}
 	var invitationDigest []byte
 	if input.InvitationToken != "" {
-		if len(input.InvitationToken) != 43 {
+		if len(input.InvitationToken) != 43 && !legacyRegistrationInvitationToken.MatchString(input.InvitationToken) {
 			return RegistrationInput{}, nil, ErrInvalidInput
 		}
 		digest := sha256.Sum256([]byte(input.InvitationToken))

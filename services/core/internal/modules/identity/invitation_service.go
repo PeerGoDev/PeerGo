@@ -137,14 +137,12 @@ func invitationEligibility(snapshot invitationIssuerSnapshot, now time.Time) (In
 		snapshot.MaxInvitesPerMember < 0 || snapshot.MaxInvitesPerMember > 100 ||
 		snapshot.MinimumInviteAccountAgeDays < 0 || snapshot.MinimumInviteAccountAgeDays > 3650 ||
 		snapshot.MinimumInviteLevel < 1 || snapshot.MinimumInviteLevel > 99 ||
-		snapshot.CurrentLevel < 1 || snapshot.UsedInvites < 0 || snapshot.CreatedAt.IsZero() || snapshot.CreatedAt.After(now) {
+		snapshot.CurrentLevel < 1 || snapshot.UsedInvites < 0 || snapshot.RemainingInvites < 0 ||
+		snapshot.RemainingInvites > 1_000_000 || snapshot.CreatedAt.IsZero() || snapshot.CreatedAt.After(now) {
 		return InvitationEligibility{}, ErrInvitationInvariant
 	}
 	accountAgeDays := int(now.Sub(snapshot.CreatedAt.UTC()) / (24 * time.Hour))
-	remaining := snapshot.MaxInvitesPerMember - snapshot.UsedInvites
-	if remaining < 0 {
-		remaining = 0
-	}
+	remaining := snapshot.RemainingInvites
 	blocker := InvitationBlockerNone
 	switch {
 	case !snapshot.MemberInvitesEnabled:
@@ -157,7 +155,7 @@ func invitationEligibility(snapshot invitationIssuerSnapshot, now time.Time) (In
 		blocker = InvitationBlockerAccountAge
 	case snapshot.CurrentLevel < snapshot.MinimumInviteLevel:
 		blocker = InvitationBlockerLevel
-	case remaining == 0:
+	case remaining == 0 || (snapshot.MaxInvitesPerMember > 0 && snapshot.UsedInvites >= snapshot.MaxInvitesPerMember):
 		blocker = InvitationBlockerQuotaExhausted
 	}
 	return InvitationEligibility{

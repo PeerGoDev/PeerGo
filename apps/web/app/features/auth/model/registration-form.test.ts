@@ -39,6 +39,15 @@ describe("registrationFormSchema", () => {
     ).toBe(false)
   })
 
+  it("accepts a migrated Rousi invitation credential", () => {
+    expect(
+      registrationFormSchema("invite").safeParse({
+        ...validInput,
+        invitationToken: "a".repeat(64),
+      }).success
+    ).toBe(true)
+  })
+
   it("rejects uppercase usernames and mismatched passwords", () => {
     const result = registrationFormSchema("open").safeParse({
       ...validInput,

@@ -48,31 +48,24 @@ func (repository *PostgresInvitationRepository) Overview(ctx context.Context, us
 	if err != nil {
 		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, fmt.Errorf("get invitation issuer context: %w", err)
 	}
-	used, err := queries.CountInvitationQuotaUsage(ctx, identitydb.CountInvitationQuotaUsageParams{UserID: invitationUUID(userID), AsOf: invitationTimestamp(now)})
+	remaining, _, err := readInvitationBalance(ctx, tx, userID, false)
 	if err != nil {
-		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, fmt.Errorf("count invitation quota usage: %w", err)
+		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, err
 	}
-	total, err := queries.CountInvitationHistory(ctx, invitationUUID(userID))
+	used, err := countInvitationCapUsage(ctx, tx, userID, now)
 	if err != nil {
-		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, fmt.Errorf("count invitation history: %w", err)
+		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, err
+	}
+	total, err := countInvitationHistory(ctx, tx, userID)
+	if err != nil {
+		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, err
 	}
 	if used < 0 || total < 0 || used > math.MaxInt || total > math.MaxInt {
 		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, ErrInvitationInvariant
 	}
-	rows, err := queries.ListInvitationHistory(ctx, identitydb.ListInvitationHistoryParams{
-		AsOf: invitationTimestamp(now), UserID: invitationUUID(userID),
-		ResultLimit: int32(limit), ResultOffset: int32(offset),
-	})
+	items, err := listInvitationHistory(ctx, tx, userID, now, limit, offset)
 	if err != nil {
 		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, fmt.Errorf("list invitation history: %w", err)
-	}
-	items := make([]MemberInvitation, 0, len(rows))
-	for _, row := range rows {
-		item, conversionErr := memberInvitationFromHistoryRow(row)
-		if conversionErr != nil {
-			return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, conversionErr
-		}
-		items = append(items, item)
 	}
 	network, err := readInvitationNetwork(ctx, tx, userID)
 	if err != nil {
@@ -81,7 +74,186 @@ func (repository *PostgresInvitationRepository) Overview(ctx context.Context, us
 	if err := tx.Commit(ctx); err != nil {
 		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, fmt.Errorf("commit invitation overview: %w", err)
 	}
-	return invitationSnapshotFromContext(contextRow, int(used)), items, int(total), network, nil
+	return invitationSnapshotFromContext(contextRow, int(used), remaining), items, int(total), network, nil
+}
+
+func readInvitationBalance(ctx context.Context, tx pgx.Tx, userID uuid.UUID, forUpdate bool) (int, bool, error) {
+	query := `
+SELECT remaining_invites::bigint
+FROM identity.invitation_accounts
+WHERE user_id = $1`
+	if forUpdate {
+		query += " FOR UPDATE"
+	}
+	var balance int64
+	err := tx.QueryRow(ctx, query, userID).Scan(&balance)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("read invitation balance: %w", err)
+	}
+	if balance < 0 || balance > 1_000_000 || balance > math.MaxInt {
+		return 0, true, ErrInvitationInvariant
+	}
+	return int(balance), true, nil
+}
+
+func countInvitationCapUsage(ctx context.Context, tx pgx.Tx, userID uuid.UUID, asOf time.Time) (int64, error) {
+	var count int64
+	err := tx.QueryRow(ctx, `
+SELECT
+    (SELECT count(*)::bigint
+       FROM identity.registration_invitations AS invitation
+      WHERE invitation.issuer_user_id = $1
+        AND invitation.source_kind = 'member'
+        AND invitation.revoked_at IS NULL
+        AND (
+            invitation.consumed_at IS NOT NULL
+            OR invitation.claimed_by IS NOT NULL
+            OR invitation.expires_at > $2
+        ))
+    +
+    (SELECT count(*)::bigint
+       FROM migration.legacy_invitation_code_openings AS opening
+       LEFT JOIN identity.registration_invitations AS invitation
+         ON invitation.id = opening.registration_invitation_id
+      WHERE opening.inviter_user_id = $1
+        AND (invitation.id IS NULL OR invitation.revoked_at IS NULL)
+        AND (
+            opening.source_claimed
+            OR invitation.consumed_at IS NOT NULL
+            OR invitation.claimed_by IS NOT NULL
+            OR opening.source_valid_until > $2
+        ))`, userID, asOf).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count invitation issuance usage: %w", err)
+	}
+	return count, nil
+}
+
+func countInvitationHistory(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.QueryRow(ctx, `
+SELECT
+    (SELECT count(*)::bigint
+       FROM identity.registration_invitations
+      WHERE issuer_user_id = $1 AND source_kind = 'member')
+    +
+    (SELECT count(*)::bigint
+       FROM migration.legacy_invitation_code_openings
+      WHERE inviter_user_id = $1)`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count invitation history: %w", err)
+	}
+	return count, nil
+}
+
+func listInvitationHistory(ctx context.Context, tx pgx.Tx, userID uuid.UUID, asOf time.Time, limit, offset int) ([]MemberInvitation, error) {
+	rows, err := tx.Query(ctx, `
+WITH history AS (
+    SELECT
+        invitation.id,
+        'member'::text AS record_source,
+        CASE
+            WHEN invitation.revoked_at IS NOT NULL THEN 'revoked'
+            WHEN invitation.consumed_at IS NOT NULL THEN 'used'
+            WHEN invitation.claimed_by IS NOT NULL THEN 'claimed'
+            WHEN invitation.expires_at <= $2 THEN 'expired'
+            ELSE 'available'
+        END::text AS status,
+        COALESCE(CASE
+            WHEN invitation.consumed_at IS NOT NULL THEN registration.username
+            ELSE NULL
+        END, '')::text AS invitee_username,
+        invitation.created_at,
+        invitation.expires_at,
+        invitation.claimed_at,
+        invitation.consumed_at,
+        invitation.revoked_at
+    FROM identity.registration_invitations AS invitation
+    LEFT JOIN identity.registrations AS registration
+      ON registration.id = invitation.claimed_by
+    WHERE invitation.issuer_user_id = $1
+      AND invitation.source_kind = 'member'
+
+    UNION ALL
+
+    SELECT
+        opening.invitation_id,
+        'legacy_import'::text AS record_source,
+        CASE
+            WHEN native_invitation.revoked_at IS NOT NULL THEN 'revoked'
+            WHEN native_invitation.consumed_at IS NOT NULL THEN 'used'
+            WHEN native_invitation.claimed_by IS NOT NULL THEN 'claimed'
+            WHEN opening.source_claimed THEN 'used'
+            WHEN opening.source_valid_until <= $2 THEN 'expired'
+            ELSE 'available'
+        END::text AS status,
+        COALESCE(native_registration.username, legacy_invitee.username, '')::text,
+        opening.source_created_at,
+        opening.source_valid_until,
+        COALESCE(native_invitation.claimed_at, opening.source_claimed_at),
+        COALESCE(native_invitation.consumed_at, opening.source_claimed_at),
+        native_invitation.revoked_at
+    FROM migration.legacy_invitation_code_openings AS opening
+    LEFT JOIN identity.users AS legacy_invitee
+      ON legacy_invitee.id = opening.invitee_user_id
+    LEFT JOIN identity.registration_invitations AS native_invitation
+      ON native_invitation.id = opening.registration_invitation_id
+    LEFT JOIN identity.registrations AS native_registration
+      ON native_registration.id = native_invitation.claimed_by
+    WHERE opening.inviter_user_id = $1
+)
+SELECT id, record_source, status, invitee_username,
+       created_at, expires_at, claimed_at, consumed_at, revoked_at
+FROM history
+ORDER BY created_at DESC, id DESC
+LIMIT $3 OFFSET $4`, userID, asOf, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]MemberInvitation, 0, limit)
+	for rows.Next() {
+		var item MemberInvitation
+		var source, status, inviteeUsername string
+		var claimedAt, consumedAt, revokedAt pgtype.Timestamptz
+		if err := rows.Scan(
+			&item.ID, &source, &status, &inviteeUsername,
+			&item.CreatedAt, &item.ExpiresAt, &claimedAt, &consumedAt, &revokedAt,
+		); err != nil {
+			return nil, err
+		}
+		item.Source = InvitationRecordSource(source)
+		item.Status = InvitationStatus(status)
+		item.CreatedAt = item.CreatedAt.UTC()
+		item.ExpiresAt = item.ExpiresAt.UTC()
+		item.ClaimedAt = invitationOptionalTime(claimedAt)
+		item.ConsumedAt = invitationOptionalTime(consumedAt)
+		item.RevokedAt = invitationOptionalTime(revokedAt)
+		if inviteeUsername != "" {
+			item.InviteeUsername = &inviteeUsername
+		}
+		if err := validateInvitationHistoryItem(item); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func validateInvitationHistoryItem(item MemberInvitation) error {
+	validSource := item.Source == InvitationRecordMember || item.Source == InvitationRecordLegacyImport
+	validStatus := item.Status == InvitationStatusAvailable || item.Status == InvitationStatusClaimed ||
+		item.Status == InvitationStatusUsed || item.Status == InvitationStatusExpired || item.Status == InvitationStatusRevoked
+	if item.ID == uuid.Nil || !validSource || !validStatus || item.CreatedAt.IsZero() || !item.ExpiresAt.After(item.CreatedAt) {
+		return ErrInvitationInvariant
+	}
+	return nil
 }
 
 func readInvitationNetwork(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (InvitationNetwork, error) {
@@ -170,6 +342,49 @@ LIMIT 100`, userID)
 	if err := rows.Err(); err != nil {
 		return InvitationNetwork{}, fmt.Errorf("finish directly invited member query: %w", err)
 	}
+	ancestorRows, err := tx.Query(ctx, `
+WITH RECURSIVE ancestors AS (
+    SELECT relationship.inviter_user_id AS user_id,
+           relationship.source_kind, relationship.established_at,
+           1 AS depth, ARRAY[$1::uuid, relationship.inviter_user_id] AS path
+    FROM identity.invitation_relationships AS relationship
+    WHERE relationship.invitee_user_id = $1
+    UNION ALL
+    SELECT relationship.inviter_user_id,
+           relationship.source_kind, relationship.established_at,
+           ancestors.depth + 1,
+           ancestors.path || relationship.inviter_user_id
+    FROM ancestors
+    JOIN identity.invitation_relationships AS relationship
+      ON relationship.invitee_user_id = ancestors.user_id
+    WHERE ancestors.depth < 32
+      AND NOT relationship.inviter_user_id = ANY(ancestors.path)
+)
+SELECT users.numeric_id, users.username, users.display_name,
+       ancestors.source_kind, ancestors.established_at
+FROM ancestors
+JOIN identity.users AS users ON users.id = ancestors.user_id
+ORDER BY ancestors.depth ASC`, userID)
+	if err != nil {
+		return InvitationNetwork{}, fmt.Errorf("list invitation ancestor chain: %w", err)
+	}
+	defer ancestorRows.Close()
+	result.AncestorMembers = make([]InvitedMember, 0, 8)
+	for ancestorRows.Next() {
+		var item InvitedMember
+		if err := ancestorRows.Scan(&item.NumericID, &item.Username, &item.DisplayName, &item.Source, &item.EstablishedAt); err != nil {
+			return InvitationNetwork{}, fmt.Errorf("scan invitation ancestor: %w", err)
+		}
+		item.EstablishedAt = item.EstablishedAt.UTC()
+		if item.NumericID < 1 || item.Username == "" || item.DisplayName == "" ||
+			(item.Source != InvitationRelationshipRegistration && item.Source != InvitationRelationshipLegacyImport) {
+			return InvitationNetwork{}, ErrInvitationInvariant
+		}
+		result.AncestorMembers = append(result.AncestorMembers, item)
+	}
+	if err := ancestorRows.Err(); err != nil {
+		return InvitationNetwork{}, fmt.Errorf("finish invitation ancestor query: %w", err)
+	}
 	return result, nil
 }
 
@@ -195,16 +410,18 @@ func (repository *PostgresInvitationRepository) Issue(ctx context.Context, comma
 	if err != nil {
 		return MemberInvitation{}, fmt.Errorf("lock invitation issuer context: %w", err)
 	}
-	used, err := queries.CountInvitationQuotaUsage(ctx, identitydb.CountInvitationQuotaUsageParams{
-		UserID: invitationUUID(command.UserID), AsOf: invitationTimestamp(command.OccurredAt),
-	})
+	remaining, accountExists, err := readInvitationBalance(ctx, tx, command.UserID, true)
+	if err != nil {
+		return MemberInvitation{}, err
+	}
+	used, err := countInvitationCapUsage(ctx, tx, command.UserID, command.OccurredAt)
 	if err != nil || used < 0 || used > math.MaxInt {
 		if err != nil {
-			return MemberInvitation{}, fmt.Errorf("count invitation quota usage: %w", err)
+			return MemberInvitation{}, err
 		}
 		return MemberInvitation{}, ErrInvitationInvariant
 	}
-	snapshot := invitationSnapshotFromLockedContext(contextRow, int(used))
+	snapshot := invitationSnapshotFromLockedContext(contextRow, int(used), remaining)
 	eligibility, err := invitationEligibility(snapshot, command.OccurredAt.UTC())
 	if err != nil {
 		return MemberInvitation{}, err
@@ -228,6 +445,32 @@ func (repository *PostgresInvitationRepository) Issue(ctx context.Context, comma
 	if err != nil {
 		return MemberInvitation{}, fmt.Errorf("insert member invitation: %w", err)
 	}
+	if !accountExists {
+		return MemberInvitation{}, ErrInvitationQuota
+	}
+	var balanceAfter int
+	if err := tx.QueryRow(ctx, `
+UPDATE identity.invitation_accounts
+SET remaining_invites = remaining_invites - 1,
+    version = version + 1,
+    updated_at = $2
+WHERE user_id = $1 AND remaining_invites > 0
+RETURNING remaining_invites`, command.UserID, command.OccurredAt).Scan(&balanceAfter); errors.Is(err, pgx.ErrNoRows) {
+		return MemberInvitation{}, ErrInvitationQuota
+	} else if err != nil {
+		return MemberInvitation{}, fmt.Errorf("debit invitation balance: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO identity.invitation_balance_events (
+    id, user_id, invitation_id, event_kind, delta, balance_after,
+    authorization_decision_id, source_reference, occurred_at, recorded_at
+) VALUES ($1,$2,$3,'issued',-1,$4,$5,$6,$7,$7)`,
+		uuid.New(), command.UserID, command.ID, balanceAfter,
+		command.Authorization.ID, "member-invitation:"+command.ID.String()+":issued",
+		command.OccurredAt,
+	); err != nil {
+		return MemberInvitation{}, fmt.Errorf("record invitation balance debit: %w", err)
+	}
 	item, err := memberInvitationFromIssue(row.ID, row.CreatedAt, row.ExpiresAt)
 	if err != nil {
 		return MemberInvitation{}, err
@@ -243,43 +486,92 @@ func (repository *PostgresInvitationRepository) Revoke(ctx context.Context, comm
 		command.Authorization.ID == uuid.Nil || !command.Authorization.Allow {
 		return MemberInvitation{}, ErrInvitationInput
 	}
-	row, err := identitydb.New(repository.pool).RevokeMemberInvitation(ctx, identitydb.RevokeMemberInvitationParams{
-		RevokedAt: invitationTimestamp(command.OccurredAt), UserID: invitationUUID(command.UserID),
-		AuthorizationDecisionID: invitationUUID(command.Authorization.ID), ID: command.InvitationID,
-	})
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return MemberInvitation{}, fmt.Errorf("begin invitation revocation: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var id uuid.UUID
+	var sourceKind string
+	var createdAt, expiresAt, revokedAt pgtype.Timestamptz
+	err = tx.QueryRow(ctx, `
+UPDATE identity.registration_invitations
+SET revoked_at = $1,
+    revoked_by = $2,
+    revoked_authorization_decision_id = $3
+WHERE id = $4
+  AND issuer_user_id = $2
+  AND source_kind IN ('member', 'legacy')
+  AND claimed_by IS NULL
+  AND consumed_at IS NULL
+  AND revoked_at IS NULL
+RETURNING id, source_kind, created_at, expires_at, revoked_at`,
+		command.OccurredAt, command.UserID, command.Authorization.ID, command.InvitationID,
+	).Scan(&id, &sourceKind, &createdAt, &expiresAt, &revokedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return MemberInvitation{}, ErrInvitationUnavailable
 	}
 	if err != nil {
 		return MemberInvitation{}, fmt.Errorf("revoke member invitation: %w", err)
 	}
-	item, err := memberInvitationFromIssue(row.ID, row.CreatedAt, row.ExpiresAt)
-	if err != nil || !row.RevokedAt.Valid {
+	var balanceAfter int
+	if err := tx.QueryRow(ctx, `
+UPDATE identity.invitation_accounts
+SET remaining_invites = remaining_invites + 1,
+    version = version + 1,
+    updated_at = $2
+WHERE user_id = $1 AND remaining_invites < 1000000
+RETURNING remaining_invites`, command.UserID, command.OccurredAt).Scan(&balanceAfter); errors.Is(err, pgx.ErrNoRows) {
+		return MemberInvitation{}, ErrInvitationInvariant
+	} else if err != nil {
+		return MemberInvitation{}, fmt.Errorf("refund invitation balance: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO identity.invitation_balance_events (
+    id, user_id, invitation_id, event_kind, delta, balance_after,
+    authorization_decision_id, source_reference, occurred_at, recorded_at
+) VALUES ($1,$2,$3,'revoked',1,$4,$5,$6,$7,$7)`,
+		uuid.New(), command.UserID, command.InvitationID, balanceAfter,
+		command.Authorization.ID, "member-invitation:"+command.InvitationID.String()+":revoked",
+		command.OccurredAt,
+	); err != nil {
+		return MemberInvitation{}, fmt.Errorf("record invitation balance refund: %w", err)
+	}
+	item, err := memberInvitationFromIssue(id, createdAt, expiresAt)
+	if err != nil || !revokedAt.Valid {
 		return MemberInvitation{}, ErrInvitationInvariant
 	}
-	revokedAt := row.RevokedAt.Time.UTC()
+	if sourceKind == "legacy" {
+		item.Source = InvitationRecordLegacyImport
+	} else if sourceKind != "member" {
+		return MemberInvitation{}, ErrInvitationInvariant
+	}
+	revokedAtValue := revokedAt.Time.UTC()
 	item.Status = InvitationStatusRevoked
-	item.RevokedAt = &revokedAt
+	item.RevokedAt = &revokedAtValue
+	if err := tx.Commit(ctx); err != nil {
+		return MemberInvitation{}, fmt.Errorf("commit invitation revocation: %w", err)
+	}
 	return item, nil
 }
 
-func invitationSnapshotFromContext(row identitydb.GetInvitationIssuerContextRow, used int) invitationIssuerSnapshot {
+func invitationSnapshotFromContext(row identitydb.GetInvitationIssuerContextRow, used, remaining int) invitationIssuerSnapshot {
 	return invitationIssuerSnapshot{
 		MemberInvitesEnabled: row.MemberInvitesEnabled, InviteValidDays: int(row.InviteValidDays),
 		MaxInvitesPerMember: int(row.MaxInvitesPerMember), MinimumInviteAccountAgeDays: int(row.MinimumInviteAccountAgeDays),
 		MinimumInviteLevel: int(row.MinimumInviteLevel), Status: row.Status, EmailVerified: row.EmailVerified,
 		CreatedAt: row.CreatedAt.Time.UTC(), CurrentLevel: int(row.CurrentLevel), AccountRestricted: row.AccountRestricted,
-		UsedInvites: used,
+		UsedInvites: used, RemainingInvites: remaining,
 	}
 }
 
-func invitationSnapshotFromLockedContext(row identitydb.GetInvitationIssuerContextForUpdateRow, used int) invitationIssuerSnapshot {
+func invitationSnapshotFromLockedContext(row identitydb.GetInvitationIssuerContextForUpdateRow, used, remaining int) invitationIssuerSnapshot {
 	return invitationIssuerSnapshot{
 		MemberInvitesEnabled: row.MemberInvitesEnabled, InviteValidDays: int(row.InviteValidDays),
 		MaxInvitesPerMember: int(row.MaxInvitesPerMember), MinimumInviteAccountAgeDays: int(row.MinimumInviteAccountAgeDays),
 		MinimumInviteLevel: int(row.MinimumInviteLevel), Status: row.Status, EmailVerified: row.EmailVerified,
 		CreatedAt: row.CreatedAt.Time.UTC(), CurrentLevel: int(row.CurrentLevel), AccountRestricted: row.AccountRestricted,
-		UsedInvites: used,
+		UsedInvites: used, RemainingInvites: remaining,
 	}
 }
 
@@ -309,7 +601,7 @@ func memberInvitationFromIssue(id uuid.UUID, createdAt, expiresAt pgtype.Timesta
 		return MemberInvitation{}, ErrInvitationInvariant
 	}
 	return MemberInvitation{
-		ID: id, Status: InvitationStatusAvailable,
+		ID: id, Source: InvitationRecordMember, Status: InvitationStatusAvailable,
 		CreatedAt: createdAt.Time.UTC(), ExpiresAt: expiresAt.Time.UTC(),
 	}, nil
 }

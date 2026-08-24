@@ -114,6 +114,15 @@ func invitationOverviewDTO(overview identity.InvitationOverview) generated.Invit
 			EstablishedAt: member.EstablishedAt,
 		})
 	}
+	ancestorMembers := make([]generated.InvitedMember, 0, len(overview.Network.AncestorMembers))
+	for _, member := range overview.Network.AncestorMembers {
+		ancestorMembers = append(ancestorMembers, generated.InvitedMember{
+			NumericId: member.NumericID, Username: member.Username,
+			DisplayName:   member.DisplayName,
+			Source:        generated.InvitationRelationshipSource(member.Source),
+			EstablishedAt: member.EstablishedAt,
+		})
+	}
 	return generated.InvitationOverview{
 		Eligibility: generated.InvitationEligibility{
 			Enabled: eligibility.Enabled, Eligible: eligibility.Eligible,
@@ -128,7 +137,8 @@ func invitationOverviewDTO(overview identity.InvitationOverview) generated.Invit
 		},
 		Items: items,
 		Network: generated.InvitationNetwork{
-			DirectMembers: directMembers, DirectCount: overview.Network.DirectCount,
+			DirectMembers: directMembers, AncestorMembers: ancestorMembers,
+			DirectCount:      overview.Network.DirectCount,
 			TotalDescendants: overview.Network.TotalDescendants,
 			HaremReward:      historicalInvitationRewardDTO(overview.Network.HaremReward),
 			InvitationReward: historicalInvitationRewardDTO(overview.Network.InvitationReward),
@@ -148,7 +158,8 @@ func historicalInvitationRewardDTO(reward identity.HistoricalInvitationReward) g
 
 func memberInvitationDTO(item identity.MemberInvitation) generated.MemberInvitation {
 	return generated.MemberInvitation{
-		Id: item.ID, Status: generated.InvitationStatus(item.Status),
+		Id: item.ID, Source: generated.MemberInvitationSource(item.Source),
+		Status:          generated.InvitationStatus(item.Status),
 		InviteeUsername: item.InviteeUsername, CreatedAt: item.CreatedAt,
 		ExpiresAt: item.ExpiresAt, ClaimedAt: item.ClaimedAt,
 		ConsumedAt: item.ConsumedAt, RevokedAt: item.RevokedAt,

@@ -768,13 +768,13 @@ WITH candidate AS (
         candidate.completed_at,
         candidate.completed_at
     FROM candidate
-    WHERE candidate.source_kind = 'member'
+    WHERE candidate.source_kind IN ('member', 'legacy')
       AND candidate.inviter_user_id IS NOT NULL
     ON CONFLICT (invitee_user_id) DO NOTHING
     RETURNING invitee_user_id
 )
 SELECT (CASE
-    WHEN candidate.source_kind <> 'member' THEN true
+    WHEN candidate.source_kind NOT IN ('member', 'legacy') THEN true
     ELSE EXISTS (
         SELECT 1
         FROM identity.invitation_relationships AS relationship
