@@ -479,7 +479,7 @@ INSERT INTO identity.manual_download_restriction_transitions (
     actor_id, appeal_id, from_restricted, to_restricted,
     from_state_version, state_version, occurred_at
 ) VALUES ($1, $2, 'revoked', 'appeal', 'appeal_approved', $3,
-          $4, $5, true, false, $6, $6 + 1, $7)`,
+          $4, $5, true, false, $6::bigint, $6::bigint + 1, $7)`,
 				uuid.New(), userID, command.Response, command.ActorID,
 				command.AppealID, sourceVersion, command.DecidedAt,
 			); err != nil {
