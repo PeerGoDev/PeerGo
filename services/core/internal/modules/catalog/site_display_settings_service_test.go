@@ -64,6 +64,9 @@ func TestSiteDisplaySettingsUpdateNormalizesAndCarriesVersionEvidence(t *testing
 		Name: " PeerGo Club ", Description: " 新的公开说明。 ",
 		TorrentFilenamePrefix: " [ROUSI] ",
 		DefaultTorrentView:    TorrentViewPoster, ShowLatestAnnouncement: false,
+		CustomNavigationItems: []CustomNavigationItem{{
+			Label: " Wiki ", URL: " https://wiki.example.com ", OpenInNewTab: true, Enabled: true,
+		}},
 		ExpectedVersion: 3, Reason: " 调整公开文案和默认视图以匹配当前社区定位。 ",
 	})
 	if err != nil {
@@ -72,6 +75,9 @@ func TestSiteDisplaySettingsUpdateNormalizesAndCarriesVersionEvidence(t *testing
 	command := repository.updateCommand
 	if result.Version != 4 || command.Name != "PeerGo Club" || command.Description != "新的公开说明。" || command.TorrentFilenamePrefix != "[ROUSI]" || command.ExpectedVersion != 3 || command.ShowLatestAnnouncement {
 		t.Fatalf("result=%+v command=%+v", result, command)
+	}
+	if len(command.CustomNavigationItems) != 1 || command.CustomNavigationItems[0].Label != "Wiki" || command.CustomNavigationItems[0].URL != "https://wiki.example.com" {
+		t.Fatalf("custom navigation command = %+v", command.CustomNavigationItems)
 	}
 	if command.ActorID == [16]byte{} || command.Authorization.ID != authorizer.decision.ID || !command.OccurredAt.Equal(now) {
 		t.Fatalf("update evidence = %+v", command)
@@ -108,5 +114,38 @@ func TestSiteDisplaySettingsRejectsInvalidInputBeforeAuthorization(t *testing.T)
 	})
 	if !errors.Is(err, ErrSiteDisplaySettingsInput) || len(authorizer.requests) != 0 {
 		t.Fatalf("invalid filename prefix error=%v authorization requests=%+v", err, authorizer.requests)
+	}
+
+	_, err = service.Update(context.Background(), categoryTestActor(time.Now()), UpdateSiteDisplaySettingsInput{
+		Name: "PeerGo", DefaultTorrentView: TorrentViewList, ExpectedVersion: 1,
+		CustomNavigationItems: []CustomNavigationItem{{
+			Label: "Wiki", URL: "http://wiki.example.com", Enabled: true,
+		}},
+		Reason: "不安全的站外链接必须在鉴权前拒绝。",
+	})
+	if !errors.Is(err, ErrSiteDisplaySettingsInput) || len(authorizer.requests) != 0 {
+		t.Fatalf("invalid custom navigation error=%v authorization requests=%+v", err, authorizer.requests)
+	}
+}
+
+func TestSiteDisplaySettingsGeneratesDefaultReasonWhenBlank(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 24, 12, 0, 0, 0, time.UTC)
+	repository := &siteDisplaySettingsRepositoryStub{updated: SiteDisplaySettings{Name: "PeerGo", Version: 2}}
+	authorizer := &categoryAuthorizerStub{decision: categoryAllowedDecision(now)}
+	service, err := NewSiteDisplaySettingsService(repository, authorizer, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewSiteDisplaySettingsService() error = %v", err)
+	}
+
+	_, err = service.Update(context.Background(), categoryTestActor(now), UpdateSiteDisplaySettingsInput{
+		Name: "PeerGo", DefaultTorrentView: TorrentViewList, ExpectedVersion: 1,
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if repository.updateCommand.Reason != defaultSiteChangeReason {
+		t.Fatalf("default reason = %q, want %q", repository.updateCommand.Reason, defaultSiteChangeReason)
 	}
 }

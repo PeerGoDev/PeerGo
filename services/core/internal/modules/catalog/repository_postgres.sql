@@ -22,7 +22,8 @@ SELECT
           )
     ) AS online_users,
     site.default_torrent_view,
-    site.show_latest_announcement
+    site.show_latest_announcement,
+    site.custom_navigation_items
 FROM catalog.site_profile AS site
 WHERE site.singleton = true;
 
@@ -304,6 +305,7 @@ SELECT
     name,
     description,
     torrent_filename_prefix,
+    custom_navigation_items,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -317,6 +319,7 @@ SELECT
     name,
     description,
     torrent_filename_prefix,
+    custom_navigation_items,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -332,6 +335,7 @@ SET
     name = sqlc.arg(site_name)::text,
     description = sqlc.arg(site_description)::text,
     torrent_filename_prefix = sqlc.arg(torrent_filename_prefix)::text,
+    custom_navigation_items = sqlc.arg(custom_navigation_items)::jsonb,
     default_torrent_view = sqlc.arg(default_torrent_view)::text,
     show_latest_announcement = sqlc.arg(show_latest_announcement)::boolean,
     version = version + 1,
@@ -343,6 +347,7 @@ RETURNING
     name,
     description,
     torrent_filename_prefix,
+    custom_navigation_items,
     default_torrent_view,
     show_latest_announcement,
     version,

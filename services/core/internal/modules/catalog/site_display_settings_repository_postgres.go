@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -44,7 +45,7 @@ func (repository *PostgresSiteDisplaySettingsRepository) GetSiteDisplaySettings(
 		return SiteDisplaySettings{}, fmt.Errorf("query site display settings: %w", err)
 	}
 	return siteDisplaySettingsFromValues(
-		row.Name, row.Description, row.TorrentFilenamePrefix, row.DefaultTorrentView, row.ShowLatestAnnouncement,
+		row.Name, row.Description, row.TorrentFilenamePrefix, row.CustomNavigationItems, row.DefaultTorrentView, row.ShowLatestAnnouncement,
 		row.Version, row.EffectiveAt, row.UpdatedAt,
 	)
 }
@@ -65,7 +66,7 @@ func (repository *PostgresSiteDisplaySettingsRepository) UpdateSiteDisplaySettin
 		return SiteDisplaySettings{}, fmt.Errorf("lock site display settings: %w", err)
 	}
 	before, err := siteDisplaySettingsFromValues(
-		locked.Name, locked.Description, locked.TorrentFilenamePrefix, locked.DefaultTorrentView, locked.ShowLatestAnnouncement,
+		locked.Name, locked.Description, locked.TorrentFilenamePrefix, locked.CustomNavigationItems, locked.DefaultTorrentView, locked.ShowLatestAnnouncement,
 		locked.Version, locked.EffectiveAt, locked.UpdatedAt,
 	)
 	if err != nil {
@@ -75,9 +76,18 @@ func (repository *PostgresSiteDisplaySettingsRepository) UpdateSiteDisplaySettin
 		return SiteDisplaySettings{}, ErrSiteDisplaySettingsVersionConflict
 	}
 
+	items := command.CustomNavigationItems
+	if items == nil {
+		items = []CustomNavigationItem{}
+	}
+	customNavigationItems, err := json.Marshal(items)
+	if err != nil {
+		return SiteDisplaySettings{}, fmt.Errorf("encode custom navigation items: %w", err)
+	}
 	row, err := queries.UpdateSiteDisplaySettings(ctx, catalogdb.UpdateSiteDisplaySettingsParams{
 		SiteName: command.Name, SiteDescription: command.Description,
 		TorrentFilenamePrefix:  command.TorrentFilenamePrefix,
+		CustomNavigationItems:  customNavigationItems,
 		DefaultTorrentView:     string(command.DefaultTorrentView),
 		ShowLatestAnnouncement: command.ShowLatestAnnouncement,
 		OccurredAt:             siteDisplaySettingsTimestamp(command.OccurredAt),
@@ -90,7 +100,7 @@ func (repository *PostgresSiteDisplaySettingsRepository) UpdateSiteDisplaySettin
 		return SiteDisplaySettings{}, fmt.Errorf("update site display settings row: %w", err)
 	}
 	after, err := siteDisplaySettingsFromValues(
-		row.Name, row.Description, row.TorrentFilenamePrefix, row.DefaultTorrentView, row.ShowLatestAnnouncement,
+		row.Name, row.Description, row.TorrentFilenamePrefix, row.CustomNavigationItems, row.DefaultTorrentView, row.ShowLatestAnnouncement,
 		row.Version, row.EffectiveAt, row.UpdatedAt,
 	)
 	if err != nil {
@@ -117,12 +127,17 @@ func siteDisplaySettingsFromValues(
 	name string,
 	description string,
 	torrentFilenamePrefix string,
+	customNavigationItemsJSON []byte,
 	defaultView string,
 	showLatestAnnouncement bool,
 	version int64,
 	effectiveAt pgtype.Timestamptz,
 	updatedAt pgtype.Timestamptz,
 ) (SiteDisplaySettings, error) {
+	customNavigationItems, err := decodeCustomNavigationItems(customNavigationItemsJSON)
+	if err != nil {
+		return SiteDisplaySettings{}, err
+	}
 	view := TorrentView(defaultView)
 	if (view != TorrentViewList && view != TorrentViewPoster) ||
 		!utf8.ValidString(torrentFilenamePrefix) || utf8.RuneCountInString(torrentFilenamePrefix) > maxTorrentFilenamePrefix ||
@@ -132,7 +147,8 @@ func siteDisplaySettingsFromValues(
 	return SiteDisplaySettings{
 		Name: name, Description: description, TorrentFilenamePrefix: torrentFilenamePrefix, DefaultTorrentView: view,
 		ShowLatestAnnouncement: showLatestAnnouncement, Version: version,
-		EffectiveAt: effectiveAt.Time, UpdatedAt: updatedAt.Time,
+		CustomNavigationItems: customNavigationItems,
+		EffectiveAt:           effectiveAt.Time, UpdatedAt: updatedAt.Time,
 	}, nil
 }
 
@@ -142,8 +158,26 @@ func siteDisplaySettingsAuditState(settings SiteDisplaySettings) SiteDisplaySett
 		TorrentFilenamePrefix:  settings.TorrentFilenamePrefix,
 		DefaultTorrentView:     settings.DefaultTorrentView,
 		ShowLatestAnnouncement: settings.ShowLatestAnnouncement,
+		CustomNavigationItems:  append(make([]CustomNavigationItem, 0, len(settings.CustomNavigationItems)), settings.CustomNavigationItems...),
 		Version:                settings.Version,
 	}
+}
+
+func decodeCustomNavigationItems(encoded []byte) ([]CustomNavigationItem, error) {
+	var items []CustomNavigationItem
+	if err := json.Unmarshal(encoded, &items); err != nil || items == nil {
+		return nil, fmt.Errorf("%w: invalid custom navigation projection", errCatalogProjectionInvalid)
+	}
+	normalized, err := normalizeCustomNavigationItems(items)
+	if err != nil || len(normalized) != len(items) {
+		return nil, fmt.Errorf("%w: invalid custom navigation projection", errCatalogProjectionInvalid)
+	}
+	for index := range items {
+		if items[index] != normalized[index] {
+			return nil, fmt.Errorf("%w: non-normalized custom navigation projection", errCatalogProjectionInvalid)
+		}
+	}
+	return normalized, nil
 }
 
 func siteDisplaySettingsTimestamp(value time.Time) pgtype.Timestamptz {

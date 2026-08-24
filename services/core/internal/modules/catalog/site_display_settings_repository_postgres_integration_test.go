@@ -41,6 +41,7 @@ func TestPostgresSiteDisplaySettingsCommitsVersionedStateAndAuditTogether(t *tes
 		name                   string
 		description            string
 		torrentFilenamePrefix  string
+		customNavigationItems  []byte
 		defaultView            string
 		showLatestAnnouncement bool
 		version                int64
@@ -48,11 +49,11 @@ func TestPostgresSiteDisplaySettingsCommitsVersionedStateAndAuditTogether(t *tes
 		updatedAt              time.Time
 	}{}
 	if err := pool.QueryRow(ctx, `
-SELECT name, description, torrent_filename_prefix, default_torrent_view, show_latest_announcement,
+SELECT name, description, torrent_filename_prefix, custom_navigation_items, default_torrent_view, show_latest_announcement,
        version, effective_at, updated_at
 FROM catalog.site_profile
 WHERE singleton = true`).Scan(
-		&original.name, &original.description, &original.torrentFilenamePrefix, &original.defaultView,
+		&original.name, &original.description, &original.torrentFilenamePrefix, &original.customNavigationItems, &original.defaultView,
 		&original.showLatestAnnouncement, &original.version,
 		&original.effectiveAt, &original.updatedAt,
 	); err != nil {
@@ -69,13 +70,14 @@ UPDATE catalog.site_profile
 SET name = $1,
     description = $2,
     torrent_filename_prefix = $3,
-    default_torrent_view = $4,
-    show_latest_announcement = $5,
-    version = $6,
-    effective_at = $7,
-    updated_at = $8
+    custom_navigation_items = $4::jsonb,
+    default_torrent_view = $5,
+    show_latest_announcement = $6,
+    version = $7,
+    effective_at = $8,
+    updated_at = $9
 WHERE singleton = true`,
-			original.name, original.description, original.torrentFilenamePrefix, original.defaultView,
+			original.name, original.description, original.torrentFilenamePrefix, original.customNavigationItems, original.defaultView,
 			original.showLatestAnnouncement, original.version,
 			original.effectiveAt, original.updatedAt,
 		)
@@ -85,6 +87,7 @@ WHERE singleton = true`,
 	newName := "PeerGo Integration " + uuid.NewString()[:8]
 	newDescription := "集成测试验证站点与展示设置的原子版本写入。"
 	newTorrentFilenamePrefix := "[INTEGRATION]"
+	newCustomNavigationURL := "https://wiki.example.com/" + uuid.NewString()
 	reason := "集成测试验证设置版本、事务回滚和审计内容脱敏。"
 	newView := catalog.TorrentViewPoster
 	if original.defaultView == string(catalog.TorrentViewPoster) {
@@ -94,6 +97,7 @@ WHERE singleton = true`,
 		UpdateSiteDisplaySettingsInput: catalog.UpdateSiteDisplaySettingsInput{
 			Name: newName, Description: newDescription, DefaultTorrentView: newView,
 			TorrentFilenamePrefix:  newTorrentFilenamePrefix,
+			CustomNavigationItems:  []catalog.CustomNavigationItem{{Label: "Wiki", URL: newCustomNavigationURL, OpenInNewTab: true, Enabled: true}},
 			ShowLatestAnnouncement: !original.showLatestAnnouncement,
 			ExpectedVersion:        original.version, Reason: reason,
 		},
@@ -140,7 +144,7 @@ WHERE singleton = true`,
 	if err != nil {
 		t.Fatalf("UpdateSiteDisplaySettings() error = %v", err)
 	}
-	if updated.Name != newName || updated.TorrentFilenamePrefix != newTorrentFilenamePrefix || updated.Version != original.version+1 || updated.DefaultTorrentView != newView || updated.ShowLatestAnnouncement == original.showLatestAnnouncement || !updated.EffectiveAt.Equal(now) {
+	if updated.Name != newName || updated.TorrentFilenamePrefix != newTorrentFilenamePrefix || len(updated.CustomNavigationItems) != 1 || updated.CustomNavigationItems[0].URL != newCustomNavigationURL || updated.Version != original.version+1 || updated.DefaultTorrentView != newView || updated.ShowLatestAnnouncement == original.showLatestAnnouncement || !updated.EffectiveAt.Equal(now) {
 		t.Fatalf("updated settings = %+v", updated)
 	}
 
@@ -157,9 +161,10 @@ SELECT count(*), bool_or(
     OR payload_json LIKE '%' || $3 || '%'
     OR payload_json LIKE '%' || $4 || '%'
     OR payload_json LIKE '%' || $5 || '%'
+    OR payload_json LIKE '%' || $6 || '%'
 )
 FROM audit.outbox
-WHERE event_id = $1`, eventID, newName, newDescription, newTorrentFilenamePrefix, reason).Scan(&eventCount, &leakedEditableText); err != nil {
+WHERE event_id = $1`, eventID, newName, newDescription, newTorrentFilenamePrefix, reason, newCustomNavigationURL).Scan(&eventCount, &leakedEditableText); err != nil {
 		t.Fatalf("read site display settings audit event: %v", err)
 	}
 	if eventCount != 1 || leakedEditableText {

@@ -2,16 +2,21 @@ import * as React from "react"
 import { useBeforeUnload, useBlocker } from "react-router"
 import { useQuery } from "@tanstack/react-query"
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   ClipboardCheckIcon,
+  ExternalLinkIcon,
   Globe2Icon,
   Grid2X2Icon,
   ListIcon,
   MonitorCogIcon,
+  PlusIcon,
   RefreshCwIcon,
   SaveIcon,
   Settings2Icon,
+  Trash2Icon,
   TriangleAlertIcon,
 } from "lucide-react"
 
@@ -55,6 +60,7 @@ import { Switch } from "~/components/ui/switch"
 import { Textarea } from "~/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group"
 import {
+  type CustomNavigationItem,
   type SiteDisplaySettings,
   siteDisplaySettingsQueryOptions,
   useUpdateSiteDisplaySettings,
@@ -83,7 +89,7 @@ export function StaffSiteSettingsPage() {
       requiredAction="site.display.manage.read"
       pageHeader={{
         title: "站点设置",
-        description: "管理站点基本信息、下载文件名与首页展示。",
+        description: "管理站点基本信息、下载文件名、首页展示与自定义菜单。",
       }}
     >
       {({ session, capabilities }) => (
@@ -170,6 +176,9 @@ function SiteDisplaySettingsForm({
   const [showLatestAnnouncement, setShowLatestAnnouncement] = React.useState(
     initialSettings.show_latest_announcement
   )
+  const [customNavigationItems, setCustomNavigationItems] = React.useState(() =>
+    initialSettings.custom_navigation_items.map((item) => ({ ...item }))
+  )
   const [reason, setReason] = React.useState("")
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [pendingValues, setPendingValues] =
@@ -190,6 +199,9 @@ function SiteDisplaySettingsForm({
     setTorrentFilenamePrefix(initialSettings.torrent_filename_prefix)
     setDefaultView(initialSettings.default_torrent_view)
     setShowLatestAnnouncement(initialSettings.show_latest_announcement)
+    setCustomNavigationItems(
+      initialSettings.custom_navigation_items.map((item) => ({ ...item }))
+    )
     setReason("")
     setPendingValues(undefined)
     setConfirmationOpen(false)
@@ -201,6 +213,7 @@ function SiteDisplaySettingsForm({
     torrentFilenamePrefix,
     defaultTorrentView: defaultView,
     showLatestAnnouncement,
+    customNavigationItems,
   }
   const hasBusinessChanges = hasSiteDisplaySettingsChanges(
     baseline,
@@ -273,6 +286,7 @@ function SiteDisplaySettingsForm({
           torrent_filename_prefix: pendingValues.torrentFilenamePrefix,
           default_torrent_view: pendingValues.defaultTorrentView,
           show_latest_announcement: pendingValues.showLatestAnnouncement,
+          custom_navigation_items: pendingValues.customNavigationItems,
           expected_version: baseline.version,
           reason: pendingValues.reason,
         },
@@ -283,6 +297,9 @@ function SiteDisplaySettingsForm({
       setTorrentFilenamePrefix(updated.torrent_filename_prefix)
       setDefaultView(updated.default_torrent_view)
       setShowLatestAnnouncement(updated.show_latest_announcement)
+      setCustomNavigationItems(
+        updated.custom_navigation_items.map((item) => ({ ...item }))
+      )
       setReason("")
       setPendingValues(undefined)
       setConfirmationOpen(false)
@@ -507,6 +524,18 @@ function SiteDisplaySettingsForm({
               </FieldGroup>
             </SettingsSection>
 
+            <SettingsSection
+              title="自定义左侧菜单"
+              icon={<ExternalLinkIcon className="size-[18px] text-info" />}
+            >
+              <CustomNavigationItemsEditor
+                items={customNavigationItems}
+                disabled={disabled}
+                error={errors.customNavigationItems}
+                onChange={setCustomNavigationItems}
+              />
+            </SettingsSection>
+
             {canUpdate ? (
               <SettingsSection
                 title="变更与审计"
@@ -589,6 +618,200 @@ function SiteDisplaySettingsForm({
   )
 }
 
+function CustomNavigationItemsEditor({
+  items,
+  disabled,
+  error,
+  onChange,
+}: {
+  items: CustomNavigationItem[]
+  disabled: boolean
+  error?: string
+  onChange: (items: CustomNavigationItem[]) => void
+}) {
+  function updateItem(index: number, patch: Partial<CustomNavigationItem>) {
+    onChange(
+      items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      )
+    )
+  }
+
+  function moveItem(index: number, offset: -1 | 1) {
+    const nextIndex = index + offset
+    if (nextIndex < 0 || nextIndex >= items.length) return
+    const nextItems = [...items]
+    const current = nextItems[index]
+    const target = nextItems[nextIndex]
+    if (!current || !target) return
+    nextItems[index] = target
+    nextItems[nextIndex] = current
+    onChange(nextItems)
+  }
+
+  return (
+    <Field data-invalid={Boolean(error)} data-disabled={disabled}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <FieldContent>
+          <FieldLabel>菜单链接</FieldLabel>
+          <FieldDescription className="text-xs">
+            最多 12 项；支持站内路径和 HTTPS 站外地址，不记录点击或访问历史。
+          </FieldDescription>
+        </FieldContent>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled || items.length >= 12}
+          onClick={() =>
+            onChange([
+              ...items,
+              {
+                label: "",
+                url: "",
+                open_in_new_tab: true,
+                enabled: true,
+              },
+            ])
+          }
+        >
+          <PlusIcon data-icon="inline-start" />
+          新增链接
+        </Button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-md border border-dashed bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+          暂无自定义菜单；可新增 Wiki、帮助中心或其他站点链接。
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {items.map((item, index) => (
+            <div
+              key={index}
+              className="rounded-lg border bg-background p-4 shadow-xs"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <span className="text-sm font-medium">菜单项 {index + 1}</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={disabled || index === 0}
+                    aria-label={`上移菜单项 ${index + 1}`}
+                    onClick={() => moveItem(index, -1)}
+                  >
+                    <ArrowUpIcon />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={disabled || index === items.length - 1}
+                    aria-label={`下移菜单项 ${index + 1}`}
+                    onClick={() => moveItem(index, 1)}
+                  >
+                    <ArrowDownIcon />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={disabled}
+                    aria-label={`删除菜单项 ${index + 1}`}
+                    onClick={() =>
+                      onChange(
+                        items.filter((_, itemIndex) => itemIndex !== index)
+                      )
+                    }
+                  >
+                    <Trash2Icon />
+                  </Button>
+                </div>
+              </div>
+
+              <FieldGroup className="grid gap-4 md:grid-cols-2">
+                <Field data-disabled={disabled}>
+                  <FieldLabel htmlFor={`custom-navigation-label-${index}`}>
+                    菜单名称
+                  </FieldLabel>
+                  <Input
+                    id={`custom-navigation-label-${index}`}
+                    value={item.label}
+                    maxLength={32}
+                    disabled={disabled}
+                    placeholder="Wiki"
+                    onChange={(event) =>
+                      updateItem(index, { label: event.target.value })
+                    }
+                  />
+                </Field>
+                <Field data-disabled={disabled}>
+                  <FieldLabel htmlFor={`custom-navigation-url-${index}`}>
+                    链接地址
+                  </FieldLabel>
+                  <Input
+                    id={`custom-navigation-url-${index}`}
+                    value={item.url}
+                    maxLength={2048}
+                    disabled={disabled}
+                    inputMode="url"
+                    placeholder="https://wiki.example.com"
+                    onChange={(event) =>
+                      updateItem(index, { url: event.target.value })
+                    }
+                  />
+                </Field>
+                <Field
+                  orientation="horizontal"
+                  data-disabled={disabled}
+                  className="min-h-10 rounded-md border px-3 py-2"
+                >
+                  <FieldContent>
+                    <FieldLabel htmlFor={`custom-navigation-enabled-${index}`}>
+                      在侧栏显示
+                    </FieldLabel>
+                  </FieldContent>
+                  <Switch
+                    id={`custom-navigation-enabled-${index}`}
+                    checked={item.enabled}
+                    disabled={disabled}
+                    onCheckedChange={(enabled) =>
+                      updateItem(index, { enabled })
+                    }
+                  />
+                </Field>
+                <Field
+                  orientation="horizontal"
+                  data-disabled={disabled}
+                  className="min-h-10 rounded-md border px-3 py-2"
+                >
+                  <FieldContent>
+                    <FieldLabel htmlFor={`custom-navigation-new-tab-${index}`}>
+                      新标签页打开
+                    </FieldLabel>
+                  </FieldContent>
+                  <Switch
+                    id={`custom-navigation-new-tab-${index}`}
+                    checked={item.open_in_new_tab}
+                    disabled={disabled}
+                    onCheckedChange={(openInNewTab) =>
+                      updateItem(index, { open_in_new_tab: openInNewTab })
+                    }
+                  />
+                </Field>
+              </FieldGroup>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <FieldError errors={error ? [{ message: error }] : []} />
+    </Field>
+  )
+}
+
 function SettingsSection({
   title,
   icon,
@@ -648,7 +871,7 @@ function SettingsConfirmationDialog({
           <AlertDialogTitle>确认站点与展示变更</AlertDialogTitle>
           <AlertDialogDescription>
             将基于第 {baseline.version} 版创建第 {baseline.version + 1} 版
-            ；成功后立即影响公共页面与新生成的种子下载文件名。
+            ；成功后立即影响公共页面、左侧菜单与新生成的种子下载文件名。
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -673,10 +896,11 @@ function SettingsConfirmationDialog({
 
         <Alert>
           <MonitorCogIcon />
-          <AlertTitle>影响范围：公共展示与下载文件名</AlertTitle>
+          <AlertTitle>影响范围：公共展示、左侧菜单与下载文件名</AlertTitle>
           <AlertDescription>
-            文件名前缀只改变浏览器保存的 .torrent 名称，不修改种子内容、Info
-            Hash、Tracker 连接策略、注册准入、身份资料或部署密钥。
+            自定义菜单只保存有界链接配置；文件名前缀只改变浏览器保存的 .torrent
+            名称。两者都不修改种子内容、Info Hash、Tracker
+            连接策略、注册准入、身份资料或部署密钥。
           </AlertDescription>
         </Alert>
 

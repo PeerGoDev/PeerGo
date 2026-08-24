@@ -11,6 +11,7 @@ import { apiClient } from "~/shared/api/client"
 import { ApiProblemError } from "~/shared/api/problem"
 
 export type SiteDisplaySettings = components["schemas"]["SiteDisplaySettings"]
+export type CustomNavigationItem = components["schemas"]["CustomNavigationItem"]
 export type UpdateSiteDisplaySettingsRequest =
   components["schemas"]["UpdateSiteDisplaySettingsRequest"]
 

@@ -4596,6 +4596,8 @@ export interface components {
             /** @enum {string} */
             default_torrent_view: "list" | "poster";
             show_latest_announcement: boolean;
+            /** @description 已启用并按后台顺序排列的左侧自定义菜单。 */
+            custom_navigation_items: components["schemas"]["CustomNavigationItem"][];
         };
         SiteDisplaySettings: {
             name: string;
@@ -4608,6 +4610,7 @@ export interface components {
             /** @enum {string} */
             default_torrent_view: "list" | "poster";
             show_latest_announcement: boolean;
+            custom_navigation_items: components["schemas"]["CustomNavigationItem"][];
             /** Format: int64 */
             version: number;
             /**
@@ -4626,9 +4629,21 @@ export interface components {
             /** @enum {string} */
             default_torrent_view: "list" | "poster";
             show_latest_announcement: boolean;
+            custom_navigation_items: components["schemas"]["CustomNavigationItem"][];
             /** Format: int64 */
             expected_version: number;
+            /** @description 可留空；服务端会生成明确的默认审计理由。 */
             reason: string;
+        };
+        CustomNavigationItem: {
+            label: string;
+            /**
+             * @description 站内绝对路径或不含凭据的 HTTPS 地址。
+             * @example https://wiki.example.com
+             */
+            url: string;
+            open_in_new_tab: boolean;
+            enabled: boolean;
         };
         RSSSubscription: {
             /** Format: uuid */

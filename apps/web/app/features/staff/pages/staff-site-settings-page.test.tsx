@@ -45,6 +45,9 @@ describe("StaffSiteSettingsPage", () => {
     expect(screen.getByLabelText("站点说明").tagName).toBe("INPUT")
     expect(screen.getByLabelText("种子文件名前缀")).toHaveValue("[ROUSI]")
     expect(screen.getByRole("heading", { name: "首页展示" })).toBeVisible()
+    expect(
+      screen.getByRole("heading", { name: "自定义左侧菜单" })
+    ).toBeVisible()
     expect(screen.getByRole("heading", { name: "变更与审计" })).toBeVisible()
     expect(screen.getByText(/最近生效于/)).toBeVisible()
 
@@ -61,6 +64,39 @@ describe("StaffSiteSettingsPage", () => {
       await screen.findByRole("heading", { name: "确认站点与展示变更" })
     ).toBeVisible()
     expect(screen.getByText("PeerGo Next")).toBeVisible()
+  })
+
+  it("adds and reviews a third-party Wiki sidebar link", async () => {
+    const user = userEvent.setup()
+    const queryClient = createQueryClient()
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/staff/settings/site",
+          element: <StaffSiteSettingsPage />,
+        },
+      ],
+      { initialEntries: ["/staff/settings/site"] }
+    )
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    )
+
+    await user.click(await screen.findByRole("button", { name: "新增链接" }))
+    await user.type(screen.getByLabelText("菜单名称"), "Wiki")
+    await user.type(
+      screen.getByLabelText("链接地址"),
+      "https://wiki.example.com"
+    )
+    await user.click(screen.getByRole("button", { name: "保存修改" }))
+
+    expect(
+      await screen.findByRole("heading", { name: "确认站点与展示变更" })
+    ).toBeVisible()
+    expect(screen.getByText("1 项：Wiki")).toBeVisible()
   })
 })
 
@@ -116,6 +152,7 @@ function createQueryClient() {
     torrent_filename_prefix: "[ROUSI]",
     default_torrent_view: "list",
     show_latest_announcement: true,
+    custom_navigation_items: [],
     version: 7,
     effective_at: "2026-08-14T00:00:00Z",
     updated_at: "2026-08-14T00:00:00Z",

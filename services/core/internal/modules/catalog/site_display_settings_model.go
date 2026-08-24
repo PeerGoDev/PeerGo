@@ -27,6 +27,7 @@ type SiteDisplaySettings struct {
 	TorrentFilenamePrefix  string
 	DefaultTorrentView     TorrentView
 	ShowLatestAnnouncement bool
+	CustomNavigationItems  []CustomNavigationItem
 	Version                int64
 	EffectiveAt            time.Time
 	UpdatedAt              time.Time
@@ -38,6 +39,7 @@ type UpdateSiteDisplaySettingsInput struct {
 	TorrentFilenamePrefix  string
 	DefaultTorrentView     TorrentView
 	ShowLatestAnnouncement bool
+	CustomNavigationItems  []CustomNavigationItem
 	ExpectedVersion        int64
 	Reason                 string
 }
@@ -52,12 +54,13 @@ type UpdateSiteDisplaySettingsCommand struct {
 // SiteDisplaySettingsAuditState is hashed before leaving Core. Editable brand
 // copy stays in the owning table and never becomes searchable audit payload.
 type SiteDisplaySettingsAuditState struct {
-	Name                   string      `json:"name"`
-	Description            string      `json:"description"`
-	TorrentFilenamePrefix  string      `json:"torrent_filename_prefix"`
-	DefaultTorrentView     TorrentView `json:"default_torrent_view"`
-	ShowLatestAnnouncement bool        `json:"show_latest_announcement"`
-	Version                int64       `json:"version"`
+	Name                   string                 `json:"name"`
+	Description            string                 `json:"description"`
+	TorrentFilenamePrefix  string                 `json:"torrent_filename_prefix"`
+	DefaultTorrentView     TorrentView            `json:"default_torrent_view"`
+	ShowLatestAnnouncement bool                   `json:"show_latest_announcement"`
+	CustomNavigationItems  []CustomNavigationItem `json:"custom_navigation_items"`
+	Version                int64                  `json:"version"`
 }
 
 type SiteDisplaySettingsAuditInput struct {

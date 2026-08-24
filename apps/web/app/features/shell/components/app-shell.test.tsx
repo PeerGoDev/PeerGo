@@ -33,6 +33,7 @@ describe("AppShell mobile navigation", () => {
       online_users: 1,
       default_torrent_view: "list",
       show_latest_announcement: true,
+      custom_navigation_items: [],
     })
     queryClient.setQueryData(sessionKeys.current(), null)
 
@@ -116,6 +117,20 @@ describe("AppShell mobile navigation", () => {
       online_users: 1,
       default_torrent_view: "list",
       show_latest_announcement: true,
+      custom_navigation_items: [
+        {
+          label: "Wiki",
+          url: "https://wiki.example.com",
+          open_in_new_tab: true,
+          enabled: true,
+        },
+        {
+          label: "停用帮助",
+          url: "/help",
+          open_in_new_tab: false,
+          enabled: false,
+        },
+      ],
     })
     queryClient.setQueryData(sessionKeys.current(), {
       user: {
@@ -227,6 +242,13 @@ describe("AppShell mobile navigation", () => {
       .closest('[data-slot="sidebar-group"]')
     expect(primaryGroup).not.toBe(socialGroup)
     expect(socialGroup).toHaveTextContent("社区")
+    const wikiLink = within(navigation).getByRole("link", { name: "Wiki" })
+    expect(wikiLink).toHaveAttribute("href", "https://wiki.example.com")
+    expect(wikiLink).toHaveAttribute("target", "_blank")
+    expect(wikiLink).toHaveAttribute("rel", "noopener noreferrer")
+    expect(
+      within(navigation).queryByRole("link", { name: "停用帮助" })
+    ).not.toBeInTheDocument()
 
     await user.click(
       within(navigation).getByRole("button", { name: "收起导航" })
@@ -290,6 +312,7 @@ describe("AppShell mobile navigation", () => {
       online_users: 9,
       default_torrent_view: "list",
       show_latest_announcement: true,
+      custom_navigation_items: [],
     })
     queryClient.setQueryData(sessionKeys.current(), {
       user: {

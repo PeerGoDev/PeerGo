@@ -1446,7 +1446,7 @@ func (h *Handler) GetSiteDisplaySettings(ctx context.Context, _ generated.GetSit
 // repository locks that singleton and commits its outbox evidence atomically.
 func (h *Handler) UpdateSiteDisplaySettings(ctx context.Context, request generated.UpdateSiteDisplaySettingsRequestObject) (generated.UpdateSiteDisplaySettingsResponseObject, error) {
 	if request.Body == nil {
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_site_display_settings", "站点与展示设置无效", "请检查名称、说明、种子文件名前缀、默认视图、版本和变更理由。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_site_display_settings", "站点与展示设置无效", "请检查名称、说明、种子文件名前缀、自定义菜单、默认视图和版本。")
 		return generated.UpdateSiteDisplaySettings400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil
@@ -1466,10 +1466,11 @@ func (h *Handler) UpdateSiteDisplaySettings(ctx context.Context, request generat
 		TorrentFilenamePrefix:  request.Body.TorrentFilenamePrefix,
 		DefaultTorrentView:     catalog.TorrentView(request.Body.DefaultTorrentView),
 		ShowLatestAnnouncement: request.Body.ShowLatestAnnouncement,
+		CustomNavigationItems:  customNavigationItemsInput(request.Body.CustomNavigationItems),
 		ExpectedVersion:        request.Body.ExpectedVersion, Reason: request.Body.Reason,
 	})
 	if errors.Is(err, catalog.ErrSiteDisplaySettingsInput) {
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_site_display_settings", "站点与展示设置无效", "请检查名称、说明、种子文件名前缀、默认视图、版本和变更理由。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_site_display_settings", "站点与展示设置无效", "请检查名称、说明、种子文件名前缀、自定义菜单、默认视图和版本。")
 		return generated.UpdateSiteDisplaySettings400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil
@@ -2909,6 +2910,7 @@ func (h *Handler) GetSiteInfo(ctx context.Context, _ generated.GetSiteInfoReques
 		OnlineUsers:            result.OnlineUsers,
 		DefaultTorrentView:     generated.SiteInfoDefaultTorrentView(result.DefaultTorrentView),
 		ShowLatestAnnouncement: result.ShowLatestAnnouncement,
+		CustomNavigationItems:  customNavigationItemsDTO(result.CustomNavigationItems),
 	}, nil
 }
 
@@ -3306,8 +3308,29 @@ func siteDisplaySettingsDTO(settings catalog.SiteDisplaySettings) generated.Site
 		TorrentFilenamePrefix:  settings.TorrentFilenamePrefix,
 		DefaultTorrentView:     generated.SiteDisplaySettingsDefaultTorrentView(settings.DefaultTorrentView),
 		ShowLatestAnnouncement: settings.ShowLatestAnnouncement,
+		CustomNavigationItems:  customNavigationItemsDTO(settings.CustomNavigationItems),
 		Version:                settings.Version, EffectiveAt: settings.EffectiveAt, UpdatedAt: settings.UpdatedAt,
 	}
+}
+
+func customNavigationItemsDTO(items []catalog.CustomNavigationItem) []generated.CustomNavigationItem {
+	result := make([]generated.CustomNavigationItem, 0, len(items))
+	for _, item := range items {
+		result = append(result, generated.CustomNavigationItem{
+			Label: item.Label, Url: item.URL, OpenInNewTab: item.OpenInNewTab, Enabled: item.Enabled,
+		})
+	}
+	return result
+}
+
+func customNavigationItemsInput(items []generated.CustomNavigationItem) []catalog.CustomNavigationItem {
+	result := make([]catalog.CustomNavigationItem, 0, len(items))
+	for _, item := range items {
+		result = append(result, catalog.CustomNavigationItem{
+			Label: item.Label, URL: item.Url, OpenInNewTab: item.OpenInNewTab, Enabled: item.Enabled,
+		})
+	}
+	return result
 }
 
 func registrationPolicySettingsDTO(policy identity.RegistrationPolicy) generated.RegistrationPolicySettings {

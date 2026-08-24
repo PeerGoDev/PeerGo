@@ -13,6 +13,7 @@ const settings: SiteDisplaySettings = {
   torrent_filename_prefix: "[ROUSI]",
   default_torrent_view: "list",
   show_latest_announcement: true,
+  custom_navigation_items: [],
   version: 3,
   effective_at: "2026-08-06T08:00:00Z",
   updated_at: "2026-08-06T08:00:00Z",
@@ -26,6 +27,7 @@ describe("siteDisplaySettingsFormSchema", () => {
       torrentFilenamePrefix: " [ROUSI] ",
       defaultTorrentView: "list",
       showLatestAnnouncement: true,
+      customNavigationItems: [],
       reason: " 核对站点公开展示文案并保持当前行为。 ",
     })
 
@@ -35,6 +37,7 @@ describe("siteDisplaySettingsFormSchema", () => {
       torrentFilenamePrefix: "[ROUSI]",
       defaultTorrentView: "list",
       showLatestAnnouncement: true,
+      customNavigationItems: [],
       reason: "核对站点公开展示文案并保持当前行为。",
     })
     expect(hasSiteDisplaySettingsChanges(settings, result)).toBe(false)
@@ -47,6 +50,7 @@ describe("siteDisplaySettingsFormSchema", () => {
       torrentFilenamePrefix: "[ROUSI-NEXT]",
       defaultTorrentView: "poster",
       showLatestAnnouncement: false,
+      customNavigationItems: [],
     })
 
     expect(changes.map((change) => change.field)).toEqual([
@@ -67,6 +71,7 @@ describe("siteDisplaySettingsFormSchema", () => {
       torrentFilenamePrefix: settings.torrent_filename_prefix,
       defaultTorrentView: settings.default_torrent_view,
       showLatestAnnouncement: settings.show_latest_announcement,
+      customNavigationItems: settings.custom_navigation_items,
       reason: "核对站点公开展示文案并保持当前行为。",
       ...override,
     })
@@ -82,6 +87,7 @@ describe("siteDisplaySettingsFormSchema", () => {
         torrentFilenamePrefix: settings.torrent_filename_prefix,
         defaultTorrentView: settings.default_torrent_view,
         showLatestAnnouncement: settings.show_latest_announcement,
+        customNavigationItems: settings.custom_navigation_items,
         reason: "",
       }).success
     ).toBe(true)
@@ -95,6 +101,73 @@ describe("siteDisplaySettingsFormSchema", () => {
         torrentFilenamePrefix: "[ROU/SI]",
         defaultTorrentView: settings.default_torrent_view,
         showLatestAnnouncement: settings.show_latest_announcement,
+        customNavigationItems: settings.custom_navigation_items,
+        reason: "",
+      }).success
+    ).toBe(false)
+  })
+
+  it("accepts bounded internal and HTTPS custom navigation links", () => {
+    const result = siteDisplaySettingsFormSchema.parse({
+      name: settings.name,
+      description: settings.description,
+      torrentFilenamePrefix: settings.torrent_filename_prefix,
+      defaultTorrentView: settings.default_torrent_view,
+      showLatestAnnouncement: settings.show_latest_announcement,
+      customNavigationItems: [
+        {
+          label: " Wiki ",
+          url: " https://wiki.example.com ",
+          open_in_new_tab: true,
+          enabled: true,
+        },
+        {
+          label: "站内帮助",
+          url: "/help",
+          open_in_new_tab: false,
+          enabled: false,
+        },
+      ],
+      reason: "",
+    })
+
+    expect(result.customNavigationItems).toEqual([
+      {
+        label: "Wiki",
+        url: "https://wiki.example.com",
+        open_in_new_tab: true,
+        enabled: true,
+      },
+      {
+        label: "站内帮助",
+        url: "/help",
+        open_in_new_tab: false,
+        enabled: false,
+      },
+    ])
+  })
+
+  it.each([
+    "http://wiki.example.com",
+    "https://user:secret@wiki.example.com",
+    "//wiki.example.com",
+    "javascript:alert(1)",
+  ])("rejects unsafe custom navigation URL %s", (url) => {
+    expect(
+      siteDisplaySettingsFormSchema.safeParse({
+        name: settings.name,
+        description: settings.description,
+        torrentFilenamePrefix: settings.torrent_filename_prefix,
+        defaultTorrentView: settings.default_torrent_view,
+        showLatestAnnouncement: settings.show_latest_announcement,
+        customNavigationItems: [
+          {
+            label: "Wiki",
+            url,
+            open_in_new_tab: true,
+            enabled: true,
+          },
+        ],
         reason: "",
       }).success
     ).toBe(false)

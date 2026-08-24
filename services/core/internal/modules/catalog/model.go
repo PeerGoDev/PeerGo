@@ -74,6 +74,17 @@ type SiteInfo struct {
 	OnlineUsers            int
 	DefaultTorrentView     TorrentView
 	ShowLatestAnnouncement bool
+	CustomNavigationItems  []CustomNavigationItem
+}
+
+// CustomNavigationItem is one bounded operator-configured sidebar link. The
+// ordered slice is stored with the site singleton; Core never records clicks or
+// visits for these links.
+type CustomNavigationItem struct {
+	Label        string `json:"label"`
+	URL          string `json:"url"`
+	OpenInNewTab bool   `json:"open_in_new_tab"`
+	Enabled      bool   `json:"enabled"`
 }
 
 type AnnouncementBodyFormat string

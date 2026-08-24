@@ -12788,6 +12788,7 @@ components:
         - online_users
         - default_torrent_view
         - show_latest_announcement
+        - custom_navigation_items
       properties:
         name:
           type: string
@@ -12821,6 +12822,12 @@ components:
             - poster
         show_latest_announcement:
           type: boolean
+        custom_navigation_items:
+          type: array
+          maxItems: 12
+          description: 已启用并按后台顺序排列的左侧自定义菜单。
+          items:
+            $ref: '#/components/schemas/CustomNavigationItem'
     SiteDisplaySettings:
       type: object
       additionalProperties: false
@@ -12830,6 +12837,7 @@ components:
         - torrent_filename_prefix
         - default_torrent_view
         - show_latest_announcement
+        - custom_navigation_items
         - version
         - effective_at
         - updated_at
@@ -12853,6 +12861,11 @@ components:
             - poster
         show_latest_announcement:
           type: boolean
+        custom_navigation_items:
+          type: array
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/CustomNavigationItem'
         version:
           type: integer
           format: int64
@@ -12874,6 +12887,7 @@ components:
         - torrent_filename_prefix
         - default_torrent_view
         - show_latest_announcement
+        - custom_navigation_items
         - expected_version
         - reason
       properties:
@@ -12895,6 +12909,11 @@ components:
             - poster
         show_latest_announcement:
           type: boolean
+        custom_navigation_items:
+          type: array
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/CustomNavigationItem'
         expected_version:
           type: integer
           format: int64
@@ -12902,8 +12921,31 @@ components:
           maximum: 9007199254740991
         reason:
           type: string
-          minLength: 10
           maxLength: 500
+          description: 可留空；服务端会生成明确的默认审计理由。
+    CustomNavigationItem:
+      type: object
+      additionalProperties: false
+      required:
+        - label
+        - url
+        - open_in_new_tab
+        - enabled
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 32
+        url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          description: 站内绝对路径或不含凭据的 HTTPS 地址。
+          example: https://wiki.example.com
+        open_in_new_tab:
+          type: boolean
+        enabled:
+          type: boolean
     RSSSubscription:
       type: object
       additionalProperties: false

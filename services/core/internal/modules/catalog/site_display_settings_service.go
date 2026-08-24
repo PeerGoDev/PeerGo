@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 	"unicode"
@@ -16,8 +17,12 @@ const (
 	maxSiteNameRunes         = 80
 	maxSiteDescriptionRunes  = 500
 	maxTorrentFilenamePrefix = 40
+	maxCustomNavigationItems = 12
+	maxCustomNavigationLabel = 32
+	maxCustomNavigationURL   = 2048
 	minSiteChangeReasonRunes = 10
 	maxSiteChangeReasonRunes = 500
+	defaultSiteChangeReason  = "更新站点与展示设置。"
 )
 
 type SiteDisplaySettingsRepository interface {
@@ -78,6 +83,14 @@ func normalizeSiteDisplaySettingsInput(input UpdateSiteDisplaySettingsInput) (Up
 	input.Description = strings.TrimSpace(input.Description)
 	input.TorrentFilenamePrefix = strings.TrimSpace(input.TorrentFilenamePrefix)
 	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = defaultSiteChangeReason
+	}
+	customNavigationItems, err := normalizeCustomNavigationItems(input.CustomNavigationItems)
+	if err != nil {
+		return UpdateSiteDisplaySettingsInput{}, ErrSiteDisplaySettingsInput
+	}
+	input.CustomNavigationItems = customNavigationItems
 	nameRunes := utf8.RuneCountInString(input.Name)
 	descriptionRunes := utf8.RuneCountInString(input.Description)
 	prefixRunes := utf8.RuneCountInString(input.TorrentFilenamePrefix)
@@ -91,6 +104,49 @@ func normalizeSiteDisplaySettingsInput(input UpdateSiteDisplaySettingsInput) (Up
 		return UpdateSiteDisplaySettingsInput{}, ErrSiteDisplaySettingsInput
 	}
 	return input, nil
+}
+
+func normalizeCustomNavigationItems(items []CustomNavigationItem) ([]CustomNavigationItem, error) {
+	if len(items) > maxCustomNavigationItems {
+		return nil, ErrSiteDisplaySettingsInput
+	}
+	normalized := make([]CustomNavigationItem, 0, len(items))
+	labels := make(map[string]struct{}, len(items))
+	urls := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		item.Label = strings.TrimSpace(item.Label)
+		item.URL = strings.TrimSpace(item.URL)
+		labelRunes := utf8.RuneCountInString(item.Label)
+		urlRunes := utf8.RuneCountInString(item.URL)
+		labelKey := strings.ToLower(item.Label)
+		if !utf8.ValidString(item.Label) || !utf8.ValidString(item.URL) ||
+			labelRunes < 1 || labelRunes > maxCustomNavigationLabel ||
+			urlRunes < 1 || urlRunes > maxCustomNavigationURL ||
+			!validCustomNavigationURL(item.URL) {
+			return nil, ErrSiteDisplaySettingsInput
+		}
+		if _, duplicate := labels[labelKey]; duplicate {
+			return nil, ErrSiteDisplaySettingsInput
+		}
+		if _, duplicate := urls[item.URL]; duplicate {
+			return nil, ErrSiteDisplaySettingsInput
+		}
+		labels[labelKey] = struct{}{}
+		urls[item.URL] = struct{}{}
+		normalized = append(normalized, item)
+	}
+	return normalized, nil
+}
+
+func validCustomNavigationURL(value string) bool {
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.User != nil || strings.Contains(value, "\\") {
+		return false
+	}
+	if strings.HasPrefix(value, "/") {
+		return !strings.HasPrefix(value, "//") && parsed.Host == "" && !parsed.IsAbs()
+	}
+	return parsed.Scheme == "https" && parsed.Host != ""
 }
 
 func validTorrentFilenamePrefix(prefix string) bool {

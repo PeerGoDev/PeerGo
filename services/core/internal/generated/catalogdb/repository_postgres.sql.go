@@ -687,6 +687,7 @@ SELECT
     name,
     description,
     torrent_filename_prefix,
+    custom_navigation_items,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -700,6 +701,7 @@ type GetSiteDisplaySettingsRow struct {
 	Name                   string
 	Description            string
 	TorrentFilenamePrefix  string
+	CustomNavigationItems  []byte
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
 	Version                int64
@@ -714,6 +716,7 @@ func (q *Queries) GetSiteDisplaySettings(ctx context.Context) (GetSiteDisplaySet
 		&i.Name,
 		&i.Description,
 		&i.TorrentFilenamePrefix,
+		&i.CustomNavigationItems,
 		&i.DefaultTorrentView,
 		&i.ShowLatestAnnouncement,
 		&i.Version,
@@ -728,6 +731,7 @@ SELECT
     name,
     description,
     torrent_filename_prefix,
+    custom_navigation_items,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -742,6 +746,7 @@ type GetSiteDisplaySettingsForUpdateRow struct {
 	Name                   string
 	Description            string
 	TorrentFilenamePrefix  string
+	CustomNavigationItems  []byte
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
 	Version                int64
@@ -756,6 +761,7 @@ func (q *Queries) GetSiteDisplaySettingsForUpdate(ctx context.Context) (GetSiteD
 		&i.Name,
 		&i.Description,
 		&i.TorrentFilenamePrefix,
+		&i.CustomNavigationItems,
 		&i.DefaultTorrentView,
 		&i.ShowLatestAnnouncement,
 		&i.Version,
@@ -789,7 +795,8 @@ SELECT
           )
     ) AS online_users,
     site.default_torrent_view,
-    site.show_latest_announcement
+    site.show_latest_announcement,
+    site.custom_navigation_items
 FROM catalog.site_profile AS site
 WHERE site.singleton = true
 `
@@ -800,6 +807,7 @@ type GetSiteInfoRow struct {
 	OnlineUsers            int32
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
+	CustomNavigationItems  []byte
 }
 
 func (q *Queries) GetSiteInfo(ctx context.Context, asOf pgtype.Timestamptz) (GetSiteInfoRow, error) {
@@ -811,6 +819,7 @@ func (q *Queries) GetSiteInfo(ctx context.Context, asOf pgtype.Timestamptz) (Get
 		&i.OnlineUsers,
 		&i.DefaultTorrentView,
 		&i.ShowLatestAnnouncement,
+		&i.CustomNavigationItems,
 	)
 	return i, err
 }
@@ -1892,17 +1901,19 @@ SET
     name = $1::text,
     description = $2::text,
     torrent_filename_prefix = $3::text,
-    default_torrent_view = $4::text,
-    show_latest_announcement = $5::boolean,
+    custom_navigation_items = $4::jsonb,
+    default_torrent_view = $5::text,
+    show_latest_announcement = $6::boolean,
     version = version + 1,
-    effective_at = $6::timestamptz,
-    updated_at = $6::timestamptz
+    effective_at = $7::timestamptz,
+    updated_at = $7::timestamptz
 WHERE singleton = true
-  AND version = $7::bigint
+  AND version = $8::bigint
 RETURNING
     name,
     description,
     torrent_filename_prefix,
+    custom_navigation_items,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -1914,6 +1925,7 @@ type UpdateSiteDisplaySettingsParams struct {
 	SiteName               string
 	SiteDescription        string
 	TorrentFilenamePrefix  string
+	CustomNavigationItems  []byte
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
 	OccurredAt             pgtype.Timestamptz
@@ -1924,6 +1936,7 @@ type UpdateSiteDisplaySettingsRow struct {
 	Name                   string
 	Description            string
 	TorrentFilenamePrefix  string
+	CustomNavigationItems  []byte
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
 	Version                int64
@@ -1936,6 +1949,7 @@ func (q *Queries) UpdateSiteDisplaySettings(ctx context.Context, arg UpdateSiteD
 		arg.SiteName,
 		arg.SiteDescription,
 		arg.TorrentFilenamePrefix,
+		arg.CustomNavigationItems,
 		arg.DefaultTorrentView,
 		arg.ShowLatestAnnouncement,
 		arg.OccurredAt,
@@ -1946,6 +1960,7 @@ func (q *Queries) UpdateSiteDisplaySettings(ctx context.Context, arg UpdateSiteD
 		&i.Name,
 		&i.Description,
 		&i.TorrentFilenamePrefix,
+		&i.CustomNavigationItems,
 		&i.DefaultTorrentView,
 		&i.ShowLatestAnnouncement,
 		&i.Version,

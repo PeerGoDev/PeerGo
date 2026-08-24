@@ -111,7 +111,18 @@ func NewService(repository Repository, now func() time.Time) *Service {
 
 // GetSiteInfo returns non-sensitive shell metadata.
 func (s *Service) GetSiteInfo(ctx context.Context) (SiteInfo, error) {
-	return s.repository.SiteInfo(ctx, s.now())
+	info, err := s.repository.SiteInfo(ctx, s.now())
+	if err != nil {
+		return SiteInfo{}, err
+	}
+	items := make([]CustomNavigationItem, 0, len(info.CustomNavigationItems))
+	for _, item := range info.CustomNavigationItems {
+		if item.Enabled {
+			items = append(items, item)
+		}
+	}
+	info.CustomNavigationItems = items
+	return info, nil
 }
 
 // GetLatestAnnouncement returns nil when nothing has been published.

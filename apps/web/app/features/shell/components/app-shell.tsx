@@ -14,6 +14,7 @@ import {
   ChevronDownIcon,
   ClockAlertIcon,
   DownloadIcon,
+  ExternalLinkIcon,
   FileCheckIcon,
   FolderClockIcon,
   GaugeIcon,
@@ -106,6 +107,8 @@ type NavigationItem = {
   to: string
   icon: LucideIcon
   badge?: string
+  external?: boolean
+  openInNewTab?: boolean
 }
 
 type NavigationGroup = {
@@ -199,6 +202,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
   const registrationAvailable = siteInfo.data?.registration_mode !== "closed"
   const siteName = siteInfo.data?.name ?? "PeerGo"
+  const customNavigationItems: NavigationItem[] = (
+    siteInfo.data?.custom_navigation_items ?? []
+  )
+    .filter((item) => item.enabled)
+    .map((item) => ({
+      label: item.label,
+      to: item.url,
+      icon: ExternalLinkIcon,
+      external: item.url.startsWith("https://"),
+      openInNewTab: item.open_in_new_tab,
+    }))
+  const customNavigationGroups: NavigationGroup[] =
+    customNavigationItems.length > 0
+      ? [{ label: "站点链接", items: customNavigationItems }]
+      : []
   const notificationBadge = unreadNotificationBadge(
     notificationSummary.data?.unread_count
   )
@@ -377,6 +395,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             },
           ],
         },
+        ...customNavigationGroups,
       ]
     : [
         {
@@ -406,6 +425,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ...communityNavigationItems,
           ],
         },
+        ...customNavigationGroups,
         {
           label: "账户与成长",
           items: accountDataNavigationItems,
@@ -775,7 +795,13 @@ function AppNavigationGroup({
                     return (
                       <SidebarMenuSubItem key={item.to}>
                         <SidebarMenuSubButton
-                          render={<SidebarNavigationLink to={item.to} />}
+                          render={
+                            <SidebarNavigationLink
+                              to={item.to}
+                              external={item.external}
+                              openInNewTab={item.openInNewTab}
+                            />
+                          }
                           isActive={itemActive}
                           className="h-9 translate-x-0 justify-end rounded-none border-r-2 border-transparent px-4 text-muted-foreground transition-colors data-active:border-primary data-active:bg-primary/10 data-active:text-primary"
                         >
@@ -817,7 +843,13 @@ function AppNavigationGroup({
                   tooltip={item.label}
                   isActive={active}
                   variant="classic"
-                  render={<SidebarNavigationLink to={item.to} />}
+                  render={
+                    <SidebarNavigationLink
+                      to={item.to}
+                      external={item.external}
+                      openInNewTab={item.openInNewTab}
+                    />
+                  }
                   className={appNavigationButtonClass}
                 >
                   <span className="group-data-[collapsible=icon]:hidden">
@@ -840,21 +872,44 @@ function AppNavigationGroup({
 }
 
 function SidebarNavigationLink({
+  external = false,
+  openInNewTab = false,
+  to,
   onClick,
   ...props
-}: ComponentProps<typeof Link>) {
+}: ComponentProps<typeof Link> & {
+  external?: boolean
+  openInNewTab?: boolean
+}) {
   const { isMobile, setOpenMobile } = useSidebar()
+
+  const handleClick: ComponentProps<"a">["onClick"] = (event) => {
+    onClick?.(event)
+    if (isMobile && !event.defaultPrevented) {
+      setOpenMobile(false)
+    }
+  }
+
+  if (external && typeof to === "string") {
+    return (
+      <a
+        {...props}
+        href={to}
+        target={openInNewTab ? "_blank" : undefined}
+        rel={openInNewTab ? "noopener noreferrer" : undefined}
+        onClick={handleClick}
+      />
+    )
+  }
 
   return (
     <Link
       prefetch="intent"
+      to={to}
       {...props}
-      onClick={(event) => {
-        onClick?.(event)
-        if (isMobile && !event.defaultPrevented) {
-          setOpenMobile(false)
-        }
-      }}
+      target={openInNewTab ? "_blank" : undefined}
+      rel={openInNewTab ? "noopener noreferrer" : undefined}
+      onClick={handleClick}
     />
   )
 }

@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -22,13 +23,32 @@ func TestGetSiteInfoUsesServiceClock(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, time.August, 22, 12, 0, 0, 0, time.UTC)
-	want := SiteInfo{Name: "PeerGo", OnlineUsers: 7}
+	want := SiteInfo{Name: "PeerGo", OnlineUsers: 7, CustomNavigationItems: []CustomNavigationItem{}}
 	repository := &recordingSiteInfoRepository{result: want}
 	service := NewService(repository, func() time.Time { return now })
 
 	got, err := service.GetSiteInfo(context.Background())
-	if err != nil || got != want || !repository.asOf.Equal(now) {
+	if err != nil || !reflect.DeepEqual(got, want) || !repository.asOf.Equal(now) {
 		t.Fatalf("GetSiteInfo() = %+v, error=%v, as_of=%s", got, err, repository.asOf)
+	}
+}
+
+func TestGetSiteInfoOnlyPublishesEnabledCustomNavigationItems(t *testing.T) {
+	t.Parallel()
+
+	wiki := CustomNavigationItem{Label: "Wiki", URL: "https://wiki.example.com", OpenInNewTab: true, Enabled: true}
+	repository := &recordingSiteInfoRepository{result: SiteInfo{
+		Name: "PeerGo",
+		CustomNavigationItems: []CustomNavigationItem{
+			wiki,
+			{Label: "Hidden", URL: "/hidden", Enabled: false},
+		},
+	}}
+	service := NewService(repository, time.Now)
+
+	got, err := service.GetSiteInfo(context.Background())
+	if err != nil || !reflect.DeepEqual(got.CustomNavigationItems, []CustomNavigationItem{wiki}) {
+		t.Fatalf("GetSiteInfo() custom navigation = %+v, error=%v", got.CustomNavigationItems, err)
 	}
 }
 

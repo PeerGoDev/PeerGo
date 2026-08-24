@@ -83,12 +83,18 @@ func (r *PostgresRepository) SiteInfo(ctx context.Context, asOf time.Time) (Site
 		return SiteInfo{}, fmt.Errorf("%w: default torrent view %q", errCatalogProjectionInvalid, row.DefaultTorrentView)
 	}
 
+	customNavigationItems, err := decodeCustomNavigationItems(row.CustomNavigationItems)
+	if err != nil {
+		return SiteInfo{}, err
+	}
+
 	return SiteInfo{
 		Name:                   row.Name,
 		Description:            row.Description,
 		OnlineUsers:            int(row.OnlineUsers),
 		DefaultTorrentView:     defaultView,
 		ShowLatestAnnouncement: row.ShowLatestAnnouncement,
+		CustomNavigationItems:  customNavigationItems,
 	}, nil
 }
 

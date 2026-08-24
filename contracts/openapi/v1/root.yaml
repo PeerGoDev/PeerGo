@@ -612,6 +612,8 @@ components:
       $ref: "./schemas/catalog.yaml#/SiteDisplaySettings"
     UpdateSiteDisplaySettingsRequest:
       $ref: "./schemas/catalog.yaml#/UpdateSiteDisplaySettingsRequest"
+    CustomNavigationItem:
+      $ref: "./schemas/catalog.yaml#/CustomNavigationItem"
     RSSSubscription:
       $ref: "./schemas/rss.yaml#/RSSSubscription"
     RSSSubscriptionList:
