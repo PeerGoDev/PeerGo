@@ -56,7 +56,7 @@ export function TorrentPurchasePriceDialog({
   }, [torrent]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (!torrent || !changed || reasonLength < 10 || reasonLength > 1000) {
+    if (!torrent || !changed || reasonLength > 1000) {
       return
     }
     try {
@@ -130,11 +130,7 @@ export function TorrentPurchasePriceDialog({
           </Field>
 
           <Field
-            data-invalid={
-              (reasonLength > 0 && reasonLength < 10) ||
-              mutation.isError ||
-              undefined
-            }
+            data-invalid={reasonLength > 1000 || mutation.isError || undefined}
           >
             <FieldLabel htmlFor="torrent-purchase-price-reason">
               修改说明
@@ -151,8 +147,8 @@ export function TorrentPurchasePriceDialog({
               }}
             />
             <FieldDescription>{reasonLength}/1000 字符</FieldDescription>
-            {reasonLength > 0 && reasonLength < 10 ? (
-              <FieldError>修改说明至少需要 10 个字符。</FieldError>
+            {reasonLength > 1000 ? (
+              <FieldError>修改说明不能超过 1000 个字符。</FieldError>
             ) : null}
             {mutation.isError ? (
               <FieldError>
@@ -167,12 +163,7 @@ export function TorrentPurchasePriceDialog({
             取消
           </AlertDialogCancel>
           <AlertDialogAction
-            disabled={
-              mutation.isPending ||
-              !changed ||
-              reasonLength < 10 ||
-              reasonLength > 1000
-            }
+            disabled={mutation.isPending || !changed || reasonLength > 1000}
             onClick={() => void handleSubmit()}
           >
             {mutation.isPending ? (

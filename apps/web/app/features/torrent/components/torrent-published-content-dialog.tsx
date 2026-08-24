@@ -286,24 +286,23 @@ function PublishedContentForm({
           ))}
         </fieldset>
 
-        <Field data-invalid={reasonLength > 0 && reasonLength < 10}>
+        <Field data-invalid={reasonLength > 1000}>
           <FieldLabel htmlFor={reasonId}>修改说明</FieldLabel>
           <Textarea
             id={reasonId}
             value={reason}
             rows={3}
-            minLength={10}
             maxLength={1000}
             disabled={mutation.isPending}
-            aria-invalid={reasonLength > 0 && reasonLength < 10}
-            placeholder="说明修改了什么，以及审核时需要注意的依据"
+            aria-invalid={reasonLength > 1000}
+            placeholder="可留空；系统会自动记录修改说明"
             onChange={(event) => setReason(event.target.value)}
           />
           <FieldDescription>
-            {reasonLength} / 1000，至少 10 个字符
+            {reasonLength} / 1000；留空时由系统自动记录
           </FieldDescription>
-          {reasonLength > 0 && reasonLength < 10 ? (
-            <FieldError>修改说明至少需要 10 个字符。</FieldError>
+          {reasonLength > 1000 ? (
+            <FieldError>修改说明不能超过 1000 个字符。</FieldError>
           ) : null}
         </Field>
       </FieldGroup>
@@ -369,8 +368,8 @@ function validateContentChange(
     return "MediaInfo 不能超过 16 MiB。"
   }
   const reasonLength = Array.from(reason).length
-  if (reasonLength < 10 || reasonLength > 1000) {
-    return "修改说明需要 10 至 1000 个字符。"
+  if (reasonLength > 1000) {
+    return "修改说明不能超过 1000 个字符。"
   }
   for (const identifier of identifiers) {
     const valid =

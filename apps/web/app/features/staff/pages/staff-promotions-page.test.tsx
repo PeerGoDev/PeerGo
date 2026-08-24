@@ -42,20 +42,13 @@ describe("StaffPromotionsPage", () => {
     expect(screen.getByLabelText("优惠类型")).toBeVisible()
     const submitButton = screen.getByRole("button", { name: "确认签发" })
     const reason = screen.getByLabelText("签发原因")
-    expect(submitButton).toBeDisabled()
+    expect(submitButton).toBeEnabled()
     expect(
-      screen.getByText("已输入 0/1000 个字符；至少填写 10 个字符后才可签发。")
+      screen.getByText("已输入 0/1000 个字符；留空时由系统自动记录。")
     ).toBeVisible()
 
     await user.type(reason, "周末活动")
-    expect(screen.getByText("签发原因至少需要 10 个字符。")).toBeVisible()
-    expect(reason).toHaveAttribute("aria-invalid", "true")
-    expect(submitButton).toBeDisabled()
-
-    await user.type(reason, "用于鼓励成员保种")
-    expect(
-      screen.queryByText("签发原因至少需要 10 个字符。")
-    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/签发原因至少/)).not.toBeInTheDocument()
     expect(reason).not.toHaveAttribute("aria-invalid", "true")
     expect(submitButton).toBeEnabled()
   })

@@ -74,7 +74,6 @@ import { formatBytes } from "~/shared/formatters/bytes"
 import { formatDateTime } from "~/shared/formatters/date-time"
 
 const filePageSize = 50
-const minimumReasonCharacters = 10
 const maximumReasonCharacters = 1_000
 
 type ReviewDecision = TorrentReviewDecisionRequest["decision"]
@@ -419,10 +418,7 @@ function ReviewVotePanel({
   const requestId = React.useRef<string>(undefined)
   const vote = useCreateTorrentReviewVote()
   const reasonCount = Array.from(reason.trim()).length
-  const reasonInvalid =
-    reasonCount > 0 &&
-    (reasonCount < minimumReasonCharacters ||
-      reasonCount > maximumReasonCharacters)
+  const reasonInvalid = reasonCount > maximumReasonCharacters
 
   function resetAttempt() {
     requestId.current = undefined
@@ -430,11 +426,7 @@ function ReviewVotePanel({
   }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (
-      reasonCount < minimumReasonCharacters ||
-      reasonCount > maximumReasonCharacters
-    )
-      return
+    if (reasonCount > maximumReasonCharacters) return
     requestId.current ??= globalThis.crypto.randomUUID()
     try {
       const result = await vote.mutateAsync({
@@ -548,14 +540,13 @@ function ReviewVotePanel({
               <Textarea
                 id={reasonFieldId}
                 rows={6}
-                minLength={minimumReasonCharacters}
                 maxLength={maximumReasonCharacters + 1}
                 value={reason}
                 aria-invalid={reasonInvalid || undefined}
                 placeholder={
                   decision === "approve"
-                    ? "写明已经核对的发布要求，至少 10 个字符。"
-                    : "写明具体问题与修改建议，至少 10 个字符。"
+                    ? "可留空；系统会自动记录已完成发布要求核对。"
+                    : "可留空；建议写明具体问题与修改建议。"
                 }
                 disabled={vote.isPending}
                 onChange={(event) => {
@@ -568,7 +559,7 @@ function ReviewVotePanel({
                 {maximumReasonCharacters.toLocaleString("zh-CN")}
               </FieldDescription>
               {reasonInvalid ? (
-                <FieldError>审核意见需要 10–1000 个字符。</FieldError>
+                <FieldError>审核意见不能超过 1000 个字符。</FieldError>
               ) : null}
             </Field>
             {vote.isError ? (
@@ -584,11 +575,7 @@ function ReviewVotePanel({
               type="submit"
               variant={decision === "reject" ? "destructive" : "default"}
               className="w-full"
-              disabled={
-                vote.isPending ||
-                reasonCount < minimumReasonCharacters ||
-                reasonCount > maximumReasonCharacters
-              }
+              disabled={vote.isPending || reasonCount > maximumReasonCharacters}
             >
               {vote.isPending ? <Spinner data-icon="inline-start" /> : null}
               {decision === "approve" ? "提交同意票" : "提交拒绝票"}

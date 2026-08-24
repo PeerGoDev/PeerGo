@@ -419,15 +419,14 @@ export function MedalDefinitionDialog({
                 <Textarea
                   id="medal-reason"
                   rows={3}
-                  minLength={10}
                   maxLength={500}
                   value={draft.reason}
                   aria-invalid={validation.reasonError !== null}
                   onChange={(event) => update("reason", event.target.value)}
                 />
                 <FieldDescription>
-                  {Array.from(draft.reason.trim()).length} / 500，至少 10
-                  个字符。
+                  {Array.from(draft.reason.trim()).length} /
+                  500；留空时由系统自动记录。
                 </FieldDescription>
                 {validation.reasonError ? (
                   <FieldError>{validation.reasonError}</FieldError>
@@ -609,9 +608,7 @@ function validateDraft(draft: MedalDraft) {
     magicBonusBPS === null ? "请输入 0–1000，最多两位小数。" : null
   const reasonLength = Array.from(draft.reason.trim()).length
   const reasonError =
-    reasonLength < 10 || reasonLength > 500
-      ? "修改说明应为 10–500 个字符。"
-      : null
+    reasonLength > 500 ? "修改说明不能超过 500 个字符。" : null
   const errors = [
     nameError,
     smallImageError,

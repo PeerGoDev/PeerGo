@@ -323,9 +323,8 @@ export function CategoryEditorSheet({
                   id="category-change-reason"
                   name="reason"
                   rows={4}
-                  minLength={10}
                   maxLength={500}
-                  placeholder="记录依据、预期影响和必要背景（10–500 字）…"
+                  placeholder="可留空；系统会自动记录变更理由"
                   disabled={isPending}
                   aria-invalid={Boolean(errors.reason)}
                 />

@@ -40,7 +40,7 @@ export function TorrentAvailabilityDialog({
   const isDisable = torrent?.state === "published"
   const action = isDisable ? "disable" : "restore"
   const reasonLength = Array.from(reason.trim()).length
-  const reasonInvalid = reasonLength > 0 && reasonLength < 10
+  const reasonInvalid = reasonLength > 1000
 
   React.useEffect(() => {
     if (!torrent) {
@@ -50,7 +50,7 @@ export function TorrentAvailabilityDialog({
   }, [torrent]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (!torrent || reasonLength < 10 || reasonLength > 1000) {
+    if (!torrent || reasonLength > 1000) {
       return
     }
     try {
@@ -109,7 +109,7 @@ export function TorrentAvailabilityDialog({
             maxLength={1000}
             rows={4}
             aria-invalid={reasonInvalid || mutation.isError || undefined}
-            placeholder="请输入至少 10 个字符，便于后续审计与交接"
+            placeholder="可留空；系统会自动记录操作原因"
             onChange={(event) => {
               setReason(event.target.value)
               if (mutation.isError) mutation.reset()
@@ -117,7 +117,7 @@ export function TorrentAvailabilityDialog({
           />
           <FieldDescription>{reasonLength}/1000 字符</FieldDescription>
           {reasonInvalid ? (
-            <FieldError>操作原因至少需要 10 个字符。</FieldError>
+            <FieldError>操作原因不能超过 1000 个字符。</FieldError>
           ) : null}
           {mutation.isError ? (
             <FieldError>
@@ -132,9 +132,7 @@ export function TorrentAvailabilityDialog({
           </AlertDialogCancel>
           <AlertDialogAction
             variant={isDisable ? "destructive" : "actionSuccess"}
-            disabled={
-              mutation.isPending || reasonLength < 10 || reasonLength > 1000
-            }
+            disabled={mutation.isPending || reasonLength > 1000}
             onClick={() => void handleSubmit()}
           >
             {mutation.isPending ? (

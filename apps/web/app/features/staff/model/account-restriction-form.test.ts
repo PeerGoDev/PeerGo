@@ -28,7 +28,6 @@ describe("account restriction forms", () => {
   it.each([
     ["unknown reason code", { reasonCode: "punishment" }],
     ["unbounded duration", { durationHours: "720" }],
-    ["short reason", { reason: "理由过短" }],
   ])("rejects %s", (_name, override) => {
     const result = createAccountRestrictionFormSchema.safeParse({
       reasonCode: "security_incident",
@@ -38,6 +37,16 @@ describe("account restriction forms", () => {
     })
 
     expect(result.success).toBe(false)
+  })
+
+  it("accepts a blank reason for server-side audit completion", () => {
+    expect(
+      createAccountRestrictionFormSchema.safeParse({
+        reasonCode: "manual_review",
+        durationHours: "24",
+        reason: "",
+      }).success
+    ).toBe(true)
   })
 
   it("normalizes an explicit revocation command", () => {

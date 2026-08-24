@@ -902,7 +902,7 @@ SubmitPublishedTorrentScreenshotChangeRequest:
         format: binary
         minLength: 1
         maxLength: 2097152
-    reason: { type: string, minLength: 10, maxLength: 1000 }
+    reason: { type: string, maxLength: 1000 }
 
 PublishedTorrentScreenshotChangeStatus:
   type: string

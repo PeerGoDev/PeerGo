@@ -168,7 +168,7 @@ function PublishedContentChangeDecisionDialog({
   const reasonLength = Array.from(reason.trim()).length
 
   async function decide(nextDecision: "approve" | "reject") {
-    if (reasonLength < 10 || reasonLength > 1000) return
+    if (reasonLength > 1000) return
     setDecision(nextDecision)
     requestId.current ??= globalThis.crypto.randomUUID()
     try {
@@ -238,20 +238,16 @@ function PublishedContentChangeDecisionDialog({
           />
         </div>
 
-        <Field
-          className="mt-4"
-          data-invalid={reasonLength > 0 && reasonLength < 10}
-        >
+        <Field className="mt-4" data-invalid={reasonLength > 1000}>
           <FieldLabel htmlFor={reasonId}>审核说明</FieldLabel>
           <Textarea
             id={reasonId}
             value={reason}
-            minLength={10}
             maxLength={1000}
             rows={3}
             disabled={mutation.isPending}
-            aria-invalid={reasonLength > 0 && reasonLength < 10}
-            placeholder="记录批准依据，或明确说明需要发布者修改的内容"
+            aria-invalid={reasonLength > 1000}
+            placeholder="可留空；系统自动记录，或填写批准依据与修改建议"
             onChange={(event) => {
               setReason(event.target.value)
               requestId.current = undefined
@@ -259,10 +255,10 @@ function PublishedContentChangeDecisionDialog({
             }}
           />
           <FieldDescription>
-            {reasonLength} / 1000，至少 10 个字符
+            {reasonLength} / 1000；留空时由系统自动生成审核说明
           </FieldDescription>
-          {reasonLength > 0 && reasonLength < 10 ? (
-            <FieldError>审核说明至少需要 10 个字符。</FieldError>
+          {reasonLength > 1000 ? (
+            <FieldError>审核说明不能超过 1000 个字符。</FieldError>
           ) : null}
         </Field>
 
@@ -270,7 +266,7 @@ function PublishedContentChangeDecisionDialog({
           <Button
             type="button"
             variant="destructive"
-            disabled={mutation.isPending || reasonLength < 10}
+            disabled={mutation.isPending || reasonLength > 1000}
             onClick={() => void decide("reject")}
           >
             {mutation.isPending && decision === "reject" ? (
@@ -282,7 +278,7 @@ function PublishedContentChangeDecisionDialog({
           </Button>
           <Button
             type="button"
-            disabled={mutation.isPending || reasonLength < 10}
+            disabled={mutation.isPending || reasonLength > 1000}
             onClick={() => void decide("approve")}
           >
             {mutation.isPending && decision === "approve" ? (

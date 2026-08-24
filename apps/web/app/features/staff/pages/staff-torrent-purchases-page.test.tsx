@@ -43,7 +43,7 @@ describe("StaffTorrentPurchasesPage", () => {
       screen.getByRole("heading", { name: "确认退款并撤销购买权限？" })
     ).toBeVisible()
     expect(screen.getByText(/退款由站点承担/)).toBeVisible()
-    expect(screen.getByRole("button", { name: "确认退款" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "确认退款" })).toBeEnabled()
   })
 })
 

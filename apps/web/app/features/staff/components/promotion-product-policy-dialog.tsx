@@ -91,8 +91,7 @@ export function PromotionProductPolicyDialog({
     Number.isInteger(stickyDays) &&
     stickyDays >= 1 &&
     stickyDays <= 30
-  const canSubmit =
-    validPrices && validDays && reasonLength >= 10 && reasonLength <= 1000
+  const canSubmit = validPrices && validDays && reasonLength <= 1000
 
   React.useEffect(() => {
     if (!open) return
@@ -262,10 +261,9 @@ export function PromotionProductPolicyDialog({
               <Textarea
                 id="policy-change-reason"
                 rows={3}
-                minLength={10}
                 maxLength={1000}
                 value={reason}
-                placeholder="至少 10 个字符，用于保留设置变更依据"
+                placeholder="可留空；系统会自动记录设置变更依据"
                 onChange={(event) => setReason(event.target.value)}
               />
               <FieldDescription>{reasonLength}/1000</FieldDescription>

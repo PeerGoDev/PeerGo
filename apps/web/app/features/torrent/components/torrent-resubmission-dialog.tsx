@@ -392,20 +392,19 @@ function TorrentEditableMetadataDialog({
                 onChange={(event) =>
                   setCorrectionNote(event.currentTarget.value)
                 }
-                minLength={10}
                 maxLength={1_000}
                 rows={4}
                 placeholder={
                   isResubmission
-                    ? "说明你根据审核反馈修改了哪些发布资料"
-                    : "说明本次为什么修改分类、标题或副标题"
+                    ? "可留空；系统会自动记录整改说明"
+                    : "可留空；系统会自动记录修改说明"
                 }
                 aria-invalid={Boolean(errors.correctionNote)}
                 disabled={mutation.isPending}
               />
               <FieldDescription>
-                至少 10 个字符，当前 {noteLength.toLocaleString("zh-CN")} /
-                1000。
+                当前 {noteLength.toLocaleString("zh-CN")} /
+                1000；留空时由系统自动记录。
               </FieldDescription>
               <FieldError>{errors.correctionNote}</FieldError>
             </Field>

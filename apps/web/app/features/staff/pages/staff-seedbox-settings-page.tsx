@@ -219,11 +219,10 @@ function SeedboxPolicyEditor({
       !Number.isFinite(standardSpeedMiB) ||
       standardSpeedMiB < 0 ||
       parsedRules.error ||
-      reason.trim().length < 10
+      [...reason.trim()].length > 1000
     ) {
       setValidationError(
-        parsedRules.error ||
-          "请检查倍率、速度，并填写至少 10 个字符的修改说明。"
+        parsedRules.error || "请检查倍率、速度，修改说明不能超过 1000 个字符。"
       )
       return
     }
@@ -463,7 +462,7 @@ function SeedboxPolicyEditor({
                   onChange={(event) => setReason(event.target.value)}
                   disabled={!canIssue || mutation.isPending}
                   aria-invalid={Boolean(validationError)}
-                  placeholder="说明本次新增网段、倍率或速度阈值的依据"
+                  placeholder="可留空；系统会自动记录修改说明"
                 />
                 {validationError ? (
                   <FieldError>{validationError}</FieldError>

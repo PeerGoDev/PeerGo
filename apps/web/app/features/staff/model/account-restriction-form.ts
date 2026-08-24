@@ -10,7 +10,6 @@ export type AccountRestrictionRevocationReasonCode =
 const humanReasonSchema = z
   .string()
   .trim()
-  .refine((value) => runeLength(value) >= 10, "请填写至少 10 个字符的人工理由")
   .refine((value) => runeLength(value) <= 500, "人工理由不能超过 500 个字符")
 
 export const createAccountRestrictionFormSchema = z.object({

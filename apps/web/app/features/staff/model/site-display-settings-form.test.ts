@@ -55,7 +55,6 @@ describe("siteDisplaySettingsFormSchema", () => {
   it.each([
     ["empty name", { name: " " }],
     ["unknown view", { defaultTorrentView: "grid" }],
-    ["short reason", { reason: "太短" }],
   ])("rejects %s before opening review", (_name, override) => {
     const result = siteDisplaySettingsFormSchema.safeParse({
       name: settings.name,
@@ -67,5 +66,17 @@ describe("siteDisplaySettingsFormSchema", () => {
     })
 
     expect(result.success).toBe(false)
+  })
+
+  it("accepts a blank audit reason", () => {
+    expect(
+      siteDisplaySettingsFormSchema.safeParse({
+        name: settings.name,
+        description: settings.description,
+        defaultTorrentView: settings.default_torrent_view,
+        showLatestAnnouncement: settings.show_latest_announcement,
+        reason: "",
+      }).success
+    ).toBe(true)
   })
 })

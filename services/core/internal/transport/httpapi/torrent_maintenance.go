@@ -12,6 +12,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
+	"github.com/peergo/peergo/services/core/internal/platform/audittext"
 )
 
 type TorrentMaintenanceService interface {
@@ -322,7 +323,7 @@ func (h *Handler) SubmitMyPublishedTorrentScreenshotChange(ctx context.Context, 
 	}
 	result, err := h.torrentMaintenance.SubmitPublishedScreenshotChange(ctx, sessionTokenFromContext(ctx), string(request.Params.XCSRFToken), torrents.SubmitPublishedScreenshotChangeInput{
 		RequestID: request.Params.IdempotencyKey, TorrentID: torrents.TorrentID(request.TorrentId), ExpectedVersion: body.ExpectedVersion,
-		Manifest: manifest, Uploads: uploads, Reason: body.Reason,
+		Manifest: manifest, Uploads: uploads, Reason: audittext.Reason(body.Reason),
 	})
 	if response, handled := publishedTorrentScreenshotChangeSubmitErrorResponse(ctx, err); handled {
 		return response, nil

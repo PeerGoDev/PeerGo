@@ -62,8 +62,7 @@ export function HNRAppealDecisionDialog({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!appeal || !decision || responseLength < 10 || responseLength > 1000)
-      return
+    if (!appeal || !decision || responseLength > 1000) return
     try {
       await mutation.mutateAsync({
         appealId: appeal.id,
@@ -146,9 +145,7 @@ export function HNRAppealDecisionDialog({
             ) : null}
             <Field
               data-invalid={
-                (responseLength > 0 && responseLength < 10) ||
-                mutation.isError ||
-                undefined
+                responseLength > 1000 || mutation.isError || undefined
               }
             >
               <FieldLabel htmlFor="hnr-appeal-decision-response">
@@ -159,7 +156,7 @@ export function HNRAppealDecisionDialog({
                 value={response}
                 maxLength={1000}
                 rows={5}
-                placeholder="说明核对结果和处理依据（至少 10 个字符）"
+                placeholder="可留空；系统自动记录，或填写核对结果和处理依据"
                 onChange={(event) => {
                   setResponse(event.target.value)
                   mutation.reset()
@@ -186,7 +183,6 @@ export function HNRAppealDecisionDialog({
               disabled={
                 !appeal ||
                 !decision ||
-                responseLength < 10 ||
                 responseLength > 1000 ||
                 mutation.isPending
               }

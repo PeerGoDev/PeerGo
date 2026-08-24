@@ -42,7 +42,6 @@ import { formatBytes } from "~/shared/formatters/bytes"
 type ReviewDecision = TorrentReviewDecisionRequest["decision"]
 type ReviewReasonCode = TorrentReviewDecisionRequest["reason_code"]
 
-const minimumReasonCharacters = 10
 const maximumReasonCharacters = 1_000
 const decisionOptions: Array<{ value: ReviewDecision; label: string }> = [
   { value: "approve", label: "赞成发布" },
@@ -82,10 +81,7 @@ export function TorrentReviewVoteDialog({
   const requestId = React.useRef<string>(undefined)
   const vote = useCreateTorrentReviewVote()
   const reasonCount = Array.from(reason.trim()).length
-  const reasonInvalid =
-    reasonCount > 0 &&
-    (reasonCount < minimumReasonCharacters ||
-      reasonCount > maximumReasonCharacters)
+  const reasonInvalid = reasonCount > maximumReasonCharacters
 
   function resetAttempt() {
     requestId.current = undefined
@@ -94,10 +90,7 @@ export function TorrentReviewVoteDialog({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (
-      reasonCount < minimumReasonCharacters ||
-      reasonCount > maximumReasonCharacters
-    ) {
+    if (reasonCount > maximumReasonCharacters) {
       return
     }
     requestId.current ??= globalThis.crypto.randomUUID()
@@ -222,14 +215,13 @@ export function TorrentReviewVoteDialog({
               <Textarea
                 id={reasonFieldId}
                 rows={5}
-                minLength={minimumReasonCharacters}
                 maxLength={maximumReasonCharacters + 1}
                 value={reason}
                 aria-invalid={reasonInvalid || undefined}
                 placeholder={
                   decision === "approve"
-                    ? "写明已经核对的发布要求，至少 10 个字符。"
-                    : "写明发现的问题和修改建议，至少 10 个字符。"
+                    ? "可留空；系统会自动记录已完成发布要求核对。"
+                    : "可留空；建议写明发现的问题和修改建议。"
                 }
                 disabled={vote.isPending}
                 onChange={(event) => {
@@ -242,7 +234,7 @@ export function TorrentReviewVoteDialog({
                 {maximumReasonCharacters.toLocaleString("zh-CN")}
               </FieldDescription>
               {reasonInvalid ? (
-                <FieldError>审核说明需要 10–1000 个字符。</FieldError>
+                <FieldError>审核说明不能超过 1000 个字符。</FieldError>
               ) : null}
             </Field>
 
@@ -271,11 +263,7 @@ export function TorrentReviewVoteDialog({
             type="submit"
             form="torrent-review-vote-form"
             variant={decision === "reject" ? "destructive" : "default"}
-            disabled={
-              vote.isPending ||
-              reasonCount < minimumReasonCharacters ||
-              reasonCount > maximumReasonCharacters
-            }
+            disabled={vote.isPending || reasonCount > maximumReasonCharacters}
           >
             {vote.isPending ? <Spinner data-icon="inline-start" /> : null}
             {decision === "approve" ? "提交赞成票" : "提交反对票"}

@@ -44,10 +44,10 @@ export function TorrentWithdrawalDialog({
   const requestId = React.useRef<string | undefined>(undefined)
   const mutation = useSubmitTorrentWithdrawal(userId)
   const reasonLength = Array.from(reason.trim()).length
-  const reasonInvalid = reasonLength > 0 && reasonLength < 10
+  const reasonInvalid = reasonLength > 1000
 
   async function submit() {
-    if (reasonLength < 10 || reasonLength > 1000) return
+    if (reasonLength > 1000) return
     requestId.current ??= globalThis.crypto.randomUUID()
     try {
       const result = await mutation.mutateAsync({
@@ -94,12 +94,11 @@ export function TorrentWithdrawalDialog({
           <Textarea
             id={reasonId}
             value={reason}
-            minLength={10}
             maxLength={1000}
             rows={4}
             disabled={mutation.isPending}
             aria-invalid={reasonInvalid || mutation.isError || undefined}
-            placeholder="请说明撤回原因，例如重复版本、内容错误或需要重新制作"
+            placeholder="可留空；系统会自动记录撤回理由"
             onChange={(event) => {
               setReason(event.target.value)
               requestId.current = undefined
@@ -107,10 +106,10 @@ export function TorrentWithdrawalDialog({
             }}
           />
           <FieldDescription>
-            {reasonLength} / 1000，至少 10 个字符
+            {reasonLength} / 1000；留空时由系统自动记录
           </FieldDescription>
           {reasonInvalid ? (
-            <FieldError>撤回理由至少需要 10 个字符。</FieldError>
+            <FieldError>撤回理由不能超过 1000 个字符。</FieldError>
           ) : null}
           {mutation.isError ? (
             <FieldError>
@@ -128,9 +127,7 @@ export function TorrentWithdrawalDialog({
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
-            disabled={
-              mutation.isPending || reasonLength < 10 || reasonLength > 1000
-            }
+            disabled={mutation.isPending || reasonLength > 1000}
             onClick={() => void submit()}
           >
             {mutation.isPending ? (

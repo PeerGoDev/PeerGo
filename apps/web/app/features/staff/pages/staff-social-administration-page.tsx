@@ -406,9 +406,8 @@ function BoardEditor({
               id="social-board-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              minLength={10}
               maxLength={500}
-              placeholder="至少 10 个字符"
+              placeholder="可留空；系统会自动记录变更理由"
             />
           </Field>
         </FieldGroup>
@@ -429,7 +428,10 @@ function BoardEditor({
           <Button
             onClick={() => void save()}
             disabled={
-              pending || !id.trim() || !name.trim() || reason.trim().length < 10
+              pending ||
+              !id.trim() ||
+              !name.trim() ||
+              [...reason.trim()].length > 500
             }
           >
             {pending ? "保存中…" : "保存"}
@@ -649,8 +651,8 @@ function PostModerationEditor({
             <Textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              minLength={10}
               maxLength={500}
+              placeholder="可留空；系统会自动记录管理理由"
             />
           </Field>
         </FieldGroup>
@@ -670,7 +672,7 @@ function PostModerationEditor({
           </Button>
           <Button
             onClick={() => void save()}
-            disabled={mutate.isPending || reason.trim().length < 10}
+            disabled={mutate.isPending || [...reason.trim()].length > 500}
           >
             保存
           </Button>

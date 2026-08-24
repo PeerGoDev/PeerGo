@@ -52,11 +52,11 @@ describe("registrationPolicySettingsFormSchema", () => {
     ).toBe(false)
   })
 
-  it("accepts a five-character reason and rejects a shorter one", () => {
+  it("accepts blank and short reasons for server-side audit completion", () => {
     expect(
       registrationPolicySettingsFormSchema.safeParse({
         ...validInput,
-        reason: "调整注册制",
+        reason: "",
       }).success
     ).toBe(true)
     expect(
@@ -64,7 +64,7 @@ describe("registrationPolicySettingsFormSchema", () => {
         ...validInput,
         reason: "调整注册",
       }).success
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it("requires a deployed secret, public site key, and at least one protected flow", () => {

@@ -81,7 +81,6 @@ export function TorrentUploadPolicyDialog({
     maxPixels >= 65_536 &&
     maxPixels <= 25_000_000 &&
     formats.length > 0 &&
-    reasonLength >= 10 &&
     reasonLength <= 1000 &&
     new Date(effectiveAt).getTime() >= Date.now() + 60_000
 
@@ -222,12 +221,11 @@ export function TorrentUploadPolicyDialog({
               <FieldError>至少保留一种图片格式。</FieldError>
             ) : null}
           </Field>
-          <Field data-invalid={reasonLength > 0 && reasonLength < 10}>
+          <Field data-invalid={reasonLength > 1000}>
             <FieldLabel htmlFor="upload-policy-reason">修改说明</FieldLabel>
             <Textarea
               id="upload-policy-reason"
               value={reason}
-              minLength={10}
               maxLength={1000}
               rows={3}
               onChange={(event) => {
@@ -237,11 +235,11 @@ export function TorrentUploadPolicyDialog({
               }}
             />
             <FieldDescription>
-              {reasonLength} / 1000，至少 10 个字符。当前 .torrent 上限为{" "}
+              {reasonLength} / 1000；留空时由系统自动记录。当前 .torrent 上限为{" "}
               {formatBytes(active.settings.metainfo_max_bytes)}。
             </FieldDescription>
-            {reasonLength > 0 && reasonLength < 10 ? (
-              <FieldError>修改说明至少需要 10 个字符。</FieldError>
+            {reasonLength > 1000 ? (
+              <FieldError>修改说明不能超过 1000 个字符。</FieldError>
             ) : null}
           </Field>
         </FieldGroup>

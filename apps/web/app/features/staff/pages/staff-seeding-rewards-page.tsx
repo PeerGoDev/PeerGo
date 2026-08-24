@@ -381,7 +381,7 @@ function SeedingRewardPolicyEditor({
   const [success, setSuccess] = React.useState("")
   const previewMutation = usePreviewSeedingRewardPolicy()
   const issueMutation = useIssueSeedingRewardPolicy()
-  const reasonError = reason.trim().length > 0 && reason.trim().length < 10
+  const reasonError = [...reason.trim()].length > 1000
   const disabled = previewMutation.isPending || issueMutation.isPending
 
   function updatePolicy<K extends keyof SeedingRewardPolicyInput>(
@@ -415,7 +415,7 @@ function SeedingRewardPolicyEditor({
   }
 
   async function handleIssue() {
-    if (!preview || reason.trim().length < 10 || !canIssue) return
+    if (!preview || reasonError || !canIssue) return
     try {
       const issued = await issueMutation.mutateAsync({
         csrfToken,
@@ -564,7 +564,7 @@ function SeedingRewardPolicyEditor({
                   maxLength={1000}
                   value={reason}
                   disabled={disabled || !canIssue}
-                  placeholder="说明为什么调整、预计影响哪些用户（至少 10 个字符）"
+                  placeholder="可留空；系统会自动记录调整说明"
                   onChange={(event) => setReason(event.target.value)}
                 />
                 <FieldDescription>
@@ -573,7 +573,7 @@ function SeedingRewardPolicyEditor({
                 <FieldError
                   errors={
                     reasonError
-                      ? [{ message: "调整说明至少需要 10 个字符。" }]
+                      ? [{ message: "调整说明不能超过 1000 个字符。" }]
                       : []
                   }
                 />
@@ -603,9 +603,7 @@ function SeedingRewardPolicyEditor({
               ) : null}
 
               <Button
-                disabled={
-                  !canIssue || !preview || reason.trim().length < 10 || disabled
-                }
+                disabled={!canIssue || !preview || reasonError || disabled}
                 onClick={() => void handleIssue()}
               >
                 {issueMutation.isPending ? (

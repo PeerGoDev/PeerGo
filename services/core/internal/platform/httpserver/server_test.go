@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"reflect"
 	"strings"
 	"testing"
@@ -2287,7 +2288,9 @@ func TestTorrentSubmissionUsesMultipartContractAndWebSessionBoundary(t *testing.
 			{Provider: "imdb", ExternalID: "tt1234567"},
 			{Provider: "tmdb", ExternalID: "123"},
 			{Provider: "douban", ExternalID: "456"},
-		}) || len(service.input.Screenshots) != 1 || !bytes.Equal(service.input.Screenshots[0].Raw, []byte("screenshot fixture")) ||
+		}) || !reflect.DeepEqual(service.input.FacetSelections, []torrents.FacetSelection{
+		{FacetID: "genre", OptionKeys: []string{"drama", "action"}},
+	}) || len(service.input.Screenshots) != 1 || !bytes.Equal(service.input.Screenshots[0].Raw, []byte("screenshot fixture")) ||
 		!bytes.Equal(service.input.RawMetainfo, rawMetainfo) {
 		t.Fatalf("upload boundary cookie=%q csrf=%q input=%+v", service.cookieToken, service.csrfToken, service.input)
 	}
@@ -3134,7 +3137,7 @@ func TestProductionRegistrationPolicyUpdatePassesOpenAPIValidation(t *testing.T)
 		"human_verification_login_enabled":false,
 		"human_verification_password_recovery_enabled":false,
 		"expected_version":1,
-		"reason":"调整注册制"
+		"reason":""
 	}`
 	request := httptest.NewRequest(
 		http.MethodPut,
@@ -5708,6 +5711,16 @@ func newTorrentSubmissionRequest(t *testing.T, idempotencyKey uuid.UUID, csrf st
 		if err := writer.WriteField(name, value); err != nil {
 			t.Fatalf("write multipart field %s: %v", name, err)
 		}
+	}
+	facetPart, err := writer.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": {`form-data; name="facet_selections"; filename="facet-selection-1.json"`},
+		"Content-Type":        {"application/json"},
+	})
+	if err != nil {
+		t.Fatalf("create multipart facet selection: %v", err)
+	}
+	if _, err := facetPart.Write([]byte(`{"facet_id":"genre","option_keys":["drama","action"]}`)); err != nil {
+		t.Fatalf("write multipart facet selection: %v", err)
 	}
 	screenshot, err := writer.CreateFormFile("screenshots", "cover.png")
 	if err != nil {

@@ -77,9 +77,8 @@ export function PromotionCampaignDialog({
     startTimestamp >= Date.now() - 30_000 &&
     duration >= 5 * 60_000 &&
     duration <= 30 * 24 * 60 * 60_000
-  const canSubmit =
-    validTorrent && validWindow && reasonLength >= 10 && reasonLength <= 1000
-  const invalidReason = reasonLength > 0 && reasonLength < 10
+  const canSubmit = validTorrent && validWindow && reasonLength <= 1000
+  const invalidReason = reasonLength > 1000
 
   React.useEffect(() => {
     if (!open) {
@@ -248,18 +247,17 @@ export function PromotionCampaignDialog({
                 maxLength={1000}
                 rows={4}
                 aria-invalid={invalidReason || mutation.isError || undefined}
-                placeholder="说明活动目的、范围与交接信息（至少 10 个字符）"
+                placeholder="可留空；系统会自动记录签发原因"
                 onChange={(event) => {
                   setReason(event.target.value)
                   if (mutation.isError) mutation.reset()
                 }}
               />
               <FieldDescription>
-                已输入 {reasonLength}/1000 个字符；至少填写 10
-                个字符后才可签发。
+                已输入 {reasonLength}/1000 个字符；留空时由系统自动记录。
               </FieldDescription>
               {invalidReason ? (
-                <FieldError>签发原因至少需要 10 个字符。</FieldError>
+                <FieldError>签发原因不能超过 1000 个字符。</FieldError>
               ) : null}
               {mutation.isError ? (
                 <FieldError className="items-start">

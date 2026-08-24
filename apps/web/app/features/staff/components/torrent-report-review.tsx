@@ -218,7 +218,7 @@ function TorrentReportDecisionDialog({
   const requestId = React.useRef<string>(undefined)
   const mutation = useDecideTorrentReportCase()
   const noteCount = Array.from(note.trim()).length
-  const noteInvalid = noteCount > 0 && (noteCount < 10 || noteCount > 1000)
+  const noteInvalid = noteCount > 1000
   const decisionOptions: Array<{ value: Decision; label: string }> = [
     { value: "dismiss", label: "确认无违规并关闭" },
     ...(canDisable
@@ -233,7 +233,7 @@ function TorrentReportDecisionDialog({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (noteCount < 10 || noteCount > 1000) return
+    if (noteCount > 1000) return
     requestId.current ??= globalThis.crypto.randomUUID()
     try {
       const result = await mutation.mutateAsync({
@@ -397,21 +397,20 @@ function TorrentReportDecisionDialog({
                 id={noteFieldId}
                 value={note}
                 rows={4}
-                minLength={10}
                 maxLength={1001}
                 disabled={mutation.isPending}
                 aria-invalid={noteInvalid || undefined}
-                placeholder="记录核对依据和处置边界，至少 10 个字符。"
+                placeholder="可留空；系统自动记录，或填写核对依据和处置边界。"
                 onChange={(event) => {
                   setNote(event.target.value)
                   resetAttempt()
                 }}
               />
               <FieldDescription>
-                {noteCount}/1000，至少 10 个字符
+                {noteCount}/1000；留空时由系统自动生成内部说明
               </FieldDescription>
               {noteInvalid ? (
-                <FieldError>内部说明需要 10–1000 个字符。</FieldError>
+                <FieldError>内部说明不能超过 1000 个字符。</FieldError>
               ) : null}
             </Field>
 
@@ -438,7 +437,7 @@ function TorrentReportDecisionDialog({
             type="submit"
             form="torrent-report-decision-form"
             variant={decision === "disable_torrent" ? "destructive" : "default"}
-            disabled={mutation.isPending || noteCount < 10 || noteCount > 1000}
+            disabled={mutation.isPending || noteCount > 1000}
           >
             {mutation.isPending ? <Spinner data-icon="inline-start" /> : null}
             {decision === "disable_torrent" ? "确认临时下架" : "确认关闭案件"}

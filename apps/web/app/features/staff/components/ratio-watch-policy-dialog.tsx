@@ -82,7 +82,6 @@ export function RatioWatchPolicyDialog({
     policy !== undefined &&
     preview !== undefined &&
     validEffectiveAt &&
-    reasonLength >= 10 &&
     reasonLength <= 1000
 
   React.useEffect(() => {
@@ -260,9 +259,7 @@ export function RatioWatchPolicyDialog({
                 </Field>
                 <Field
                   data-invalid={
-                    (reasonLength > 0 && reasonLength < 10) ||
-                    issueMutation.isError ||
-                    undefined
+                    reasonLength > 1000 || issueMutation.isError || undefined
                   }
                 >
                   <FieldLabel htmlFor="ratio-reason">调整原因</FieldLabel>
@@ -270,7 +267,7 @@ export function RatioWatchPolicyDialog({
                     id="ratio-reason"
                     value={reason}
                     maxLength={1000}
-                    placeholder="说明调整依据、影响范围和回退条件（至少 10 个字符）"
+                    placeholder="可留空；系统会自动记录调整依据"
                     onChange={(event) => {
                       setReason(event.target.value)
                       issueMutation.reset()

@@ -94,7 +94,6 @@ export function HNRPolicyDialog({
     policy !== undefined &&
     preview !== undefined &&
     validEffectiveAt &&
-    reasonLength >= 10 &&
     reasonLength <= 1000
 
   React.useEffect(() => {
@@ -313,9 +312,7 @@ export function HNRPolicyDialog({
                 </Field>
                 <Field
                   data-invalid={
-                    (reasonLength > 0 && reasonLength < 10) ||
-                    issueMutation.isError ||
-                    undefined
+                    reasonLength > 1000 || issueMutation.isError || undefined
                   }
                 >
                   <FieldLabel htmlFor="hnr-reason">调整原因</FieldLabel>
@@ -324,7 +321,7 @@ export function HNRPolicyDialog({
                     value={reason}
                     rows={3}
                     maxLength={1000}
-                    placeholder="说明本次调整依据与交接信息（至少 10 个字符）"
+                    placeholder="可留空；系统会自动记录调整原因"
                     onChange={(event) => {
                       setReason(event.target.value)
                       issueMutation.reset()
@@ -334,8 +331,8 @@ export function HNRPolicyDialog({
                     已输入 {reasonLength}/1000 个字符；原因只保存在 Core
                     审计记录中。
                   </FieldDescription>
-                  {reasonLength > 0 && reasonLength < 10 ? (
-                    <FieldError>调整原因至少需要 10 个字符。</FieldError>
+                  {reasonLength > 1000 ? (
+                    <FieldError>调整原因不能超过 1000 个字符。</FieldError>
                   ) : null}
                   {issueMutation.isError ? (
                     <FieldError className="items-start">

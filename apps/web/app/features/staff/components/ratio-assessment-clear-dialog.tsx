@@ -52,7 +52,7 @@ export function RatioAssessmentClearDialog({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!assessment || reasonLength < 10 || reasonLength > 1000) return
+    if (!assessment || reasonLength > 1000) return
     try {
       await mutation.mutateAsync({
         assessmentId: assessment.id,
@@ -94,9 +94,7 @@ export function RatioAssessmentClearDialog({
             ) : null}
             <Field
               data-invalid={
-                (reasonLength > 0 && reasonLength < 10) ||
-                mutation.isError ||
-                undefined
+                reasonLength > 1000 || mutation.isError || undefined
               }
             >
               <FieldLabel htmlFor="ratio-assessment-clear-reason">
@@ -106,7 +104,7 @@ export function RatioAssessmentClearDialog({
                 id="ratio-assessment-clear-reason"
                 value={reason}
                 maxLength={1000}
-                placeholder="说明核对结果和解除依据（至少 10 个字符）"
+                placeholder="可留空；系统自动记录，或填写核对结果和解除依据"
                 onChange={(event) => {
                   setReason(event.target.value)
                   mutation.reset()
@@ -130,10 +128,7 @@ export function RatioAssessmentClearDialog({
             <Button
               type="submit"
               disabled={
-                !assessment ||
-                reasonLength < 10 ||
-                reasonLength > 1000 ||
-                mutation.isPending
+                !assessment || reasonLength > 1000 || mutation.isPending
               }
             >
               {mutation.isPending ? (

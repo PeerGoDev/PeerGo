@@ -5,7 +5,7 @@ const emailDomainPattern =
   /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/
 
 export const registrationPolicyReasonLimits = {
-  minimum: 5,
+  minimum: 0,
   maximum: 500,
 } as const
 
@@ -61,11 +61,6 @@ export const registrationPolicySettingsFormSchema = z
     reason: z
       .string()
       .trim()
-      .refine(
-        (value) =>
-          Array.from(value).length >= registrationPolicyReasonLimits.minimum,
-        `请填写至少 ${registrationPolicyReasonLimits.minimum} 个字符的变更理由`
-      )
       .refine(
         (value) =>
           Array.from(value).length <= registrationPolicyReasonLimits.maximum,

@@ -168,6 +168,7 @@ func New(dependencies Dependencies, logger *slog.Logger) (http.Handler, error) {
 
 	router.Group(func(apiRouter chi.Router) {
 		apiRouter.Use(limitUploadBody(dependencies.TorrentUploadMaxBytes))
+		apiRouter.Use(fillAutomaticCommandText)
 		// Both generated binding and full OpenAPI validation remain enabled: the
 		// first provides typed handlers, while this middleware enforces schema
 		// bounds before any use case is called.

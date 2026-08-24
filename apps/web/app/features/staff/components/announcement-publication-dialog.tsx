@@ -208,7 +208,6 @@ export function AnnouncementPublicationDialog({
                   id="announcement-publication-reason"
                   name="reason"
                   rows={4}
-                  minLength={10}
                   maxLength={500}
                   placeholder={copy.reasonPlaceholder}
                   disabled={isPending}
@@ -258,23 +257,23 @@ function publicationCopy(
     case "publish_now":
       return {
         description: `将已预览的第 ${announcement.revision_number} 稿立即设为公开版本。`,
-        reasonPlaceholder: "记录发布依据和已完成的复核（10–500 字）…",
+        reasonPlaceholder: "可留空；系统会自动记录发布依据",
       }
     case "schedule":
       return {
         description: `为已预览的第 ${announcement.revision_number} 稿设置生效时间；到点前现有公开版本保持不变。`,
-        reasonPlaceholder: "记录排期依据、时区和复核结论（10–500 字）…",
+        reasonPlaceholder: "可留空；系统会自动记录排期依据",
       }
     case "cancel_schedule":
       return {
         description: "把尚未到点的预约修订退回草稿，不影响当前公开版本。",
-        reasonPlaceholder: "记录取消排期的原因与后续处理（10–500 字）…",
+        reasonPlaceholder: "可留空；系统会自动记录取消排期原因",
       }
     case "withdraw":
       return {
         description:
           "停止这篇公告的公开访问；公告地址、修订和评论历史均会保留。",
-        reasonPlaceholder: "记录撤回依据、影响范围和后续安排（10–500 字）…",
+        reasonPlaceholder: "可留空；系统会自动记录撤回依据",
       }
   }
 }

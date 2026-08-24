@@ -489,11 +489,10 @@ function SiteDisplaySettingsForm({
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                       rows={3}
-                      minLength={10}
                       maxLength={500}
                       disabled={mutation.isPending}
                       aria-invalid={Boolean(errors.reason)}
-                      placeholder="记录依据、影响范围和必要背景（10–500 字）…"
+                      placeholder="可留空；系统会自动记录变更理由"
                     />
                     <FieldDescription className="text-xs">
                       完整理由会安全保存，审计记录仅保留必要摘要。

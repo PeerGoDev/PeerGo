@@ -76,13 +76,16 @@ describe("submitTorrent", () => {
     expect(body.get("imdb_id")).toBe("tt1234567")
     expect(body.get("tmdb_id")).toBe("123")
     expect(body.get("douban_id")).toBe("456")
-    expect(body.get("facet_selections[0][facet_id]")).toBe("genre")
-    expect(body.get("facet_selections[0][option_keys][0]")).toBe("drama")
-    expect(body.get("facet_selections[0][option_keys][1]")).toBe("action")
-    expect(body.get("facet_selections[1][facet_id]")).toBe("region")
-    expect(body.get("facet_selections[1][option_keys][0]")).toBe(
-      "mainland-china"
-    )
+    const facetParts = body.getAll("facet_selections")
+    expect(facetParts).toHaveLength(2)
+    await expect(readJsonPart(facetParts[0])).resolves.toEqual({
+      facet_id: "genre",
+      option_keys: ["drama", "action"],
+    })
+    await expect(readJsonPart(facetParts[1])).resolves.toEqual({
+      facet_id: "region",
+      option_keys: ["mainland-china"],
+    })
     expect(body.getAll("screenshots")).toEqual([screenshot])
     expect(body.get("torrent_file")).toEqual(torrentFile)
 
@@ -123,4 +126,27 @@ describe("submitTorrent", () => {
       message: "种子已经存在",
     } satisfies Partial<ApiProblemError>)
   })
+
+  it("accepts trusted-publisher submissions returned as published", async () => {
+    const resultPromise = submitTorrent({
+      category_id: "movies",
+      title: "Trusted release",
+      subtitle: "",
+      description: "Description",
+      media_info: "MediaInfo",
+      anonymous: false,
+      torrent_file: new File(["d4:infodee"], "trusted.torrent"),
+      csrfToken: "csrf-token",
+      idempotencyKey: "0198f20a-6da8-7e51-9c64-777777777777",
+    })
+    const request = MockUploadXMLHttpRequest.instances[0]
+    request.respond(201, { ...submission, state: "published" })
+
+    await expect(resultPromise).resolves.toMatchObject({ state: "published" })
+  })
 })
+
+async function readJsonPart(value: FormDataEntryValue) {
+  if (!(value instanceof Blob)) throw new TypeError("expected a JSON Blob")
+  return JSON.parse(await value.text()) as unknown
+}

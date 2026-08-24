@@ -490,9 +490,8 @@ function AnnouncementEditorLoaded({
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
                     rows={4}
-                    minLength={10}
                     maxLength={500}
-                    placeholder="记录资料来源、修订范围与复核要求（10–500 字）…"
+                    placeholder="可留空；系统会自动记录草稿变更理由"
                     disabled={isPending || editingLocked}
                     aria-invalid={Boolean(errors.reason)}
                   />

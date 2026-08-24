@@ -255,8 +255,8 @@ function CategoryFacetOptionDialog({
       setError("排序权重必须是 0–1,000,000 之间的整数。")
       return
     }
-    if ([...reason].length < 10 || [...reason].length > 500) {
-      setError("变更理由需为 10–500 个字符。")
+    if ([...reason].length > 500) {
+      setError("变更理由不能超过 500 个字符。")
       return
     }
     setError("")
@@ -376,10 +376,9 @@ function CategoryFacetOptionDialog({
               <Textarea
                 id="category-option-reason"
                 name="reason"
-                minLength={10}
                 maxLength={500}
                 disabled={mutation.isPending}
-                placeholder="说明添加、改名、排序或停用的运营原因（至少 10 个字符）"
+                placeholder="可留空；系统会自动记录本次变更理由"
               />
               <FieldError errors={error ? [{ message: error }] : []} />
             </Field>

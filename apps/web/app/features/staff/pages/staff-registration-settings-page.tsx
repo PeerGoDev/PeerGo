@@ -71,7 +71,6 @@ import {
   type RegistrationPolicySettingsFormValues,
   emailDomainModeLabel,
   humanVerificationProviderLabel,
-  registrationPolicyReasonLimits,
   registrationModeLabel,
   registrationPolicySettingsFormSchema,
 } from "~/features/staff/model/registration-policy-settings-form"
@@ -1026,7 +1025,7 @@ function RegistrationPolicyForm({
                   maxLength={500}
                   disabled={disabled}
                   aria-invalid={Boolean(reasonError)}
-                  placeholder={`说明本次调整注册或邀请政策的原因（至少 ${registrationPolicyReasonLimits.minimum} 个字符）`}
+                  placeholder="可留空；系统会自动记录变更理由"
                 />
                 <FieldDescription>
                   理由用于操作复核；审计事件只保存不可逆摘要。

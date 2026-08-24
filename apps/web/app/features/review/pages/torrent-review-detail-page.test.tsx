@@ -124,7 +124,7 @@ AUDIO.1........: Chinese AAC 2 channels`,
     expect(screen.getByText("投票前隐藏立场分布")).toBeVisible()
     expect(screen.queryByText(/同意 2 票/)).not.toBeInTheDocument()
     expect(screen.queryByText(/拒绝 0 票/)).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "提交同意票" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "提交同意票" })).toBeEnabled()
     expect(
       screen.getByRole("button", { name: "返回审核队列" })
     ).toHaveAttribute("href", "/review/queue")

@@ -175,7 +175,6 @@ export function ContributionExperiencePolicyDialog({
             <Textarea
               id="contribution-experience-reason"
               rows={3}
-              minLength={10}
               maxLength={1000}
               value={reason}
               aria-invalid={validation.reasonError !== null}
@@ -185,7 +184,7 @@ export function ContributionExperiencePolicyDialog({
               }}
             />
             <FieldDescription>
-              {Array.from(reason.trim()).length} / 1000，至少 10 个字符。
+              {Array.from(reason.trim()).length} / 1000；留空时由系统自动记录。
             </FieldDescription>
             {validation.reasonError ? (
               <FieldError>{validation.reasonError}</FieldError>
@@ -277,11 +276,7 @@ function validateDraft(
   }
   const reasonLength = Array.from(reason.trim()).length
   const reasonError =
-    reasonLength > 0 && reasonLength < 10
-      ? "调整说明至少需要 10 个字符。"
-      : reasonLength > 1000
-        ? "调整说明不能超过 1000 个字符。"
-        : null
+    reasonLength > 1000 ? "调整说明不能超过 1000 个字符。" : null
   const completeValues =
     values.uploadGiB !== null &&
     values.torrent !== null &&
@@ -298,10 +293,7 @@ function validateDraft(
     timeError,
     reasonError,
     valid:
-      completeValues !== null &&
-      timeError === null &&
-      reasonLength >= 10 &&
-      reasonError === null,
+      completeValues !== null && timeError === null && reasonError === null,
   }
 }
 

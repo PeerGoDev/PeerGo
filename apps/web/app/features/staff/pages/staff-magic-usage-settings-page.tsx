@@ -504,11 +504,10 @@ function TransferPolicyEditor({
                   id={`${fieldPrefix}-policy-reason`}
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
-                  minLength={10}
                   maxLength={1000}
                   rows={3}
                   disabled={disabled}
-                  placeholder="说明开放、关闭或调整额度的原因（至少 10 个字符）…"
+                  placeholder="可留空；系统会自动记录变更原因"
                 />
                 <FieldError>{validationError}</FieldError>
               </Field>
@@ -669,8 +668,8 @@ function validatePolicy(input: {
   if (!/^(?:[0-9]|[1-4][0-9]|50)(?:\.[0-9]{1,2})?$/.test(input.feePercent)) {
     return "手续费必须是 0–50 之间、最多两位小数的百分比。"
   }
-  if ([...input.reason.trim()].length < 10)
-    return "变更原因至少需要 10 个字符。"
+  if ([...input.reason.trim()].length > 1000)
+    return "变更原因不能超过 1000 个字符。"
   return ""
 }
 

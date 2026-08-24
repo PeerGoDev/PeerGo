@@ -6,7 +6,7 @@ import {
 } from "~/features/torrent/model/torrent-resubmission-form"
 
 describe("torrent resubmission form", () => {
-  it("normalizes the shared editable metadata and requires a useful note", () => {
+  it("normalizes the shared editable metadata and optional note", () => {
     const result = torrentResubmissionFormSchema.parse({
       categoryId: " movies ",
       title: " Corrected release ",
@@ -20,6 +20,17 @@ describe("torrent resubmission form", () => {
       subtitle: "New subtitle",
       correctionNote: "已经按反馈补全发布资料。",
     })
+  })
+
+  it("accepts a blank note for server-side audit completion", () => {
+    expect(
+      torrentResubmissionFormSchema.safeParse({
+        categoryId: "movies",
+        title: "Corrected release",
+        subtitle: "",
+        correctionNote: "",
+      }).success
+    ).toBe(true)
   })
 
   it("distinguishes a correction note from an actual metadata change", () => {

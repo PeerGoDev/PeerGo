@@ -134,14 +134,20 @@ describe("TorrentUploadPage", () => {
     expect(body.get("media_info")).toBe("General")
     expect(body.get("anonymous")).toBe("true")
     expect(body.get("imdb_id")).toBe("tt1234567")
-    expect(body.get("facet_selections[0][facet_id]")).toBe("genre")
-    expect(body.get("facet_selections[0][option_keys][0]")).toBe("drama")
-    expect(body.get("facet_selections[1][facet_id]")).toBe("region")
-    expect(body.get("facet_selections[1][option_keys][0]")).toBe(
-      "mainland-china"
-    )
-    expect(body.get("facet_selections[2][facet_id]")).toBe("release-type")
-    expect(body.get("facet_selections[2][option_keys][0]")).toBe("web-dl")
+    const facetParts = body.getAll("facet_selections")
+    expect(facetParts).toHaveLength(3)
+    await expect(readJsonPart(facetParts[0])).resolves.toEqual({
+      facet_id: "genre",
+      option_keys: ["drama"],
+    })
+    await expect(readJsonPart(facetParts[1])).resolves.toEqual({
+      facet_id: "region",
+      option_keys: ["mainland-china"],
+    })
+    await expect(readJsonPart(facetParts[2])).resolves.toEqual({
+      facet_id: "release-type",
+      option_keys: ["web-dl"],
+    })
     expect(body.getAll("screenshots")).toEqual([screenshot])
     act(() => {
       request.reportProgress(1, 2)
@@ -213,6 +219,11 @@ describe("TorrentUploadPage", () => {
 
 function changeField(label: string, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } })
+}
+
+async function readJsonPart(value: FormDataEntryValue) {
+  if (!(value instanceof Blob)) throw new TypeError("expected a JSON Blob")
+  return JSON.parse(await value.text()) as unknown
 }
 
 function renderPage({ canSubmit = true }: { canSubmit?: boolean } = {}) {

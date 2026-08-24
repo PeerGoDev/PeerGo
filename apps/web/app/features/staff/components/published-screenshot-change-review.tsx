@@ -158,7 +158,7 @@ function ScreenshotDecisionDialog({
   const mutation = useDecidePublishedTorrentScreenshotChange()
   const reasonLength = Array.from(reason.trim()).length
   async function decide(next: "approve" | "reject") {
-    if (reasonLength < 10) return
+    if (reasonLength > 1000) return
     setDecision(next)
     requestId.current ??= globalThis.crypto.randomUUID()
     try {
@@ -223,12 +223,11 @@ function ScreenshotDecisionDialog({
             candidate
           />
         </div>
-        <Field data-invalid={reasonLength > 0 && reasonLength < 10}>
+        <Field data-invalid={reasonLength > 1000}>
           <FieldLabel htmlFor="screenshot-decision-reason">审核说明</FieldLabel>
           <Textarea
             id="screenshot-decision-reason"
             value={reason}
-            minLength={10}
             maxLength={1000}
             rows={3}
             disabled={mutation.isPending}
@@ -240,17 +239,17 @@ function ScreenshotDecisionDialog({
             }}
           />
           <FieldDescription>
-            {reasonLength} / 1000，至少 10 个字符
+            {reasonLength} / 1000；留空时由系统自动生成审核说明
           </FieldDescription>
-          {reasonLength > 0 && reasonLength < 10 ? (
-            <FieldError>审核说明至少需要 10 个字符。</FieldError>
+          {reasonLength > 1000 ? (
+            <FieldError>审核说明不能超过 1000 个字符。</FieldError>
           ) : null}
         </Field>
         <DialogFooter>
           <Button
             type="button"
             variant="destructive"
-            disabled={mutation.isPending || reasonLength < 10}
+            disabled={mutation.isPending || reasonLength > 1000}
             onClick={() => void decide("reject")}
           >
             {mutation.isPending && decision === "reject" ? (
@@ -262,7 +261,7 @@ function ScreenshotDecisionDialog({
           </Button>
           <Button
             type="button"
-            disabled={mutation.isPending || reasonLength < 10}
+            disabled={mutation.isPending || reasonLength > 1000}
             onClick={() => void decide("approve")}
           >
             {mutation.isPending && decision === "approve" ? (

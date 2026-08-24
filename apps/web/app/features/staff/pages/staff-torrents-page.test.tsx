@@ -49,7 +49,7 @@ describe("StaffTorrentsPage", () => {
     expect(await screen.findByRole("alertdialog")).toBeVisible()
     expect(screen.getByRole("heading", { name: "下架种子" })).toBeVisible()
     expect(screen.getByText(/Tracker 准入会按同一版本关闭/)).toBeVisible()
-    expect(screen.getByRole("button", { name: "确认下架" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "确认下架" })).toBeEnabled()
   })
 })
 

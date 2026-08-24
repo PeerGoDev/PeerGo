@@ -107,10 +107,7 @@ function SeedboxReportItem({
   const pending = report.status === "pending"
 
   async function decide(decision: "approve" | "reject") {
-    if (reason.trim().length < 10) {
-      setError("请填写至少 10 个字符的审核说明。")
-      return
-    }
+    if (reason.trim().length > 1000) return
     setError("")
     try {
       await mutation.mutateAsync({
@@ -168,7 +165,7 @@ function SeedboxReportItem({
               onChange={(event) => setReason(event.target.value)}
               rows={2}
               disabled={!canDecide || mutation.isPending}
-              placeholder="说明核验依据、服务商和地址归属"
+              placeholder="可留空；系统自动记录，或填写核验依据与地址归属"
             />
             {error ? <FieldError>{error}</FieldError> : null}
           </Field>

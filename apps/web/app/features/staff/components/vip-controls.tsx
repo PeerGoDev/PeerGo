@@ -220,8 +220,8 @@ function VIPChangeDialog({
 
   async function handleSubmit() {
     const normalizedReason = reason.trim()
-    if (normalizedReason.length < 10 || normalizedReason.length > 500) {
-      setValidationError("请填写 10–500 个字符的人工理由。")
+    if ([...normalizedReason].length > 500) {
+      setValidationError("人工理由不能超过 500 个字符。")
       return
     }
     setValidationError(undefined)
@@ -289,13 +289,12 @@ function VIPChangeDialog({
             <Textarea
               id="vip-change-reason"
               value={reason}
-              minLength={10}
               maxLength={500}
               rows={4}
               placeholder={
                 mode === "grant"
-                  ? "记录签发依据（10–500 字）…"
-                  : "记录撤销依据（10–500 字）…"
+                  ? "可留空；系统会自动记录签发依据"
+                  : "可留空；系统会自动记录撤销依据"
               }
               onChange={(event) => {
                 setReason(event.target.value)

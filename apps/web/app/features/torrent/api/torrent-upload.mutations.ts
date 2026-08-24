@@ -46,16 +46,14 @@ export function submitTorrent(
   if (input.tmdb_id) body.set("tmdb_id", input.tmdb_id)
   if (input.douban_id) body.set("douban_id", input.douban_id)
   input.facet_selections?.forEach((selection, selectionIndex) => {
-    body.set(
-      `facet_selections[${selectionIndex}][facet_id]`,
-      selection.facet_id
+    // Each array item is one JSON multipart part. kin-openapi validates only
+    // declared top-level part names, so bracket-expanded field names such as
+    // facet_selections[0][facet_id] are rejected before Core can bind them.
+    body.append(
+      "facet_selections",
+      new Blob([JSON.stringify(selection)], { type: "application/json" }),
+      `facet-selection-${selectionIndex + 1}.json`
     )
-    selection.option_keys.forEach((optionKey, optionIndex) => {
-      body.set(
-        `facet_selections[${selectionIndex}][option_keys][${optionIndex}]`,
-        optionKey
-      )
-    })
   })
   input.screenshots?.forEach((screenshot) => {
     body.append("screenshots", screenshot, screenshot.name)
@@ -135,7 +133,7 @@ function isTorrentSubmission(value: unknown): value is TorrentSubmission {
     Number.isSafeInteger(result.id) &&
     result.id > 0 &&
     typeof result.info_hash_v1 === "string" &&
-    result.state === "pending_review" &&
+    (result.state === "pending_review" || result.state === "published") &&
     typeof result.content_name === "string" &&
     typeof result.total_size_bytes === "number" &&
     typeof result.file_count === "number" &&

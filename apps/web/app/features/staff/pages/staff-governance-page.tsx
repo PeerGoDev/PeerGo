@@ -478,8 +478,8 @@ function ProposeRevocationDialog({
     event.preventDefault()
     const form = event.currentTarget
     const reason = String(new FormData(form).get("reason") ?? "").trim()
-    if (reason.length < 10 || reason.length > 1000) {
-      setReasonError("请填写 10–1000 字的完整撤权理由")
+    if ([...reason].length > 1000) {
+      setReasonError("撤权理由不能超过 1000 个字符")
       return
     }
     setReasonError("")
@@ -557,10 +557,9 @@ function ProposeRevocationDialog({
             <Textarea
               id={`revoke-reason-${grant.id}`}
               name="reason"
-              minLength={10}
               maxLength={1000}
               rows={4}
-              placeholder="说明为何需要撤销、依据和预期影响…"
+              placeholder="可留空；系统会自动记录撤权理由"
               aria-invalid={Boolean(reasonError)}
               disabled={mutation.isPending}
             />
@@ -712,8 +711,8 @@ function ReviewDialog({
     event.preventDefault()
     const form = event.currentTarget
     const reason = String(new FormData(form).get("reason") ?? "").trim()
-    if (reason.length < 10 || reason.length > 1000) {
-      setReasonError("请填写 10–1000 字的独立复核意见")
+    if ([...reason].length > 1000) {
+      setReasonError("独立复核意见不能超过 1000 个字符")
       return
     }
     setReasonError("")
@@ -787,10 +786,9 @@ function ReviewDialog({
             <Textarea
               id={`${domain}-${decision}-${request.id}`}
               name="reason"
-              minLength={10}
               maxLength={1000}
               rows={4}
-              placeholder="记录核验依据、风险判断与决定理由…"
+              placeholder="可留空；系统会自动记录独立复核意见"
               aria-invalid={Boolean(reasonError)}
               disabled={mutation.isPending}
             />

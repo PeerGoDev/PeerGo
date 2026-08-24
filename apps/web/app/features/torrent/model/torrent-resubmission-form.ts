@@ -11,7 +11,6 @@ export const torrentResubmissionFormSchema =
     correctionNote: z
       .string()
       .trim()
-      .refine((value) => runeLength(value) >= 10, "整改说明至少需要 10 个字符")
       .refine(
         (value) => runeLength(value) <= 1_000,
         "整改说明不能超过 1000 个字符"

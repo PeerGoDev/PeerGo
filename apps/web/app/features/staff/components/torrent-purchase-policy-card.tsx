@@ -79,7 +79,7 @@ export function TorrentPurchasePolicyCard({
     (feeValid && basisPoints !== purchase.tax_basis_points)
 
   async function handleConfirm() {
-    if (!changed || !feeValid || reasonLength < 10 || reasonLength > 1000) {
+    if (!changed || !feeValid || reasonLength > 1000) {
       return
     }
     try {
@@ -188,9 +188,7 @@ export function TorrentPurchasePolicyCard({
             ) : null}
           </Field>
 
-          <Field
-            data-invalid={(reasonLength > 0 && reasonLength < 10) || undefined}
-          >
+          <Field data-invalid={reasonLength > 1000 || undefined}>
             <FieldLabel htmlFor="torrent-purchase-policy-reason">
               修改说明
             </FieldLabel>
@@ -208,8 +206,8 @@ export function TorrentPurchasePolicyCard({
               }}
             />
             <FieldDescription>{reasonLength}/1000 字符</FieldDescription>
-            {reasonLength > 0 && reasonLength < 10 ? (
-              <FieldError>修改说明至少需要 10 个字符。</FieldError>
+            {reasonLength > 1000 ? (
+              <FieldError>修改说明不能超过 1000 个字符。</FieldError>
             ) : null}
           </Field>
         </FieldGroup>
@@ -236,7 +234,7 @@ export function TorrentPurchasePolicyCard({
           <Button
             type="button"
             disabled={
-              mutation.isPending || !changed || !feeValid || reasonLength < 10
+              mutation.isPending || !changed || !feeValid || reasonLength > 1000
             }
             onClick={() => setConfirmationOpen(true)}
           >

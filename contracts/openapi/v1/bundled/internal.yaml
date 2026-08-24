@@ -5960,6 +5960,9 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/TorrentSubmissionRequest'
+            encoding:
+              facet_selections:
+                contentType: application/json
       responses:
         '201':
           description: 原始对象已完整回读校验，种子及文件清单已原子写入待审核状态。
@@ -21443,7 +21446,6 @@ components:
             maxLength: 2097152
         reason:
           type: string
-          minLength: 10
           maxLength: 1000
     PublishedTorrentScreenshotChange:
       type: object

@@ -128,7 +128,7 @@ function RSSSettingsForm({
   const [rate, setRate] = React.useState(initial.requests_per_minute)
   const [reason, setReason] = React.useState("")
   const [success, setSuccess] = React.useState("")
-  const reasonValid = Array.from(reason.trim()).length >= 10
+  const reasonValid = Array.from(reason.trim()).length <= 500
   const changed =
     enabled !== initial.enabled ||
     cacheTTL !== initial.cache_ttl_seconds ||
@@ -270,11 +270,11 @@ function RSSSettingsForm({
                   rows={3}
                   disabled={!canUpdate || update.isPending}
                   onChange={(event) => setReason(event.target.value)}
-                  placeholder="至少 10 个字符，将写入后台审计记录"
+                  placeholder="可留空；系统会自动写入后台审计记录"
                 />
                 <FieldError>
                   {reason && !reasonValid
-                    ? "请填写至少 10 个字符的变更理由"
+                    ? "变更理由不能超过 500 个字符"
                     : undefined}
                 </FieldError>
               </Field>

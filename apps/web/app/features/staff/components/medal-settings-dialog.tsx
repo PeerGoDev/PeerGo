@@ -170,7 +170,7 @@ export function MedalSettingsDialog({
                 rows={3}
                 maxLength={500}
                 aria-invalid={Boolean(validation.reasonError)}
-                placeholder="说明本次调整全站勋章规则的原因（至少 10 个字符）"
+                placeholder="可留空；系统会自动记录全站勋章规则的变更理由"
                 onChange={(event) => update("reason", event.target.value)}
               />
               <FieldDescription>
@@ -324,10 +324,7 @@ function validateDraft(draft: Draft, expectedVersion: number) {
         : null,
     maximumMagicBonusError:
       maximumMagicBonusBps === null ? "请输入 0–1000%，最多两位小数。" : null,
-    reasonError:
-      reasonLength < 10 || reasonLength > 500
-        ? "变更理由需为 10–500 个字符。"
-        : null,
+    reasonError: reasonLength > 500 ? "变更理由不能超过 500 个字符。" : null,
     body: undefined as MedalSettingsWriteRequest | undefined,
   }
   if (

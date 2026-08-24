@@ -385,7 +385,6 @@ function RestrictionEditorDialog({
                 id="manual-download-restriction-reason"
                 value={reason}
                 rows={5}
-                minLength={10}
                 maxLength={500}
                 onChange={(event) => {
                   setReason(event.target.value)
@@ -393,7 +392,7 @@ function RestrictionEditorDialog({
                   mutation.reset()
                 }}
                 aria-invalid={Boolean(validationError || mutation.isError)}
-                placeholder="记录依据、影响范围和复核条件（10–500 字）…"
+                placeholder="可留空；系统会自动记录人工理由"
               />
               <FieldDescription>
                 保存后会追加历史记录，不覆盖已有处置证据。
@@ -538,7 +537,6 @@ function RestrictionRevokeDialog({
               id="manual-download-restriction-revoke-reason"
               value={reason}
               rows={4}
-              minLength={10}
               maxLength={500}
               onChange={(event) => {
                 setReason(event.target.value)
@@ -546,7 +544,7 @@ function RestrictionRevokeDialog({
                 mutation.reset()
               }}
               aria-invalid={Boolean(validationError || mutation.isError)}
-              placeholder="记录复核结论和解除依据（10–500 字）…"
+              placeholder="可留空；系统会自动记录解除理由"
             />
             {validationError ? (
               <FieldError>{validationError}</FieldError>

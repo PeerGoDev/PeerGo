@@ -44,7 +44,6 @@ import {
 } from "~/features/social/api/comments.queries"
 import { ApiProblemError } from "~/shared/api/problem"
 
-const minimumNoteCharacters = 10
 const maximumNoteCharacters = 1_000
 
 export function CommentModerationDecisionDialog({
@@ -71,9 +70,7 @@ export function CommentModerationDecisionDialog({
   const requestId = React.useRef<string>(undefined)
   const decide = useDecideCommentModerationCase()
   const noteCount = Array.from(note.trim()).length
-  const noteInvalid =
-    noteCount > 0 &&
-    (noteCount < minimumNoteCharacters || noteCount > maximumNoteCharacters)
+  const noteInvalid = noteCount > maximumNoteCharacters
   const canHide = moderationCase.comment.state === "visible"
   const decisionOptions: Array<{
     value: CommentModerationDecision
@@ -90,10 +87,7 @@ export function CommentModerationDecisionDialog({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (
-      noteCount < minimumNoteCharacters ||
-      noteCount > maximumNoteCharacters
-    ) {
+    if (noteCount > maximumNoteCharacters) {
       return
     }
     requestId.current ??= globalThis.crypto.randomUUID()
@@ -239,10 +233,9 @@ export function CommentModerationDecisionDialog({
                 id={noteFieldId}
                 value={note}
                 rows={5}
-                minLength={minimumNoteCharacters}
                 maxLength={maximumNoteCharacters + 1}
                 aria-invalid={noteInvalid || undefined}
-                placeholder="说明核对依据和处置边界，至少 10 个字符。"
+                placeholder="可留空；系统自动记录，或填写核对依据和处置边界。"
                 disabled={decide.isPending}
                 onChange={(event) => {
                   setNote(event.target.value)
@@ -255,7 +248,7 @@ export function CommentModerationDecisionDialog({
                 完整说明仅供后台留档，对外记录只保留必要摘要
               </FieldDescription>
               {noteInvalid ? (
-                <FieldError>内部说明需要 10–1000 个字符。</FieldError>
+                <FieldError>内部说明不能超过 1000 个字符。</FieldError>
               ) : null}
             </Field>
 
@@ -284,11 +277,7 @@ export function CommentModerationDecisionDialog({
             type="submit"
             form="comment-moderation-decision-form"
             variant={decision === "hide_comment" ? "destructive" : "default"}
-            disabled={
-              decide.isPending ||
-              noteCount < minimumNoteCharacters ||
-              noteCount > maximumNoteCharacters
-            }
+            disabled={decide.isPending || noteCount > maximumNoteCharacters}
           >
             {decide.isPending ? <Spinner data-icon="inline-start" /> : null}
             {decision === "hide_comment" ? "确认隐藏" : "确认关闭"}

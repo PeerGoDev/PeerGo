@@ -286,7 +286,6 @@ function NewcomerPolicyDialogContent({
     Number(uploadGiB) >= 0 &&
     Number(seedingHours) >= 0 &&
     (!enabled || Number(uploadGiB) > 0 || Number(seedingHours) > 0) &&
-    reasonLength >= 10 &&
     reasonLength <= 1000 &&
     Date.parse(effectiveAt) >= Date.parse(minimumEffectiveFrom)
 
@@ -409,25 +408,19 @@ function NewcomerPolicyDialogContent({
             </FieldDescription>
           </Field>
           <Field
-            data-invalid={
-              (reasonLength > 0 && reasonLength < 10) ||
-              mutation.isError ||
-              undefined
-            }
+            data-invalid={reasonLength > 1000 || mutation.isError || undefined}
           >
             <FieldLabel htmlFor="newcomer-policy-reason">调整原因</FieldLabel>
             <Textarea
               id="newcomer-policy-reason"
               value={reason}
               maxLength={1000}
-              aria-invalid={
-                (reasonLength > 0 && reasonLength < 10) || mutation.isError
-              }
+              aria-invalid={reasonLength > 1000 || mutation.isError}
               onChange={(event) => {
                 setReason(event.target.value)
                 mutation.reset()
               }}
-              placeholder="说明本次启用、关闭或调整目标的原因（至少 10 个字符）"
+              placeholder="可留空；系统会自动记录本次调整原因"
             />
             <FieldDescription>{reasonLength}/1000 个字符</FieldDescription>
             {mutation.isError ? (

@@ -11,10 +11,6 @@ const administrationReasonSchema = z
   .string()
   .trim()
   .refine(
-    (value) => Array.from(value).length >= 10,
-    "请填写至少 10 个字符的人工理由"
-  )
-  .refine(
     (value) => Array.from(value).length <= 500,
     "人工理由不能超过 500 个字符"
   )

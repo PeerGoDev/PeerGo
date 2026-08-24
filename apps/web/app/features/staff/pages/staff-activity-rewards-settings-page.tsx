@@ -467,11 +467,10 @@ function AttendancePolicyEditor({
                   id="attendance-change-reason"
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
-                  minLength={10}
                   maxLength={1000}
                   rows={3}
                   disabled={disabled}
-                  placeholder="说明调整依据和影响范围（至少 10 个字符）…"
+                  placeholder="可留空；系统会自动记录变更原因"
                   aria-invalid={Boolean(validationError)}
                 />
                 <FieldError>{validationError}</FieldError>
@@ -756,7 +755,8 @@ function validateSettings(input: {
     if (days.has(Number(milestone.days))) return "连续奖励天数不能重复。"
     days.add(Number(milestone.days))
   }
-  if (input.reason.trim().length < 10) return "请填写至少 10 个字符的变更原因。"
+  if ([...input.reason.trim()].length > 1000)
+    return "变更原因不能超过 1000 个字符。"
   return ""
 }
 

@@ -590,7 +590,7 @@ function ReviewSubmissionDialog({
 }) {
   const mutation = useReviewWorkgroupTaskSubmission()
   const [reason, setReason] = React.useState("")
-  const valid = reason.trim().length >= 10 && reason.trim().length <= 1000
+  const valid = [...reason.trim()].length <= 1000
   const submission = state.assignment.latest_submission
 
   React.useEffect(() => {
@@ -645,7 +645,7 @@ function ReviewSubmissionDialog({
                 aria-invalid={reason.length > 0 && !valid}
               />
               <FieldDescription>
-                说明核对结果；要求修改时请写清具体缺项，10–1000 个字符。
+                可留空；系统会自动记录验收说明。要求修改时建议写清具体缺项。
               </FieldDescription>
               <FieldError>
                 {reason.length > 0 && !valid

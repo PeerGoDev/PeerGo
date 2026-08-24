@@ -2,7 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
+	"mime/multipart"
 	"net/http"
 
 	"github.com/oapi-codegen/runtime"
@@ -26,8 +29,11 @@ func (h *Handler) SubmitTorrent(ctx context.Context, request generated.SubmitTor
 	if request.Body == nil {
 		return torrentUploadBadRequest(ctx), nil
 	}
-	var body generated.TorrentSubmissionRequest
-	if err := runtime.BindMultipart(&body, *request.Body); err != nil {
+	body, cleanup, err := bindTorrentSubmissionMultipart(*request.Body)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	if err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
 			problem := newProblemFromContext(ctx, http.StatusRequestEntityTooLarge, "torrent_upload_too_large", "种子文件过大", "上传内容超过当前站点允许的大小。")
@@ -73,6 +79,58 @@ func (h *Handler) SubmitTorrent(ctx context.Context, request generated.SubmitTor
 		FileCount:      result.FileCount,
 		SubmittedAt:    result.SubmittedAt,
 	}, nil
+}
+
+const maxTorrentFacetSelectionPartBytes = 16 << 10
+
+// bindTorrentSubmissionMultipart keeps the wire representation valid for both
+// OpenAPI validation and the generated Go model. Complex array values are sent
+// as repeated JSON parts because multipart bracket expansion creates
+// undeclared top-level fields and is rejected by kin-openapi.
+func bindTorrentSubmissionMultipart(reader multipart.Reader) (generated.TorrentSubmissionRequest, func(), error) {
+	form, err := reader.ReadForm(32 << 20)
+	if err != nil {
+		return generated.TorrentSubmissionRequest{}, nil, err
+	}
+	cleanup := func() { _ = form.RemoveAll() }
+
+	var body generated.TorrentSubmissionRequest
+	if err := runtime.BindForm(&body, form.Value, form.File, nil); err != nil {
+		return generated.TorrentSubmissionRequest{}, cleanup, err
+	}
+
+	parts := form.File["facet_selections"]
+	if len(parts) == 0 {
+		return body, cleanup, nil
+	}
+	if len(parts) > 20 {
+		return generated.TorrentSubmissionRequest{}, cleanup, torrents.ErrTorrentInputInvalid
+	}
+	selections := make([]generated.TorrentFacetSelectionInput, 0, len(parts))
+	for _, part := range parts {
+		file, err := part.Open()
+		if err != nil {
+			return generated.TorrentSubmissionRequest{}, cleanup, err
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(file, maxTorrentFacetSelectionPartBytes+1))
+		closeErr := file.Close()
+		if readErr != nil {
+			return generated.TorrentSubmissionRequest{}, cleanup, readErr
+		}
+		if closeErr != nil {
+			return generated.TorrentSubmissionRequest{}, cleanup, closeErr
+		}
+		if len(raw) == 0 || len(raw) > maxTorrentFacetSelectionPartBytes {
+			return generated.TorrentSubmissionRequest{}, cleanup, torrents.ErrTorrentInputInvalid
+		}
+		var selection generated.TorrentFacetSelectionInput
+		if err := json.Unmarshal(raw, &selection); err != nil {
+			return generated.TorrentSubmissionRequest{}, cleanup, err
+		}
+		selections = append(selections, selection)
+	}
+	body.FacetSelections = &selections
+	return body, cleanup, nil
 }
 
 func torrentUploadScreenshots(body generated.TorrentSubmissionRequest) ([]torrents.TorrentScreenshotInput, error) {

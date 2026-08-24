@@ -42,7 +42,6 @@ import { ApiProblemError } from "~/shared/api/problem"
 type ReviewDecision = TorrentReviewDecisionRequest["decision"]
 type ReviewReasonCode = TorrentReviewDecisionRequest["reason_code"]
 
-const minimumReasonCharacters = 10
 const maximumReasonCharacters = 1_000
 const decisionOptions: Array<{ value: ReviewDecision; label: string }> = [
   { value: "approve", label: "通过并发布" },
@@ -82,10 +81,7 @@ export function TorrentReviewDecisionDialog({
   const requestId = React.useRef<string>(undefined)
   const decide = useDecideTorrentReview()
   const reasonCount = Array.from(reason.trim()).length
-  const reasonInvalid =
-    reasonCount > 0 &&
-    (reasonCount < minimumReasonCharacters ||
-      reasonCount > maximumReasonCharacters)
+  const reasonInvalid = reasonCount > maximumReasonCharacters
 
   function resetAttempt() {
     requestId.current = undefined
@@ -94,10 +90,7 @@ export function TorrentReviewDecisionDialog({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (
-      reasonCount < minimumReasonCharacters ||
-      reasonCount > maximumReasonCharacters
-    ) {
+    if (reasonCount > maximumReasonCharacters) {
       return
     }
     requestId.current ??= globalThis.crypto.randomUUID()
@@ -221,14 +214,13 @@ export function TorrentReviewDecisionDialog({
               <Textarea
                 id={reasonFieldId}
                 rows={5}
-                minLength={minimumReasonCharacters}
                 maxLength={maximumReasonCharacters + 1}
                 value={reason}
                 aria-invalid={reasonInvalid || undefined}
                 placeholder={
                   decision === "approve"
-                    ? "说明已核对的发布要求，至少 10 个字符。"
-                    : "向上传者说明需要修改的内容，至少 10 个字符。"
+                    ? "可留空；系统会自动记录已完成发布要求核对。"
+                    : "可留空；建议向上传者说明需要修改的内容。"
                 }
                 disabled={decide.isPending}
                 onChange={(event) => {
@@ -242,7 +234,7 @@ export function TorrentReviewDecisionDialog({
                 上传者会在自己的审核记录中看到该说明
               </FieldDescription>
               {reasonInvalid ? (
-                <FieldError>审核说明需要 10–1000 个字符。</FieldError>
+                <FieldError>审核说明不能超过 1000 个字符。</FieldError>
               ) : null}
             </Field>
 
@@ -271,11 +263,7 @@ export function TorrentReviewDecisionDialog({
             type="submit"
             form="torrent-review-decision-form"
             variant={decision === "reject" ? "destructive" : "default"}
-            disabled={
-              decide.isPending ||
-              reasonCount < minimumReasonCharacters ||
-              reasonCount > maximumReasonCharacters
-            }
+            disabled={decide.isPending || reasonCount > maximumReasonCharacters}
           >
             {decide.isPending ? <Spinner data-icon="inline-start" /> : null}
             {decision === "approve" ? "确认通过" : "确认驳回"}

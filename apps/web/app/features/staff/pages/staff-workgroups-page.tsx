@@ -560,8 +560,8 @@ function ContributionPolicyDialog({
   )
   const targetError = target ? targetValidationError : undefined
   const reasonError =
-    reason.length > 0 && reason.trim().length < 10
-      ? "设置理由至少需要 10 个字符。"
+    [...reason.trim()].length > 1000
+      ? "设置理由不能超过 1000 个字符。"
       : undefined
 
   React.useEffect(() => {
@@ -576,7 +576,7 @@ function ContributionPolicyDialog({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (targetValidationError || reason.trim().length < 10) return
+    if (targetValidationError || reasonError) return
     try {
       await mutation.mutateAsync({
         csrfToken,
@@ -646,7 +646,6 @@ function ContributionPolicyDialog({
               <Textarea
                 id="contribution-policy-reason"
                 value={reason}
-                minLength={10}
                 maxLength={1000}
                 aria-invalid={Boolean(reasonError)}
                 onChange={(event) => setReason(event.target.value)}
@@ -667,7 +666,7 @@ function ContributionPolicyDialog({
                 !effectiveMonth ||
                 !target ||
                 Boolean(targetValidationError) ||
-                reason.trim().length < 10 ||
+                Boolean(reasonError) ||
                 mutation.isPending
               }
             >
@@ -1123,10 +1122,9 @@ function ContributionReminderDialog({
                 id="workgroup-contribution-reminder-reason"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
-                minLength={10}
                 maxLength={1000}
                 rows={5}
-                placeholder="说明需要关注的贡献进度，以及建议如何补足。"
+                placeholder="可留空；系统会自动记录提醒说明"
               />
               <FieldDescription>
                 该说明会向成员显示；提醒不会自动暂停或结束成员资格。
@@ -1147,7 +1145,7 @@ function ContributionReminderDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={mutation.isPending || reason.trim().length < 10}
+              disabled={mutation.isPending || [...reason.trim()].length > 1000}
             >
               {mutation.isPending ? (
                 <Spinner data-icon="inline-start" />
@@ -1210,12 +1208,11 @@ function ApplicationDecisionDialog({
             <Textarea
               id="application-decision-reason"
               value={reason}
-              minLength={10}
               maxLength={1000}
               onChange={(event) => setReason(event.target.value)}
             />
             <FieldDescription>
-              至少 10 个字符，决定与理由不可覆盖。
+              可留空；系统会自动记录审批理由，决定与理由不可覆盖。
             </FieldDescription>
           </Field>
           <DialogFooter>
@@ -1224,7 +1221,7 @@ function ApplicationDecisionDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={reason.trim().length < 10 || mutation.isPending}
+              disabled={[...reason.trim()].length > 1000 || mutation.isPending}
             >
               {mutation.isPending ? "正在保存…" : "确认决定"}
             </Button>
@@ -1294,12 +1291,11 @@ function GrantMembershipDialog({
               <Textarea
                 id="workgroup-grant-reason"
                 value={reason}
-                minLength={10}
                 maxLength={1000}
                 onChange={(event) => setReason(event.target.value)}
               />
               <FieldDescription>
-                至少 10 个字符，作为成员历史的一部分。
+                可留空；系统会自动记录并作为成员历史的一部分。
               </FieldDescription>
             </Field>
           </FieldGroup>
@@ -1310,7 +1306,9 @@ function GrantMembershipDialog({
             <Button
               type="submit"
               disabled={
-                !userId || reason.trim().length < 10 || mutation.isPending
+                !userId ||
+                [...reason.trim()].length > 1000 ||
+                mutation.isPending
               }
             >
               {mutation.isPending ? "正在保存…" : "确认添加"}
@@ -1364,7 +1362,6 @@ function MembershipChangeDialog({
             <Textarea
               id="membership-change-reason"
               value={reason}
-              minLength={10}
               maxLength={1000}
               onChange={(event) => setReason(event.target.value)}
             />
@@ -1378,7 +1375,7 @@ function MembershipChangeDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={reason.trim().length < 10 || mutation.isPending}
+              disabled={[...reason.trim()].length > 1000 || mutation.isPending}
             >
               {mutation.isPending ? "正在保存…" : "确认变更"}
             </Button>

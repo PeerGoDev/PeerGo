@@ -342,9 +342,8 @@ function CreateRestrictionForm({
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   rows={4}
-                  minLength={10}
                   maxLength={500}
-                  placeholder="记录依据、影响范围和后续复核要求（10–500 字）…"
+                  placeholder="可留空；系统会自动记录人工理由"
                   disabled={mutation.isPending}
                   aria-invalid={Boolean(errors.reason)}
                 />
@@ -604,9 +603,8 @@ function RevokeRestrictionForm({
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   rows={4}
-                  minLength={10}
                   maxLength={500}
-                  placeholder="记录解除依据和复核结论（10–500 字）…"
+                  placeholder="可留空；系统会自动记录解除理由"
                   disabled={mutation.isPending}
                   aria-invalid={Boolean(errors.reason)}
                 />

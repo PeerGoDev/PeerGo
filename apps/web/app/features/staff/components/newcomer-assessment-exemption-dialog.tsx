@@ -53,7 +53,7 @@ export function NewcomerAssessmentExemptionDialog({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!assessment || reasonLength < 10 || reasonLength > 1000) return
+    if (!assessment || reasonLength > 1000) return
     try {
       await mutation.mutateAsync({
         assessmentId: assessment.id,
@@ -90,9 +90,7 @@ export function NewcomerAssessmentExemptionDialog({
             </Alert>
             <Field
               data-invalid={
-                (reasonLength > 0 && reasonLength < 10) ||
-                mutation.isError ||
-                undefined
+                reasonLength > 1000 || mutation.isError || undefined
               }
             >
               <FieldLabel htmlFor="newcomer-exemption-reason">
@@ -102,10 +100,8 @@ export function NewcomerAssessmentExemptionDialog({
                 id="newcomer-exemption-reason"
                 value={reason}
                 maxLength={1000}
-                placeholder="说明核对结果和豁免依据（至少 10 个字符）"
-                aria-invalid={
-                  (reasonLength > 0 && reasonLength < 10) || mutation.isError
-                }
+                placeholder="可留空；系统自动记录，或填写核对结果和豁免依据"
+                aria-invalid={reasonLength > 1000 || mutation.isError}
                 onChange={(event) => {
                   setReason(event.target.value)
                   mutation.reset()
@@ -129,10 +125,7 @@ export function NewcomerAssessmentExemptionDialog({
             <Button
               type="submit"
               disabled={
-                !assessment ||
-                reasonLength < 10 ||
-                reasonLength > 1000 ||
-                mutation.isPending
+                !assessment || reasonLength > 1000 || mutation.isPending
               }
             >
               {mutation.isPending ? (

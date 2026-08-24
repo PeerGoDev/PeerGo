@@ -47,7 +47,7 @@ export function TorrentPurchaseRefundDialog({
   }, [purchase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (!purchase || reasonLength < 10 || reasonLength > 1000) return
+    if (!purchase || reasonLength > 1000) return
     try {
       const result = await mutation.mutateAsync({
         buyerNumericId: purchase.buyer_numeric_id,
@@ -93,11 +93,7 @@ export function TorrentPurchaseRefundDialog({
 
         <FieldGroup>
           <Field
-            data-invalid={
-              (reasonLength > 0 && reasonLength < 10) ||
-              mutation.isError ||
-              undefined
-            }
+            data-invalid={reasonLength > 1000 || mutation.isError || undefined}
           >
             <FieldLabel htmlFor="torrent-purchase-refund-reason">
               退款说明
@@ -107,15 +103,15 @@ export function TorrentPurchaseRefundDialog({
               value={reason}
               rows={3}
               maxLength={1000}
-              placeholder="例如：核实为重复购买，按工单结论执行全额退款"
+              placeholder="可留空；系统会自动记录退款说明"
               onChange={(event) => {
                 setReason(event.target.value)
                 if (mutation.isError) mutation.reset()
               }}
             />
             <FieldDescription>{reasonLength}/1000 字符</FieldDescription>
-            {reasonLength > 0 && reasonLength < 10 ? (
-              <FieldError>退款说明至少需要 10 个字符。</FieldError>
+            {reasonLength > 1000 ? (
+              <FieldError>退款说明不能超过 1000 个字符。</FieldError>
             ) : null}
             {mutation.isError ? (
               <FieldError>
@@ -131,9 +127,7 @@ export function TorrentPurchaseRefundDialog({
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
-            disabled={
-              mutation.isPending || reasonLength < 10 || reasonLength > 1000
-            }
+            disabled={mutation.isPending || reasonLength > 1000}
             onClick={() => void handleSubmit()}
           >
             {mutation.isPending ? (

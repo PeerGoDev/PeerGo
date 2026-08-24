@@ -41,7 +41,6 @@ describe("categoryFormSchema", () => {
   it.each([
     ["uppercase id", { id: "Documentary" }],
     ["fractional order", { displayOrder: "3.5" }],
-    ["short reason", { reason: "理由太短" }],
   ])("rejects %s before a mutation is opened", (_name, override) => {
     const result = categoryFormSchema.safeParse({
       id: "documentary",
@@ -53,6 +52,18 @@ describe("categoryFormSchema", () => {
     })
 
     expect(result.success).toBe(false)
+  })
+
+  it("accepts a blank audit reason", () => {
+    expect(
+      categoryFormSchema.safeParse({
+        id: "documentary",
+        name: "纪录片",
+        displayOrder: "30",
+        enabled: true,
+        reason: "",
+      }).success
+    ).toBe(true)
   })
 
   it("detects only business-field changes, not the audit reason", () => {

@@ -102,6 +102,9 @@ TorrentsPath:
         multipart/form-data:
           schema:
             $ref: "../schemas/torrents.yaml#/TorrentSubmissionRequest"
+          encoding:
+            facet_selections:
+              contentType: application/json
     responses:
       "201":
         description: >-

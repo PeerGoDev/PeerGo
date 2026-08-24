@@ -16,9 +16,7 @@ describe("AnnouncementEditorSheet", () => {
       screen.getByText("仅可使用字母、数字、点、下划线和连字符，最长 120 位")
     ).toBeInTheDocument()
     expect(screen.getByText("请输入公告标题")).toBeInTheDocument()
-    expect(
-      screen.getByText("请填写至少 10 个字符的变更理由")
-    ).toBeInTheDocument()
+    expect(screen.queryByText(/变更理由.*至少 10/)).not.toBeInTheDocument()
     await waitFor(() =>
       expect(screen.getByLabelText("公开路由键")).toHaveFocus()
     )

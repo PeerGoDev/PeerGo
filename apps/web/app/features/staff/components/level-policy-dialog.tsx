@@ -312,7 +312,6 @@ export function LevelPolicyDialog({
             <Textarea
               id="level-policy-reason"
               rows={3}
-              minLength={10}
               maxLength={1000}
               value={reason}
               aria-invalid={validation.reasonError !== null}
@@ -323,7 +322,7 @@ export function LevelPolicyDialog({
               }}
             />
             <FieldDescription>
-              {Array.from(reason.trim()).length} / 1000，至少 10 个字符。
+              {Array.from(reason.trim()).length} / 1000；留空时由系统自动记录。
             </FieldDescription>
             {validation.reasonError ? (
               <FieldError>{validation.reasonError}</FieldError>
@@ -428,11 +427,7 @@ function validateLevelPolicy(
 
   const reasonLength = Array.from(reason.trim()).length
   const reasonError =
-    reasonLength > 0 && reasonLength < 10
-      ? "修改说明至少需要 10 个字符。"
-      : reasonLength > 1000
-        ? "修改说明不能超过 1000 个字符。"
-        : null
+    reasonLength > 1000 ? "修改说明不能超过 1000 个字符。" : null
   const rowError = invalidRows.size
     ? "经验门槛必须从 0 开始并逐级增加；做种加成和额外计奖数量不能在更高等级降低。"
     : null
@@ -446,7 +441,6 @@ function validateLevelPolicy(
       levels.length <= 99 &&
       invalidRows.size === 0 &&
       timeError === null &&
-      reasonLength >= 10 &&
       reasonLength <= 1000,
   }
 }

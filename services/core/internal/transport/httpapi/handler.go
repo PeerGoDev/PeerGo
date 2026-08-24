@@ -1292,7 +1292,7 @@ func (h *Handler) RevokeManagedUserManualDownloadRestriction(ctx context.Context
 
 func (h *Handler) ChangeManagedUserVIP(ctx context.Context, request generated.ChangeManagedUserVIPRequestObject) (generated.ChangeManagedUserVIPResponseObject, error) {
 	if request.Body == nil {
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_vip_change", "VIP 变更无效", "请检查期限、账户版本、状态版本和人工理由。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_vip_change", "VIP 变更无效", "请检查期限、账户版本和状态版本。")
 		return generated.ChangeManagedUserVIP400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil
@@ -1314,7 +1314,7 @@ func (h *Handler) ChangeManagedUserVIP(ctx context.Context, request generated.Ch
 		ExpectedStateVersion: request.Body.ExpectedStateVersion,
 	})
 	if errors.Is(err, identity.ErrUserAdministrationInput) {
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_vip_change", "VIP 变更无效", "限期 VIP 为 1–3650 天；永久 VIP 不填写期限，理由至少 10 个字符。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_vip_change", "VIP 变更无效", "限期 VIP 为 1–3650 天；永久 VIP 不填写期限。")
 		return generated.ChangeManagedUserVIP400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil

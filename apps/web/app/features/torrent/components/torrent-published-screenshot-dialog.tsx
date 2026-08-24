@@ -141,7 +141,7 @@ export function TorrentPublishedScreenshotDialog({
   }
 
   async function submit() {
-    if (reasonLength < 10 || reasonLength > 1000 || items.length > 6) return
+    if (reasonLength > 1000 || items.length > 6) return
     const uploads = items
       .filter(
         (item): item is Extract<EditorItem, { kind: "upload" }> =>
@@ -278,7 +278,7 @@ export function TorrentPublishedScreenshotDialog({
               </FieldDescription>
               {inputError ? <FieldError>{inputError}</FieldError> : null}
             </Field>
-            <Field data-invalid={reasonLength > 0 && reasonLength < 10}>
+            <Field data-invalid={reasonLength > 1000}>
               <FieldLabel htmlFor="published-screenshot-reason">
                 修改说明
               </FieldLabel>
@@ -286,9 +286,8 @@ export function TorrentPublishedScreenshotDialog({
                 id="published-screenshot-reason"
                 value={reason}
                 rows={3}
-                minLength={10}
                 maxLength={1000}
-                placeholder="说明更换截图、封面或顺序的原因"
+                placeholder="可留空；系统会自动记录修改说明"
                 onChange={(event) => {
                   setReason(event.target.value)
                   requestId.current = undefined
@@ -296,10 +295,10 @@ export function TorrentPublishedScreenshotDialog({
                 }}
               />
               <FieldDescription>
-                {reasonLength} / 1000，至少 10 个字符
+                {reasonLength} / 1000；留空时由系统自动记录
               </FieldDescription>
-              {reasonLength > 0 && reasonLength < 10 ? (
-                <FieldError>修改说明至少需要 10 个字符。</FieldError>
+              {reasonLength > 1000 ? (
+                <FieldError>修改说明不能超过 1000 个字符。</FieldError>
               ) : null}
             </Field>
           </FieldGroup>
@@ -320,7 +319,7 @@ export function TorrentPublishedScreenshotDialog({
               detail.isPending ||
               detail.isError ||
               mutation.isPending ||
-              reasonLength < 10
+              reasonLength > 1000
             }
             onClick={() => void submit()}
           >
