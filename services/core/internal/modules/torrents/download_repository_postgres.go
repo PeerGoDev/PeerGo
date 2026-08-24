@@ -86,7 +86,7 @@ func (repository *PostgresTorrentDownloadRepository) PublishedDownloadSource(ctx
 		})
 	}
 	return TorrentDownloadSource{
-		TorrentID: torrentID, Title: object.Title, ObjectID: object.ObjectID,
+		TorrentID: torrentID, Title: object.Title, FilenamePrefix: object.TorrentFilenamePrefix, ObjectID: object.ObjectID,
 		Descriptor: StoredObjectDescriptor{SHA256: contentDigest, ByteLength: object.ByteLength},
 		InfoOffset: object.InfoOffset, InfoLength: object.InfoLength,
 		Locations: locations,

@@ -2,6 +2,7 @@
 SELECT
     torrent.id AS torrent_id,
     torrent.title,
+    site.torrent_filename_prefix,
     object.id AS object_id,
     object.content_sha256,
     object.byte_length,
@@ -9,8 +10,10 @@ SELECT
     object.info_length
 FROM torrents.torrents AS torrent
 JOIN torrents.torrent_objects AS object ON object.id = torrent.object_id
+CROSS JOIN catalog.site_profile AS site
 WHERE torrent.id = sqlc.arg(torrent_id)::bigint
-  AND torrent.state = 'published';
+  AND torrent.state = 'published'
+  AND site.singleton = true;
 
 -- name: ListReadableTorrentObjectLocations :many
 SELECT

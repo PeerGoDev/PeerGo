@@ -686,6 +686,7 @@ const getSiteDisplaySettings = `-- name: GetSiteDisplaySettings :one
 SELECT
     name,
     description,
+    torrent_filename_prefix,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -698,6 +699,7 @@ WHERE singleton = true
 type GetSiteDisplaySettingsRow struct {
 	Name                   string
 	Description            string
+	TorrentFilenamePrefix  string
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
 	Version                int64
@@ -711,6 +713,7 @@ func (q *Queries) GetSiteDisplaySettings(ctx context.Context) (GetSiteDisplaySet
 	err := row.Scan(
 		&i.Name,
 		&i.Description,
+		&i.TorrentFilenamePrefix,
 		&i.DefaultTorrentView,
 		&i.ShowLatestAnnouncement,
 		&i.Version,
@@ -724,6 +727,7 @@ const getSiteDisplaySettingsForUpdate = `-- name: GetSiteDisplaySettingsForUpdat
 SELECT
     name,
     description,
+    torrent_filename_prefix,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -737,6 +741,7 @@ FOR UPDATE
 type GetSiteDisplaySettingsForUpdateRow struct {
 	Name                   string
 	Description            string
+	TorrentFilenamePrefix  string
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
 	Version                int64
@@ -750,6 +755,7 @@ func (q *Queries) GetSiteDisplaySettingsForUpdate(ctx context.Context) (GetSiteD
 	err := row.Scan(
 		&i.Name,
 		&i.Description,
+		&i.TorrentFilenamePrefix,
 		&i.DefaultTorrentView,
 		&i.ShowLatestAnnouncement,
 		&i.Version,
@@ -1885,16 +1891,18 @@ UPDATE catalog.site_profile
 SET
     name = $1::text,
     description = $2::text,
-    default_torrent_view = $3::text,
-    show_latest_announcement = $4::boolean,
+    torrent_filename_prefix = $3::text,
+    default_torrent_view = $4::text,
+    show_latest_announcement = $5::boolean,
     version = version + 1,
-    effective_at = $5::timestamptz,
-    updated_at = $5::timestamptz
+    effective_at = $6::timestamptz,
+    updated_at = $6::timestamptz
 WHERE singleton = true
-  AND version = $6::bigint
+  AND version = $7::bigint
 RETURNING
     name,
     description,
+    torrent_filename_prefix,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -1905,6 +1913,7 @@ RETURNING
 type UpdateSiteDisplaySettingsParams struct {
 	SiteName               string
 	SiteDescription        string
+	TorrentFilenamePrefix  string
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
 	OccurredAt             pgtype.Timestamptz
@@ -1914,6 +1923,7 @@ type UpdateSiteDisplaySettingsParams struct {
 type UpdateSiteDisplaySettingsRow struct {
 	Name                   string
 	Description            string
+	TorrentFilenamePrefix  string
 	DefaultTorrentView     string
 	ShowLatestAnnouncement bool
 	Version                int64
@@ -1925,6 +1935,7 @@ func (q *Queries) UpdateSiteDisplaySettings(ctx context.Context, arg UpdateSiteD
 	row := q.db.QueryRow(ctx, updateSiteDisplaySettings,
 		arg.SiteName,
 		arg.SiteDescription,
+		arg.TorrentFilenamePrefix,
 		arg.DefaultTorrentView,
 		arg.ShowLatestAnnouncement,
 		arg.OccurredAt,
@@ -1934,6 +1945,7 @@ func (q *Queries) UpdateSiteDisplaySettings(ctx context.Context, arg UpdateSiteD
 	err := row.Scan(
 		&i.Name,
 		&i.Description,
+		&i.TorrentFilenamePrefix,
 		&i.DefaultTorrentView,
 		&i.ShowLatestAnnouncement,
 		&i.Version,

@@ -8915,8 +8915,13 @@ type SiteDisplaySettings struct {
 	EffectiveAt            time.Time `json:"effective_at"`
 	Name                   string    `json:"name"`
 	ShowLatestAnnouncement bool      `json:"show_latest_announcement"`
-	UpdatedAt              time.Time `json:"updated_at"`
-	Version                int64     `json:"version"`
+
+	// TorrentFilenamePrefix 下载普通或 RSS 种子时添加在标题前的文件名前缀；留空表示不添加。
+	//
+	// Example: [ROUSI]
+	TorrentFilenamePrefix string    `json:"torrent_filename_prefix"`
+	UpdatedAt             time.Time `json:"updated_at"`
+	Version               int64     `json:"version"`
 }
 
 // SiteDisplaySettingsDefaultTorrentView defines model for SiteDisplaySettings.DefaultTorrentView.
@@ -10377,6 +10382,9 @@ type UpdateSiteDisplaySettingsRequest struct {
 	Name                   string                                             `json:"name"`
 	Reason                 string                                             `json:"reason"`
 	ShowLatestAnnouncement bool                                               `json:"show_latest_announcement"`
+
+	// TorrentFilenamePrefix 下载文件名前缀；保存后立即应用于普通下载和 RSS 下载。
+	TorrentFilenamePrefix string `json:"torrent_filename_prefix"`
 }
 
 // UpdateSiteDisplaySettingsRequestDefaultTorrentView defines model for UpdateSiteDisplaySettingsRequest.DefaultTorrentView.

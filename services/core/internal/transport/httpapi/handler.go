@@ -1446,7 +1446,7 @@ func (h *Handler) GetSiteDisplaySettings(ctx context.Context, _ generated.GetSit
 // repository locks that singleton and commits its outbox evidence atomically.
 func (h *Handler) UpdateSiteDisplaySettings(ctx context.Context, request generated.UpdateSiteDisplaySettingsRequestObject) (generated.UpdateSiteDisplaySettingsResponseObject, error) {
 	if request.Body == nil {
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_site_display_settings", "站点与展示设置无效", "请检查名称、说明、默认视图、版本和变更理由。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_site_display_settings", "站点与展示设置无效", "请检查名称、说明、种子文件名前缀、默认视图、版本和变更理由。")
 		return generated.UpdateSiteDisplaySettings400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil
@@ -1463,12 +1463,13 @@ func (h *Handler) UpdateSiteDisplaySettings(ctx context.Context, request generat
 	}
 	result, err := h.siteDisplaySettings.Update(ctx, staffActor(session), catalog.UpdateSiteDisplaySettingsInput{
 		Name: request.Body.Name, Description: request.Body.Description,
+		TorrentFilenamePrefix:  request.Body.TorrentFilenamePrefix,
 		DefaultTorrentView:     catalog.TorrentView(request.Body.DefaultTorrentView),
 		ShowLatestAnnouncement: request.Body.ShowLatestAnnouncement,
 		ExpectedVersion:        request.Body.ExpectedVersion, Reason: request.Body.Reason,
 	})
 	if errors.Is(err, catalog.ErrSiteDisplaySettingsInput) {
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_site_display_settings", "站点与展示设置无效", "请检查名称、说明、默认视图、版本和变更理由。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_site_display_settings", "站点与展示设置无效", "请检查名称、说明、种子文件名前缀、默认视图、版本和变更理由。")
 		return generated.UpdateSiteDisplaySettings400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil
@@ -3302,6 +3303,7 @@ func managedCategoryFacetOptionDTO(option catalog.ManagedCategoryFacetOption) ge
 func siteDisplaySettingsDTO(settings catalog.SiteDisplaySettings) generated.SiteDisplaySettings {
 	return generated.SiteDisplaySettings{
 		Name: settings.Name, Description: settings.Description,
+		TorrentFilenamePrefix:  settings.TorrentFilenamePrefix,
 		DefaultTorrentView:     generated.SiteDisplaySettingsDefaultTorrentView(settings.DefaultTorrentView),
 		ShowLatestAnnouncement: settings.ShowLatestAnnouncement,
 		Version:                settings.Version, EffectiveAt: settings.EffectiveAt, UpdatedAt: settings.UpdatedAt,

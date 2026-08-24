@@ -12,6 +12,21 @@ export const siteDisplaySettingsFormSchema = z.object({
     .string()
     .trim()
     .refine((value) => runeLength(value) <= 500, "站点说明不能超过 500 个字符"),
+  torrentFilenamePrefix: z
+    .string()
+    .trim()
+    .refine(
+      (value) => runeLength(value) <= 40,
+      "种子文件名前缀不能超过 40 个字符"
+    )
+    .refine(
+      (value) => !/[\\/:*?"<>|\u0000-\u001f\u007f]/u.test(value),
+      "种子文件名前缀不能包含路径或控制字符"
+    )
+    .refine(
+      (value) => value === "" || value.replaceAll(".", "").length > 0,
+      "种子文件名前缀不能只包含句点"
+    ),
   defaultTorrentView: z.enum(["list", "poster"]),
   showLatestAnnouncement: z.boolean(),
   reason: z
@@ -62,6 +77,13 @@ export function siteDisplaySettingsDiff(
       field: "站点说明",
       before: displayText(settings.description),
       after: displayText(values.description),
+    })
+  }
+  if (settings.torrent_filename_prefix !== values.torrentFilenamePrefix) {
+    changes.push({
+      field: "种子文件名前缀",
+      before: displayText(settings.torrent_filename_prefix),
+      after: displayText(values.torrentFilenamePrefix),
     })
   }
   if (settings.default_torrent_view !== values.defaultTorrentView) {

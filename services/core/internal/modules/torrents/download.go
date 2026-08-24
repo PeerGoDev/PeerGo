@@ -39,13 +39,14 @@ type TorrentDownloadLocation struct {
 }
 
 type TorrentDownloadSource struct {
-	TorrentID  TorrentID
-	Title      string
-	ObjectID   uuid.UUID
-	Descriptor StoredObjectDescriptor
-	InfoOffset int64
-	InfoLength int64
-	Locations  []TorrentDownloadLocation
+	TorrentID      TorrentID
+	Title          string
+	FilenamePrefix string
+	ObjectID       uuid.UUID
+	Descriptor     StoredObjectDescriptor
+	InfoOffset     int64
+	InfoLength     int64
+	Locations      []TorrentDownloadLocation
 }
 
 type TorrentDownloadResult struct {
@@ -236,7 +237,7 @@ func (service *TorrentDownloadService) downloadForAuthorizedUser(ctx context.Con
 	}
 	return TorrentDownloadResult{
 		Data:     copyBytes,
-		Filename: torrentDownloadFilename(source.Title, source.TorrentID),
+		Filename: torrentDownloadFilename(source.FilenamePrefix, source.Title, source.TorrentID),
 	}, nil
 }
 
@@ -274,10 +275,30 @@ func (service *TorrentDownloadService) readVerifiedOriginal(ctx context.Context,
 	return data, nil
 }
 
-func torrentDownloadFilename(title string, torrentID TorrentID) string {
-	title = strings.TrimSpace(title)
+func torrentDownloadFilename(prefix, title string, torrentID TorrentID) string {
+	title = torrentDownloadFilenamePart(title)
+	if title == "" {
+		title = fmt.Sprintf("PeerGo-%d", torrentID)
+	}
+	prefix = torrentDownloadFilenamePart(prefix)
+	name := title
+	if prefix != "" {
+		name = prefix + "." + title
+	}
+	if utf8.RuneCountInString(name) > maxDownloadFilenameRunes {
+		name = string([]rune(name)[:maxDownloadFilenameRunes])
+	}
+	name = strings.Trim(strings.TrimSpace(name), ".")
+	if name == "" {
+		name = fmt.Sprintf("PeerGo-%d", torrentID)
+	}
+	return name + ".torrent"
+}
+
+func torrentDownloadFilenamePart(value string) string {
+	value = strings.TrimSpace(value)
 	var builder strings.Builder
-	for _, character := range title {
+	for _, character := range value {
 		if builder.Len() >= maxDownloadFilenameRunes*utf8.UTFMax {
 			break
 		}
@@ -288,12 +309,5 @@ func torrentDownloadFilename(title string, torrentID TorrentID) string {
 			builder.WriteRune(character)
 		}
 	}
-	name := strings.Trim(strings.TrimSpace(builder.String()), ".")
-	if utf8.RuneCountInString(name) > maxDownloadFilenameRunes {
-		name = string([]rune(name)[:maxDownloadFilenameRunes])
-	}
-	if name == "" {
-		name = fmt.Sprintf("PeerGo-%d", torrentID)
-	}
-	return name + ".torrent"
+	return strings.Trim(strings.TrimSpace(builder.String()), ".")
 }

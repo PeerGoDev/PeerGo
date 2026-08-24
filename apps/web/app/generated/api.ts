@@ -4600,6 +4600,11 @@ export interface components {
         SiteDisplaySettings: {
             name: string;
             description: string;
+            /**
+             * @description 下载普通或 RSS 种子时添加在标题前的文件名前缀；留空表示不添加。
+             * @example [ROUSI]
+             */
+            torrent_filename_prefix: string;
             /** @enum {string} */
             default_torrent_view: "list" | "poster";
             show_latest_announcement: boolean;
@@ -4616,6 +4621,8 @@ export interface components {
         UpdateSiteDisplaySettingsRequest: {
             name: string;
             description: string;
+            /** @description 下载文件名前缀；保存后立即应用于普通下载和 RSS 下载。 */
+            torrent_filename_prefix: string;
             /** @enum {string} */
             default_torrent_view: "list" | "poster";
             show_latest_announcement: boolean;

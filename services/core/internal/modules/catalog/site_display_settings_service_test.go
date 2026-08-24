@@ -62,14 +62,15 @@ func TestSiteDisplaySettingsUpdateNormalizesAndCarriesVersionEvidence(t *testing
 
 	result, err := service.Update(context.Background(), categoryTestActor(now), UpdateSiteDisplaySettingsInput{
 		Name: " PeerGo Club ", Description: " 新的公开说明。 ",
-		DefaultTorrentView: TorrentViewPoster, ShowLatestAnnouncement: false,
+		TorrentFilenamePrefix: " [ROUSI] ",
+		DefaultTorrentView:    TorrentViewPoster, ShowLatestAnnouncement: false,
 		ExpectedVersion: 3, Reason: " 调整公开文案和默认视图以匹配当前社区定位。 ",
 	})
 	if err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 	command := repository.updateCommand
-	if result.Version != 4 || command.Name != "PeerGo Club" || command.Description != "新的公开说明。" || command.ExpectedVersion != 3 || command.ShowLatestAnnouncement {
+	if result.Version != 4 || command.Name != "PeerGo Club" || command.Description != "新的公开说明。" || command.TorrentFilenamePrefix != "[ROUSI]" || command.ExpectedVersion != 3 || command.ShowLatestAnnouncement {
 		t.Fatalf("result=%+v command=%+v", result, command)
 	}
 	if command.ActorID == [16]byte{} || command.Authorization.ID != authorizer.decision.ID || !command.OccurredAt.Equal(now) {
@@ -99,5 +100,13 @@ func TestSiteDisplaySettingsRejectsInvalidInputBeforeAuthorization(t *testing.T)
 	}
 	if len(authorizer.requests) != 0 {
 		t.Fatalf("authorization requests = %+v, want none", authorizer.requests)
+	}
+
+	_, err = service.Update(context.Background(), categoryTestActor(time.Now()), UpdateSiteDisplaySettingsInput{
+		Name: "PeerGo", TorrentFilenamePrefix: `[ROU/SI]`, DefaultTorrentView: TorrentViewList, ExpectedVersion: 1,
+		Reason: "文件名前缀包含路径分隔符，必须在鉴权前拒绝。",
+	})
+	if !errors.Is(err, ErrSiteDisplaySettingsInput) || len(authorizer.requests) != 0 {
+		t.Fatalf("invalid filename prefix error=%v authorization requests=%+v", err, authorizer.requests)
 	}
 }

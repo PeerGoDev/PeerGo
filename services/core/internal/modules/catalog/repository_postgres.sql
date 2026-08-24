@@ -303,6 +303,7 @@ WHERE id = sqlc.arg(announcement_id)::text
 SELECT
     name,
     description,
+    torrent_filename_prefix,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -315,6 +316,7 @@ WHERE singleton = true;
 SELECT
     name,
     description,
+    torrent_filename_prefix,
     default_torrent_view,
     show_latest_announcement,
     version,
@@ -329,6 +331,7 @@ UPDATE catalog.site_profile
 SET
     name = sqlc.arg(site_name)::text,
     description = sqlc.arg(site_description)::text,
+    torrent_filename_prefix = sqlc.arg(torrent_filename_prefix)::text,
     default_torrent_view = sqlc.arg(default_torrent_view)::text,
     show_latest_announcement = sqlc.arg(show_latest_announcement)::boolean,
     version = version + 1,
@@ -339,6 +342,7 @@ WHERE singleton = true
 RETURNING
     name,
     description,
+    torrent_filename_prefix,
     default_torrent_view,
     show_latest_announcement,
     version,

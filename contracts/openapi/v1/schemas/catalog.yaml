@@ -67,6 +67,7 @@ SiteDisplaySettings:
   required:
     - name
     - description
+    - torrent_filename_prefix
     - default_torrent_view
     - show_latest_announcement
     - version
@@ -80,6 +81,11 @@ SiteDisplaySettings:
     description:
       type: string
       maxLength: 500
+    torrent_filename_prefix:
+      type: string
+      maxLength: 40
+      description: 下载普通或 RSS 种子时添加在标题前的文件名前缀；留空表示不添加。
+      example: "[ROUSI]"
     default_torrent_view:
       type: string
       enum: [list, poster]
@@ -104,6 +110,7 @@ UpdateSiteDisplaySettingsRequest:
   required:
     - name
     - description
+    - torrent_filename_prefix
     - default_torrent_view
     - show_latest_announcement
     - expected_version
@@ -116,6 +123,10 @@ UpdateSiteDisplaySettingsRequest:
     description:
       type: string
       maxLength: 500
+    torrent_filename_prefix:
+      type: string
+      maxLength: 40
+      description: 下载文件名前缀；保存后立即应用于普通下载和 RSS 下载。
     default_torrent_view:
       type: string
       enum: [list, poster]

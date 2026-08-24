@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -43,7 +44,7 @@ func (repository *PostgresSiteDisplaySettingsRepository) GetSiteDisplaySettings(
 		return SiteDisplaySettings{}, fmt.Errorf("query site display settings: %w", err)
 	}
 	return siteDisplaySettingsFromValues(
-		row.Name, row.Description, row.DefaultTorrentView, row.ShowLatestAnnouncement,
+		row.Name, row.Description, row.TorrentFilenamePrefix, row.DefaultTorrentView, row.ShowLatestAnnouncement,
 		row.Version, row.EffectiveAt, row.UpdatedAt,
 	)
 }
@@ -64,7 +65,7 @@ func (repository *PostgresSiteDisplaySettingsRepository) UpdateSiteDisplaySettin
 		return SiteDisplaySettings{}, fmt.Errorf("lock site display settings: %w", err)
 	}
 	before, err := siteDisplaySettingsFromValues(
-		locked.Name, locked.Description, locked.DefaultTorrentView, locked.ShowLatestAnnouncement,
+		locked.Name, locked.Description, locked.TorrentFilenamePrefix, locked.DefaultTorrentView, locked.ShowLatestAnnouncement,
 		locked.Version, locked.EffectiveAt, locked.UpdatedAt,
 	)
 	if err != nil {
@@ -76,6 +77,7 @@ func (repository *PostgresSiteDisplaySettingsRepository) UpdateSiteDisplaySettin
 
 	row, err := queries.UpdateSiteDisplaySettings(ctx, catalogdb.UpdateSiteDisplaySettingsParams{
 		SiteName: command.Name, SiteDescription: command.Description,
+		TorrentFilenamePrefix:  command.TorrentFilenamePrefix,
 		DefaultTorrentView:     string(command.DefaultTorrentView),
 		ShowLatestAnnouncement: command.ShowLatestAnnouncement,
 		OccurredAt:             siteDisplaySettingsTimestamp(command.OccurredAt),
@@ -88,7 +90,7 @@ func (repository *PostgresSiteDisplaySettingsRepository) UpdateSiteDisplaySettin
 		return SiteDisplaySettings{}, fmt.Errorf("update site display settings row: %w", err)
 	}
 	after, err := siteDisplaySettingsFromValues(
-		row.Name, row.Description, row.DefaultTorrentView, row.ShowLatestAnnouncement,
+		row.Name, row.Description, row.TorrentFilenamePrefix, row.DefaultTorrentView, row.ShowLatestAnnouncement,
 		row.Version, row.EffectiveAt, row.UpdatedAt,
 	)
 	if err != nil {
@@ -114,6 +116,7 @@ func (repository *PostgresSiteDisplaySettingsRepository) UpdateSiteDisplaySettin
 func siteDisplaySettingsFromValues(
 	name string,
 	description string,
+	torrentFilenamePrefix string,
 	defaultView string,
 	showLatestAnnouncement bool,
 	version int64,
@@ -121,11 +124,13 @@ func siteDisplaySettingsFromValues(
 	updatedAt pgtype.Timestamptz,
 ) (SiteDisplaySettings, error) {
 	view := TorrentView(defaultView)
-	if (view != TorrentViewList && view != TorrentViewPoster) || version < 1 || !effectiveAt.Valid || !updatedAt.Valid {
+	if (view != TorrentViewList && view != TorrentViewPoster) ||
+		!utf8.ValidString(torrentFilenamePrefix) || utf8.RuneCountInString(torrentFilenamePrefix) > maxTorrentFilenamePrefix ||
+		!validTorrentFilenamePrefix(torrentFilenamePrefix) || version < 1 || !effectiveAt.Valid || !updatedAt.Valid {
 		return SiteDisplaySettings{}, fmt.Errorf("%w: invalid site display settings projection", errCatalogProjectionInvalid)
 	}
 	return SiteDisplaySettings{
-		Name: name, Description: description, DefaultTorrentView: view,
+		Name: name, Description: description, TorrentFilenamePrefix: torrentFilenamePrefix, DefaultTorrentView: view,
 		ShowLatestAnnouncement: showLatestAnnouncement, Version: version,
 		EffectiveAt: effectiveAt.Time, UpdatedAt: updatedAt.Time,
 	}, nil
@@ -134,6 +139,7 @@ func siteDisplaySettingsFromValues(
 func siteDisplaySettingsAuditState(settings SiteDisplaySettings) SiteDisplaySettingsAuditState {
 	return SiteDisplaySettingsAuditState{
 		Name: settings.Name, Description: settings.Description,
+		TorrentFilenamePrefix:  settings.TorrentFilenamePrefix,
 		DefaultTorrentView:     settings.DefaultTorrentView,
 		ShowLatestAnnouncement: settings.ShowLatestAnnouncement,
 		Version:                settings.Version,

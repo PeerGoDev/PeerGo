@@ -26,10 +26,12 @@ func TestSiteDisplaySettingsChangeBuilderHashesEditableValuesAndReason(t *testin
 	}
 	before := catalog.SiteDisplaySettingsAuditState{
 		Name: "PeerGo", Description: "旧说明", DefaultTorrentView: catalog.TorrentViewList,
+		TorrentFilenamePrefix:  "[PEERGO]",
 		ShowLatestAnnouncement: true, Version: 4,
 	}
 	after := catalog.SiteDisplaySettingsAuditState{
 		Name: "PeerGo Club", Description: "新说明", DefaultTorrentView: catalog.TorrentViewPoster,
+		TorrentFilenamePrefix:  "[ROUSI]",
 		ShowLatestAnnouncement: false, Version: 5,
 	}
 	reason := "调整公开站点展示以匹配当前社区定位。"
@@ -50,7 +52,7 @@ func TestSiteDisplaySettingsChangeBuilderHashesEditableValuesAndReason(t *testin
 	if event.ID != eventID || event.Type != SiteDisplaySettingsChangeEventType || event.SchemaVersion != SiteDisplaySettingsChangeSchemaVersion {
 		t.Fatalf("event envelope = %+v", event)
 	}
-	for _, raw := range []string{before.Name, before.Description, after.Name, after.Description, reason} {
+	for _, raw := range []string{before.Name, before.Description, before.TorrentFilenamePrefix, after.Name, after.Description, after.TorrentFilenamePrefix, reason} {
 		if bytes.Contains(event.Payload, []byte(raw)) {
 			t.Fatalf("payload contains editable raw text %q: %s", raw, event.Payload)
 		}

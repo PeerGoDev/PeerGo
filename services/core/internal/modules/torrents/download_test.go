@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -181,7 +183,7 @@ func TestTorrentDownloadUsesVerifiedFallbackAndServerSideCredential(t *testing.T
 	const torrentID TorrentID = 42
 	objectID := uuid.New()
 	repository := &torrentDownloadRepositoryFixture{source: TorrentDownloadSource{
-		TorrentID: torrentID, Title: "Release / 2026", ObjectID: objectID,
+		TorrentID: torrentID, Title: "Release / 2026", FilenamePrefix: "[ROUSI]", ObjectID: objectID,
 		Descriptor: descriptor, InfoOffset: parsed.InfoOffset, InfoLength: parsed.InfoLength,
 		Locations: []TorrentDownloadLocation{
 			{ID: uuid.New(), BackendID: "local-primary", ObjectKey: key, State: StorageLocationVerified, Preferred: true, Descriptor: descriptor, VerifiedAt: verifiedAt},
@@ -209,7 +211,7 @@ func TestTorrentDownloadUsesVerifiedFallbackAndServerSideCredential(t *testing.T
 	if err != nil {
 		t.Fatalf("Download() error = %v", err)
 	}
-	if repository.id != torrentID || credentials.user.ID != user.ID || result.Filename != "Release _ 2026.torrent" {
+	if repository.id != torrentID || credentials.user.ID != user.ID || result.Filename != "[ROUSI].Release _ 2026.torrent" {
 		t.Fatalf("download result filename=%q", result.Filename)
 	}
 	if authorizer.request.Action != authz.ActionTorrentDownload || authorizer.request.Resource.OwnerID != user.ID {
@@ -222,6 +224,36 @@ func TestTorrentDownloadUsesVerifiedFallbackAndServerSideCredential(t *testing.T
 	announce, _ := root.get("announce")
 	if string(announce.bytes) != "https://tracker.example/tracker/0123456789abcdef0123456789abcdef/announce" {
 		t.Fatalf("announce = %q", announce.bytes)
+	}
+}
+
+func TestTorrentDownloadFilenameSupportsOperatorPrefixAndSafeFallbacks(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		prefix string
+		title  string
+		want   string
+	}{
+		{name: "Rousi legacy prefix", prefix: "[ROUSI]", title: "电影 2026", want: "[ROUSI].电影 2026.torrent"},
+		{name: "prefix disabled", title: "电影 2026", want: "电影 2026.torrent"},
+		{name: "unsafe characters", prefix: `[ROU/SI]`, title: `Release: 2026`, want: "[ROU_SI].Release_ 2026.torrent"},
+		{name: "empty title", prefix: "[ROUSI]", title: "...", want: "[ROUSI].PeerGo-42.torrent"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := torrentDownloadFilename(test.prefix, test.title, 42); got != test.want {
+				t.Fatalf("torrentDownloadFilename() = %q, want %q", got, test.want)
+			}
+		})
+	}
+
+	longTitle := strings.Repeat("影", maxDownloadFilenameRunes)
+	got := torrentDownloadFilename("[ROUSI]", longTitle, 42)
+	if utf8.RuneCountInString(strings.TrimSuffix(got, ".torrent")) != maxDownloadFilenameRunes || !strings.HasPrefix(got, "[ROUSI].") {
+		t.Fatalf("bounded prefixed filename = %q", got)
 	}
 }
 

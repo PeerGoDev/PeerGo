@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
@@ -14,6 +15,7 @@ import (
 const (
 	maxSiteNameRunes         = 80
 	maxSiteDescriptionRunes  = 500
+	maxTorrentFilenamePrefix = 40
 	minSiteChangeReasonRunes = 10
 	maxSiteChangeReasonRunes = 500
 )
@@ -74,16 +76,28 @@ func (service *SiteDisplaySettingsService) Update(ctx context.Context, actor aut
 func normalizeSiteDisplaySettingsInput(input UpdateSiteDisplaySettingsInput) (UpdateSiteDisplaySettingsInput, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
+	input.TorrentFilenamePrefix = strings.TrimSpace(input.TorrentFilenamePrefix)
 	input.Reason = strings.TrimSpace(input.Reason)
 	nameRunes := utf8.RuneCountInString(input.Name)
 	descriptionRunes := utf8.RuneCountInString(input.Description)
+	prefixRunes := utf8.RuneCountInString(input.TorrentFilenamePrefix)
 	reasonRunes := utf8.RuneCountInString(input.Reason)
 	validView := input.DefaultTorrentView == TorrentViewList || input.DefaultTorrentView == TorrentViewPoster
-	if !utf8.ValidString(input.Name) || !utf8.ValidString(input.Description) || !utf8.ValidString(input.Reason) ||
+	if !utf8.ValidString(input.Name) || !utf8.ValidString(input.Description) || !utf8.ValidString(input.TorrentFilenamePrefix) || !utf8.ValidString(input.Reason) ||
 		nameRunes < 1 || nameRunes > maxSiteNameRunes || descriptionRunes > maxSiteDescriptionRunes ||
+		prefixRunes > maxTorrentFilenamePrefix || !validTorrentFilenamePrefix(input.TorrentFilenamePrefix) ||
 		reasonRunes < minSiteChangeReasonRunes || reasonRunes > maxSiteChangeReasonRunes ||
 		input.ExpectedVersion < 1 || !validView {
 		return UpdateSiteDisplaySettingsInput{}, ErrSiteDisplaySettingsInput
 	}
 	return input, nil
+}
+
+func validTorrentFilenamePrefix(prefix string) bool {
+	for _, character := range prefix {
+		if unicode.IsControl(character) || strings.ContainsRune(`/\\:*?"<>|`, character) {
+			return false
+		}
+	}
+	return prefix == "" || strings.Trim(prefix, ".") != ""
 }

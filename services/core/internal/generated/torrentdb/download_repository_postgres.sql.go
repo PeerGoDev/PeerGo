@@ -16,6 +16,7 @@ const getPublishedTorrentDownloadObject = `-- name: GetPublishedTorrentDownloadO
 SELECT
     torrent.id AS torrent_id,
     torrent.title,
+    site.torrent_filename_prefix,
     object.id AS object_id,
     object.content_sha256,
     object.byte_length,
@@ -23,18 +24,21 @@ SELECT
     object.info_length
 FROM torrents.torrents AS torrent
 JOIN torrents.torrent_objects AS object ON object.id = torrent.object_id
+CROSS JOIN catalog.site_profile AS site
 WHERE torrent.id = $1::bigint
   AND torrent.state = 'published'
+  AND site.singleton = true
 `
 
 type GetPublishedTorrentDownloadObjectRow struct {
-	TorrentID     int64
-	Title         string
-	ObjectID      uuid.UUID
-	ContentSha256 []byte
-	ByteLength    int64
-	InfoOffset    int64
-	InfoLength    int64
+	TorrentID             int64
+	Title                 string
+	TorrentFilenamePrefix string
+	ObjectID              uuid.UUID
+	ContentSha256         []byte
+	ByteLength            int64
+	InfoOffset            int64
+	InfoLength            int64
 }
 
 func (q *Queries) GetPublishedTorrentDownloadObject(ctx context.Context, torrentID int64) (GetPublishedTorrentDownloadObjectRow, error) {
@@ -43,6 +47,7 @@ func (q *Queries) GetPublishedTorrentDownloadObject(ctx context.Context, torrent
 	err := row.Scan(
 		&i.TorrentID,
 		&i.Title,
+		&i.TorrentFilenamePrefix,
 		&i.ObjectID,
 		&i.ContentSha256,
 		&i.ByteLength,

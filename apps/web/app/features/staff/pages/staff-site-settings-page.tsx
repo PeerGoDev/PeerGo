@@ -83,7 +83,7 @@ export function StaffSiteSettingsPage() {
       requiredAction="site.display.manage.read"
       pageHeader={{
         title: "站点设置",
-        description: "管理站点基本信息与首页展示。",
+        description: "管理站点基本信息、下载文件名与首页展示。",
       }}
     >
       {({ session, capabilities }) => (
@@ -161,6 +161,9 @@ function SiteDisplaySettingsForm({
   const [description, setDescription] = React.useState(
     initialSettings.description
   )
+  const [torrentFilenamePrefix, setTorrentFilenamePrefix] = React.useState(
+    initialSettings.torrent_filename_prefix
+  )
   const [defaultView, setDefaultView] = React.useState<"list" | "poster">(
     initialSettings.default_torrent_view
   )
@@ -184,6 +187,7 @@ function SiteDisplaySettingsForm({
     setBaseline(initialSettings)
     setName(initialSettings.name)
     setDescription(initialSettings.description)
+    setTorrentFilenamePrefix(initialSettings.torrent_filename_prefix)
     setDefaultView(initialSettings.default_torrent_view)
     setShowLatestAnnouncement(initialSettings.show_latest_announcement)
     setReason("")
@@ -194,6 +198,7 @@ function SiteDisplaySettingsForm({
   const businessValues: SiteDisplaySettingsBusinessValues = {
     name,
     description,
+    torrentFilenamePrefix,
     defaultTorrentView: defaultView,
     showLatestAnnouncement,
   }
@@ -247,7 +252,7 @@ function SiteDisplaySettingsForm({
       return
     }
     if (!hasSiteDisplaySettingsChanges(baseline, result.data)) {
-      setErrors({ form: "公开展示字段均未变化，无需创建空版本。" })
+      setErrors({ form: "站点设置字段均未变化，无需创建空版本。" })
       return
     }
     setErrors({})
@@ -265,6 +270,7 @@ function SiteDisplaySettingsForm({
         body: {
           name: pendingValues.name,
           description: pendingValues.description,
+          torrent_filename_prefix: pendingValues.torrentFilenamePrefix,
           default_torrent_view: pendingValues.defaultTorrentView,
           show_latest_announcement: pendingValues.showLatestAnnouncement,
           expected_version: baseline.version,
@@ -274,6 +280,7 @@ function SiteDisplaySettingsForm({
       setBaseline(updated)
       setName(updated.name)
       setDescription(updated.description)
+      setTorrentFilenamePrefix(updated.torrent_filename_prefix)
       setDefaultView(updated.default_torrent_view)
       setShowLatestAnnouncement(updated.show_latest_announcement)
       setReason("")
@@ -402,6 +409,38 @@ function SiteDisplaySettingsForm({
                     errors={
                       errors.description
                         ? [{ message: errors.description }]
+                        : []
+                    }
+                  />
+                </Field>
+
+                <Field
+                  data-invalid={Boolean(errors.torrentFilenamePrefix)}
+                  data-disabled={disabled}
+                >
+                  <FieldLabel htmlFor="torrent-filename-prefix">
+                    种子文件名前缀
+                  </FieldLabel>
+                  <Input
+                    id="torrent-filename-prefix"
+                    name="torrentFilenamePrefix"
+                    value={torrentFilenamePrefix}
+                    onChange={(event) =>
+                      setTorrentFilenamePrefix(event.target.value)
+                    }
+                    maxLength={40}
+                    disabled={disabled}
+                    aria-invalid={Boolean(errors.torrentFilenamePrefix)}
+                    placeholder="[ROUSI]"
+                  />
+                  <FieldDescription className="text-xs">
+                    下载文件将命名为“前缀.种子标题.torrent”；留空可关闭前缀，普通下载和
+                    RSS 下载都会立即使用新值。
+                  </FieldDescription>
+                  <FieldError
+                    errors={
+                      errors.torrentFilenamePrefix
+                        ? [{ message: errors.torrentFilenamePrefix }]
                         : []
                     }
                   />
@@ -609,7 +648,7 @@ function SettingsConfirmationDialog({
           <AlertDialogTitle>确认站点与展示变更</AlertDialogTitle>
           <AlertDialogDescription>
             将基于第 {baseline.version} 版创建第 {baseline.version + 1} 版
-            ；成功后立即影响公共页面。
+            ；成功后立即影响公共页面与新生成的种子下载文件名。
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -634,9 +673,10 @@ function SettingsConfirmationDialog({
 
         <Alert>
           <MonitorCogIcon />
-          <AlertTitle>影响范围：公共站点展示</AlertTitle>
+          <AlertTitle>影响范围：公共展示与下载文件名</AlertTitle>
           <AlertDescription>
-            不修改注册准入、Tracker、种子内容、身份资料或部署密钥。
+            文件名前缀只改变浏览器保存的 .torrent 名称，不修改种子内容、Info
+            Hash、Tracker 连接策略、注册准入、身份资料或部署密钥。
           </AlertDescription>
         </Alert>
 

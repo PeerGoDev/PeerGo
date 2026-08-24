@@ -2595,7 +2595,7 @@ func TestTorrentDownloadUsesBinaryContractAndKeepsCredentialOutOfTheRequest(t *t
 	passkey := strings.Repeat("a", 32)
 	rawMetainfo := []byte("d8:announce63:https://tracker.peergo.test/tracker/" + passkey + "/announce4:infode")
 	service := &recordingTorrentDownloadService{result: torrents.TorrentDownloadResult{
-		Filename: "电影 2026.torrent",
+		Filename: "[ROUSI].电影 2026.torrent",
 		Data:     rawMetainfo,
 	}}
 	handler := testHandlerWithTorrentDownload(t, service)
@@ -2612,7 +2612,7 @@ func TestTorrentDownloadUsesBinaryContractAndKeepsCredentialOutOfTheRequest(t *t
 		t.Fatalf("cache=%q nosniff=%q", response.Header().Get("Cache-Control"), response.Header().Get("X-Content-Type-Options"))
 	}
 	_, parameters, err := mime.ParseMediaType(response.Header().Get("Content-Disposition"))
-	if err != nil || parameters["filename"] != "电影 2026.torrent" {
+	if err != nil || parameters["filename"] != "[ROUSI].电影 2026.torrent" {
 		t.Fatalf("content disposition=%q parameters=%v err=%v", response.Header().Get("Content-Disposition"), parameters, err)
 	}
 	if service.cookieToken != "web-token" || service.torrentID != torrentID || !bytes.Equal(response.Body.Bytes(), rawMetainfo) {
@@ -4988,10 +4988,12 @@ func TestSiteDisplaySettingsUsesStaffAudienceAndOptimisticVersion(t *testing.T) 
 	settingsService := &recordingSiteDisplaySettingsService{
 		getResult: catalog.SiteDisplaySettings{
 			Name: "PeerGo", Description: "旧说明", DefaultTorrentView: catalog.TorrentViewList,
+			TorrentFilenamePrefix:  "[ROUSI]",
 			ShowLatestAnnouncement: true, Version: 3, EffectiveAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour),
 		},
 		updateResult: catalog.SiteDisplaySettings{
 			Name: "PeerGo Club", Description: "新说明", DefaultTorrentView: catalog.TorrentViewPoster,
+			TorrentFilenamePrefix:  "[ROUSI]",
 			ShowLatestAnnouncement: false, Version: 4, EffectiveAt: now, UpdatedAt: now,
 		},
 	}
@@ -5005,14 +5007,14 @@ func TestSiteDisplaySettingsUsesStaffAudienceAndOptimisticVersion(t *testing.T) 
 	getRequest.AddCookie(&http.Cookie{Name: "peergo_staff_session", Value: "staff-token"})
 	getResponse := httptest.NewRecorder()
 	handler.ServeHTTP(getResponse, getRequest)
-	if getResponse.Code != http.StatusOK || !strings.Contains(getResponse.Body.String(), `"version":3`) {
+	if getResponse.Code != http.StatusOK || !strings.Contains(getResponse.Body.String(), `"version":3`) || !strings.Contains(getResponse.Body.String(), `"torrent_filename_prefix":"[ROUSI]"`) {
 		t.Fatalf("get status = %d, body=%s", getResponse.Code, getResponse.Body.String())
 	}
 	if staffService.currentStaffToken != "staff-token" || settingsService.getActor.Subject.ID != userID {
 		t.Fatalf("staff token=%q actor=%+v", staffService.currentStaffToken, settingsService.getActor)
 	}
 
-	updateRequest := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/site", strings.NewReader(`{"name":"PeerGo Club","description":"新说明","default_torrent_view":"poster","show_latest_announcement":false,"expected_version":3,"reason":"调整公开文案和默认展示以匹配当前社区定位。"}`))
+	updateRequest := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/site", strings.NewReader(`{"name":"PeerGo Club","description":"新说明","torrent_filename_prefix":"[ROUSI]","default_torrent_view":"poster","show_latest_announcement":false,"expected_version":3,"reason":"调整公开文案和默认展示以匹配当前社区定位。"}`))
 	updateRequest.Header.Set("Content-Type", "application/json")
 	updateRequest.Header.Set("Origin", "http://peergo.test")
 	updateRequest.Header.Set("X-CSRF-Token", staffCSRF)
@@ -5022,12 +5024,12 @@ func TestSiteDisplaySettingsUsesStaffAudienceAndOptimisticVersion(t *testing.T) 
 	if updateResponse.Code != http.StatusOK || !strings.Contains(updateResponse.Body.String(), `"version":4`) {
 		t.Fatalf("update status = %d, body=%s", updateResponse.Code, updateResponse.Body.String())
 	}
-	if staffService.writeStaffToken != "staff-token" || staffService.writeCSRF != staffCSRF || settingsService.updateActor.Subject.ID != userID || settingsService.updateInput.ExpectedVersion != 3 || settingsService.updateInput.DefaultTorrentView != catalog.TorrentViewPoster || settingsService.updateInput.ShowLatestAnnouncement {
+	if staffService.writeStaffToken != "staff-token" || staffService.writeCSRF != staffCSRF || settingsService.updateActor.Subject.ID != userID || settingsService.updateInput.ExpectedVersion != 3 || settingsService.updateInput.TorrentFilenamePrefix != "[ROUSI]" || settingsService.updateInput.DefaultTorrentView != catalog.TorrentViewPoster || settingsService.updateInput.ShowLatestAnnouncement {
 		t.Fatalf("write token=%q csrf=%q actor=%+v input=%+v", staffService.writeStaffToken, staffService.writeCSRF, settingsService.updateActor, settingsService.updateInput)
 	}
 
 	settingsService.err = catalog.ErrSiteDisplaySettingsVersionConflict
-	conflictRequest := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/site", strings.NewReader(`{"name":"PeerGo","description":"旧说明","default_torrent_view":"list","show_latest_announcement":true,"expected_version":3,"reason":"使用旧版本提交以验证设置冲突响应。"}`))
+	conflictRequest := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/site", strings.NewReader(`{"name":"PeerGo","description":"旧说明","torrent_filename_prefix":"[ROUSI]","default_torrent_view":"list","show_latest_announcement":true,"expected_version":3,"reason":"使用旧版本提交以验证设置冲突响应。"}`))
 	conflictRequest.Header.Set("Content-Type", "application/json")
 	conflictRequest.Header.Set("Origin", "http://peergo.test")
 	conflictRequest.Header.Set("X-CSRF-Token", staffCSRF)

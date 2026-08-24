@@ -43,6 +43,7 @@ describe("StaffSiteSettingsPage", () => {
     expect(save).toHaveClass("w-28")
     expect(save).toBeDisabled()
     expect(screen.getByLabelText("站点说明").tagName).toBe("INPUT")
+    expect(screen.getByLabelText("种子文件名前缀")).toHaveValue("[ROUSI]")
     expect(screen.getByRole("heading", { name: "首页展示" })).toBeVisible()
     expect(screen.getByRole("heading", { name: "变更与审计" })).toBeVisible()
     expect(screen.getByText(/最近生效于/)).toBeVisible()
@@ -112,6 +113,7 @@ function createQueryClient() {
   const settings: SiteDisplaySettings = {
     name: "PeerGo",
     description: "一套从零设计的现代 Private Tracker 平台",
+    torrent_filename_prefix: "[ROUSI]",
     default_torrent_view: "list",
     show_latest_announcement: true,
     version: 7,

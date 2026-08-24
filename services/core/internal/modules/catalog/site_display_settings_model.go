@@ -24,6 +24,7 @@ const SiteDisplaySettingsSection = "site-display"
 type SiteDisplaySettings struct {
 	Name                   string
 	Description            string
+	TorrentFilenamePrefix  string
 	DefaultTorrentView     TorrentView
 	ShowLatestAnnouncement bool
 	Version                int64
@@ -34,6 +35,7 @@ type SiteDisplaySettings struct {
 type UpdateSiteDisplaySettingsInput struct {
 	Name                   string
 	Description            string
+	TorrentFilenamePrefix  string
 	DefaultTorrentView     TorrentView
 	ShowLatestAnnouncement bool
 	ExpectedVersion        int64
@@ -52,6 +54,7 @@ type UpdateSiteDisplaySettingsCommand struct {
 type SiteDisplaySettingsAuditState struct {
 	Name                   string      `json:"name"`
 	Description            string      `json:"description"`
+	TorrentFilenamePrefix  string      `json:"torrent_filename_prefix"`
 	DefaultTorrentView     TorrentView `json:"default_torrent_view"`
 	ShowLatestAnnouncement bool        `json:"show_latest_announcement"`
 	Version                int64       `json:"version"`
