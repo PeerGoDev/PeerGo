@@ -27,13 +27,15 @@ func TestCreatePostDigestCoversCommunityFeaturesAndLegacyRetries(t *testing.T) {
 	t.Parallel()
 	body := "一条带功能的动态 #测试"
 	mediaID := uuid.New()
+	torrentID := int64(42)
 	closesAt := time.Date(2026, time.August, 24, 12, 0, 0, 0, time.UTC)
-	base := createPostInputSHA256(body, "general", nil, nil, nil)
-	withBoard := createPostInputSHA256(body, "resources", nil, nil, nil)
-	withMedia := createPostInputSHA256(body, "general", []uuid.UUID{mediaID}, nil, nil)
-	withPoll := createPostInputSHA256(body, "general", nil, &CreatePollInput{Question: "可以吗？", Options: []string{"可以", "不可以"}, ClosesAt: &closesAt}, nil)
-	withPacket := createPostInputSHA256(body, "general", nil, nil, &CreateRedPacketInput{TotalAmount: 20, ClaimCount: 4})
-	for name, digest := range map[string][sha256.Size]byte{"board": withBoard, "media": withMedia, "poll": withPoll, "packet": withPacket} {
+	base := createPostInputSHA256(body, "general", nil, nil, nil, nil)
+	withBoard := createPostInputSHA256(body, "resources", nil, nil, nil, nil)
+	withMedia := createPostInputSHA256(body, "general", []uuid.UUID{mediaID}, nil, nil, nil)
+	withPoll := createPostInputSHA256(body, "general", nil, &CreatePollInput{Question: "可以吗？", Options: []string{"可以", "不可以"}, ClosesAt: &closesAt}, nil, nil)
+	withPacket := createPostInputSHA256(body, "general", nil, nil, &CreateRedPacketInput{TotalAmount: 20, ClaimCount: 4}, nil)
+	withTorrent := createPostInputSHA256(body, "general", nil, nil, nil, &torrentID)
+	for name, digest := range map[string][sha256.Size]byte{"board": withBoard, "media": withMedia, "poll": withPoll, "packet": withPacket, "torrent": withTorrent} {
 		if digest == base {
 			t.Fatalf("%s did not affect create digest", name)
 		}

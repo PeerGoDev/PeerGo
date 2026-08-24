@@ -69,6 +69,7 @@ SELECT
     author.display_name AS author_display_name,
     post.create_body_sha256,
     post.body,
+    post.torrent_id,
     post.state,
     post.version,
     post.created_at,
@@ -102,6 +103,7 @@ type FindPostByCreateRequestRow struct {
 	AuthorDisplayName string
 	CreateBodySha256  []byte
 	Body              string
+	TorrentID         pgtype.Int8
 	State             string
 	Version           int64
 	CreatedAt         pgtype.Timestamptz
@@ -121,6 +123,7 @@ func (q *Queries) FindPostByCreateRequest(ctx context.Context, arg FindPostByCre
 		&i.AuthorDisplayName,
 		&i.CreateBodySha256,
 		&i.Body,
+		&i.TorrentID,
 		&i.State,
 		&i.Version,
 		&i.CreatedAt,
@@ -139,6 +142,7 @@ SELECT
     author.username AS author_username,
     author.display_name AS author_display_name,
     post.body,
+    post.torrent_id,
     post.state,
     post.version,
     post.created_at,
@@ -169,6 +173,7 @@ type FindVisiblePostRow struct {
 	AuthorUsername    string
 	AuthorDisplayName string
 	Body              string
+	TorrentID         pgtype.Int8
 	State             string
 	Version           int64
 	CreatedAt         pgtype.Timestamptz
@@ -187,6 +192,7 @@ func (q *Queries) FindVisiblePost(ctx context.Context, postPublicID uuid.UUID) (
 		&i.AuthorUsername,
 		&i.AuthorDisplayName,
 		&i.Body,
+		&i.TorrentID,
 		&i.State,
 		&i.Version,
 		&i.CreatedAt,
@@ -204,6 +210,7 @@ INSERT INTO social.posts (
     create_request_id,
 	create_body_sha256,
 	board_id,
+    torrent_id,
     body,
     body_format,
     state,
@@ -216,12 +223,13 @@ INSERT INTO social.posts (
     $3::uuid,
 	$4::bytea,
 	$5::text,
-    $6::text,
+    $6::bigint,
+    $7::text,
     'plain_text',
     'visible',
     1,
-    $7::timestamptz,
-    $7::timestamptz
+    $8::timestamptz,
+    $8::timestamptz
 )
 ON CONFLICT (author_id, create_request_id) DO NOTHING
 `
@@ -232,6 +240,7 @@ type InsertPostParams struct {
 	CreateRequestID  uuid.UUID
 	CreateBodySha256 []byte
 	BoardID          string
+	TorrentID        pgtype.Int8
 	Body             string
 	CreatedAt        pgtype.Timestamptz
 }
@@ -243,6 +252,7 @@ func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (int64, 
 		arg.CreateRequestID,
 		arg.CreateBodySha256,
 		arg.BoardID,
+		arg.TorrentID,
 		arg.Body,
 		arg.CreatedAt,
 	)
@@ -299,6 +309,7 @@ SELECT
     author.username AS author_username,
     author.display_name AS author_display_name,
     post.body,
+    post.torrent_id,
     post.state,
     post.version,
     post.created_at,
@@ -369,6 +380,7 @@ type ListVisiblePostsRow struct {
 	AuthorUsername    string
 	AuthorDisplayName string
 	Body              string
+	TorrentID         pgtype.Int8
 	State             string
 	Version           int64
 	CreatedAt         pgtype.Timestamptz
@@ -403,6 +415,7 @@ func (q *Queries) ListVisiblePosts(ctx context.Context, arg ListVisiblePostsPara
 			&i.AuthorUsername,
 			&i.AuthorDisplayName,
 			&i.Body,
+			&i.TorrentID,
 			&i.State,
 			&i.Version,
 			&i.CreatedAt,
@@ -428,6 +441,7 @@ SELECT
     author.username AS author_username,
     author.display_name AS author_display_name,
     post.body,
+    post.torrent_id,
     post.state,
     post.version,
     post.created_at,
@@ -461,6 +475,7 @@ type LockPostForAuthorRow struct {
 	AuthorUsername    string
 	AuthorDisplayName string
 	Body              string
+	TorrentID         pgtype.Int8
 	State             string
 	Version           int64
 	CreatedAt         pgtype.Timestamptz
@@ -479,6 +494,7 @@ func (q *Queries) LockPostForAuthor(ctx context.Context, arg LockPostForAuthorPa
 		&i.AuthorUsername,
 		&i.AuthorDisplayName,
 		&i.Body,
+		&i.TorrentID,
 		&i.State,
 		&i.Version,
 		&i.CreatedAt,

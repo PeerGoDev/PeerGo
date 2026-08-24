@@ -15656,8 +15656,8 @@ components:
           $ref: '#/components/schemas/SocialBoard'
         content:
           type: string
-          minLength: 1
           maxLength: 2000
+          description: 正文可在附带种子卡片时留空。
         version:
           type: integer
           format: int64
@@ -15700,6 +15700,9 @@ components:
           nullable: true
         red_packet:
           $ref: '#/components/schemas/SocialRedPacket'
+          nullable: true
+        torrent:
+          $ref: '#/components/schemas/SocialTorrentCard'
           nullable: true
         created_at:
           type: string
@@ -15762,8 +15765,8 @@ components:
       properties:
         content:
           type: string
-          minLength: 1
           maxLength: 2000
+          description: 附带 torrent_id 时可以留空；其他动态仍需填写正文。
         board_id:
           type: string
           pattern: ^[a-z0-9][a-z0-9-]{0,63}$
@@ -15779,6 +15782,11 @@ components:
           nullable: true
         red_packet:
           $ref: '#/components/schemas/CreateSocialRedPacketRequest'
+          nullable: true
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
           nullable: true
     CreateSocialPollRequest:
       type: object
@@ -22466,6 +22474,36 @@ components:
           type: string
           nullable: true
           maxLength: 2048
+    SocialTorrentCard:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - available
+        - title
+        - subtitle
+        - size_bytes
+        - cover_available
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        available:
+          type: boolean
+          description: false 表示关联仍保留，但种子已经不再公开。
+        title:
+          type: string
+          maxLength: 240
+        subtitle:
+          type: string
+          maxLength: 300
+        size_bytes:
+          type: integer
+          format: int64
+          minimum: 0
+        cover_available:
+          type: boolean
     SocialNotificationCategory:
       type: string
       enum:

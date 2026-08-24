@@ -178,6 +178,34 @@ ORDER BY media.position`, post.ID)
 		}
 		mediaRows.Close()
 
+		post.Torrent = nil
+		var sharedTorrent PostTorrent
+		err = db.QueryRow(ctx, `
+SELECT torrent.id,
+       torrent.state = 'published' AS available,
+       CASE WHEN torrent.state = 'published' THEN torrent.title ELSE '' END,
+       CASE WHEN torrent.state = 'published' THEN torrent.subtitle ELSE '' END,
+       CASE WHEN torrent.state = 'published' THEN torrent.total_size_bytes ELSE 0 END,
+       torrent.state = 'published' AND EXISTS (
+           SELECT 1
+           FROM torrents.torrent_screenshot_set_heads AS head
+           JOIN torrents.torrent_screenshot_set_items AS item
+             ON item.set_id = head.active_set_id AND item.position = 0
+           WHERE head.torrent_id = torrent.id
+       ) AS cover_available
+FROM social.posts AS source
+JOIN torrents.torrents AS torrent ON torrent.id = source.torrent_id
+WHERE source.public_id = $1`, post.ID).Scan(
+			&sharedTorrent.ID, &sharedTorrent.Available, &sharedTorrent.Title,
+			&sharedTorrent.Subtitle, &sharedTorrent.SizeBytes, &sharedTorrent.CoverAvailable,
+		)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("read shared social torrent: %w", err)
+		}
+		if err == nil {
+			post.Torrent = &sharedTorrent
+		}
+
 		topicRows, err := db.Query(ctx, `
 SELECT topic.display_topic FROM social.post_topics AS topic
 JOIN social.posts AS source ON source.id = topic.post_id

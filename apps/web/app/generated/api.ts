@@ -5532,6 +5532,7 @@ export interface components {
             id: string;
             author: components["schemas"]["SocialPostAuthor"];
             board: components["schemas"]["SocialBoard"];
+            /** @description 正文可在附带种子卡片时留空。 */
             content: string;
             /** Format: int64 */
             version: number;
@@ -5550,6 +5551,7 @@ export interface components {
             media: components["schemas"]["SocialPostMedia"][];
             poll?: components["schemas"]["SocialPoll"];
             red_packet?: components["schemas"]["SocialRedPacket"];
+            torrent?: components["schemas"]["SocialTorrentCard"];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -5571,11 +5573,14 @@ export interface components {
             feed: components["schemas"]["SocialFeedKind"];
         };
         CreateSocialPostRequest: {
+            /** @description 附带 torrent_id 时可以留空；其他动态仍需填写正文。 */
             content: string;
             board_id: string;
             media_ids?: string[];
             poll?: components["schemas"]["CreateSocialPollRequest"];
             red_packet?: components["schemas"]["CreateSocialRedPacketRequest"];
+            /** Format: int64 */
+            torrent_id?: number | null;
         };
         CreateSocialPollRequest: {
             question: string;
@@ -7843,6 +7848,17 @@ export interface components {
             id: number;
             name: string;
             image_path?: string | null;
+        };
+        SocialTorrentCard: {
+            /** Format: int64 */
+            id: number;
+            /** @description false 表示关联仍保留，但种子已经不再公开。 */
+            available: boolean;
+            title: string;
+            subtitle: string;
+            /** Format: int64 */
+            size_bytes: number;
+            cover_available: boolean;
         };
         /** @enum {string} */
         SocialNotificationCategory: "all" | "replies" | "likes" | "follows";

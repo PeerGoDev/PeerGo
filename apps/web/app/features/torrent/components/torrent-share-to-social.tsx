@@ -25,7 +25,6 @@ import { formatTorrentSize } from "~/features/torrent/model/format"
 import { ApiProblemError } from "~/shared/api/problem"
 
 const maxShareReasonCharacters = 500
-const maxSocialPostCharacters = 2_000
 
 export function TorrentShareToSocial({
   torrentId,
@@ -54,12 +53,7 @@ export function TorrentShareToSocial({
   )
   const canPost = actions.has("social.post.create.self")
   const reasonCount = Array.from(reason).length
-  const postContent = buildSharePost(reason, title, torrentId)
-  const postCount = Array.from(postContent).length
-  const valid =
-    reasonCount <= maxShareReasonCharacters &&
-    postCount <= maxSocialPostCharacters &&
-    canPost
+  const valid = reasonCount <= maxShareReasonCharacters && canPost
 
   function changeOpen(nextOpen: boolean) {
     if (!nextOpen && createPost.isPending) return
@@ -83,8 +77,9 @@ export function TorrentShareToSocial({
     requestId.current ??= globalThis.crypto.randomUUID()
     try {
       await createPost.mutateAsync({
-        content: postContent,
+        content: reason.trim(),
         boardId: "resources",
+        torrentId,
         csrfToken: session.data.csrf_token,
         idempotencyKey: requestId.current,
       })
@@ -256,13 +251,6 @@ export function TorrentShareToSocial({
       </DialogContent>
     </Dialog>
   )
-}
-
-function buildSharePost(reason: string, title: string, torrentId: number) {
-  const recommendation = reason.trim()
-  return [recommendation, `分享种子：${title}`, `/torrents/${torrentId}`]
-    .filter(Boolean)
-    .join("\n\n")
 }
 
 function shareSwarmCount(value: number | undefined) {

@@ -11,6 +11,7 @@ import {
   Repeat2Icon,
   Trash2Icon,
   GiftIcon,
+  HardDriveIcon,
   PinIcon,
   SparklesIcon,
   UserPlusIcon,
@@ -57,7 +58,11 @@ import {
   useStaffSession,
 } from "~/features/staff/api/staff-session.mutations"
 import { hasCapability } from "~/features/staff/model/capability"
-import { formatRelativeTime } from "~/features/torrent/model/format"
+import { TorrentCoverImage } from "~/features/torrent/components/torrent-cover-image"
+import {
+  formatRelativeTime,
+  formatTorrentSize,
+} from "~/features/torrent/model/format"
 import { UserAvatar } from "~/shared/components/user-avatar"
 import { ApiProblemError } from "~/shared/api/problem"
 import { formatDateTime } from "~/shared/formatters/date-time"
@@ -80,8 +85,12 @@ export function SocialPostCard({
   compact?: boolean
   onDeleted?: () => void
 }) {
+  const visiblePostContent = sharedTorrentPostContent(
+    post.content,
+    post.torrent?.id
+  )
   const [editing, setEditing] = React.useState(false)
-  const [draft, setDraft] = React.useState(post.content)
+  const [draft, setDraft] = React.useState(visiblePostContent)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const updatePost = useUpdateSocialPost(post.id)
   const deletePost = useDeleteSocialPost()
@@ -104,7 +113,7 @@ export function SocialPostCard({
   const media = post.media ?? []
 
   async function saveEdit() {
-    if (!csrfToken || !draft.trim()) return
+    if (!csrfToken || (!draft.trim() && !post.torrent)) return
     try {
       await updatePost.mutateAsync({
         content: draft.trim(),
@@ -185,7 +194,7 @@ export function SocialPostCard({
           variant="ghost"
           size="sm"
           onClick={() => {
-            setDraft(post.content)
+            setDraft(visiblePostContent)
             setEditing(false)
             updatePost.reset()
           }}
@@ -195,16 +204,16 @@ export function SocialPostCard({
         <Button
           size="sm"
           onClick={saveEdit}
-          disabled={!draft.trim() || updatePost.isPending}
+          disabled={(!draft.trim() && !post.torrent) || updatePost.isPending}
         >
           {updatePost.isPending ? <Spinner data-icon="inline-start" /> : null}
           保存
         </Button>
       </div>
     </div>
-  ) : (
-    <PostContent content={post.content} compact={compact} />
-  )
+  ) : visiblePostContent ? (
+    <PostContent content={visiblePostContent} compact={compact} />
+  ) : null
 
   return (
     <article
@@ -338,7 +347,7 @@ export function SocialPostCard({
                 {isOwner ? (
                   <DropdownMenuItem
                     onClick={() => {
-                      setDraft(post.content)
+                      setDraft(visiblePostContent)
                       setEditing(true)
                     }}
                   >
@@ -564,6 +573,8 @@ export function SocialPostCard({
         </div>
       ) : null}
 
+      {post.torrent ? <SharedTorrentCard torrent={post.torrent} /> : null}
+
       {post.pinned || post.featured ? (
         <div className="mt-2 flex gap-1">
           {post.pinned ? (
@@ -646,7 +657,12 @@ export function SocialPostCard({
             </Button>
             {!isOwner ? (
               <ContentTipDialog
-                target={{ kind: "post", postId: post.id, title: post.content }}
+                target={{
+                  kind: "post",
+                  postId: post.id,
+                  title:
+                    visiblePostContent || post.torrent?.title || "动态内容",
+                }}
                 userId={currentUserId}
                 csrfToken={csrfToken}
                 buttonVariant="ghost"
@@ -702,6 +718,62 @@ export function SocialPostCard({
       </AlertDialog>
     </article>
   )
+}
+
+function SharedTorrentCard({
+  torrent,
+}: {
+  torrent: NonNullable<SocialPost["torrent"]>
+}) {
+  if (!torrent.available) {
+    return (
+      <div className="mt-3 rounded-lg border bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+        该种子已经不再公开
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      to={`/torrents/${torrent.id}`}
+      className="group mt-3 block overflow-hidden rounded-lg border bg-muted/10 transition-colors hover:bg-accent/50"
+    >
+      <div className="flex min-h-28">
+        {torrent.cover_available ? (
+          <div className="relative h-28 w-20 shrink-0 overflow-hidden bg-muted">
+            <TorrentCoverImage
+              torrentId={torrent.id}
+              title={torrent.title}
+              className="size-full object-cover"
+              fallbackClassName="[&_svg]:size-5"
+            />
+          </div>
+        ) : null}
+        <div className="min-w-0 flex-1 p-3">
+          <div className="line-clamp-1 font-medium transition-colors group-hover:text-primary">
+            {torrent.title}
+          </div>
+          {torrent.subtitle ? (
+            <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+              {torrent.subtitle}
+            </div>
+          ) : null}
+          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+            <HardDriveIcon className="size-3" aria-hidden="true" />
+            <span>{formatTorrentSize(torrent.size_bytes)}</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+function sharedTorrentPostContent(content: string, torrentId?: number) {
+  if (!torrentId) return content
+  const generatedSuffix = new RegExp(
+    `(?:^|\\n\\n)分享种子：[^\\n]+\\n\\n/torrents/${torrentId}$`
+  )
+  return content.replace(generatedSuffix, "").trimEnd()
 }
 
 function PostContent({

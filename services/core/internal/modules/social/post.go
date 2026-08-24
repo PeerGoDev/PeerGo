@@ -25,13 +25,14 @@ const (
 )
 
 var (
-	ErrPostInput               = errors.New("social post input is invalid")
-	ErrPostNotFound            = errors.New("visible owned social post was not found")
-	ErrPostVersionConflict     = errors.New("social post version conflicts with current state")
-	ErrPostIdempotencyConflict = errors.New("social post idempotency key was reused with different input")
-	ErrPostInvariant           = errors.New("social post projection violates persisted invariants")
-	ErrSocialBoardUnavailable  = errors.New("social board is unavailable")
-	ErrSocialCommunityConflict = errors.New("social community state conflicts with current state")
+	ErrPostInput                = errors.New("social post input is invalid")
+	ErrPostNotFound             = errors.New("visible owned social post was not found")
+	ErrPostVersionConflict      = errors.New("social post version conflicts with current state")
+	ErrPostIdempotencyConflict  = errors.New("social post idempotency key was reused with different input")
+	ErrPostInvariant            = errors.New("social post projection violates persisted invariants")
+	ErrSocialBoardUnavailable   = errors.New("social board is unavailable")
+	ErrSocialTorrentUnavailable = errors.New("social torrent reference is unavailable")
+	ErrSocialCommunityConflict  = errors.New("social community state conflicts with current state")
 )
 
 type PostState string
@@ -74,6 +75,17 @@ type AuthorMedal struct {
 	ImagePath *string
 }
 
+// PostTorrent is the member-safe projection attached to a shared torrent.
+// An unavailable reference intentionally retains only its stable numeric ID.
+type PostTorrent struct {
+	ID             int64
+	Available      bool
+	Title          string
+	Subtitle       string
+	SizeBytes      int64
+	CoverAvailable bool
+}
+
 // Post is the public dynamic-feed projection. Internal IDs, request digests,
 // revision evidence and comment-thread bindings never leave the module.
 type Post struct {
@@ -94,6 +106,7 @@ type Post struct {
 	Media        []PostMedia
 	Poll         *Poll
 	RedPacket    *RedPacket
+	Torrent      *PostTorrent
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	EditedAt     *time.Time
@@ -130,6 +143,7 @@ type CreatePostInput struct {
 	MediaIDs  []uuid.UUID
 	Poll      *CreatePollInput
 	RedPacket *CreateRedPacketInput
+	TorrentID *int64
 }
 
 type BoardPostingPolicy struct {
@@ -156,6 +170,7 @@ type createPostCommand struct {
 	MediaIDs               []uuid.UUID
 	Poll                   *CreatePollInput
 	RedPacket              *CreateRedPacketInput
+	TorrentID              *int64
 	Topics                 []string
 	CanPostRestrictedBoard bool
 	CreateBodySHA256       [sha256.Size]byte
@@ -266,13 +281,13 @@ func (service *PostService) FindVisible(ctx context.Context, cookieToken string,
 }
 
 func (service *PostService) Create(ctx context.Context, cookieToken, csrfToken string, input CreatePostInput) (Post, error) {
-	body, err := normalizePostBody(input.Body)
+	body, err := normalizePostBody(input.Body, input.TorrentID != nil)
 	boardID := strings.TrimSpace(input.BoardID)
 	if boardID == "" {
 		boardID = "general"
 	}
 	validationNow := service.now().UTC()
-	if err != nil || input.RequestID == uuid.Nil || !validBoardID(boardID) || len(input.MediaIDs) > MaxPostMedia || validateCreatePoll(input.Poll, validationNow) != nil || validateCreateRedPacket(input.RedPacket) != nil {
+	if err != nil || input.RequestID == uuid.Nil || !validBoardID(boardID) || len(input.MediaIDs) > MaxPostMedia || input.TorrentID != nil && *input.TorrentID < 1 || validateCreatePoll(input.Poll, validationNow) != nil || validateCreateRedPacket(input.RedPacket) != nil {
 		return Post{}, ErrPostInput
 	}
 	authorID, now, err := service.authorizeWrite(ctx, cookieToken, csrfToken, authz.ActionSocialPostCreateSelf)
@@ -293,8 +308,8 @@ func (service *PostService) Create(ctx context.Context, cookieToken, csrfToken s
 	post, err := service.repository.Create(ctx, createPostCommand{
 		PublicID: uuid.New(), RequestID: input.RequestID, AuthorID: authorID, Body: body,
 		BoardID: boardID, MediaIDs: append([]uuid.UUID(nil), input.MediaIDs...), Poll: input.Poll,
-		RedPacket: input.RedPacket, Topics: extractTopics(body), CanPostRestrictedBoard: canPostRestrictedBoard,
-		CreateBodySHA256: createPostInputSHA256(body, boardID, input.MediaIDs, input.Poll, input.RedPacket), CreatedAt: now,
+		RedPacket: input.RedPacket, TorrentID: copyInt64Pointer(input.TorrentID), Topics: extractTopics(body), CanPostRestrictedBoard: canPostRestrictedBoard,
+		CreateBodySHA256: createPostInputSHA256(body, boardID, input.MediaIDs, input.Poll, input.RedPacket, input.TorrentID), CreatedAt: now,
 	})
 	if err != nil {
 		return Post{}, err
@@ -313,7 +328,7 @@ func (service *PostService) Create(ctx context.Context, cookieToken, csrfToken s
 }
 
 func (service *PostService) UpdateMyPost(ctx context.Context, cookieToken, csrfToken string, input UpdatePostInput) (Post, error) {
-	body, err := normalizePostBody(input.Body)
+	body, err := normalizePostBody(input.Body, true)
 	if err != nil || input.PostID == uuid.Nil || input.ExpectedVersion < 1 {
 		return Post{}, ErrPostInput
 	}
@@ -365,7 +380,7 @@ func (service *PostService) authorizeRead(ctx context.Context, cookieToken strin
 	return session.User.ID, nil
 }
 
-func createPostInputSHA256(body, boardID string, mediaIDs []uuid.UUID, poll *CreatePollInput, redPacket *CreateRedPacketInput) [sha256.Size]byte {
+func createPostInputSHA256(body, boardID string, mediaIDs []uuid.UUID, poll *CreatePollInput, redPacket *CreateRedPacketInput, torrentID *int64) [sha256.Size]byte {
 	type canonicalPoll struct {
 		Question string   `json:"question"`
 		Options  []string `json:"options"`
@@ -381,8 +396,9 @@ func createPostInputSHA256(body, boardID string, mediaIDs []uuid.UUID, poll *Cre
 		MediaIDs  []string            `json:"media_ids"`
 		Poll      *canonicalPoll      `json:"poll,omitempty"`
 		RedPacket *canonicalRedPacket `json:"red_packet,omitempty"`
+		TorrentID *int64              `json:"torrent_id,omitempty"`
 	}
-	canonical := canonicalInput{Body: body, BoardID: boardID, MediaIDs: make([]string, 0, len(mediaIDs))}
+	canonical := canonicalInput{Body: body, BoardID: boardID, MediaIDs: make([]string, 0, len(mediaIDs)), TorrentID: copyInt64Pointer(torrentID)}
 	for _, mediaID := range mediaIDs {
 		canonical.MediaIDs = append(canonical.MediaIDs, mediaID.String())
 	}
@@ -412,7 +428,7 @@ func createPostDigestMatches(stored []byte, command createPostCommand) bool {
 	// Posts created before boards and attachments existed stored a digest of the
 	// body only. Preserve retry compatibility for that exact legacy shape while
 	// still rejecting a reused request ID that adds any new feature.
-	legacyShape := command.BoardID == "general" && len(command.MediaIDs) == 0 && command.Poll == nil && command.RedPacket == nil
+	legacyShape := command.BoardID == "general" && len(command.MediaIDs) == 0 && command.Poll == nil && command.RedPacket == nil && command.TorrentID == nil
 	legacyDigest := sha256.Sum256([]byte(command.Body))
 	return legacyShape && bytes.Equal(stored, legacyDigest[:])
 }
@@ -429,7 +445,7 @@ func (service *PostService) authorizeWrite(ctx context.Context, cookieToken, csr
 	return session.User.ID, now, nil
 }
 
-func normalizePostBody(value string) (string, error) {
+func normalizePostBody(value string, allowEmpty bool) (string, error) {
 	if !utf8.ValidString(value) {
 		return "", ErrPostInput
 	}
@@ -437,7 +453,7 @@ func normalizePostBody(value string) (string, error) {
 	value = strings.ReplaceAll(value, "\r", "\n")
 	value = strings.TrimSpace(value)
 	count := utf8.RuneCountInString(value)
-	if count < 1 || count > MaxPostBodyRunes {
+	if count > MaxPostBodyRunes || !allowEmpty && count < 1 {
 		return "", ErrPostInput
 	}
 	for _, character := range value {
@@ -457,7 +473,7 @@ func validatePersistedPost(post Post) error {
 	}
 	switch post.State {
 	case PostVisible:
-		if _, err := normalizePostBody(post.Body); err != nil {
+		if _, err := normalizePostBody(post.Body, post.Torrent != nil); err != nil {
 			return ErrPostInvariant
 		}
 	case PostAuthorDeleted:
@@ -470,7 +486,18 @@ func validatePersistedPost(post Post) error {
 	if post.EditedAt != nil && (post.EditedAt.Before(post.CreatedAt) || post.EditedAt.After(post.UpdatedAt)) {
 		return ErrPostInvariant
 	}
+	if post.Torrent != nil && post.Torrent.ID < 1 {
+		return ErrPostInvariant
+	}
 	return nil
+}
+
+func copyInt64Pointer(value *int64) *int64 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
 
 func validPostSort(sort PostSort) bool {

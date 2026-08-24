@@ -92,7 +92,7 @@ describe("SocialPostCard", () => {
     expect(screen.getByRole("button", { name: "收起" })).toBeVisible()
   })
 
-  it("links a shared torrent path back to its PeerGo detail page", () => {
+  it("renders a PtYes-style card for a real shared torrent association", () => {
     const torrentId = 42
 
     render(
@@ -123,7 +123,7 @@ describe("SocialPostCard", () => {
                 post_count: 1,
                 version: 1,
               },
-              content: `分享种子：演示资源\n\n/torrents/${torrentId}`,
+              content: `值得收藏\n\n分享种子：演示资源\n\n/torrents/${torrentId}`,
               version: 1,
               comment_count: 0,
               like_count: 0,
@@ -135,6 +135,14 @@ describe("SocialPostCard", () => {
               hidden: false,
               topics: [],
               media: [],
+              torrent: {
+                id: torrentId,
+                available: true,
+                title: "演示资源",
+                subtitle: "完整演示副标题",
+                size_bytes: 1024,
+                cover_available: false,
+              },
               created_at: "2026-08-13T06:00:00Z",
               updated_at: "2026-08-13T06:00:00Z",
             }}
@@ -143,9 +151,14 @@ describe("SocialPostCard", () => {
       </MemoryRouter>
     )
 
-    expect(
-      screen.getByRole("link", { name: `/torrents/${torrentId}` })
-    ).toHaveAttribute("href", `/torrents/${torrentId}`)
+    expect(screen.getByText("值得收藏")).toBeVisible()
+    expect(screen.queryByText(/分享种子：/)).not.toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /演示资源/ })).toHaveAttribute(
+      "href",
+      `/torrents/${torrentId}`
+    )
+    expect(screen.getByText("完整演示副标题")).toBeVisible()
+    expect(screen.getByText("1 KB")).toBeVisible()
     expect(screen.getByRole("button", { name: "点赞" })).toHaveClass("border-0")
     expect(screen.getByRole("button", { name: "评论" })).toHaveClass("border-0")
   })

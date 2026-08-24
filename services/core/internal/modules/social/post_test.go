@@ -137,6 +137,30 @@ func TestPostServiceRejectsInvalidInputBeforeAuthentication(t *testing.T) {
 	}
 }
 
+func TestPostServiceAllowsCardOnlyTorrentShare(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 24, 8, 0, 0, 0, time.UTC)
+	userID, postID, requestID := uuid.New(), uuid.New(), uuid.New()
+	torrentID := int64(42)
+	post := Post{
+		ID: postID, Author: PostAuthor{ID: userID, Username: "demo", DisplayName: "演示用户"},
+		Body: "", Torrent: &PostTorrent{ID: torrentID}, State: PostVisible, Version: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	authenticator := &postAuthenticatorFixture{session: identity.WebSession{User: identity.User{ID: userID}}}
+	repository := &postRepositoryFixture{created: post}
+	service, err := NewPostService(authenticator, &postAuthorizerFixture{}, repository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	created, err := service.Create(context.Background(), "cookie", "csrf", CreatePostInput{
+		RequestID: requestID, Body: "  \r\n", BoardID: "resources", TorrentID: &torrentID,
+	})
+	if err != nil || created.ID != postID || repository.createCommand.Body != "" || repository.createCommand.TorrentID == nil || *repository.createCommand.TorrentID != torrentID {
+		t.Fatalf("Create(torrent share) post=%+v command=%+v error=%v", created, repository.createCommand, err)
+	}
+}
+
 func TestPostServiceRequiresRestrictedBoardCapability(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, time.August, 24, 3, 0, 0, 0, time.UTC)

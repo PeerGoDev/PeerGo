@@ -68,7 +68,7 @@ func (repository *PostgresPostRepository) List(ctx context.Context, query PostLi
 	for _, row := range rows {
 		post, conversionErr := postFromFields(
 			row.PostInternalID, row.PublicID, row.AuthorID, row.AuthorUsername, row.AuthorDisplayName,
-			row.Body, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt,
+			row.Body, row.TorrentID, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt,
 		)
 		if conversionErr != nil {
 			return nil, 0, conversionErr
@@ -98,7 +98,7 @@ func (repository *PostgresPostRepository) FindVisible(ctx context.Context, postI
 	}
 	return postFromFields(
 		row.PostInternalID, row.PublicID, row.AuthorID, row.AuthorUsername, row.AuthorDisplayName,
-		row.Body, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt,
+		row.Body, row.TorrentID, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt,
 	)
 }
 
@@ -116,9 +116,9 @@ func (repository *PostgresPostRepository) ResolveBoardPostingPolicy(ctx context.
 }
 
 func (repository *PostgresPostRepository) Create(ctx context.Context, command createPostCommand) (Post, error) {
-	normalizedBody, bodyErr := normalizePostBody(command.Body)
+	normalizedBody, bodyErr := normalizePostBody(command.Body, command.TorrentID != nil)
 	if command.PublicID == uuid.Nil || command.RequestID == uuid.Nil || command.AuthorID == uuid.Nil || command.CreatedAt.IsZero() || !validBoardID(command.BoardID) ||
-		bodyErr != nil || normalizedBody != command.Body || command.CreateBodySHA256 != createPostInputSHA256(command.Body, command.BoardID, command.MediaIDs, command.Poll, command.RedPacket) {
+		bodyErr != nil || normalizedBody != command.Body || command.TorrentID != nil && *command.TorrentID < 1 || command.CreateBodySHA256 != createPostInputSHA256(command.Body, command.BoardID, command.MediaIDs, command.Poll, command.RedPacket, command.TorrentID) {
 		return Post{}, ErrPostInput
 	}
 	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -144,9 +144,19 @@ func (repository *PostgresPostRepository) Create(ctx context.Context, command cr
 	} else if !errors.Is(findErr, pgx.ErrNoRows) {
 		return Post{}, fmt.Errorf("find social post create request: %w", findErr)
 	}
+	if command.TorrentID != nil {
+		var published bool
+		err := tx.QueryRow(ctx, `SELECT state = 'published' FROM torrents.torrents WHERE id = $1 FOR SHARE`, *command.TorrentID).Scan(&published)
+		if errors.Is(err, pgx.ErrNoRows) || err == nil && !published {
+			return Post{}, ErrSocialTorrentUnavailable
+		}
+		if err != nil {
+			return Post{}, fmt.Errorf("validate shared social torrent: %w", err)
+		}
+	}
 	inserted, err := queries.InsertPost(ctx, socialdb.InsertPostParams{
 		PublicID: command.PublicID, AuthorID: command.AuthorID, CreateRequestID: command.RequestID,
-		CreateBodySha256: command.CreateBodySHA256[:], BoardID: command.BoardID, Body: command.Body, CreatedAt: timestamp(command.CreatedAt),
+		CreateBodySha256: command.CreateBodySHA256[:], BoardID: command.BoardID, TorrentID: nullableInt64(command.TorrentID), Body: command.Body, CreatedAt: timestamp(command.CreatedAt),
 	})
 	if err != nil {
 		return Post{}, fmt.Errorf("insert social post: %w", err)
@@ -184,7 +194,7 @@ func (repository *PostgresPostRepository) Create(ctx context.Context, command cr
 }
 
 func (repository *PostgresPostRepository) Update(ctx context.Context, command updatePostCommand) (Post, error) {
-	normalizedBody, bodyErr := normalizePostBody(command.Body)
+	normalizedBody, bodyErr := normalizePostBody(command.Body, true)
 	if command.PostID == uuid.Nil || command.AuthorID == uuid.Nil || command.ExpectedVersion < 1 || command.UpdatedAt.IsZero() ||
 		bodyErr != nil || normalizedBody != command.Body {
 		return Post{}, ErrPostInput
@@ -208,6 +218,9 @@ func (repository *PostgresPostRepository) Update(ctx context.Context, command up
 	}
 	if current.State != PostVisible {
 		return Post{}, ErrPostNotFound
+	}
+	if command.Body == "" && current.Torrent == nil {
+		return Post{}, ErrPostInput
 	}
 	if current.Body == command.Body && (current.Version == command.ExpectedVersion || current.Version == command.ExpectedVersion+1) {
 		if err := tx.Commit(ctx); err != nil {
@@ -313,20 +326,20 @@ func (repository *PostgresPostRepository) Delete(ctx context.Context, command de
 
 func postFromCreateRequestRow(row socialdb.FindPostByCreateRequestRow) (Post, error) {
 	return postFromFields(row.PostInternalID, row.PublicID, row.AuthorID, row.AuthorUsername, row.AuthorDisplayName,
-		row.Body, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt)
+		row.Body, row.TorrentID, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt)
 }
 
 func postFromLockedRow(row socialdb.LockPostForAuthorRow) (Post, error) {
 	return postFromFields(row.PostInternalID, row.PublicID, row.AuthorID, row.AuthorUsername, row.AuthorDisplayName,
-		row.Body, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt)
+		row.Body, row.TorrentID, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt)
 }
 
 func postFromVisibleRow(row socialdb.FindVisiblePostRow) (Post, error) {
 	return postFromFields(row.PostInternalID, row.PublicID, row.AuthorID, row.AuthorUsername, row.AuthorDisplayName,
-		row.Body, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt)
+		row.Body, row.TorrentID, row.State, row.Version, row.CommentCount, row.CreatedAt, row.UpdatedAt, row.EditedAt)
 }
 
-func postFromFields(internalID int64, publicID, authorID uuid.UUID, username, displayName, body, state string, version, commentCount int64, createdAt, updatedAt pgtype.Timestamptz, editedAt pgtype.Timestamptz) (Post, error) {
+func postFromFields(internalID int64, publicID, authorID uuid.UUID, username, displayName, body string, torrentID pgtype.Int8, state string, version, commentCount int64, createdAt, updatedAt pgtype.Timestamptz, editedAt pgtype.Timestamptz) (Post, error) {
 	if internalID < 1 || !createdAt.Valid || !updatedAt.Valid {
 		return Post{}, ErrPostInvariant
 	}
@@ -334,6 +347,9 @@ func postFromFields(internalID int64, publicID, authorID uuid.UUID, username, di
 		ID: publicID, Author: PostAuthor{ID: authorID, Username: username, DisplayName: displayName},
 		Body: body, State: PostState(state), Version: version, CommentCount: commentCount,
 		CreatedAt: createdAt.Time.UTC(), UpdatedAt: updatedAt.Time.UTC(),
+	}
+	if torrentID.Valid {
+		post.Torrent = &PostTorrent{ID: torrentID.Int64}
 	}
 	if editedAt.Valid {
 		value := editedAt.Time.UTC()
@@ -343,6 +359,13 @@ func postFromFields(internalID int64, publicID, authorID uuid.UUID, username, di
 		return Post{}, err
 	}
 	return post, nil
+}
+
+func nullableInt64(value *int64) pgtype.Int8 {
+	if value == nil {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: *value, Valid: true}
 }
 
 var _ PostRepository = (*PostgresPostRepository)(nil)

@@ -195,6 +195,7 @@ export function useCreateSocialPost() {
       mediaIds?: string[]
       poll?: CreateSocialPollRequest
       redPacket?: CreateSocialRedPacketRequest
+      torrentId?: number
       csrfToken: string
       idempotencyKey: string
     }): Promise<SocialPost> => {
@@ -213,6 +214,7 @@ export function useCreateSocialPost() {
             media_ids: input.mediaIds,
             poll: input.poll,
             red_packet: input.redPacket,
+            torrent_id: input.torrentId,
           },
         }
       )

@@ -262,7 +262,7 @@ func TestPostgresSocialRedPacketLetsSenderClaimOneShare(t *testing.T) {
 		Body:             body,
 		BoardID:          "general",
 		RedPacket:        redPacket,
-		CreateBodySHA256: createPostInputSHA256(body, "general", nil, nil, redPacket),
+		CreateBodySHA256: createPostInputSHA256(body, "general", nil, nil, redPacket, nil),
 		CreatedAt:        now.Add(time.Second),
 	})
 	if err != nil || created.ID != postID {

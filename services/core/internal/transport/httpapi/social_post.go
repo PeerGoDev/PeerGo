@@ -77,7 +77,7 @@ func (h *Handler) CreateSocialPost(ctx context.Context, request generated.Create
 	}
 	post, err := h.socialPosts.Create(ctx, sessionTokenFromContext(ctx), string(request.Params.XCSRFToken), social.CreatePostInput{
 		RequestID: request.Params.IdempotencyKey, Body: request.Body.Content, BoardID: request.Body.BoardId,
-		MediaIDs: optionalUUIDs(request.Body.MediaIds), Poll: createPollInput(request.Body.Poll), RedPacket: createRedPacketInput(request.Body.RedPacket),
+		MediaIDs: optionalUUIDs(request.Body.MediaIds), Poll: createPollInput(request.Body.Poll), RedPacket: createRedPacketInput(request.Body.RedPacket), TorrentID: request.Body.TorrentId,
 	})
 	switch {
 	case errors.Is(err, social.ErrPostInput):
@@ -100,6 +100,9 @@ func (h *Handler) CreateSocialPost(ctx context.Context, request generated.Create
 		return generated.CreateSocialPost409ApplicationProblemPlusJSONResponse(problem), nil
 	case errors.Is(err, social.ErrSocialBoardUnavailable):
 		problem := newProblemFromContext(ctx, http.StatusConflict, "social_board_unavailable", "板块不可发布", "该板块已停用或不接受成员发布，请选择其他板块。")
+		return generated.CreateSocialPost409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, social.ErrSocialTorrentUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "social_torrent_unavailable", "种子无法分享", "该种子不存在或已经不再公开，请刷新种子详情后重试。")
 		return generated.CreateSocialPost409ApplicationProblemPlusJSONResponse(problem), nil
 	case errors.Is(err, social.ErrSocialInsufficientMagic):
 		problem := newProblemFromContext(ctx, http.StatusConflict, "social_red_packet_balance_insufficient", "魔力值不足", "当前余额不足以发放这个红包，请调整金额后重试。")
@@ -179,7 +182,7 @@ func socialPostDTO(post social.Post) generated.SocialPost {
 		Id: post.ID, Author: socialPostAuthorDTO(post.Author),
 		Board: socialBoardDTO(post.Board), Content: post.Body, Version: post.Version, CommentCount: post.CommentCount,
 		LikeCount: post.LikeCount, RepostCount: post.RepostCount, LikedByMe: post.LikedByMe, RepostedByMe: post.RepostedByMe,
-		Pinned: post.Pinned, Featured: post.Featured, Hidden: boolPointer(post.State == social.PostModeratorHidden), Topics: post.Topics, Media: socialMediaDTOs(post.Media), Poll: socialPollDTO(post.Poll), RedPacket: socialRedPacketDTO(post.RedPacket),
+		Pinned: post.Pinned, Featured: post.Featured, Hidden: boolPointer(post.State == social.PostModeratorHidden), Topics: post.Topics, Media: socialMediaDTOs(post.Media), Poll: socialPollDTO(post.Poll), RedPacket: socialRedPacketDTO(post.RedPacket), Torrent: socialTorrentDTO(post.Torrent),
 		CreatedAt: post.CreatedAt, UpdatedAt: post.UpdatedAt, EditedAt: post.EditedAt,
 	}
 }
@@ -250,4 +253,14 @@ func socialRedPacketDTO(packet *social.RedPacket) *generated.SocialRedPacket {
 		return nil
 	}
 	return &generated.SocialRedPacket{TotalAmount: packet.TotalAmount, ClaimCount: packet.ClaimCount, RemainingAmount: packet.RemainingAmount, RemainingClaims: packet.RemainingClaims, ClaimedByMe: packet.ClaimedByMe, MyClaimAmount: packet.MyClaimAmount}
+}
+
+func socialTorrentDTO(torrent *social.PostTorrent) *generated.SocialTorrentCard {
+	if torrent == nil {
+		return nil
+	}
+	return &generated.SocialTorrentCard{
+		Id: torrent.ID, Available: torrent.Available, Title: torrent.Title,
+		Subtitle: torrent.Subtitle, SizeBytes: torrent.SizeBytes, CoverAvailable: torrent.CoverAvailable,
+	}
 }
