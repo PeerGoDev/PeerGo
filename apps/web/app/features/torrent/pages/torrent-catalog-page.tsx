@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "~/components/ui/select"
 import { useWebSession } from "~/features/auth/api/session.mutations"
+import { useTrafficOverview } from "~/features/traffic/api/traffic.queries"
 import { useSiteInfo } from "~/features/site/api/site.queries"
 import {
   type TorrentPromotion,
@@ -76,6 +77,7 @@ export function TorrentCatalogPage() {
   const [draftQuery, setDraftQuery] = React.useState(query)
   const session = useWebSession()
   const siteInfo = useSiteInfo()
+  const traffic = useTrafficOverview(session.data?.user.id)
   const authenticated = Boolean(session.data)
   const categories = useCategoryList(authenticated)
   const torrents = useTorrentList(
@@ -92,6 +94,16 @@ export function TorrentCatalogPage() {
   const torrentIds = React.useMemo(
     () => torrents.data?.items.map((torrent) => torrent.id) ?? [],
     [torrents.data?.items]
+  )
+  const activityByTorrentId = React.useMemo(
+    () =>
+      new Map(
+        (traffic.data?.torrent_activity ?? []).map((activity) => [
+          activity.torrent.id,
+          activity,
+        ])
+      ),
+    [traffic.data?.torrent_activity]
   )
   const bookmarkControls = useTorrentBookmarkControls(torrentIds)
   const [view, setView] = useTorrentView(siteInfo.data?.default_torrent_view)
@@ -311,6 +323,7 @@ export function TorrentCatalogPage() {
                   torrents={torrents.data.items}
                   bookmarkControls={bookmarkControls}
                   adultCoversVisible={adultCoversVisible}
+                  activityByTorrentId={activityByTorrentId}
                   sort={sort}
                   onSortChange={(nextSort) =>
                     updateFilters({
@@ -324,6 +337,7 @@ export function TorrentCatalogPage() {
                   poster={false}
                   bookmarkControls={bookmarkControls}
                   adultCoversVisible={adultCoversVisible}
+                  activityByTorrentId={activityByTorrentId}
                 />
               </>
             ) : (
@@ -332,6 +346,7 @@ export function TorrentCatalogPage() {
                 poster
                 bookmarkControls={bookmarkControls}
                 adultCoversVisible={adultCoversVisible}
+                activityByTorrentId={activityByTorrentId}
               />
             )}
           </>

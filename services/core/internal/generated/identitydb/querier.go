@@ -72,6 +72,7 @@ type Querier interface {
 	ListInvitationHistory(ctx context.Context, arg ListInvitationHistoryParams) ([]ListInvitationHistoryRow, error)
 	ListManagedUsers(ctx context.Context, arg ListManagedUsersParams) ([]ListManagedUsersRow, error)
 	ListManualDownloadRestrictionTransitions(ctx context.Context, userID uuid.UUID) ([]ListManualDownloadRestrictionTransitionsRow, error)
+	ListPublicUserPublishedTorrents(ctx context.Context, arg ListPublicUserPublishedTorrentsParams) ([]ListPublicUserPublishedTorrentsRow, error)
 	ListVIPTransitions(ctx context.Context, userID uuid.UUID) ([]ListVIPTransitionsRow, error)
 	LockActiveWebSessionForEnrollment(ctx context.Context, arg LockActiveWebSessionForEnrollmentParams) (pgtype.Timestamptz, error)
 	LockActiveWebSessionForStaff(ctx context.Context, arg LockActiveWebSessionForStaffParams) (pgtype.Timestamptz, error)

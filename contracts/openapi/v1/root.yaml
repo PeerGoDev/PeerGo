@@ -64,6 +64,8 @@ paths:
     $ref: "./domains/identity.yaml#/ManagedUsersPath"
   /api/v1/admin/users/{user_id}:
     $ref: "./domains/identity.yaml#/ManagedUserPath"
+  /api/v1/admin/users/{user_id}/tracker-activity:
+    $ref: "./domains/profile-activity.yaml#/ManagedUserTrackerActivityPath"
   /api/v1/admin/users/{user_id}/account-restrictions:
     $ref: "./domains/identity.yaml#/ManagedUserAccountRestrictionsPath"
   /api/v1/admin/users/{user_id}/account-restrictions/{restriction_id}/revocations:
@@ -92,6 +94,8 @@ paths:
     $ref: "./domains/seedbox.yaml#/MySeedboxReportsPath"
   /api/v1/me/traffic:
     $ref: "./domains/traffic.yaml#/MyTrafficPath"
+  /api/v1/me/tracker-activity:
+    $ref: "./domains/profile-activity.yaml#/MyTrackerActivityPath"
   /api/v1/me/ratio-watch:
     $ref: "./domains/ratio.yaml#/MyRatioWatchPath"
   /api/v1/me/newcomer-assessment:

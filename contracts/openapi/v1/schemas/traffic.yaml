@@ -157,10 +157,44 @@ TrafficEntry:
       format: date-time
       description: Settlement 按事件时刻优惠政策完成最终结算的时刻。
 
+TrafficTorrentActivity:
+  type: object
+  additionalProperties: false
+  required:
+    - torrent
+    - total_size_bytes
+    - raw_uploaded_bytes
+    - raw_downloaded_bytes
+    - progress_basis_points
+    - completed
+    - last_settled_at
+  properties:
+    torrent:
+      $ref: "#/TrafficTorrentReference"
+    total_size_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    raw_uploaded_bytes:
+      $ref: "#/TrafficByteCount"
+    raw_downloaded_bytes:
+      $ref: "#/TrafficByteCount"
+    progress_basis_points:
+      type: integer
+      minimum: 0
+      maximum: 10000
+      description: 当前累计下载进度；10000 表示 100%。
+    completed:
+      type: boolean
+      description: H&R 完成事实或累计原始下载量已达到种子体积。
+    last_settled_at:
+      type: string
+      format: date-time
+
 TrafficOverview:
   type: object
   additionalProperties: false
-  required: [totals, entries]
+  required: [totals, entries, torrent_activity]
   properties:
     totals:
       $ref: "#/TrafficTotals"
@@ -170,6 +204,14 @@ TrafficOverview:
       description: 按流量区间结束时刻倒序排列的最近最终结算。
       items:
         $ref: "#/TrafficEntry"
+    torrent_activity:
+      type: array
+      maxItems: 500
+      description: >-
+        最近活跃的每用户/种子累计投影；不包含 announce、IP、peer ID
+        或客户端会话历史。
+      items:
+        $ref: "#/TrafficTorrentActivity"
 
 HNRDurationSeconds:
   type: string

@@ -6,6 +6,7 @@ package httpserver
 import (
 	"bytes"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -57,6 +58,10 @@ type SubjectAdmission interface {
 type SwarmEngine interface {
 	Announce(swarm.Request) (swarm.Result, error)
 	ActivePeers([20]byte, time.Time, int) ([]swarm.ActivePeer, bool)
+}
+
+type UserSwarmEngine interface {
+	ActivePeersByUser(string, time.Time, int) ([]swarm.UserActivePeer, bool)
 }
 
 type SwarmScraper interface {
@@ -183,6 +188,10 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.serveOperationsRuntime(response, request)
 		return
 	}
+	if strings.HasPrefix(request.URL.Path, "/internal/v1/operations/users/") {
+		handler.serveOperationsUserActivePeers(response, request)
+		return
+	}
 	if strings.HasPrefix(request.URL.Path, "/internal/v1/operations/swarms/") {
 		handler.serveOperationsActivePeers(response, request)
 		return
@@ -199,6 +208,78 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	if handler.observer != nil {
 		handler.observer.ObserveRequest(observation)
 	}
+}
+
+func (handler *Handler) serveOperationsUserActivePeers(response http.ResponseWriter, request *http.Request) {
+	operations := handler.config.Operations
+	userSwarms, supported := handler.swarms.(UserSwarmEngine)
+	if operations == nil || !supported || request.Method != http.MethodGet || request.ContentLength > 0 || len(request.TransferEncoding) != 0 {
+		http.NotFound(response, request)
+		return
+	}
+	if !operationsAuthorized(request, operations.ServiceToken) {
+		handler.writeJSON(response, http.StatusForbidden, map[string]string{"code": "service_auth_failed"})
+		return
+	}
+	prefix := "/internal/v1/operations/users/"
+	remainder := strings.TrimPrefix(request.URL.Path, prefix)
+	userID, found := strings.CutSuffix(remainder, "/peers")
+	if !found || strings.Contains(userID, "/") || !validOperationsUserID(userID) {
+		http.NotFound(response, request)
+		return
+	}
+	limit := 100
+	query := request.URL.Query()
+	if len(query) > 1 || (len(query) == 1 && !query.Has("limit")) || len(query["limit"]) > 1 {
+		handler.writeJSON(response, http.StatusBadRequest, map[string]string{"code": "invalid_peer_query"})
+		return
+	}
+	if value := query.Get("limit"); value != "" {
+		parsed, parseErr := strconv.Atoi(value)
+		if parseErr != nil || parsed < 1 || parsed > trackeroperationsv1.MaxUserActivePeerLimit {
+			handler.writeJSON(response, http.StatusBadRequest, map[string]string{"code": "invalid_peer_query"})
+			return
+		}
+		limit = parsed
+	}
+	now := handler.now().UTC().Round(0)
+	active, truncated := userSwarms.ActivePeersByUser(userID, now, limit)
+	items := make([]trackeroperationsv1.UserActivePeer, 0, len(active))
+	for _, peer := range active {
+		admission, exists := handler.torrents.LookupAdmission(peer.InfoHash)
+		if !exists {
+			truncated = true
+			continue
+		}
+		items = append(items, trackeroperationsv1.UserActivePeer{
+			TorrentID: admission.Torrent.TorrentID, InfoHashV1: hex.EncodeToString(peer.InfoHash[:]),
+			TotalSizeBytes: admission.Torrent.TotalSizeBytes, ClientFamily: peer.ClientFamily,
+			AddressFamily: peer.AddressFamily, Seedbox: peer.Seedbox, Uploaded: peer.Uploaded,
+			Downloaded: peer.Downloaded, UploadSpeed: peer.UploadSpeed, DownloadSpeed: peer.DownloadSpeed,
+			Left: peer.Left, LastAnnounce: peer.LastAnnounce.UTC().Round(0),
+		})
+	}
+	handler.writeJSON(response, http.StatusOK, trackeroperationsv1.UserActivePeerPage{
+		UserID: userID, GeneratedAt: now, Items: items, Truncated: truncated,
+	})
+}
+
+func validOperationsUserID(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	for index, character := range value {
+		if index == 8 || index == 13 || index == 18 || index == 23 {
+			if character != '-' {
+				return false
+			}
+			continue
+		}
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func (handler *Handler) serveOperationsRuntime(response http.ResponseWriter, request *http.Request) {

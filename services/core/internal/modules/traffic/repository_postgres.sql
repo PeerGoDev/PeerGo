@@ -179,6 +179,45 @@ WHERE entry.user_id = sqlc.arg(user_id)::uuid
 ORDER BY entry.interval_ends_at DESC, entry.bucket_start DESC, entry.rollup_id DESC
 LIMIT sqlc.arg(result_limit)::integer;
 
+-- name: ListUserTorrentActivity :many
+-- This is the bounded current projection used by the catalog/profile UI. It
+-- intentionally reads the compact cumulative row instead of retaining or
+-- replaying announce history. H&R completion is authoritative when present;
+-- otherwise the raw downloaded byte total supplies a conservative progress
+-- estimate capped at 100%.
+WITH completed_torrents AS (
+    SELECT DISTINCT obligation.torrent_id
+    FROM traffic.user_hnr_obligations AS obligation
+    WHERE obligation.user_id = sqlc.arg(user_id)::uuid
+)
+SELECT
+    totals.torrent_id,
+    torrent.title AS torrent_title,
+    torrent.total_size_bytes,
+    totals.raw_uploaded,
+    totals.raw_downloaded,
+    CASE
+        WHEN completed.torrent_id IS NOT NULL THEN 10000
+        WHEN torrent.total_size_bytes <= 0 THEN 0
+        ELSE LEAST(
+            10000,
+            FLOOR(
+                totals.raw_downloaded::numeric * 10000
+                / torrent.total_size_bytes::numeric
+            )::integer
+        )
+    END::integer AS progress_basis_points,
+    completed.torrent_id IS NOT NULL
+        OR totals.raw_downloaded >= torrent.total_size_bytes AS completed,
+    totals.last_occurred_at
+FROM traffic.user_torrent_totals AS totals
+JOIN torrents.torrents AS torrent ON torrent.id = totals.torrent_id
+LEFT JOIN completed_torrents AS completed ON completed.torrent_id = totals.torrent_id
+WHERE totals.user_id = sqlc.arg(user_id)::uuid
+  AND totals.last_occurred_at IS NOT NULL
+ORDER BY totals.updated_at DESC, totals.torrent_id DESC
+LIMIT sqlc.arg(result_limit)::integer;
+
 -- name: ListUserTrafficExplanationSegments :many
 SELECT
     settlement_id,

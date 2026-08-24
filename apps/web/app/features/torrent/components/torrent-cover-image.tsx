@@ -16,6 +16,7 @@ export function TorrentCoverImage({
   showObscuredLabel = false,
   obscuredLabel = "NSFW · 18+",
   available = true,
+  source = "cover",
 }: {
   torrentId: number
   title: string
@@ -27,16 +28,19 @@ export function TorrentCoverImage({
   showObscuredLabel?: boolean
   obscuredLabel?: string
   available?: boolean
+  source?: "cover" | "screenshot"
 }) {
   const [failed, setFailed] = React.useState(false)
   const canReadCover = available && isTorrentId(torrentId) && !failed
-  const source = resolveApiUrl(
-    `/api/v1/torrents/${encodeURIComponent(torrentId)}/cover`
+  const imageSource = resolveApiUrl(
+    source === "screenshot"
+      ? `/api/v1/torrents/${encodeURIComponent(torrentId)}/screenshots/0`
+      : `/api/v1/torrents/${encodeURIComponent(torrentId)}/cover`
   )
 
   React.useEffect(() => {
     setFailed(false)
-  }, [torrentId])
+  }, [source, torrentId])
 
   if (!canReadCover) {
     return (
@@ -58,7 +62,7 @@ export function TorrentCoverImage({
     <>
       {blurredBackground ? (
         <img
-          src={source}
+          src={imageSource}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 size-full scale-110 object-cover opacity-60 blur-xl"
@@ -66,7 +70,7 @@ export function TorrentCoverImage({
         />
       ) : null}
       <img
-        src={source}
+        src={imageSource}
         alt={obscured ? `${title}封面已隐藏` : `${title}封面`}
         className={cn(
           className,

@@ -1,0 +1,91 @@
+UserTrackerTask:
+  type: object
+  additionalProperties: false
+  required:
+    - torrent_id
+    - info_hash_v1
+    - client_families
+    - address_families
+    - active_connections
+    - seeding_connections
+    - leeching_connections
+    - progress_basis_points
+    - uploaded
+    - downloaded
+    - upload_speed
+    - download_speed
+    - last_announce
+    - seedbox
+  properties:
+    torrent_id:
+      type: integer
+      format: int64
+      minimum: 1
+    info_hash_v1:
+      type: string
+      pattern: "^[0-9a-f]{40}$"
+      description: 用于识别旧版任务的公开 v1 info hash；不包含 passkey 或 peer id。
+    client_families:
+      type: array
+      maxItems: 16
+      items:
+        type: string
+        minLength: 1
+        maxLength: 64
+    address_families:
+      type: array
+      maxItems: 2
+      items:
+        type: string
+        enum: [IPv4, IPv6]
+    active_connections:
+      type: integer
+      minimum: 1
+      maximum: 200
+    seeding_connections:
+      type: integer
+      minimum: 0
+      maximum: 200
+    leeching_connections:
+      type: integer
+      minimum: 0
+      maximum: 200
+    progress_basis_points:
+      type: integer
+      minimum: 0
+      maximum: 10000
+    uploaded:
+      $ref: "./traffic.yaml#/TrafficByteCount"
+    downloaded:
+      $ref: "./traffic.yaml#/TrafficByteCount"
+    upload_speed:
+      $ref: "./traffic.yaml#/TrafficByteCount"
+    download_speed:
+      $ref: "./traffic.yaml#/TrafficByteCount"
+    last_announce:
+      type: string
+      format: date-time
+    seedbox:
+      type: boolean
+
+UserTrackerActivity:
+  type: object
+  additionalProperties: false
+  required: [items, total_connections, truncated, generated_at]
+  properties:
+    items:
+      type: array
+      maxItems: 200
+      items:
+        $ref: "#/UserTrackerTask"
+    total_connections:
+      type: integer
+      minimum: 0
+      maximum: 200
+    truncated:
+      type: boolean
+      description: Tracker 的有界内存扫描或返回上限是否截断了结果。
+    generated_at:
+      type: string
+      format: date-time
+      description: Tracker 生成当前瞬时视图的服务端时间。

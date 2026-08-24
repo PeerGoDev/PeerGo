@@ -10,6 +10,11 @@ import {
 import { TorrentBookmarkButton } from "~/features/torrent/components/torrent-bookmark-button"
 import { TorrentDownloadButton } from "~/features/torrent/components/torrent-download-button"
 import { TorrentCoverImage } from "~/features/torrent/components/torrent-cover-image"
+import { TorrentCoverPreview } from "~/features/torrent/components/torrent-cover-preview"
+import {
+  TorrentDownloadProgress,
+  type TorrentActivity,
+} from "~/features/torrent/components/torrent-download-progress"
 import { TorrentSize } from "~/features/torrent/components/torrent-size"
 import { TorrentTitleLink } from "~/features/torrent/components/torrent-title-link"
 import { isTorrentId } from "~/features/torrent/api/torrent.download"
@@ -30,12 +35,14 @@ export function TorrentCards({
   bookmarkControls,
   timestampByTorrentId,
   adultCoversVisible = false,
+  activityByTorrentId,
 }: {
   torrents: Torrent[]
   poster: boolean
   bookmarkControls?: TorrentBookmarkControls
   timestampByTorrentId?: ReadonlyMap<number, string>
   adultCoversVisible?: boolean
+  activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
 }) {
   if (poster) {
     return (
@@ -47,7 +54,15 @@ export function TorrentCards({
             getTorrentSwarmFreshness(torrent) === "unavailable"
           const posterContent = (
             <>
-              <div className="relative flex aspect-[2/3] items-center justify-center overflow-hidden rounded-lg bg-muted shadow-sm transition-shadow group-hover:shadow-lg">
+              <TorrentCoverPreview
+                torrentId={torrent.id}
+                title={torrent.name}
+                triggerClassName="relative flex aspect-[2/3] items-center justify-center overflow-hidden rounded-lg bg-muted shadow-sm transition-shadow group-hover:shadow-lg"
+                disabled={
+                  !adultCoversVisible &&
+                  torrentCoverRequiresAdultConfirmation(torrent.category)
+                }
+              >
                 <TorrentCoverImage
                   torrentId={torrent.id}
                   title={torrent.name}
@@ -90,7 +105,11 @@ export function TorrentCards({
                     </span>
                   </div>
                 </div>
-              </div>
+                <TorrentDownloadProgress
+                  activity={activityByTorrentId?.get(torrent.id)}
+                  overlay
+                />
+              </TorrentCoverPreview>
 
               <div className="mt-2 px-0.5">
                 <h3
@@ -142,8 +161,19 @@ export function TorrentCards({
           getTorrentSwarmFreshness(torrent) === "unavailable"
 
         return (
-          <article key={torrent.id} className="flex min-w-0 gap-3 border-t p-3">
-            <div className="relative flex h-24 w-16 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground">
+          <article
+            key={torrent.id}
+            className="relative flex min-w-0 gap-3 overflow-hidden border-t p-3"
+          >
+            <TorrentCoverPreview
+              torrentId={torrent.id}
+              title={torrent.name}
+              triggerClassName="relative flex h-24 w-16 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground"
+              disabled={
+                !adultCoversVisible &&
+                torrentCoverRequiresAdultConfirmation(torrent.category)
+              }
+            >
               <TorrentCoverImage
                 torrentId={torrent.id}
                 title={torrent.name}
@@ -155,7 +185,7 @@ export function TorrentCards({
                 }
                 showObscuredLabel
               />
-            </div>
+            </TorrentCoverPreview>
             <div className="flex min-w-0 flex-1 flex-col justify-between">
               <div className="flex min-w-0 items-start gap-1.5">
                 <h3 className="min-w-0 flex-1 text-sm leading-snug font-medium">
@@ -223,6 +253,10 @@ export function TorrentCards({
                 </span>
               </div>
             </div>
+            <TorrentDownloadProgress
+              activity={activityByTorrentId?.get(torrent.id)}
+              overlay
+            />
           </article>
         )
       })}

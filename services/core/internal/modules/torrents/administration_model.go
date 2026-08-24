@@ -125,6 +125,33 @@ type ManagedTorrentPeerList struct {
 	GeneratedAt      time.Time
 }
 
+// UserTrackerTask is a privacy-minimized, in-memory-only aggregate of the
+// target user's live Tracker connections for one torrent. It deliberately has
+// no endpoint, port, peer ID, passkey or durable session identifier.
+type UserTrackerTask struct {
+	TorrentID           TorrentID
+	InfoHashV1          string
+	ClientFamilies      []string
+	AddressFamilies     []string
+	ActiveConnections   int
+	SeedingConnections  int
+	LeechingConnections int
+	ProgressBasisPoints int
+	Uploaded            int64
+	Downloaded          int64
+	UploadSpeed         int64
+	DownloadSpeed       int64
+	LastAnnounce        time.Time
+	Seedbox             bool
+}
+
+type UserTrackerActivity struct {
+	Items            []UserTrackerTask
+	TotalConnections int
+	Truncated        bool
+	GeneratedAt      time.Time
+}
+
 type ManagedTorrentQuery struct {
 	Query      string
 	State      State

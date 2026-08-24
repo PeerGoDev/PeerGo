@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
+
 	generated "github.com/peergo/peergo/services/core/internal/generated/api"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/torrentpurchase"
@@ -89,6 +91,47 @@ func (h *Handler) ListManagedTorrentPeers(ctx context.Context, request generated
 	return generated.ListManagedTorrentPeers200JSONResponse{
 		Body:    managedTorrentPeerListDTO(page),
 		Headers: generated.ListManagedTorrentPeers200ResponseHeaders{CacheControl: "private, no-store"},
+	}, nil
+}
+
+func (h *Handler) GetManagedUserTrackerActivity(ctx context.Context, request generated.GetManagedUserTrackerActivityRequestObject) (generated.GetManagedUserTrackerActivityResponseObject, error) {
+	session, authenticationProblem, err := h.authenticateStaffRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.GetManagedUserTrackerActivity401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.GetManagedUserTrackerActivity403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	if request.UserId == uuid.Nil {
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_tracker_activity_query", "用户查询无效", "用户编号无效。")
+		return generated.GetManagedUserTrackerActivity400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	}
+	activity, err := h.torrentRead.ManagedUserTrackerActivity(ctx, staffActor(session), request.UserId)
+	switch {
+	case errors.Is(err, torrents.ErrTorrentAdministrationInput):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_tracker_activity_query", "用户查询无效", "用户编号无效。")
+		return generated.GetManagedUserTrackerActivity400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, authz.ErrForbidden):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "user_tracker_activity_read_denied", "无法查看在线任务", "当前后台身份没有 user.account.read 权限。")
+		return generated.GetManagedUserTrackerActivity403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrManagedTorrentPeersUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "tracker_activity_unavailable", "在线任务暂时不可用", "Tracker 当前无法提供实时活动，请稍后重试。")
+		return generated.GetManagedUserTrackerActivitydefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.GetManagedUserTrackerActivity200JSONResponse{
+		Body: userTrackerActivityDTO(activity),
+		Headers: generated.GetManagedUserTrackerActivity200ResponseHeaders{
+			CacheControl: "private, no-store",
+		},
 	}, nil
 }
 

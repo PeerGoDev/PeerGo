@@ -1,0 +1,61 @@
+MyTrackerActivityPath:
+  get:
+    operationId: getMyTrackerActivity
+    summary: 获取当前用户的在线 BT 任务与客户端摘要
+    description: >-
+      直接读取 Tracker 的有界内存视图，不写入 Core 数据库；响应不包含 IP、端口、
+      passkey、peer id 或会话标识。
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: traffic.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 当前用户的瞬时 Tracker 活动。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/profile-activity.yaml#/UserTrackerActivity"
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedUserTrackerActivityPath:
+  get:
+    operationId: getManagedUserTrackerActivity
+    summary: 获取指定用户的在线 BT 任务与客户端摘要
+    description: >-
+      仅供 user.account.read 后台身份读取 Tracker 当前内存摘要；不返回网络端点、
+      passkey、peer id 或持久化活动历史。
+    tags: [torrents]
+    x-audience: [staff]
+    x-owner: core-torrents
+    x-permission: user.account.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    responses:
+      "200":
+        description: 目标用户的瞬时 Tracker 活动。
+        headers:
+          Cache-Control:
+            required: true
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/profile-activity.yaml#/UserTrackerActivity"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

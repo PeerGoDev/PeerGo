@@ -313,6 +313,13 @@ func (service *TorrentReadService) ManagedActivePeers(ctx context.Context, actor
 	return service.administration.ActivePeers(ctx, actor, torrentID)
 }
 
+func (service *TorrentReadService) ManagedUserTrackerActivity(ctx context.Context, actor authz.StaffActor, userID uuid.UUID) (UserTrackerActivity, error) {
+	if service.administration == nil {
+		return UserTrackerActivity{}, ErrManagedTorrentPeersUnavailable
+	}
+	return service.administration.UserActivePeers(ctx, actor, userID)
+}
+
 // ActivePeers restores the member-facing PtYes user list while retaining the
 // privacy-minimized Tracker projection. A valid Web session is required, and
 // network endpoints and protocol/session identifiers never leave Tracker.
@@ -337,6 +344,20 @@ func (service *TorrentReadService) ActivePeers(ctx context.Context, cookieToken 
 		return ManagedTorrentPeerList{}, ErrManagedTorrentPeersUnavailable
 	}
 	return service.administration.activePeers(ctx, torrentID)
+}
+
+func (service *TorrentReadService) MyTrackerActivity(ctx context.Context, cookieToken string) (UserTrackerActivity, error) {
+	session, err := service.authenticator.CurrentSession(ctx, cookieToken)
+	if err != nil {
+		return UserTrackerActivity{}, err
+	}
+	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionTrafficReadSelf, service.now().UTC()); err != nil {
+		return UserTrackerActivity{}, err
+	}
+	if service.administration == nil {
+		return UserTrackerActivity{}, ErrManagedTorrentPeersUnavailable
+	}
+	return service.administration.userActivePeers(ctx, session.User.ID)
 }
 
 func (service *TorrentReadService) Cover(ctx context.Context, torrentID TorrentID) (PublicCover, error) {

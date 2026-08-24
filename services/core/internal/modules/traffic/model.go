@@ -26,6 +26,10 @@ var (
 const (
 	DefaultOverviewLimit = 20
 	MaximumOverviewLimit = 50
+	// MaximumTorrentActivity keeps the compact per-torrent projection bounded
+	// for account/profile and catalog progress views. The rows already exist as
+	// current cumulative totals; this read never creates another history stream.
+	MaximumTorrentActivity = 500
 )
 
 type ExplanationStatus string
@@ -94,8 +98,24 @@ type ExplanationSegment struct {
 }
 
 type Overview struct {
-	Totals  Totals
-	Entries []Entry
+	Totals          Totals
+	Entries         []Entry
+	TorrentActivity []TorrentActivity
+}
+
+// TorrentActivity is the current cumulative, user-owned view of one torrent.
+// It is derived from traffic.user_torrent_totals and the immutable H&R
+// completion projection, so displaying progress does not retain announce or
+// peer-session detail in Core.
+type TorrentActivity struct {
+	TorrentID        int64
+	TorrentTitle     string
+	TotalSizeBytes   int64
+	RawUploaded      int64
+	RawDownloaded    int64
+	ProgressBasisPts int
+	Completed        bool
+	LastSettledAt    time.Time
 }
 
 type OverviewRepository interface {

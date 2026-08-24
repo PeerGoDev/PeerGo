@@ -751,6 +751,91 @@ func (q *Queries) ListUserHNRObligations(ctx context.Context, arg ListUserHNRObl
 	return items, nil
 }
 
+const listUserTorrentActivity = `-- name: ListUserTorrentActivity :many
+WITH completed_torrents AS (
+    SELECT DISTINCT obligation.torrent_id
+    FROM traffic.user_hnr_obligations AS obligation
+    WHERE obligation.user_id = $1::uuid
+)
+SELECT
+    totals.torrent_id,
+    torrent.title AS torrent_title,
+    torrent.total_size_bytes,
+    totals.raw_uploaded,
+    totals.raw_downloaded,
+    CASE
+        WHEN completed.torrent_id IS NOT NULL THEN 10000
+        WHEN torrent.total_size_bytes <= 0 THEN 0
+        ELSE LEAST(
+            10000,
+            FLOOR(
+                totals.raw_downloaded::numeric * 10000
+                / torrent.total_size_bytes::numeric
+            )::integer
+        )
+    END::integer AS progress_basis_points,
+    completed.torrent_id IS NOT NULL
+        OR totals.raw_downloaded >= torrent.total_size_bytes AS completed,
+    totals.last_occurred_at
+FROM traffic.user_torrent_totals AS totals
+JOIN torrents.torrents AS torrent ON torrent.id = totals.torrent_id
+LEFT JOIN completed_torrents AS completed ON completed.torrent_id = totals.torrent_id
+WHERE totals.user_id = $1::uuid
+  AND totals.last_occurred_at IS NOT NULL
+ORDER BY totals.updated_at DESC, totals.torrent_id DESC
+LIMIT $2::integer
+`
+
+type ListUserTorrentActivityParams struct {
+	UserID      uuid.UUID
+	ResultLimit int32
+}
+
+type ListUserTorrentActivityRow struct {
+	TorrentID           int64
+	TorrentTitle        string
+	TotalSizeBytes      int64
+	RawUploaded         int64
+	RawDownloaded       int64
+	ProgressBasisPoints int32
+	Completed           pgtype.Bool
+	LastOccurredAt      pgtype.Timestamptz
+}
+
+// This is the bounded current projection used by the catalog/profile UI. It
+// intentionally reads the compact cumulative row instead of retaining or
+// replaying announce history. H&R completion is authoritative when present;
+// otherwise the raw downloaded byte total supplies a conservative progress
+// estimate capped at 100%.
+func (q *Queries) ListUserTorrentActivity(ctx context.Context, arg ListUserTorrentActivityParams) ([]ListUserTorrentActivityRow, error) {
+	rows, err := q.db.Query(ctx, listUserTorrentActivity, arg.UserID, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserTorrentActivityRow{}
+	for rows.Next() {
+		var i ListUserTorrentActivityRow
+		if err := rows.Scan(
+			&i.TorrentID,
+			&i.TorrentTitle,
+			&i.TotalSizeBytes,
+			&i.RawUploaded,
+			&i.RawDownloaded,
+			&i.ProgressBasisPoints,
+			&i.Completed,
+			&i.LastOccurredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserTrafficEntries = `-- name: ListUserTrafficEntries :many
 SELECT
     entry.rollup_id AS settlement_id,

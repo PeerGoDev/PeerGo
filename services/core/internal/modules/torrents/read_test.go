@@ -240,13 +240,23 @@ func TestTorrentReadExposesPrivacyMinimizedActivePeersToSignedInMembers(t *testi
 		peerRepository,
 		staffAuthorizer,
 		func() time.Time { return now },
-		trackerPeerReaderStub{page: trackeroperationsv1.ActivePeerPage{
-			GeneratedAt: now,
-			Items: []trackeroperationsv1.ActivePeer{{
-				UserID: userID.String(), ClientFamily: "qbittorrent", AddressFamily: 4, Uploaded: 500,
-				Downloaded: 100, Left: 0, LastAnnounce: now.Add(-time.Minute),
-			}},
-		}},
+		trackerPeerReaderStub{
+			page: trackeroperationsv1.ActivePeerPage{
+				GeneratedAt: now,
+				Items: []trackeroperationsv1.ActivePeer{{
+					UserID: userID.String(), ClientFamily: "qbittorrent", AddressFamily: 4, Uploaded: 500,
+					Downloaded: 100, Left: 0, LastAnnounce: now.Add(-time.Minute),
+				}},
+			},
+			userPage: trackeroperationsv1.UserActivePeerPage{
+				UserID: userID.String(), GeneratedAt: now,
+				Items: []trackeroperationsv1.UserActivePeer{{
+					TorrentID: 42, InfoHashV1: "00112233445566778899aabbccddeeff00112233", TotalSizeBytes: 1_000,
+					ClientFamily: "qbittorrent", AddressFamily: 4, Uploaded: 500, Downloaded: 100,
+					Left: 0, LastAnnounce: now.Add(-time.Minute),
+				}},
+			},
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -276,6 +286,17 @@ func TestTorrentReadExposesPrivacyMinimizedActivePeersToSignedInMembers(t *testi
 		memberAuthorizer.request.Subject.ID != userID ||
 		memberAuthorizer.request.CredentialAudience != authz.AudienceWebSession {
 		t.Fatalf("member peer authorization request = %+v", memberAuthorizer.request)
+	}
+	activity, err := service.MyTrackerActivity(context.Background(), "member-cookie")
+	if err != nil || len(activity.Items) != 1 || activity.Items[0].TorrentID != 42 {
+		t.Fatalf("MyTrackerActivity() = %+v, %v", activity, err)
+	}
+	if memberAuthorizer.request.Action != authz.ActionTrafficReadSelf || memberAuthorizer.request.Subject.ID != userID ||
+		memberAuthorizer.request.CredentialAudience != authz.AudienceWebSession {
+		t.Fatalf("member tracker activity authorization request = %+v", memberAuthorizer.request)
+	}
+	if len(staffAuthorizer.requests) != 0 {
+		t.Fatalf("member tracker activity entered staff authorization: %+v", staffAuthorizer.requests)
 	}
 }
 

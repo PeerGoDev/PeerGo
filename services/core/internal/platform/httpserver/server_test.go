@@ -1059,12 +1059,20 @@ func (unavailableTorrentReadService) ActivePeers(context.Context, string, torren
 	return torrents.ManagedTorrentPeerList{}, identity.ErrSessionNotFound
 }
 
+func (unavailableTorrentReadService) MyTrackerActivity(context.Context, string) (torrents.UserTrackerActivity, error) {
+	return torrents.UserTrackerActivity{}, identity.ErrSessionNotFound
+}
+
 func (unavailableTorrentReadService) ListManaged(context.Context, authz.StaffActor, torrents.ManagedTorrentQuery) (torrents.ManagedTorrentPage, error) {
 	return torrents.ManagedTorrentPage{}, authz.ErrForbidden
 }
 
 func (unavailableTorrentReadService) ManagedActivePeers(context.Context, authz.StaffActor, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error) {
 	return torrents.ManagedTorrentPeerList{}, authz.ErrForbidden
+}
+
+func (unavailableTorrentReadService) ManagedUserTrackerActivity(context.Context, authz.StaffActor, uuid.UUID) (torrents.UserTrackerActivity, error) {
+	return torrents.UserTrackerActivity{}, authz.ErrForbidden
 }
 
 func (unavailableTorrentReadService) ChangeAvailability(context.Context, authz.StaffActor, torrents.ChangeTorrentAvailabilityInput) (torrents.TorrentAvailabilityResult, error) {
@@ -1131,12 +1139,20 @@ func (service *recordingTorrentReadService) ActivePeers(context.Context, string,
 	return torrents.ManagedTorrentPeerList{}, nil
 }
 
+func (service *recordingTorrentReadService) MyTrackerActivity(context.Context, string) (torrents.UserTrackerActivity, error) {
+	return torrents.UserTrackerActivity{}, nil
+}
+
 func (service *recordingTorrentReadService) ListManaged(context.Context, authz.StaffActor, torrents.ManagedTorrentQuery) (torrents.ManagedTorrentPage, error) {
 	return torrents.ManagedTorrentPage{}, nil
 }
 
 func (service *recordingTorrentReadService) ManagedActivePeers(context.Context, authz.StaffActor, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error) {
 	return torrents.ManagedTorrentPeerList{}, nil
+}
+
+func (service *recordingTorrentReadService) ManagedUserTrackerActivity(context.Context, authz.StaffActor, uuid.UUID) (torrents.UserTrackerActivity, error) {
+	return torrents.UserTrackerActivity{}, nil
 }
 
 func (service *recordingTorrentReadService) ChangeAvailability(context.Context, authz.StaffActor, torrents.ChangeTorrentAvailabilityInput) (torrents.TorrentAvailabilityResult, error) {

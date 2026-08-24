@@ -7,9 +7,12 @@ import { describe, expect, it } from "vitest"
 import { sessionKeys } from "~/features/auth/api/session.mutations"
 import { capabilityKeys } from "~/features/authz/api/capabilities.queries"
 import { socialPostKeys } from "~/features/social/api/posts.queries"
+import { staffSessionKeys } from "~/features/staff/api/staff-session.mutations"
+import { userAdministrationKeys } from "~/features/staff/api/user-administration.queries"
 import { torrentBookmarkKeys } from "~/features/torrent/api/torrent-bookmarks.queries"
 import { torrentKeys } from "~/features/torrent/api/torrent.queries"
 import { trafficKeys } from "~/features/traffic/api/traffic.queries"
+import { trackerActivityKeys } from "~/features/user/api/tracker-activity.queries"
 import { userKeys } from "~/features/user/api/user.queries"
 import { UserProfilePage } from "~/features/user/pages/user-profile-page"
 import { ApiProblemError } from "~/shared/api/problem"
@@ -94,12 +97,124 @@ describe("UserProfilePage", () => {
     expect(screen.getByRole("heading", { name: "另一位成员" })).toBeVisible()
     expect(screen.getByText("@someone-else")).toBeVisible()
     expect(screen.getByText("7 个")).toBeVisible()
-    expect(screen.getAllByText("未公开")).toHaveLength(2)
+    expect(screen.getAllByText("未公开")).toHaveLength(6)
     expect(
       screen.queryByRole("button", { name: "设置" })
     ).not.toBeInTheDocument()
     expect(screen.queryByText("邮箱状态")).not.toBeInTheDocument()
     expect(screen.queryByText("发布1")).not.toBeInTheDocument()
+  })
+
+  it("adds private account and live client fields only for an authorized admin view", () => {
+    const queryClient = profileTestClient()
+    const targetId = "0198f20a-6da8-7e51-9c64-222222222222"
+    queryClient.setQueryData(capabilityKeys.current(userId), {
+      policy_version: "2026-08-12",
+      items: [
+        capability("traffic.read.self"),
+        capability("torrent.submission.read.self"),
+        capability("torrent.bookmark.read.self"),
+        capability("staff.session.create.self"),
+      ],
+    })
+    queryClient.setQueryData(staffSessionKeys.current(), {
+      user: {
+        id: userId,
+        username: "legacy-user",
+        display_name: "迁移用户",
+        email_verified: true,
+      },
+      expires_at: "2026-09-05T12:00:00Z",
+      csrf_token: "s".repeat(43),
+    })
+    queryClient.setQueryData(staffSessionKeys.capabilities(userId), {
+      policy_version: "2026-08-12",
+      items: [capability("user.account.read")],
+    })
+    const filters = {
+      query: "someone-else",
+      status: "all" as const,
+      page: 1,
+      pageSize: 20,
+    }
+    const managed = {
+      id: targetId,
+      numeric_id: 2180,
+      username: "someone-else",
+      display_name: "另一位成员",
+      email: "member@example.test",
+      email_verified: true,
+      banned: false,
+      download_restricted: false,
+      vip_enabled: false,
+      vip_active: false,
+      status: "active" as const,
+      version: 3,
+      active_restriction_count: 0,
+      uploaded_bytes: "4096",
+      downloaded_bytes: "2048",
+      magic_balance: "1234",
+      level: 8,
+      role_names: ["member", "reviewer"],
+      last_active_at: "2026-08-13T06:00:00Z",
+      created_at: "2025-06-01T08:00:00Z",
+      updated_at: "2026-08-13T06:00:00Z",
+    }
+    queryClient.setQueryData(userAdministrationKeys.list(filters), {
+      items: [managed],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      summary: {
+        total: 1,
+        active: 1,
+        banned: 0,
+        pending_activation: 0,
+        vip: 0,
+        download_restricted: 0,
+        unverified: 0,
+      },
+    })
+    queryClient.setQueryData(userAdministrationKeys.detail(targetId), {
+      ...managed,
+      active_restrictions: [],
+      manual_download_restriction: { active: false, version: 0 },
+      manual_download_restriction_history: [],
+      vip_state: { enabled: false, active: false, version: 0 },
+      vip_history: [],
+    })
+    queryClient.setQueryData(trackerActivityKeys.managed(targetId), {
+      items: [
+        {
+          torrent_id: 42,
+          info_hash_v1: "a".repeat(40),
+          client_families: ["qBittorrent"],
+          address_families: ["IPv4", "IPv6"],
+          active_connections: 2,
+          seeding_connections: 1,
+          leeching_connections: 1,
+          progress_basis_points: 10000,
+          uploaded: "4096",
+          downloaded: "2048",
+          upload_speed: "1024",
+          download_speed: "0",
+          last_announce: "2026-08-13T06:00:00Z",
+          seedbox: true,
+        },
+      ],
+      total_connections: 2,
+      truncated: false,
+      generated_at: "2026-08-13T06:00:00Z",
+    })
+
+    renderProfile(queryClient, "/user/someone-else")
+
+    expect(screen.getByText("管理员视图")).toBeVisible()
+    expect(screen.getByText("member@example.test")).toBeVisible()
+    expect(screen.getByText("member、reviewer")).toBeVisible()
+    expect(screen.getByText("双栈")).toBeVisible()
+    expect(screen.getByText("盒子")).toBeVisible()
+    expect(screen.getByText("qBittorrent")).toBeVisible()
   })
 
   it("does not misreport a temporary profile failure as a missing member", async () => {
@@ -162,16 +277,20 @@ function profileTestClient() {
     ],
   })
   queryClient.setQueryData(userKeys.profile("legacy-user"), {
+    numeric_id: 2179,
     username: "legacy-user",
     display_name: "迁移用户",
     joined_at: "2024-03-18T09:30:00Z",
     published_torrent_count: 3,
+    published_torrents: [],
   })
   queryClient.setQueryData(userKeys.profile("someone-else"), {
+    numeric_id: 2180,
     username: "someone-else",
     display_name: "另一位成员",
     joined_at: "2025-06-01T08:00:00Z",
     published_torrent_count: 7,
+    published_torrents: [],
   })
   queryClient.setQueryData(trafficKeys.current(userId), {
     totals: {
@@ -184,6 +303,13 @@ function profileTestClient() {
       projection_updated_at: null,
     },
     entries: [],
+    torrent_activity: [],
+  })
+  queryClient.setQueryData(trackerActivityKeys.mine(userId), {
+    items: [],
+    total_connections: 0,
+    truncated: false,
+    generated_at: "2026-08-13T06:00:00Z",
   })
   queryClient.setQueryData(torrentKeys.mySubmissions(userId, 20), {
     total: 3,

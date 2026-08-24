@@ -52,6 +52,7 @@ import {
 } from "~/features/torrent/api/torrent.queries"
 import { TorrentDownloadButton } from "~/features/torrent/components/torrent-download-button"
 import { TorrentCoverImage } from "~/features/torrent/components/torrent-cover-image"
+import { TorrentCoverPreview } from "~/features/torrent/components/torrent-cover-preview"
 import { torrentPromotionLabel } from "~/features/torrent/components/torrent-promotion"
 import { TorrentBookmarkButton } from "~/features/torrent/components/torrent-bookmark-button"
 import { TorrentPromotionProductDialog } from "~/features/torrent/components/torrent-promotion-product-dialog"
@@ -213,8 +214,11 @@ function TorrentDetailContent({
         </div>
 
         <div className="flex min-w-0 gap-4 max-md:flex-wrap max-md:gap-3">
-          <div
-            className={cn(
+          <TorrentCoverPreview
+            torrentId={detail.id}
+            title={detail.title}
+            disabled={detail.screenshot_count === 0}
+            triggerClassName={cn(
               "relative w-32 shrink-0 self-start overflow-hidden rounded-lg border bg-muted max-sm:w-24 md:w-40",
               // Migrated images are intentionally absent. Preserve the same
               // desktop cover slot as PtYes so the statistics rail and the
@@ -233,7 +237,7 @@ function TorrentDetailContent({
               fallbackClassName="bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-300 px-2 text-center text-xs text-neutral-500 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 dark:text-neutral-400 [&_svg]:size-7"
               fallbackLabel="暂无封面"
             />
-          </div>
+          </TorrentCoverPreview>
 
           <div className="flex min-w-0 flex-1 flex-col gap-2 max-md:basis-[55%]">
             {detail.subtitle ? (

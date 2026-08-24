@@ -68,6 +68,31 @@ func TestClientReadsAuthenticatedActivePeers(t *testing.T) {
 	}
 }
 
+func TestClientReadsAuthenticatedUserActivePeers(t *testing.T) {
+	const token = "peergo-test-tracker-service-token-2026"
+	const userID = "0198f20a-6da8-7e51-9c64-111111111111"
+	client, err := NewClient("https://tracker.example", token, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.httpClient.Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path != "/internal/v1/operations/users/"+userID+"/peers" || request.URL.Query().Get("limit") != "25" ||
+			request.Header.Get("Authorization") != "Bearer "+token {
+			t.Fatalf("unexpected request: %s", request.URL.String())
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"user_id":"0198f20a-6da8-7e51-9c64-111111111111","generated_at":"2026-08-25T12:00:00Z","items":[{"torrent_id":42,"info_hash_v1":"00112233445566778899aabbccddeeff00112233","total_size_bytes":1000,"client_family":"qbittorrent","address_family":6,"seedbox":true,"uploaded":10,"downloaded":20,"upload_speed":1,"download_speed":2,"left":30,"last_announce":"2026-08-25T11:59:00Z"}],"truncated":false}`)),
+			Request:    request,
+		}, nil
+	})
+	page, err := client.ActivePeersByUser(context.Background(), userID, 25)
+	if err != nil || len(page.Items) != 1 || page.Items[0].TorrentID != 42 ||
+		page.Items[0].AddressFamily != 6 || !page.Items[0].Seedbox {
+		t.Fatalf("ActivePeersByUser() = %+v, err = %v", page, err)
+	}
+}
+
 func TestClientReadsRuntimeWithMaximumSeedboxRegistry(t *testing.T) {
 	runtime := validRuntime()
 	runtime.Seedbox = trackerruntimepolicyv1.SeedboxPolicy{

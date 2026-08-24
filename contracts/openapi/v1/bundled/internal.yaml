@@ -1270,6 +1270,47 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/users/{user_id}/tracker-activity:
+    get:
+      operationId: getManagedUserTrackerActivity
+      summary: 获取指定用户的在线 BT 任务与客户端摘要
+      description: 仅供 user.account.read 后台身份读取 Tracker 当前内存摘要；不返回网络端点、 passkey、peer id 或持久化活动历史。
+      tags:
+        - torrents
+      x-audience:
+        - staff
+      x-owner: core-torrents
+      x-permission: user.account.read
+      x-credential-audience: staff-session
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 目标用户的瞬时 Tracker 活动。
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserTrackerActivity'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/users/{user_id}/account-restrictions:
     post:
       operationId: createManagedUserAccountRestriction
@@ -1971,6 +2012,38 @@ paths:
                 $ref: '#/components/schemas/TrafficOverview'
         '400':
           $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/tracker-activity:
+    get:
+      operationId: getMyTrackerActivity
+      summary: 获取当前用户的在线 BT 任务与客户端摘要
+      description: 直接读取 Tracker 的有界内存视图，不写入 Core 数据库；响应不包含 IP、端口、 passkey、peer id 或会话标识。
+      tags:
+        - torrents
+      x-audience:
+        - web
+      x-owner: core-torrents
+      x-permission: traffic.read.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 当前用户的瞬时 Tracker 活动。
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserTrackerActivity'
         '401':
           $ref: '#/components/responses/ProblemResponse'
         '403':
@@ -10695,11 +10768,18 @@ components:
       type: object
       additionalProperties: false
       required:
+        - numeric_id
         - username
         - display_name
         - joined_at
         - published_torrent_count
+        - published_torrents
       properties:
+        numeric_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 站内公开数字用户编号。
         username:
           type: string
           minLength: 1
@@ -10716,6 +10796,12 @@ components:
           format: int64
           minimum: 0
           description: 当前可公开且非匿名发布的种子数量。
+        published_torrents:
+          type: array
+          maxItems: 10
+          description: 最近公开且非匿名发布的种子；审核中和匿名发布不会出现。
+          items:
+            $ref: '#/components/schemas/PublicUserPublishedTorrent'
     AccountSecurityOverview:
       type: object
       additionalProperties: false
@@ -13500,7 +13586,7 @@ components:
         limit:
           type: integer
           minimum: 1
-          maximum: 50
+          maximum: 100
         offset:
           type: integer
           minimum: 0
@@ -18566,6 +18652,7 @@ components:
       required:
         - totals
         - entries
+        - torrent_activity
       properties:
         totals:
           $ref: '#/components/schemas/TrafficTotals'
@@ -18575,6 +18662,12 @@ components:
           description: 按流量区间结束时刻倒序排列的最近最终结算。
           items:
             $ref: '#/components/schemas/TrafficEntry'
+        torrent_activity:
+          type: array
+          maxItems: 500
+          description: 最近活跃的每用户/种子累计投影；不包含 announce、IP、peer ID 或客户端会话历史。
+          items:
+            $ref: '#/components/schemas/TrafficTorrentActivity'
     HNRDurationSeconds:
       type: string
       pattern: ^(0|[1-9][0-9]{0,18})$
@@ -19105,6 +19198,37 @@ components:
           pattern: ^[0-9a-f]{64}$
           description: 公开缓存版本；不暴露对象存储位置。
         updated_at:
+          type: string
+          format: date-time
+    PublicUserPublishedTorrent:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - subtitle
+        - category
+        - total_size_bytes
+        - published_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 240
+        subtitle:
+          type: string
+          maxLength: 300
+        category:
+          $ref: '#/components/schemas/Category'
+        total_size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+        published_at:
           type: string
           format: date-time
     TwoFactorStatus:
@@ -19842,6 +19966,102 @@ components:
           type: string
           minLength: 1
           maxLength: 40
+    UserTrackerTask:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent_id
+        - info_hash_v1
+        - client_families
+        - address_families
+        - active_connections
+        - seeding_connections
+        - leeching_connections
+        - progress_basis_points
+        - uploaded
+        - downloaded
+        - upload_speed
+        - download_speed
+        - last_announce
+        - seedbox
+      properties:
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
+        info_hash_v1:
+          type: string
+          pattern: ^[0-9a-f]{40}$
+          description: 用于识别旧版任务的公开 v1 info hash；不包含 passkey 或 peer id。
+        client_families:
+          type: array
+          maxItems: 16
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+        address_families:
+          type: array
+          maxItems: 2
+          items:
+            type: string
+            enum:
+              - IPv4
+              - IPv6
+        active_connections:
+          type: integer
+          minimum: 1
+          maximum: 200
+        seeding_connections:
+          type: integer
+          minimum: 0
+          maximum: 200
+        leeching_connections:
+          type: integer
+          minimum: 0
+          maximum: 200
+        progress_basis_points:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        uploaded:
+          $ref: '#/components/schemas/TrafficByteCount'
+        downloaded:
+          $ref: '#/components/schemas/TrafficByteCount'
+        upload_speed:
+          $ref: '#/components/schemas/TrafficByteCount'
+        download_speed:
+          $ref: '#/components/schemas/TrafficByteCount'
+        last_announce:
+          type: string
+          format: date-time
+        seedbox:
+          type: boolean
+    UserTrackerActivity:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total_connections
+        - truncated
+        - generated_at
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/UserTrackerTask'
+        total_connections:
+          type: integer
+          minimum: 0
+          maximum: 200
+        truncated:
+          type: boolean
+          description: Tracker 的有界内存扫描或返回上限是否截断了结果。
+        generated_at:
+          type: string
+          format: date-time
+          description: Tracker 生成当前瞬时视图的服务端时间。
     ManualDownloadRestrictionReasonCode:
       type: string
       enum:
@@ -20053,6 +20273,39 @@ components:
           type: string
           minLength: 10
           maxLength: 1000
+    TrafficTorrentActivity:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent
+        - total_size_bytes
+        - raw_uploaded_bytes
+        - raw_downloaded_bytes
+        - progress_basis_points
+        - completed
+        - last_settled_at
+      properties:
+        torrent:
+          $ref: '#/components/schemas/TrafficTorrentReference'
+        total_size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+        raw_uploaded_bytes:
+          $ref: '#/components/schemas/TrafficByteCount'
+        raw_downloaded_bytes:
+          $ref: '#/components/schemas/TrafficByteCount'
+        progress_basis_points:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          description: 当前累计下载进度；10000 表示 100%。
+        completed:
+          type: boolean
+          description: H&R 完成事实或累计原始下载量已达到种子体积。
+        last_settled_at:
+          type: string
+          format: date-time
     MyRatioWatchRestrictionSource:
       type: string
       enum:

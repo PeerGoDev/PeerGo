@@ -29,6 +29,12 @@ type Querier interface {
 	InsertUserTrafficExplanationSegment(ctx context.Context, arg InsertUserTrafficExplanationSegmentParams) error
 	ListTrafficProjectionCleanupCandidates(ctx context.Context, arg ListTrafficProjectionCleanupCandidatesParams) ([]uuid.UUID, error)
 	ListUserHNRObligations(ctx context.Context, arg ListUserHNRObligationsParams) ([]ListUserHNRObligationsRow, error)
+	// This is the bounded current projection used by the catalog/profile UI. It
+	// intentionally reads the compact cumulative row instead of retaining or
+	// replaying announce history. H&R completion is authoritative when present;
+	// otherwise the raw downloaded byte total supplies a conservative progress
+	// estimate capped at 100%.
+	ListUserTorrentActivity(ctx context.Context, arg ListUserTorrentActivityParams) ([]ListUserTorrentActivityRow, error)
 	ListUserTrafficEntries(ctx context.Context, arg ListUserTrafficEntriesParams) ([]ListUserTrafficEntriesRow, error)
 	ListUserTrafficExplanationSegments(ctx context.Context, settlementIds []uuid.UUID) ([]TrafficUserTrafficEntrySegment, error)
 	LockHNRProjectionAggregate(ctx context.Context, obligationID uuid.UUID) error

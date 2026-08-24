@@ -170,6 +170,38 @@ func TestEngineReturnsBoundedPrivacyMinimizedActivePeers(t *testing.T) {
 	}
 }
 
+func TestEngineReturnsBoundedUserPeersAcrossSwarms(t *testing.T) {
+	t.Parallel()
+	engine := testEngine(t, 10, 20)
+	now := time.Date(2026, 8, 25, 9, 0, 0, 0, time.UTC)
+	first := testRequest("user-a", "192.0.2.10:6881", 500, now)
+	first.Uploaded, first.Downloaded = 10, 500
+	if _, err := engine.Announce(first); err != nil {
+		t.Fatal(err)
+	}
+	second := testRequest("user-a", "[2001:db8::10]:6882", 0, now.Add(time.Second))
+	second.InfoHash[0], second.PeerID[0] = 2, 2
+	second.Uploaded, second.Downloaded, second.Seedbox = 20, 1_000, true
+	if _, err := engine.Announce(second); err != nil {
+		t.Fatal(err)
+	}
+	other := testRequest("user-b", "192.0.2.11:6883", 0, now.Add(2*time.Second))
+	other.InfoHash[0], other.PeerID[0] = 3, 3
+	if _, err := engine.Announce(other); err != nil {
+		t.Fatal(err)
+	}
+
+	peers, truncated := engine.ActivePeersByUser("user-a", now.Add(3*time.Second), 10)
+	if truncated || len(peers) != 2 || peers[0].InfoHash[0] != 2 || peers[0].AddressFamily != 6 ||
+		!peers[0].Seedbox || peers[1].InfoHash[0] != 1 || peers[1].UserID != "user-a" {
+		t.Fatalf("ActivePeersByUser() = %+v, truncated=%v", peers, truncated)
+	}
+	limited, limitedTruncated := engine.ActivePeersByUser("user-a", now.Add(3*time.Second), 1)
+	if !limitedTruncated || len(limited) != 1 || limited[0].InfoHash[0] != 2 {
+		t.Fatalf("limited ActivePeersByUser() = %+v, truncated=%v", limited, limitedTruncated)
+	}
+}
+
 func testEngine(t *testing.T, maxSwarms int64, maxPeers int64) *Engine {
 	t.Helper()
 	engine, err := NewEngine(Config{

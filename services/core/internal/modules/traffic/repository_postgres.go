@@ -217,10 +217,32 @@ func (repository *PostgresRepository) Overview(ctx context.Context, userID uuid.
 	if (!hasTotals && len(entries) != 0) || (hasTotals && totals.EntryCount < int64(len(entries))) {
 		return Overview{}, ErrInvariant
 	}
+	activityRows, err := queries.ListUserTorrentActivity(ctx, trafficdb.ListUserTorrentActivityParams{
+		UserID: userID, ResultLimit: MaximumTorrentActivity,
+	})
+	if err != nil {
+		return Overview{}, fmt.Errorf("list Core user torrent activity: %w", err)
+	}
+	activity := make([]TorrentActivity, 0, len(activityRows))
+	for _, row := range activityRows {
+		completed := row.Completed.Valid && row.Completed.Bool
+		if row.TorrentID < 1 || strings.TrimSpace(row.TorrentTitle) == "" || row.TotalSizeBytes < 1 ||
+			row.RawUploaded < 0 || row.RawDownloaded < 0 || row.ProgressBasisPoints < 0 ||
+			row.ProgressBasisPoints > 10_000 || !row.Completed.Valid || !row.LastOccurredAt.Valid ||
+			(completed && row.ProgressBasisPoints != 10_000) {
+			return Overview{}, ErrInvariant
+		}
+		activity = append(activity, TorrentActivity{
+			TorrentID: row.TorrentID, TorrentTitle: row.TorrentTitle, TotalSizeBytes: row.TotalSizeBytes,
+			RawUploaded: row.RawUploaded, RawDownloaded: row.RawDownloaded,
+			ProgressBasisPts: int(row.ProgressBasisPoints), Completed: completed,
+			LastSettledAt: row.LastOccurredAt.Time.UTC().Round(0),
+		})
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return Overview{}, fmt.Errorf("commit Core traffic overview: %w", err)
 	}
-	return Overview{Totals: totals, Entries: entries}, nil
+	return Overview{Totals: totals, Entries: entries, TorrentActivity: activity}, nil
 }
 
 func explanationFromProjection(status pgtype.Text, count pgtype.Int4) (Explanation, error) {

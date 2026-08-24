@@ -34,6 +34,11 @@ import { TorrentSize } from "~/features/torrent/components/torrent-size"
 import { TorrentBookmarkButton } from "~/features/torrent/components/torrent-bookmark-button"
 import { TorrentDownloadButton } from "~/features/torrent/components/torrent-download-button"
 import { TorrentCoverImage } from "~/features/torrent/components/torrent-cover-image"
+import { TorrentCoverPreview } from "~/features/torrent/components/torrent-cover-preview"
+import {
+  TorrentDownloadProgress,
+  type TorrentActivity,
+} from "~/features/torrent/components/torrent-download-progress"
 import { TorrentTitleLink } from "~/features/torrent/components/torrent-title-link"
 import { TorrentSwarmNumbers } from "~/features/torrent/components/torrent-swarm-numbers"
 import type { TorrentBookmarkControls } from "~/features/torrent/hooks/use-torrent-bookmark-controls"
@@ -53,6 +58,7 @@ export function TorrentTable({
   sort,
   onSortChange,
   adultCoversVisible = false,
+  activityByTorrentId,
 }: {
   torrents: Torrent[]
   bookmarkControls?: TorrentBookmarkControls
@@ -62,6 +68,7 @@ export function TorrentTable({
   sort?: TorrentSort
   onSortChange?: (sort: TorrentSort) => void
   adultCoversVisible?: boolean
+  activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
 }) {
   if (layout === "bookmarks") {
     return (
@@ -69,6 +76,7 @@ export function TorrentTable({
         torrents={torrents}
         bookmarkControls={bookmarkControls}
         adultCoversVisible={adultCoversVisible}
+        activityByTorrentId={activityByTorrentId}
       />
     )
   }
@@ -193,10 +201,18 @@ export function TorrentTable({
             {torrents.map((torrent) => (
               <TableRow
                 key={torrent.id}
-                className="grid grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px] items-center gap-2 border-t! border-b-0! px-4 py-2 hover:bg-accent/70"
+                className="relative grid grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px] items-center gap-2 overflow-hidden border-t! border-b-0! px-4 py-2 hover:bg-accent/70"
               >
                 <TableCell className="p-0">
-                  <div className="flex h-8 w-12 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground">
+                  <TorrentCoverPreview
+                    torrentId={torrent.id}
+                    title={torrent.name}
+                    triggerClassName="flex h-8 w-12 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground"
+                    disabled={
+                      !adultCoversVisible &&
+                      torrentCoverRequiresAdultConfirmation(torrent.category)
+                    }
+                  >
                     <TorrentCoverImage
                       torrentId={torrent.id}
                       title={torrent.name}
@@ -207,7 +223,7 @@ export function TorrentTable({
                         torrentCoverRequiresAdultConfirmation(torrent.category)
                       }
                     />
-                  </div>
+                  </TorrentCoverPreview>
                 </TableCell>
                 <TableCell className="min-w-0 p-0">
                   <div className="min-w-0">
@@ -270,6 +286,10 @@ export function TorrentTable({
                     />
                   </div>
                 </TableCell>
+                <TorrentDownloadProgress
+                  activity={activityByTorrentId?.get(torrent.id)}
+                  overlay
+                />
               </TableRow>
             ))}
           </TableBody>
@@ -283,10 +303,12 @@ function TorrentBookmarkTable({
   torrents,
   bookmarkControls,
   adultCoversVisible,
+  activityByTorrentId,
 }: {
   torrents: Torrent[]
   bookmarkControls?: TorrentBookmarkControls
   adultCoversVisible: boolean
+  activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
 }) {
   return (
     <Card className="hidden gap-0 rounded-lg border py-0 shadow-none ring-0 md:flex">
@@ -326,10 +348,18 @@ function TorrentBookmarkTable({
             {torrents.map((torrent) => (
               <TableRow
                 key={torrent.id}
-                className="grid grid-cols-[48px_minmax(0,1fr)_100px_70px_70px_70px_110px_40px] items-center gap-3 border-t! border-b-0! px-4 py-2 hover:bg-accent/70"
+                className="relative grid grid-cols-[48px_minmax(0,1fr)_100px_70px_70px_70px_110px_40px] items-center gap-3 overflow-hidden border-t! border-b-0! px-4 py-2 hover:bg-accent/70"
               >
                 <TableCell className="p-0">
-                  <div className="flex h-8 w-12 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground">
+                  <TorrentCoverPreview
+                    torrentId={torrent.id}
+                    title={torrent.name}
+                    triggerClassName="flex h-8 w-12 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground"
+                    disabled={
+                      !adultCoversVisible &&
+                      torrentCoverRequiresAdultConfirmation(torrent.category)
+                    }
+                  >
                     <TorrentCoverImage
                       torrentId={torrent.id}
                       title={torrent.name}
@@ -340,7 +370,7 @@ function TorrentBookmarkTable({
                         torrentCoverRequiresAdultConfirmation(torrent.category)
                       }
                     />
-                  </div>
+                  </TorrentCoverPreview>
                 </TableCell>
                 <TableCell className="min-w-0 p-0">
                   <div className="min-w-0">
@@ -385,6 +415,10 @@ function TorrentBookmarkTable({
                     controls={bookmarkControls}
                   />
                 </TableCell>
+                <TorrentDownloadProgress
+                  activity={activityByTorrentId?.get(torrent.id)}
+                  overlay
+                />
               </TableRow>
             ))}
           </TableBody>

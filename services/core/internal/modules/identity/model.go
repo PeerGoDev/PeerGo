@@ -81,10 +81,25 @@ type User struct {
 // Private account, credential, traffic and moderation fields must never be
 // added here merely because they exist in another identity read model.
 type PublicUserProfile struct {
+	NumericID             int64
 	Username              string
 	DisplayName           string
 	JoinedAt              time.Time
 	PublishedTorrentCount int64
+	PublishedTorrents     []PublicUserPublishedTorrent
+}
+
+// PublicUserPublishedTorrent is the intentionally small, non-anonymous
+// publication list shown to other members. Submission/review state and
+// uploader-private evidence remain in the self-service torrent projection.
+type PublicUserPublishedTorrent struct {
+	ID             int64
+	Title          string
+	Subtitle       string
+	CategoryID     string
+	CategoryName   string
+	TotalSizeBytes int64
+	PublishedAt    time.Time
 }
 
 // SessionRecord contains only the digest of the browser token. Raw tokens must

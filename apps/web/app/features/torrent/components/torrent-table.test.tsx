@@ -7,6 +7,63 @@ import { TooltipProvider } from "~/components/ui/tooltip"
 import { TorrentTable } from "~/features/torrent/components/torrent-table"
 
 describe("TorrentTable", () => {
+  it("shows the current user's bounded download progress on a matching torrent row", () => {
+    const queryClient = new QueryClient()
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <TorrentTable
+              torrents={[
+                {
+                  id: 42,
+                  name: "Downloaded Release",
+                  subtitle: "Resume this transfer",
+                  category: { id: "movies", name: "电影" },
+                  size_bytes: 4096,
+                  seeders: 1,
+                  leechers: 1,
+                  completed: 1,
+                  promotion: "none",
+                  sticky_until: null,
+                  uploaded_at: "2026-08-12T10:00:00Z",
+                  swarm_observed_at: "2026-08-12T10:00:00Z",
+                  swarm_stale: false,
+                },
+              ]}
+              activityByTorrentId={
+                new Map([
+                  [
+                    42,
+                    {
+                      torrent: { id: 42, title: "Downloaded Release" },
+                      total_size_bytes: 4096,
+                      raw_uploaded_bytes: "0",
+                      raw_downloaded_bytes: "2048",
+                      progress_basis_points: 5000,
+                      completed: false,
+                      last_settled_at: "2026-08-12T10:00:00Z",
+                    },
+                  ],
+                ])
+              }
+            />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    )
+
+    const progress = screen.getByRole("progressbar", {
+      name: "下载进度 50.0%",
+    })
+    expect(progress).toBeVisible()
+    expect(progress).toHaveAttribute("aria-valuenow", "50")
+    expect(progress).toHaveClass("absolute", "bottom-0")
+    expect(screen.getByText("Downloaded Release").closest("tr")).toHaveClass(
+      "relative"
+    )
+  })
+
   it("renders promotion and known stale values without repeating a row badge", () => {
     const queryClient = new QueryClient({
       defaultOptions: { mutations: { retry: false } },

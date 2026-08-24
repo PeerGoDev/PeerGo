@@ -1322,6 +1322,8 @@ func (q *Queries) GetPublicUserAvatar(ctx context.Context, arg GetPublicUserAvat
 
 const getPublicUserProfileByUsername = `-- name: GetPublicUserProfileByUsername :one
 SELECT
+    users.id,
+    users.numeric_id,
     users.username,
     users.display_name,
     users.created_at AS joined_at,
@@ -1350,6 +1352,8 @@ type GetPublicUserProfileByUsernameParams struct {
 }
 
 type GetPublicUserProfileByUsernameRow struct {
+	ID                    uuid.UUID
+	NumericID             int64
 	Username              string
 	DisplayName           string
 	JoinedAt              pgtype.Timestamptz
@@ -1360,6 +1364,8 @@ func (q *Queries) GetPublicUserProfileByUsername(ctx context.Context, arg GetPub
 	row := q.db.QueryRow(ctx, getPublicUserProfileByUsername, arg.Username, arg.AsOf)
 	var i GetPublicUserProfileByUsernameRow
 	err := row.Scan(
+		&i.ID,
+		&i.NumericID,
 		&i.Username,
 		&i.DisplayName,
 		&i.JoinedAt,
@@ -2937,6 +2943,68 @@ func (q *Queries) ListManualDownloadRestrictionTransitions(ctx context.Context, 
 			&i.OccurredAt,
 			&i.ActorNumericID,
 			&i.ActorUsername,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicUserPublishedTorrents = `-- name: ListPublicUserPublishedTorrents :many
+SELECT
+    torrent.id,
+    torrent.title,
+    torrent.subtitle,
+    torrent.category_id,
+    category.name AS category_name,
+    torrent.total_size_bytes,
+    torrent.published_at
+FROM torrents.torrents AS torrent
+JOIN catalog.categories AS category ON category.id = torrent.category_id
+WHERE torrent.uploader_id = $1::uuid
+  AND torrent.state = 'published'
+  AND NOT torrent.anonymous
+  AND torrent.published_at IS NOT NULL
+ORDER BY torrent.published_at DESC, torrent.id DESC
+LIMIT $2::integer
+`
+
+type ListPublicUserPublishedTorrentsParams struct {
+	UserID      uuid.UUID
+	ResultLimit int32
+}
+
+type ListPublicUserPublishedTorrentsRow struct {
+	ID             int64
+	Title          string
+	Subtitle       string
+	CategoryID     string
+	CategoryName   string
+	TotalSizeBytes int64
+	PublishedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ListPublicUserPublishedTorrents(ctx context.Context, arg ListPublicUserPublishedTorrentsParams) ([]ListPublicUserPublishedTorrentsRow, error) {
+	rows, err := q.db.Query(ctx, listPublicUserPublishedTorrents, arg.UserID, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicUserPublishedTorrentsRow{}
+	for rows.Next() {
+		var i ListPublicUserPublishedTorrentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Subtitle,
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.TotalSizeBytes,
+			&i.PublishedAt,
 		); err != nil {
 			return nil, err
 		}

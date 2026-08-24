@@ -39,6 +39,10 @@ type TrackerPeerReader interface {
 	ActivePeers(context.Context, string, int) (trackeroperationsv1.ActivePeerPage, error)
 }
 
+type TrackerUserPeerReader interface {
+	ActivePeersByUser(context.Context, string, int) (trackeroperationsv1.UserActivePeerPage, error)
+}
+
 type TorrentAdministrationService struct {
 	repository     TorrentAdministrationRepository
 	peerRepository TorrentPeerRepository
@@ -78,6 +82,90 @@ func (service *TorrentAdministrationService) ActivePeers(ctx context.Context, ac
 		return ManagedTorrentPeerList{}, err
 	}
 	return service.activePeers(ctx, torrentID)
+}
+
+func (service *TorrentAdministrationService) UserActivePeers(ctx context.Context, actor authz.StaffActor, userID uuid.UUID) (UserTrackerActivity, error) {
+	if userID == uuid.Nil {
+		return UserTrackerActivity{}, ErrTorrentAdministrationInput
+	}
+	now := service.now().UTC()
+	if _, err := authz.AuthorizeStaffAction(ctx, service.authorizer, actor, authz.ActionUserAccountRead, authz.SiteScope(), now, "user-tracker-activity"); err != nil {
+		return UserTrackerActivity{}, err
+	}
+	return service.userActivePeers(ctx, userID)
+}
+
+func (service *TorrentAdministrationService) userActivePeers(ctx context.Context, userID uuid.UUID) (UserTrackerActivity, error) {
+	reader, ok := service.peerReader.(TrackerUserPeerReader)
+	if !ok || userID == uuid.Nil {
+		return UserTrackerActivity{}, ErrManagedTorrentPeersUnavailable
+	}
+	page, err := reader.ActivePeersByUser(ctx, userID.String(), trackeroperationsv1.MaxUserActivePeerLimit)
+	if err != nil {
+		return UserTrackerActivity{}, fmt.Errorf("%w: %v", ErrManagedTorrentPeersUnavailable, err)
+	}
+	grouped := make(map[int64]*UserTrackerTask, len(page.Items))
+	clients := make(map[int64]map[string]struct{}, len(page.Items))
+	addressFamilies := make(map[int64]map[string]struct{}, len(page.Items))
+	for _, active := range page.Items {
+		if active.TorrentID < 1 || active.TotalSizeBytes < 1 || active.Left < 0 || active.Left > active.TotalSizeBytes ||
+			(active.AddressFamily != 4 && active.AddressFamily != 6) || strings.TrimSpace(active.ClientFamily) == "" {
+			return UserTrackerActivity{}, ErrTorrentReadInvariant
+		}
+		task := grouped[active.TorrentID]
+		if task == nil {
+			task = &UserTrackerTask{TorrentID: TorrentID(active.TorrentID), InfoHashV1: active.InfoHashV1}
+			grouped[active.TorrentID] = task
+			clients[active.TorrentID] = make(map[string]struct{})
+			addressFamilies[active.TorrentID] = make(map[string]struct{})
+		} else if task.InfoHashV1 != active.InfoHashV1 {
+			return UserTrackerActivity{}, ErrTorrentReadInvariant
+		}
+		task.ActiveConnections++
+		if active.Left == 0 {
+			task.SeedingConnections++
+		} else {
+			task.LeechingConnections++
+		}
+		task.ProgressBasisPoints = max(task.ProgressBasisPoints, progressBasisPoints(active.TotalSizeBytes, active.Left))
+		task.Uploaded = max(task.Uploaded, active.Uploaded)
+		task.Downloaded = max(task.Downloaded, active.Downloaded)
+		task.UploadSpeed = saturatingAdd(task.UploadSpeed, active.UploadSpeed)
+		task.DownloadSpeed = saturatingAdd(task.DownloadSpeed, active.DownloadSpeed)
+		task.Seedbox = task.Seedbox || active.Seedbox
+		if active.LastAnnounce.After(task.LastAnnounce) {
+			task.LastAnnounce = active.LastAnnounce
+		}
+		clients[active.TorrentID][active.ClientFamily] = struct{}{}
+		addressFamilies[active.TorrentID][addressFamilyLabel(active.AddressFamily)] = struct{}{}
+	}
+	items := make([]UserTrackerTask, 0, len(grouped))
+	for torrentID, task := range grouped {
+		for client := range clients[torrentID] {
+			task.ClientFamilies = append(task.ClientFamilies, client)
+		}
+		slices.Sort(task.ClientFamilies)
+		for family := range addressFamilies[torrentID] {
+			task.AddressFamilies = append(task.AddressFamilies, family)
+		}
+		slices.Sort(task.AddressFamilies)
+		items = append(items, *task)
+	}
+	slices.SortFunc(items, func(left, right UserTrackerTask) int {
+		if compared := right.LastAnnounce.Compare(left.LastAnnounce); compared != 0 {
+			return compared
+		}
+		if left.TorrentID < right.TorrentID {
+			return 1
+		}
+		if left.TorrentID > right.TorrentID {
+			return -1
+		}
+		return 0
+	})
+	return UserTrackerActivity{
+		Items: items, TotalConnections: len(page.Items), Truncated: page.Truncated, GeneratedAt: page.GeneratedAt,
+	}, nil
 }
 
 // activePeers is shared by the staff workbench and the authenticated member

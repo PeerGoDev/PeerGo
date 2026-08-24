@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -77,7 +78,8 @@ func (r *PostgresRepository) WebSessionPolicy(ctx context.Context) (WebSessionPo
 	return policy, nil
 }
 
-// PublicProfileByUsername implements Repository with a single aggregate read.
+// PublicProfileByUsername uses two bounded reads: one aggregate profile row and
+// at most ten recent public, non-anonymous publications.
 // Anonymous torrents are intentionally excluded: their uploader association
 // is operational metadata and must not be re-identified by a member page.
 func (r *PostgresRepository) PublicProfileByUsername(ctx context.Context, username string, asOf time.Time) (PublicUserProfile, error) {
@@ -94,11 +96,31 @@ func (r *PostgresRepository) PublicProfileByUsername(ctx context.Context, userna
 	if !row.JoinedAt.Valid {
 		return PublicUserProfile{}, errors.New("public user profile contains an invalid join timestamp")
 	}
+	publishedRows, err := r.queries.ListPublicUserPublishedTorrents(ctx, identitydb.ListPublicUserPublishedTorrentsParams{
+		UserID: row.ID, ResultLimit: 10,
+	})
+	if err != nil {
+		return PublicUserProfile{}, fmt.Errorf("list public user published torrents: %w", err)
+	}
+	published := make([]PublicUserPublishedTorrent, 0, len(publishedRows))
+	for _, item := range publishedRows {
+		if item.ID < 1 || strings.TrimSpace(item.Title) == "" || strings.TrimSpace(item.CategoryID) == "" ||
+			strings.TrimSpace(item.CategoryName) == "" || item.TotalSizeBytes < 1 || !item.PublishedAt.Valid {
+			return PublicUserProfile{}, errors.New("public user published torrent projection is invalid")
+		}
+		published = append(published, PublicUserPublishedTorrent{
+			ID: item.ID, Title: item.Title, Subtitle: item.Subtitle,
+			CategoryID: item.CategoryID, CategoryName: item.CategoryName,
+			TotalSizeBytes: item.TotalSizeBytes, PublishedAt: item.PublishedAt.Time.UTC(),
+		})
+	}
 	return PublicUserProfile{
+		NumericID:             row.NumericID,
 		Username:              row.Username,
 		DisplayName:           row.DisplayName,
 		JoinedAt:              row.JoinedAt.Time.UTC(),
 		PublishedTorrentCount: row.PublishedTorrentCount,
+		PublishedTorrents:     published,
 	}, nil
 }
 

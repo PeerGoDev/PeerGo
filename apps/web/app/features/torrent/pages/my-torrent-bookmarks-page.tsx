@@ -26,6 +26,7 @@ import {
 } from "~/components/ui/empty"
 import { useWebSession } from "~/features/auth/api/session.mutations"
 import { useCapabilities } from "~/features/authz/api/capabilities.queries"
+import { useTrafficOverview } from "~/features/traffic/api/traffic.queries"
 import { useMyTorrentBookmarks } from "~/features/torrent/api/torrent-bookmarks.queries"
 import { TorrentCards } from "~/features/torrent/components/torrent-cards"
 import { TorrentListSkeleton } from "~/features/torrent/components/torrent-list-state"
@@ -42,6 +43,7 @@ export function MyTorrentBookmarksPage() {
   const [offset, setOffset] = React.useState(0)
   const session = useWebSession()
   const capabilities = useCapabilities(session.data?.user.id)
+  const traffic = useTrafficOverview(session.data?.user.id)
   const canRead = Boolean(
     capabilities.data?.items.some(
       (capability) => capability.action === "torrent.bookmark.read.self"
@@ -72,6 +74,16 @@ export function MyTorrentBookmarksPage() {
     [torrents]
   )
   const bookmarkControls = useTorrentBookmarkControls(torrentIds)
+  const activityByTorrentId = React.useMemo(
+    () =>
+      new Map(
+        (traffic.data?.torrent_activity ?? []).map((activity) => [
+          activity.torrent.id,
+          activity,
+        ])
+      ),
+    [traffic.data?.torrent_activity]
+  )
   const [adultCoversVisible] = useAdultCoverVisibility()
 
   React.useEffect(() => {
@@ -181,6 +193,7 @@ export function MyTorrentBookmarksPage() {
                 bookmarkControls={bookmarkControls}
                 layout="bookmarks"
                 adultCoversVisible={adultCoversVisible}
+                activityByTorrentId={activityByTorrentId}
               />
               <TorrentCards
                 torrents={torrents}
@@ -188,6 +201,7 @@ export function MyTorrentBookmarksPage() {
                 bookmarkControls={bookmarkControls}
                 timestampByTorrentId={bookmarkTimes}
                 adultCoversVisible={adultCoversVisible}
+                activityByTorrentId={activityByTorrentId}
               />
               <OffsetPagination
                 total={bookmarks.data.total}

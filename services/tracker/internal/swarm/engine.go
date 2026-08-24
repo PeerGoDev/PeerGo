@@ -28,6 +28,10 @@ const (
 	peerKeyDomain           = "peergo:tracker:swarm-peer-key:v1\x00"
 	completionTokenDomain   = "peergo:tracker:completion-transition:v1\x00"
 	maxActivePeerInspection = 1_000
+	// Profile reads are infrequent service-authenticated operations. A hard
+	// inspection ceiling prevents them from turning into an unbounded global
+	// scan while still avoiding a second per-user activity store.
+	maxUserActivePeerInspection = 100_000
 )
 
 type Config struct {
@@ -130,6 +134,14 @@ type ActivePeer struct {
 	DownloadSpeed int64
 	Left          int64
 	LastAnnounce  time.Time
+}
+
+// UserActivePeer associates the privacy-minimized live connection with its
+// swarm. The info hash is already public torrent identity; socket endpoints
+// and protocol/session identifiers remain inside the Engine.
+type UserActivePeer struct {
+	InfoHash [20]byte
+	ActivePeer
 }
 
 func NewEngine(config Config) (*Engine, error) {
@@ -244,6 +256,67 @@ func (engine *Engine) ActivePeers(infoHash [20]byte, now time.Time, limit int) (
 	if len(peers) > limit {
 		peers = peers[:limit]
 	}
+	return peers, truncated
+}
+
+// ActivePeersByUser returns a bounded current view across swarms without
+// creating a durable user/peer index. Each shard is held only while copied,
+// and the total inspected peer count is capped independently of Engine size.
+func (engine *Engine) ActivePeersByUser(userID string, now time.Time, limit int) ([]UserActivePeer, bool) {
+	if userID == "" || len(userID) > 64 || now.IsZero() || limit < 1 || limit > 200 {
+		return nil, false
+	}
+	peers := make([]UserActivePeer, 0, limit+1)
+	inspected := 0
+	truncated := false
+
+scan:
+	for shardIndex := range engine.shards {
+		shard := &engine.shards[shardIndex]
+		shard.mu.Lock()
+		for _, infoHash := range shard.swarmKeys {
+			state := shard.swarms[infoHash]
+			if state == nil {
+				continue
+			}
+			state.sweepExpired(now, engine.config.SweepBudget, &engine.totalPeers)
+			for _, peer := range state.peers {
+				if inspected >= maxUserActivePeerInspection {
+					truncated = true
+					shard.mu.Unlock()
+					break scan
+				}
+				inspected++
+				if peer.userID != userID || !peer.expiresAt.After(now) {
+					continue
+				}
+				addressFamily := 6
+				if peer.endpoint.Addr().Is4() {
+					addressFamily = 4
+				}
+				peers = append(peers, UserActivePeer{
+					InfoHash: infoHash,
+					ActivePeer: ActivePeer{
+						UserID: peer.userID, ClientFamily: peer.clientFamily, AddressFamily: addressFamily,
+						Seedbox: peer.seedbox, Uploaded: peer.uploaded, Downloaded: peer.downloaded,
+						UploadSpeed: peer.uploadSpeed, DownloadSpeed: peer.downloadSpeed, Left: peer.left,
+						LastAnnounce: peer.lastAnnounce,
+					},
+				})
+				if len(peers) > limit {
+					truncated = true
+					slices.SortFunc(peers, func(left, right UserActivePeer) int {
+						return right.LastAnnounce.Compare(left.LastAnnounce)
+					})
+					peers = peers[:limit]
+				}
+			}
+		}
+		shard.mu.Unlock()
+	}
+	slices.SortFunc(peers, func(left, right UserActivePeer) int {
+		return right.LastAnnounce.Compare(left.LastAnnounce)
+	})
 	return peers, truncated
 }
 

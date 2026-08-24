@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "~/components/ui/select"
 import { useWebSession } from "~/features/auth/api/session.mutations"
+import { useTrafficOverview } from "~/features/traffic/api/traffic.queries"
 import {
   type TorrentSearchScope,
   type TorrentSort,
@@ -86,6 +87,7 @@ export function TorrentSearchPage() {
   const [history, setHistory] = React.useState<string[]>([])
   const session = useWebSession()
   const authenticated = Boolean(session.data)
+  const traffic = useTrafficOverview(session.data?.user.id)
   const categories = useCategoryList(authenticated)
   const torrents = useTorrentList(
     {
@@ -103,6 +105,16 @@ export function TorrentSearchPage() {
     [torrents.data?.items]
   )
   const bookmarkControls = useTorrentBookmarkControls(torrentIds)
+  const activityByTorrentId = React.useMemo(
+    () =>
+      new Map(
+        (traffic.data?.torrent_activity ?? []).map((activity) => [
+          activity.torrent.id,
+          activity,
+        ])
+      ),
+    [traffic.data?.torrent_activity]
+  )
   const [adultCoversVisible] = useAdultCoverVisibility()
 
   React.useEffect(() => setDraftQuery(query), [query])
@@ -369,12 +381,14 @@ export function TorrentSearchPage() {
                 torrents={torrents.data.items}
                 bookmarkControls={bookmarkControls}
                 adultCoversVisible={adultCoversVisible}
+                activityByTorrentId={activityByTorrentId}
               />
               <TorrentCards
                 torrents={torrents.data.items}
                 poster={false}
                 bookmarkControls={bookmarkControls}
                 adultCoversVisible={adultCoversVisible}
+                activityByTorrentId={activityByTorrentId}
               />
               <OffsetPagination
                 total={torrents.data.total}

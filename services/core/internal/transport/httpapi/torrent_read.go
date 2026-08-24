@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
+
 	generated "github.com/peergo/peergo/services/core/internal/generated/api"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
@@ -27,10 +29,44 @@ type TorrentReadService interface {
 	RelatedVersions(context.Context, torrents.TorrentID) ([]catalog.TorrentSummary, error)
 	Files(context.Context, torrents.TorrentID, int, int) (torrents.PublicFilePage, error)
 	ActivePeers(context.Context, string, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error)
+	MyTrackerActivity(context.Context, string) (torrents.UserTrackerActivity, error)
 	MySubmissions(context.Context, string, int) (torrents.MySubmissionPage, error)
 	ListManaged(context.Context, authz.StaffActor, torrents.ManagedTorrentQuery) (torrents.ManagedTorrentPage, error)
 	ManagedActivePeers(context.Context, authz.StaffActor, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error)
+	ManagedUserTrackerActivity(context.Context, authz.StaffActor, uuid.UUID) (torrents.UserTrackerActivity, error)
 	ChangeAvailability(context.Context, authz.StaffActor, torrents.ChangeTorrentAvailabilityInput) (torrents.TorrentAvailabilityResult, error)
+}
+
+func (h *Handler) GetMyTrackerActivity(ctx context.Context, _ generated.GetMyTrackerActivityRequestObject) (generated.GetMyTrackerActivityResponseObject, error) {
+	cookieToken := sessionTokenFromContext(ctx)
+	if cookieToken == "" {
+		problem := newProblemFromContext(ctx, http.StatusUnauthorized, "session_required", "需要登录", "请登录后查看自己的在线 BT 任务。")
+		return generated.GetMyTrackerActivity401ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	}
+	activity, err := h.torrentRead.MyTrackerActivity(ctx, cookieToken)
+	switch {
+	case errors.Is(err, identity.ErrSessionNotFound):
+		problem := newProblemFromContext(ctx, http.StatusUnauthorized, "session_required", "会话已经失效", "请重新登录后查看自己的在线 BT 任务。")
+		return generated.GetMyTrackerActivity401ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, authz.ErrForbidden):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "tracker_activity_read_denied", "无法查看在线任务", "当前账号没有 traffic.read.self 能力。")
+		return generated.GetMyTrackerActivity403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrManagedTorrentPeersUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "tracker_activity_unavailable", "在线任务暂时不可用", "Tracker 当前无法提供实时活动，请稍后重试。")
+		return generated.GetMyTrackerActivitydefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.GetMyTrackerActivity200JSONResponse{
+		Body: userTrackerActivityDTO(activity),
+		Headers: generated.GetMyTrackerActivity200ResponseHeaders{
+			CacheControl: "private, no-store",
+		},
+	}, nil
 }
 
 func (h *Handler) ListTorrentPeers(ctx context.Context, request generated.ListTorrentPeersRequestObject) (generated.ListTorrentPeersResponseObject, error) {
@@ -98,6 +134,29 @@ func torrentPeerAddressFamiliesDTO(values []string) []generated.TorrentPeerAddre
 		result = append(result, generated.TorrentPeerAddressFamilies(value))
 	}
 	return result
+}
+
+func userTrackerActivityDTO(activity torrents.UserTrackerActivity) generated.UserTrackerActivity {
+	items := make([]generated.UserTrackerTask, 0, len(activity.Items))
+	for _, task := range activity.Items {
+		addressFamilies := make([]generated.UserTrackerTaskAddressFamilies, 0, len(task.AddressFamilies))
+		for _, family := range task.AddressFamilies {
+			addressFamilies = append(addressFamilies, generated.UserTrackerTaskAddressFamilies(family))
+		}
+		items = append(items, generated.UserTrackerTask{
+			TorrentId: int64(task.TorrentID), InfoHashV1: task.InfoHashV1,
+			ClientFamilies: task.ClientFamilies, AddressFamilies: addressFamilies,
+			ActiveConnections: task.ActiveConnections, SeedingConnections: task.SeedingConnections,
+			LeechingConnections: task.LeechingConnections, ProgressBasisPoints: task.ProgressBasisPoints,
+			Uploaded: strconv.FormatInt(task.Uploaded, 10), Downloaded: strconv.FormatInt(task.Downloaded, 10),
+			UploadSpeed: strconv.FormatInt(task.UploadSpeed, 10), DownloadSpeed: strconv.FormatInt(task.DownloadSpeed, 10),
+			LastAnnounce: task.LastAnnounce, Seedbox: task.Seedbox,
+		})
+	}
+	return generated.UserTrackerActivity{
+		Items: items, TotalConnections: activity.TotalConnections,
+		Truncated: activity.Truncated, GeneratedAt: activity.GeneratedAt,
+	}
 }
 
 func (h *Handler) GetTorrentScreenshot(ctx context.Context, request generated.GetTorrentScreenshotRequestObject) (generated.GetTorrentScreenshotResponseObject, error) {

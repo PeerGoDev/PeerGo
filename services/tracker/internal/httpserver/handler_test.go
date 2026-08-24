@@ -54,6 +54,17 @@ func TestHandlerServesAuthenticatedBoundedActivePeersWithoutEndpoints(t *testing
 		page.Items[0].ClientFamily != "qbittorrent" || page.Items[0].AddressFamily != 4 || page.Items[0].Seedbox {
 		t.Fatalf("active peer page=%+v error=%v", page, err)
 	}
+	userRequest := httptest.NewRequest(http.MethodGet, "/internal/v1/operations/users/"+trackerSubject().UserID+"/peers?limit=10", nil)
+	userRequest.Header.Set("Authorization", "Bearer "+serviceToken)
+	userResponse := httptest.NewRecorder()
+	handler.ServeHTTP(userResponse, userRequest)
+	var userPage trackeroperationsv1.UserActivePeerPage
+	if err := json.Unmarshal(userResponse.Body.Bytes(), &userPage); err != nil || userResponse.Code != http.StatusOK ||
+		!userPage.Valid(trackerSubject().UserID, 10) || len(userPage.Items) != 1 ||
+		userPage.Items[0].TorrentID != 42 || userPage.Items[0].TotalSizeBytes != 1_000 ||
+		bytes.Contains(userResponse.Body.Bytes(), []byte("192.0.2.10")) || bytes.Contains(userResponse.Body.Bytes(), []byte("peer_id")) {
+		t.Fatalf("user active peer page=%+v status=%d body=%s error=%v", userPage, userResponse.Code, userResponse.Body.String(), err)
+	}
 
 	denied := httptest.NewRecorder()
 	handler.ServeHTTP(denied, httptest.NewRequest(http.MethodGet, request.URL.String(), nil))
@@ -540,7 +551,7 @@ func testHandler(t *testing.T, hash [20]byte, passkey string, ready bool) (*Hand
 }
 
 func trackerTorrent(id int64) trackercontrolv1.Torrent {
-	return trackercontrolv1.Torrent{TorrentID: id}
+	return trackercontrolv1.Torrent{TorrentID: id, TotalSizeBytes: 1_000}
 }
 
 func trackerSubject() trackersubjectcontrolv1.Subject {

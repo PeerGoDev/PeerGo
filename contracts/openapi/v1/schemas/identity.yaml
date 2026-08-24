@@ -862,8 +862,14 @@ WebSession:
 PublicUserProfile:
   type: object
   additionalProperties: false
-  required: [username, display_name, joined_at, published_torrent_count]
+  required:
+    [numeric_id, username, display_name, joined_at, published_torrent_count, published_torrents]
   properties:
+    numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+      description: 站内公开数字用户编号。
     username:
       type: string
       minLength: 1
@@ -880,6 +886,38 @@ PublicUserProfile:
       format: int64
       minimum: 0
       description: 当前可公开且非匿名发布的种子数量。
+    published_torrents:
+      type: array
+      maxItems: 10
+      description: 最近公开且非匿名发布的种子；审核中和匿名发布不会出现。
+      items:
+        $ref: "#/PublicUserPublishedTorrent"
+
+PublicUserPublishedTorrent:
+  type: object
+  additionalProperties: false
+  required: [id, title, subtitle, category, total_size_bytes, published_at]
+  properties:
+    id:
+      type: integer
+      format: int64
+      minimum: 1
+    title:
+      type: string
+      minLength: 1
+      maxLength: 240
+    subtitle:
+      type: string
+      maxLength: 300
+    category:
+      $ref: "./catalog.yaml#/Category"
+    total_size_bytes:
+      type: integer
+      format: int64
+      minimum: 1
+    published_at:
+      type: string
+      format: date-time
 
 AccountSecurityOverview:
   type: object

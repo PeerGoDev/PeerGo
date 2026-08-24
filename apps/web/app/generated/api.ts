@@ -502,6 +502,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/tracker-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取指定用户的在线 BT 任务与客户端摘要
+         * @description 仅供 user.account.read 后台身份读取 Tracker 当前内存摘要；不返回网络端点、 passkey、peer id 或持久化活动历史。
+         */
+        get: operations["getManagedUserTrackerActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/account-restrictions": {
         parameters: {
             query?: never;
@@ -757,6 +777,26 @@ export interface paths {
         };
         /** 获取当前用户的最终流量汇总与最近结算条目 */
         get: operations["getMyTraffic"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/tracker-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取当前用户的在线 BT 任务与客户端摘要
+         * @description 直接读取 Tracker 的有界内存视图，不写入 Core 数据库；响应不包含 IP、端口、 passkey、peer id 或会话标识。
+         */
+        get: operations["getMyTrackerActivity"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3879,6 +3919,11 @@ export interface components {
             csrf_token: string;
         };
         PublicUserProfile: {
+            /**
+             * Format: int64
+             * @description 站内公开数字用户编号。
+             */
+            numeric_id: number;
             username: string;
             display_name: string;
             /** Format: date-time */
@@ -3888,6 +3933,8 @@ export interface components {
              * @description 当前可公开且非匿名发布的种子数量。
              */
             published_torrent_count: number;
+            /** @description 最近公开且非匿名发布的种子；审核中和匿名发布不会出现。 */
+            published_torrents: components["schemas"]["PublicUserPublishedTorrent"][];
         };
         AccountSecurityOverview: {
             email_verified: boolean;
@@ -6536,6 +6583,8 @@ export interface components {
             totals: components["schemas"]["TrafficTotals"];
             /** @description 按流量区间结束时刻倒序排列的最近最终结算。 */
             entries: components["schemas"]["TrafficEntry"][];
+            /** @description 最近活跃的每用户/种子累计投影；不包含 announce、IP、peer ID 或客户端会话历史。 */
+            torrent_activity: components["schemas"]["TrafficTorrentActivity"][];
         };
         /**
          * @description 非负 int64 秒数的十进制文本，避免 JavaScript Number 精度损失。
@@ -6738,6 +6787,17 @@ export interface components {
             revision: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        PublicUserPublishedTorrent: {
+            /** Format: int64 */
+            id: number;
+            title: string;
+            subtitle: string;
+            category: components["schemas"]["Category"];
+            /** Format: int64 */
+            total_size_bytes: number;
+            /** Format: date-time */
+            published_at: string;
         };
         TwoFactorStatus: {
             enabled: boolean;
@@ -6975,6 +7035,36 @@ export interface components {
             actor_numeric_id?: number;
             actor_username?: string;
         };
+        UserTrackerTask: {
+            /** Format: int64 */
+            torrent_id: number;
+            /** @description 用于识别旧版任务的公开 v1 info hash；不包含 passkey 或 peer id。 */
+            info_hash_v1: string;
+            client_families: string[];
+            address_families: ("IPv4" | "IPv6")[];
+            active_connections: number;
+            seeding_connections: number;
+            leeching_connections: number;
+            progress_basis_points: number;
+            uploaded: components["schemas"]["TrafficByteCount"];
+            downloaded: components["schemas"]["TrafficByteCount"];
+            upload_speed: components["schemas"]["TrafficByteCount"];
+            download_speed: components["schemas"]["TrafficByteCount"];
+            /** Format: date-time */
+            last_announce: string;
+            seedbox: boolean;
+        };
+        UserTrackerActivity: {
+            items: components["schemas"]["UserTrackerTask"][];
+            total_connections: number;
+            /** @description Tracker 的有界内存扫描或返回上限是否截断了结果。 */
+            truncated: boolean;
+            /**
+             * Format: date-time
+             * @description Tracker 生成当前瞬时视图的服务端时间。
+             */
+            generated_at: string;
+        };
         /** @enum {string} */
         ManualDownloadRestrictionReasonCode: "manual_review" | "policy_violation" | "abuse_prevention";
         /** @enum {string} */
@@ -7039,6 +7129,19 @@ export interface components {
             /** Format: int64 */
             bandwidth_mbps: number;
             statement: string;
+        };
+        TrafficTorrentActivity: {
+            torrent: components["schemas"]["TrafficTorrentReference"];
+            /** Format: int64 */
+            total_size_bytes: number;
+            raw_uploaded_bytes: components["schemas"]["TrafficByteCount"];
+            raw_downloaded_bytes: components["schemas"]["TrafficByteCount"];
+            /** @description 当前累计下载进度；10000 表示 100%。 */
+            progress_basis_points: number;
+            /** @description H&R 完成事实或累计原始下载量已达到种子体积。 */
+            completed: boolean;
+            /** Format: date-time */
+            last_settled_at: string;
         };
         /**
          * @description ratio_watch 表示由长期分享率考核限制，account 表示独立账户状态限制， both 表示两种限制同时存在。不会公开账户限制的内部操作记录。
@@ -10071,6 +10174,34 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
+    getManagedUserTrackerActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 目标用户的瞬时 Tracker 活动。 */
+            200: {
+                headers: {
+                    "Cache-Control": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTrackerActivity"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
     createManagedUserAccountRestriction: {
         parameters: {
             query?: never;
@@ -10594,6 +10725,31 @@ export interface operations {
                 };
             };
             400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMyTrackerActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前用户的瞬时 Tracker 活动。 */
+            200: {
+                headers: {
+                    "Cache-Control": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTrackerActivity"];
+                };
+            };
             401: components["responses"]["ProblemResponse"];
             403: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];

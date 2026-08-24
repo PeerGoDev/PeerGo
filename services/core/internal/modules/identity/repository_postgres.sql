@@ -14,6 +14,8 @@ WHERE credential_ref = sqlc.arg(credential_ref)
 
 -- name: GetPublicUserProfileByUsername :one
 SELECT
+    users.id,
+    users.numeric_id,
     users.username,
     users.display_name,
     users.created_at AS joined_at,
@@ -34,6 +36,24 @@ WHERE lower(users.username) = lower(sqlc.arg(username))
         AND restriction.expires_at > sqlc.arg(as_of)
   )
 GROUP BY users.id, users.username, users.display_name, users.created_at;
+
+-- name: ListPublicUserPublishedTorrents :many
+SELECT
+    torrent.id,
+    torrent.title,
+    torrent.subtitle,
+    torrent.category_id,
+    category.name AS category_name,
+    torrent.total_size_bytes,
+    torrent.published_at
+FROM torrents.torrents AS torrent
+JOIN catalog.categories AS category ON category.id = torrent.category_id
+WHERE torrent.uploader_id = sqlc.arg(user_id)::uuid
+  AND torrent.state = 'published'
+  AND NOT torrent.anonymous
+  AND torrent.published_at IS NOT NULL
+ORDER BY torrent.published_at DESC, torrent.id DESC
+LIMIT sqlc.arg(result_limit)::integer;
 
 -- name: UpdateMyDisplayName :one
 UPDATE identity.users AS users

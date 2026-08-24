@@ -139,10 +139,10 @@ describe("TorrentDetailPage", () => {
     )
     expect(screen.getByText("完整发布说明")).toBeVisible()
     expect(screen.getByRole("button", { name: "分享到动态圈" })).toBeVisible()
-    expect(screen.getByText("18 seeding")).toBeVisible()
+    expect(screen.getByText("18 个做种")).toBeVisible()
     expect(screen.getByText("5 个下载者")).toBeVisible()
     const peerListHeader = screen
-      .getByText("User List")
+      .getByText("用户列表")
       .closest("[data-slot=card-header]")
     expect(peerListHeader).toHaveClass("p-6", "pb-2")
     expect(peerListHeader?.closest("[data-slot=card]")).toHaveClass(
@@ -166,7 +166,7 @@ describe("TorrentDetailPage", () => {
       mediaInfoCard?.querySelector("[data-slot=card-content]")
     ).toHaveClass("px-6", "pb-6")
     expect(
-      screen.getByText("User List").closest("[data-slot=card-title]")
+      screen.getByText("用户列表").closest("[data-slot=card-title]")
     ).toHaveClass("font-semibold")
     const rawMediaInfoButton = screen.getByRole("button", {
       name: "查看原始信息",
@@ -259,7 +259,7 @@ describe("TorrentDetailPage", () => {
       screen.queryByRole("button", { name: "展开种子参数" })
     ).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole("button", { name: /User List/ }))
+    fireEvent.click(screen.getByRole("button", { name: /用户列表/ }))
 
     expect(screen.getByText(/登录后可查看当前做种者和下载者/)).toBeVisible()
   })

@@ -75,6 +75,7 @@ describe("TrafficPage", () => {
           settled_at: "2026-08-09T12:01:00Z",
         },
       ],
+      torrent_activity: [],
     }
     queryClient.setQueryData(trafficKeys.current(userId), overview)
 
@@ -126,6 +127,7 @@ describe("TrafficPage", () => {
         projection_updated_at: null,
       },
       entries: [],
+      torrent_activity: [],
     } satisfies TrafficOverview)
 
     renderTrafficPage(queryClient)

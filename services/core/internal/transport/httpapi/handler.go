@@ -3210,6 +3210,17 @@ func trafficOverviewDTO(result traffic.Overview) generated.TrafficOverview {
 			SettledAt: entry.SettledAt,
 		})
 	}
+	torrentActivity := make([]generated.TrafficTorrentActivity, 0, len(result.TorrentActivity))
+	for _, item := range result.TorrentActivity {
+		torrentActivity = append(torrentActivity, generated.TrafficTorrentActivity{
+			Torrent:             generated.TrafficTorrentReference{Id: item.TorrentID, Title: item.TorrentTitle},
+			TotalSizeBytes:      item.TotalSizeBytes,
+			RawUploadedBytes:    generated.TrafficByteCount(strconv.FormatInt(item.RawUploaded, 10)),
+			RawDownloadedBytes:  generated.TrafficByteCount(strconv.FormatInt(item.RawDownloaded, 10)),
+			ProgressBasisPoints: item.ProgressBasisPts, Completed: item.Completed,
+			LastSettledAt: item.LastSettledAt,
+		})
+	}
 	return generated.TrafficOverview{
 		Totals: generated.TrafficTotals{
 			RawUploadedBytes:       strconv.FormatInt(result.Totals.RawUploaded, 10),
@@ -3220,7 +3231,7 @@ func trafficOverviewDTO(result traffic.Overview) generated.TrafficOverview {
 			LastSettledAt:          result.Totals.LastSettledAt,
 			ProjectionUpdatedAt:    result.Totals.ProjectionUpdatedAt,
 		},
-		Entries: entries,
+		Entries: entries, TorrentActivity: torrentActivity,
 	}
 }
 
@@ -3520,11 +3531,21 @@ func webSessionDTO(session identity.WebSession) generated.WebSession {
 }
 
 func publicUserProfileDTO(profile identity.PublicUserProfile) generated.PublicUserProfile {
+	published := make([]generated.PublicUserPublishedTorrent, 0, len(profile.PublishedTorrents))
+	for _, torrent := range profile.PublishedTorrents {
+		published = append(published, generated.PublicUserPublishedTorrent{
+			Id: torrent.ID, Title: torrent.Title, Subtitle: torrent.Subtitle,
+			Category:       generated.Category{Id: torrent.CategoryID, Name: torrent.CategoryName},
+			TotalSizeBytes: torrent.TotalSizeBytes, PublishedAt: torrent.PublishedAt,
+		})
+	}
 	return generated.PublicUserProfile{
+		NumericId:             profile.NumericID,
 		Username:              profile.Username,
 		DisplayName:           profile.DisplayName,
 		JoinedAt:              profile.JoinedAt,
 		PublishedTorrentCount: profile.PublishedTorrentCount,
+		PublishedTorrents:     published,
 	}
 }
 

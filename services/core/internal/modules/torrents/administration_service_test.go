@@ -45,7 +45,12 @@ func (stub *torrentAdministrationRepositoryStub) ManagedPeerIdentities(_ context
 }
 
 type trackerPeerReaderStub struct {
-	page trackeroperationsv1.ActivePeerPage
+	page     trackeroperationsv1.ActivePeerPage
+	userPage trackeroperationsv1.UserActivePeerPage
+}
+
+func (stub trackerPeerReaderStub) ActivePeersByUser(context.Context, string, int) (trackeroperationsv1.UserActivePeerPage, error) {
+	return stub.userPage, nil
 }
 
 func (stub trackerPeerReaderStub) ActivePeers(context.Context, string, int) (trackeroperationsv1.ActivePeerPage, error) {
@@ -175,6 +180,35 @@ func TestTorrentAdministrationAggregatesBoundedTrackerPeersByUser(t *testing.T) 
 	}
 	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionTorrentManageRead ||
 		authorizer.requests[0].CredentialAudience != authz.AudienceStaffSession {
+		t.Fatalf("authorization requests = %+v", authorizer.requests)
+	}
+}
+
+func TestTorrentAdministrationAggregatesLiveTasksForAuthorizedUserView(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 25, 12, 0, 0, 0, time.UTC)
+	userID := uuid.MustParse("0198f20a-6da8-7e51-9c64-333333333333")
+	tracker := trackerPeerReaderStub{userPage: trackeroperationsv1.UserActivePeerPage{
+		UserID: userID.String(), GeneratedAt: now, Truncated: false,
+		Items: []trackeroperationsv1.UserActivePeer{
+			{TorrentID: 42, InfoHashV1: "00112233445566778899aabbccddeeff00112233", TotalSizeBytes: 1_000, ClientFamily: "qbittorrent", AddressFamily: 4, Seedbox: true, Uploaded: 500, Downloaded: 1_000, UploadSpeed: 10, Left: 0, LastAnnounce: now.Add(-time.Minute)},
+			{TorrentID: 42, InfoHashV1: "00112233445566778899aabbccddeeff00112233", TotalSizeBytes: 1_000, ClientFamily: "qbittorrent", AddressFamily: 6, Seedbox: true, Uploaded: 500, Downloaded: 1_000, UploadSpeed: 20, Left: 0, LastAnnounce: now.Add(-2 * time.Minute)},
+			{TorrentID: 43, InfoHashV1: "112233445566778899aabbccddeeff0011223344", TotalSizeBytes: 2_000, ClientFamily: "transmission", AddressFamily: 4, Downloaded: 500, DownloadSpeed: 30, Left: 1_500, LastAnnounce: now.Add(-3 * time.Minute)},
+		},
+	}}
+	authorizer := &torrentAdministrationAuthorizerStub{decision: torrentAdministrationAllowedDecision(now)}
+	service, err := NewTorrentAdministrationService(&torrentAdministrationRepositoryStub{}, authorizer, func() time.Time { return now }, tracker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	activity, err := service.UserActivePeers(context.Background(), torrentAdministrationTestActor(), userID)
+	if err != nil || activity.TotalConnections != 3 || len(activity.Items) != 2 ||
+		activity.Items[0].TorrentID != 42 || activity.Items[0].ActiveConnections != 2 ||
+		activity.Items[0].UploadSpeed != 30 || len(activity.Items[0].AddressFamilies) != 2 ||
+		!activity.Items[0].Seedbox || activity.Items[1].ProgressBasisPoints != 2500 {
+		t.Fatalf("UserActivePeers() = %+v, err = %v", activity, err)
+	}
+	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionUserAccountRead {
 		t.Fatalf("authorization requests = %+v", authorizer.requests)
 	}
 }
