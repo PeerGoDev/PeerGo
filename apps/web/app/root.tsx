@@ -13,6 +13,7 @@ import {
 import type { Route } from "./+types/root"
 import "~/shared/polyfills/crypto-random-uuid"
 import { AppProviders } from "~/shared/providers/app-providers"
+import { SiteDocumentTitle } from "~/features/site/components/site-document-title"
 import {
   AppLoadingSkeleton,
   RouteLoadingSkeleton,
@@ -67,6 +68,7 @@ export default function App() {
 
   return (
     <AppProviders>
+      <SiteDocumentTitle />
       <Suspense fallback={<AppLoadingSkeleton />}>
         <Shell>
           <RoutedContent />
