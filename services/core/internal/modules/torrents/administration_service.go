@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -124,7 +125,11 @@ func (service *TorrentAdministrationService) aggregateActivePeers(ctx context.Co
 	}
 	grouped := make(map[uuid.UUID]*ManagedTorrentPeer, len(userIDs))
 	clients := make(map[uuid.UUID]map[string]struct{}, len(userIDs))
+	addressFamilies := make(map[uuid.UUID]map[string]struct{}, len(userIDs))
 	for _, active := range page.Items {
+		if active.AddressFamily != 4 && active.AddressFamily != 6 {
+			return ManagedTorrentPeerList{}, ErrTorrentReadInvariant
+		}
 		userID := uuid.MustParse(active.UserID)
 		identity, exists := identityByID[userID]
 		if !exists {
@@ -135,10 +140,11 @@ func (service *TorrentAdministrationService) aggregateActivePeers(ctx context.Co
 			peer = &ManagedTorrentPeer{
 				UserID: userID, NumericID: identity.NumericID, Username: identity.Username,
 				DisplayName: identity.DisplayName, ProgressBasisPoints: progressBasisPoints(target.TotalSizeBytes, active.Left),
-				Uploader: userID == target.UploaderID,
+				Uploader: userID == target.UploaderID, AnonymousUploader: target.Anonymous && userID == target.UploaderID,
 			}
 			grouped[userID] = peer
 			clients[userID] = make(map[string]struct{})
+			addressFamilies[userID] = make(map[string]struct{})
 		}
 		peer.ActiveConnections++
 		if active.Left == 0 {
@@ -149,10 +155,14 @@ func (service *TorrentAdministrationService) aggregateActivePeers(ctx context.Co
 		peer.ProgressBasisPoints = max(peer.ProgressBasisPoints, progressBasisPoints(target.TotalSizeBytes, active.Left))
 		peer.Uploaded = max(peer.Uploaded, active.Uploaded)
 		peer.Downloaded = max(peer.Downloaded, active.Downloaded)
+		peer.UploadSpeed = saturatingAdd(peer.UploadSpeed, active.UploadSpeed)
+		peer.DownloadSpeed = saturatingAdd(peer.DownloadSpeed, active.DownloadSpeed)
+		peer.Seedbox = peer.Seedbox || active.Seedbox
 		if active.LastAnnounce.After(peer.LastAnnounce) {
 			peer.LastAnnounce = active.LastAnnounce
 		}
 		clients[userID][active.ClientFamily] = struct{}{}
+		addressFamilies[userID][addressFamilyLabel(active.AddressFamily)] = struct{}{}
 	}
 	items := make([]ManagedTorrentPeer, 0, len(grouped))
 	for userID, peer := range grouped {
@@ -161,6 +171,11 @@ func (service *TorrentAdministrationService) aggregateActivePeers(ctx context.Co
 			peer.ClientFamilies = append(peer.ClientFamilies, client)
 		}
 		slices.Sort(peer.ClientFamilies)
+		peer.AddressFamilies = make([]string, 0, len(addressFamilies[userID]))
+		for family := range addressFamilies[userID] {
+			peer.AddressFamilies = append(peer.AddressFamilies, family)
+		}
+		slices.Sort(peer.AddressFamilies)
 		items = append(items, *peer)
 	}
 	slices.SortFunc(items, func(left, right ManagedTorrentPeer) int {
@@ -176,6 +191,23 @@ func (service *TorrentAdministrationService) aggregateActivePeers(ctx context.Co
 		TorrentID: target.TorrentID, Items: items, TotalConnections: len(page.Items),
 		Truncated: page.Truncated, GeneratedAt: page.GeneratedAt,
 	}, nil
+}
+
+func addressFamilyLabel(family int) string {
+	if family == 6 {
+		return "ipv6"
+	}
+	return "ipv4"
+}
+
+func saturatingAdd(current, next int64) int64 {
+	if next <= 0 {
+		return current
+	}
+	if current > math.MaxInt64-next {
+		return math.MaxInt64
+	}
+	return current + next
 }
 
 func progressBasisPoints(totalSizeBytes, left int64) int {

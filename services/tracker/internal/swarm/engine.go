@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"math"
 	"net/netip"
 	"slices"
 	"sync"
@@ -45,6 +46,7 @@ type Request struct {
 	Key          string
 	Endpoint     netip.AddrPort
 	ClientFamily string
+	Seedbox      bool
 	Left         int64
 	Uploaded     int64
 	Downloaded   int64
@@ -91,9 +93,12 @@ type peerState struct {
 	endpoint                 netip.AddrPort
 	userID                   string
 	clientFamily             string
+	seedbox                  bool
 	left                     int64
 	uploaded                 int64
 	downloaded               int64
+	uploadSpeed              int64
+	downloadSpeed            int64
 	lastAnnounce             time.Time
 	expiresAt                time.Time
 	lastCompletionDownloaded int64
@@ -115,12 +120,16 @@ type Stats struct {
 // in-memory connection. Network endpoints and protocol identifiers are never
 // returned.
 type ActivePeer struct {
-	UserID       string
-	ClientFamily string
-	Uploaded     int64
-	Downloaded   int64
-	Left         int64
-	LastAnnounce time.Time
+	UserID        string
+	ClientFamily  string
+	AddressFamily int
+	Seedbox       bool
+	Uploaded      int64
+	Downloaded    int64
+	UploadSpeed   int64
+	DownloadSpeed int64
+	Left          int64
+	LastAnnounce  time.Time
 }
 
 func NewEngine(config Config) (*Engine, error) {
@@ -219,9 +228,14 @@ func (engine *Engine) ActivePeers(infoHash [20]byte, now time.Time, limit int) (
 		if !peer.expiresAt.After(now) {
 			continue
 		}
+		addressFamily := 6
+		if peer.endpoint.Addr().Is4() {
+			addressFamily = 4
+		}
 		peers = append(peers, ActivePeer{
-			UserID: peer.userID, ClientFamily: peer.clientFamily,
-			Uploaded: peer.uploaded, Downloaded: peer.downloaded, Left: peer.left,
+			UserID: peer.userID, ClientFamily: peer.clientFamily, AddressFamily: addressFamily,
+			Seedbox: peer.seedbox, Uploaded: peer.uploaded, Downloaded: peer.downloaded,
+			UploadSpeed: peer.uploadSpeed, DownloadSpeed: peer.downloadSpeed, Left: peer.left,
 			LastAnnounce: peer.lastAnnounce,
 		})
 	}
@@ -340,7 +354,7 @@ func (state *swarmState) insert(key [32]byte, request Request, ttl time.Duration
 	state.index[key] = len(state.peers)
 	state.peers = append(state.peers, peerState{
 		key: key, id: request.PeerID, endpoint: request.Endpoint,
-		userID: request.UserID, clientFamily: request.ClientFamily,
+		userID: request.UserID, clientFamily: request.ClientFamily, seedbox: request.Seedbox,
 		left: request.Left, uploaded: request.Uploaded, downloaded: request.Downloaded,
 		lastAnnounce: request.Now, expiresAt: request.Now.Add(ttl), lastCompletionDownloaded: -1,
 	})
@@ -349,6 +363,8 @@ func (state *swarmState) insert(key [32]byte, request Request, ttl time.Duration
 
 func (state *swarmState) updateAt(index int, request Request, ttl time.Duration) [32]byte {
 	peer := &state.peers[index]
+	peer.uploadSpeed = bytesPerSecond(request.Uploaded, peer.uploaded, request.Now.Sub(peer.lastAnnounce))
+	peer.downloadSpeed = bytesPerSecond(request.Downloaded, peer.downloaded, request.Now.Sub(peer.lastAnnounce))
 	var completionToken [32]byte
 	if request.Event == protocol.EventCompleted && request.Left == 0 && peer.left > 0 {
 		completionToken = deriveCompletionToken(request, peer.key)
@@ -366,12 +382,24 @@ func (state *swarmState) updateAt(index int, request Request, ttl time.Duration)
 	peer.endpoint = request.Endpoint
 	peer.userID = request.UserID
 	peer.clientFamily = request.ClientFamily
+	peer.seedbox = request.Seedbox
 	peer.left = request.Left
 	peer.uploaded = request.Uploaded
 	peer.downloaded = request.Downloaded
 	peer.lastAnnounce = request.Now
 	peer.expiresAt = request.Now.Add(ttl)
 	return completionToken
+}
+
+func bytesPerSecond(current, previous int64, elapsed time.Duration) int64 {
+	if current <= previous || elapsed <= 0 {
+		return 0
+	}
+	rate := float64(current-previous) / elapsed.Seconds()
+	if rate >= math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return int64(rate)
 }
 
 func (state *swarmState) removeAt(index int) {

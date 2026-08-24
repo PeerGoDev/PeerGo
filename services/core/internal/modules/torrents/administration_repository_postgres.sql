@@ -79,7 +79,8 @@ SELECT
     torrent.id,
     torrent.info_hash_v1,
     torrent.total_size_bytes,
-    torrent.uploader_id
+    torrent.uploader_id,
+    torrent.anonymous
 FROM torrents.torrents AS torrent
 WHERE torrent.id = sqlc.arg(torrent_id)::bigint
   AND torrent.state = 'published';

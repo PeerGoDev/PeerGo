@@ -260,8 +260,9 @@ func (handler *Handler) serveOperationsActivePeers(response http.ResponseWriter,
 	items := make([]trackeroperationsv1.ActivePeer, 0, len(active))
 	for _, peer := range active {
 		items = append(items, trackeroperationsv1.ActivePeer{
-			UserID: peer.UserID, ClientFamily: peer.ClientFamily,
-			Uploaded: peer.Uploaded, Downloaded: peer.Downloaded, Left: peer.Left,
+			UserID: peer.UserID, ClientFamily: peer.ClientFamily, AddressFamily: peer.AddressFamily,
+			Seedbox: peer.Seedbox, Uploaded: peer.Uploaded, Downloaded: peer.Downloaded,
+			UploadSpeed: peer.UploadSpeed, DownloadSpeed: peer.DownloadSpeed, Left: peer.Left,
 			LastAnnounce: peer.LastAnnounce.UTC().Round(0),
 		})
 	}
@@ -361,28 +362,6 @@ func (handler *Handler) serveTracker(response http.ResponseWriter, request *http
 		handler.writeTracker(response, protocol.EncodeFailure("tracker temporarily unavailable"))
 		return
 	}
-	result, err := handler.swarms.Announce(swarm.Request{
-		InfoHash: announce.InfoHash, UserID: subjectAdmission.Subject.UserID, PeerID: announce.PeerID,
-		Key: announce.Key, Endpoint: netip.AddrPortFrom(address, announce.Port),
-		ClientFamily: clientFamily, Left: announce.Left, Uploaded: announce.Uploaded,
-		Downloaded: announce.Downloaded, Event: announce.Event, NumWant: announce.NumWant, Now: now,
-	})
-	if errors.Is(err, swarm.ErrCapacity) {
-		handler.writeTracker(response, protocol.EncodeFailure("tracker busy"))
-		return
-	}
-	if err != nil {
-		handler.writeTracker(response, protocol.EncodeFailure("tracker temporarily unavailable"))
-		return
-	}
-	encoded, err := protocol.EncodeAnnounce(protocol.AnnounceResponse{
-		Interval: policy.AnnounceIntervalSeconds, MinInterval: policy.MinAnnounceIntervalSeconds,
-		Complete: result.Complete, Incomplete: result.Incomplete, Peers: result.Peers,
-	}, announce.Compact)
-	if err != nil {
-		handler.writeTracker(response, protocol.EncodeFailure("tracker temporarily unavailable"))
-		return
-	}
 	addressFamily := 6
 	if address.Is4() {
 		addressFamily = 4
@@ -404,6 +383,28 @@ func (handler *Handler) serveTracker(response http.ResponseWriter, request *http
 		UploadFactorBasisPoints:   int64(classification.UploadFactorBasisPoints),
 		DownloadFactorBasisPoints: &downloadFactor,
 		SpeedLimitBytesPerSecond:  classification.SpeedLimitBytesPerSecond,
+	}
+	result, err := handler.swarms.Announce(swarm.Request{
+		InfoHash: announce.InfoHash, UserID: subjectAdmission.Subject.UserID, PeerID: announce.PeerID,
+		Key: announce.Key, Endpoint: netip.AddrPortFrom(address, announce.Port),
+		ClientFamily: clientFamily, Seedbox: classification.Seedbox, Left: announce.Left, Uploaded: announce.Uploaded,
+		Downloaded: announce.Downloaded, Event: announce.Event, NumWant: announce.NumWant, Now: now,
+	})
+	if errors.Is(err, swarm.ErrCapacity) {
+		handler.writeTracker(response, protocol.EncodeFailure("tracker busy"))
+		return
+	}
+	if err != nil {
+		handler.writeTracker(response, protocol.EncodeFailure("tracker temporarily unavailable"))
+		return
+	}
+	encoded, err := protocol.EncodeAnnounce(protocol.AnnounceResponse{
+		Interval: policy.AnnounceIntervalSeconds, MinInterval: policy.MinAnnounceIntervalSeconds,
+		Complete: result.Complete, Incomplete: result.Incomplete, Peers: result.Peers,
+	}, announce.Compact)
+	if err != nil {
+		handler.writeTracker(response, protocol.EncodeFailure("tracker temporarily unavailable"))
+		return
 	}
 	event, err := handler.eventFactory.New(announceevent.Input{
 		ReceivedAt: now, UserID: subjectAdmission.Subject.UserID,

@@ -243,7 +243,7 @@ func TestTorrentReadExposesPrivacyMinimizedActivePeersToSignedInMembers(t *testi
 		trackerPeerReaderStub{page: trackeroperationsv1.ActivePeerPage{
 			GeneratedAt: now,
 			Items: []trackeroperationsv1.ActivePeer{{
-				UserID: userID.String(), ClientFamily: "qbittorrent", Uploaded: 500,
+				UserID: userID.String(), ClientFamily: "qbittorrent", AddressFamily: 4, Uploaded: 500,
 				Downloaded: 100, Left: 0, LastAnnounce: now.Add(-time.Minute),
 			}},
 		}},

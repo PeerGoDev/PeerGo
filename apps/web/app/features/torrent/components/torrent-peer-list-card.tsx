@@ -1,7 +1,14 @@
 import * as React from "react"
 import { Link } from "react-router"
-import { DownloadIcon, UploadIcon, UsersIcon } from "lucide-react"
+import {
+  DownloadIcon,
+  EyeOffIcon,
+  ShieldCheckIcon,
+  UploadIcon,
+  UsersIcon,
+} from "lucide-react"
 
+import { Badge } from "~/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
 import {
   Collapsible,
@@ -18,8 +25,16 @@ import {
   TableRow,
 } from "~/components/ui/table"
 import { useWebSession } from "~/features/auth/api/session.mutations"
+import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import {
+  useStaffCapabilities,
+  useStaffSession,
+} from "~/features/staff/api/staff-session.mutations"
+import { hasCapability } from "~/features/staff/model/capability"
+import {
+  type ManagedTorrentPeerList,
   type TorrentPeerList,
+  useManagedTorrentPeers,
   useTorrentPeers,
   useTorrentSwarm,
 } from "~/features/torrent/api/torrent.queries"
@@ -28,13 +43,41 @@ import { ApiProblemError } from "~/shared/api/problem"
 import { formatBytes } from "~/shared/formatters/bytes"
 import { formatCompactDateTime } from "~/shared/formatters/date-time"
 
-type TorrentPeer = TorrentPeerList["items"][number]
+type MemberTorrentPeer = TorrentPeerList["items"][number]
+type ManagedTorrentPeer = ManagedTorrentPeerList["items"][number]
+type TorrentPeer = MemberTorrentPeer | ManagedTorrentPeer
+type TorrentPeerData = TorrentPeerList | ManagedTorrentPeerList
+type TorrentPeerQueryState = {
+  data: TorrentPeerData | undefined
+  error: Error | null
+  isError: boolean
+  isPending: boolean
+}
 
 export function TorrentPeerListCard({ torrentId }: { torrentId: number }) {
   const [open, setOpen] = React.useState(false)
   const session = useWebSession()
+  const capabilities = useCapabilities(session.data?.user.id)
+  const canCreateStaffSession = hasCapability(
+    capabilities.data,
+    "staff.session.create.self"
+  )
+  const staffSession = useStaffSession(canCreateStaffSession)
+  const staffCapabilities = useStaffCapabilities(staffSession.data?.user.id)
+  const managedView = hasCapability(
+    staffCapabilities.data,
+    "torrent.manage.read"
+  )
   const swarm = useTorrentSwarm(torrentId)
-  const peers = useTorrentPeers(torrentId, Boolean(session.data))
+  const memberPeers = useTorrentPeers(
+    torrentId,
+    Boolean(session.data) && !managedView
+  )
+  const managedPeers = useManagedTorrentPeers(
+    torrentId,
+    Boolean(session.data) && managedView
+  )
+  const peers: TorrentPeerQueryState = managedView ? managedPeers : memberPeers
   const grouped = React.useMemo(
     () => groupPeers(peers.data?.items ?? []),
     [peers.data?.items]
@@ -54,7 +97,16 @@ export function TorrentPeerListCard({ torrentId }: { torrentId: number }) {
             <CardTitle className="flex items-center justify-between gap-4 text-base font-semibold max-sm:items-start">
               <span className="flex items-center gap-2">
                 <UsersIcon className="size-4" />
-                User List
+                用户列表
+                {managedView ? (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 text-[10px] font-normal"
+                  >
+                    <ShieldCheckIcon className="size-3" />
+                    管理视图
+                  </Badge>
+                ) : null}
               </span>
               <span className="flex flex-wrap items-center justify-end gap-3 text-sm font-normal">
                 {swarm.isPending && !peers.data ? (
@@ -62,7 +114,7 @@ export function TorrentPeerListCard({ torrentId }: { torrentId: number }) {
                 ) : (
                   <>
                     <span className="text-green-500">
-                      {seedingCount} seeding
+                      {seedingCount} 个做种
                     </span>
                     <span className="text-blue-500">
                       {leechingCount} 个下载者
@@ -81,6 +133,7 @@ export function TorrentPeerListCard({ torrentId }: { torrentId: number }) {
           <CardContent className="space-y-6">
             <PeerListContent
               signedIn={Boolean(session.data)}
+              managedView={managedView}
               peers={peers}
               grouped={grouped}
             />
@@ -93,11 +146,13 @@ export function TorrentPeerListCard({ torrentId }: { torrentId: number }) {
 
 function PeerListContent({
   signedIn,
+  managedView,
   peers,
   grouped,
 }: {
   signedIn: boolean
-  peers: ReturnType<typeof useTorrentPeers>
+  managedView: boolean
+  peers: TorrentPeerQueryState
   grouped: ReturnType<typeof groupPeers>
 }) {
   if (!signedIn) {
@@ -129,8 +184,16 @@ function PeerListContent({
 
   return (
     <>
-      <PeerSection kind="seeding" peers={grouped.seeders} />
-      <PeerSection kind="leeching" peers={grouped.leechers} />
+      <PeerSection
+        kind="seeding"
+        peers={grouped.seeders}
+        managedView={managedView}
+      />
+      <PeerSection
+        kind="leeching"
+        peers={grouped.leechers}
+        managedView={managedView}
+      />
       {peers.data.truncated ? (
         <p className="text-center text-xs text-muted-foreground">
           活跃连接超过 200 个，当前显示 Tracker 最近返回的部分用户。
@@ -143,9 +206,11 @@ function PeerListContent({
 function PeerSection({
   kind,
   peers,
+  managedView,
 }: {
   kind: "seeding" | "leeching"
   peers: TorrentPeer[]
+  managedView: boolean
 }) {
   const seeding = kind === "seeding"
   return (
@@ -166,16 +231,22 @@ function PeerSection({
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
-          <Table className={seeding ? "min-w-[680px]" : "min-w-[760px]"}>
+          <Table className={seeding ? "min-w-[1040px]" : "min-w-[1120px]"}>
             <TableHeader>
               <TableRow className="bg-muted/30 text-xs text-muted-foreground">
                 <TableHead className="px-3 py-2">用户</TableHead>
+                <TableHead className="px-3 py-2">网络</TableHead>
+                {managedView ? (
+                  <TableHead className="px-3 py-2">账号</TableHead>
+                ) : null}
                 {!seeding ? (
                   <TableHead className="px-3 py-2 text-center">进度</TableHead>
                 ) : null}
                 <TableHead className="px-3 py-2 text-center">分享率</TableHead>
                 <TableHead className="px-3 py-2 text-right">上传量</TableHead>
                 <TableHead className="px-3 py-2 text-right">下载量</TableHead>
+                <TableHead className="px-3 py-2 text-right">↑速度</TableHead>
+                <TableHead className="px-3 py-2 text-right">↓速度</TableHead>
                 <TableHead className="px-3 py-2">客户端</TableHead>
                 <TableHead className="px-3 py-2 text-right">汇报</TableHead>
               </TableRow>
@@ -187,25 +258,16 @@ function PeerSection({
                   className="text-xs hover:bg-muted/50"
                 >
                   <TableCell className="px-3 py-2">
-                    <div className="flex items-center gap-1">
-                      <Link
-                        to={`/user/${encodeURIComponent(peer.username)}`}
-                        className="text-primary hover:underline"
-                      >
-                        {peer.display_name}
-                      </Link>
-                      {peer.uploader ? (
-                        <span className="text-green-500" title="发布者">
-                          发布者
-                        </span>
-                      ) : null}
-                    </div>
-                    {peer.display_name !== peer.username ? (
-                      <div className="text-[11px] text-muted-foreground">
-                        @{peer.username}
-                      </div>
-                    ) : null}
+                    <PeerIdentity peer={peer} />
                   </TableCell>
+                  <TableCell className="px-3 py-2">
+                    <PeerNetwork peer={peer} />
+                  </TableCell>
+                  {managedView ? (
+                    <TableCell className="px-3 py-2">
+                      <ManagedPeerAccount peer={peer} />
+                    </TableCell>
+                  ) : null}
                   {!seeding ? (
                     <TableCell className="px-3 py-2 text-center">
                       <PeerProgress basisPoints={peer.progress_basis_points} />
@@ -222,16 +284,27 @@ function PeerSection({
                   <TableCell className="px-3 py-2 text-right text-blue-500">
                     {formatBytes(peer.downloaded)}
                   </TableCell>
+                  <TableCell className="px-3 py-2 text-right text-green-500">
+                    {formatSpeed(peer.upload_speed)}
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-right text-blue-500">
+                    {formatSpeed(peer.download_speed)}
+                  </TableCell>
                   <TableCell className="px-3 py-2">
-                    <span title={peer.client_families.join(" / ")}>
-                      {peer.client_families.map(clientLabel).join(" / ") ||
-                        "未知客户端"}
-                    </span>
-                    {connectionCount(peer, kind) > 1 ? (
-                      <span className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
-                        ×{connectionCount(peer, kind)}
+                    <div className="flex max-w-40 flex-wrap items-center gap-1">
+                      <span title={peer.client_families.join(" / ")}>
+                        {peer.client_families.map(clientLabel).join(" / ") ||
+                          "未知客户端"}
                       </span>
-                    ) : null}
+                      {connectionCount(peer, kind) > 1 ? (
+                        <span
+                          className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground"
+                          title={`${connectionCount(peer, kind)} 个活跃连接`}
+                        >
+                          ×{connectionCount(peer, kind)}
+                        </span>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="px-3 py-2 text-right text-muted-foreground">
                     <time
@@ -249,6 +322,111 @@ function PeerSection({
       )}
     </section>
   )
+}
+
+function PeerIdentity({ peer }: { peer: TorrentPeer }) {
+  if (isAnonymousMemberPeer(peer)) {
+    return (
+      <div className="flex items-center gap-1 text-muted-foreground">
+        <EyeOffIcon className="size-3.5" />
+        <span>匿名</span>
+        <span className="text-green-500" title="发布者">
+          发布者
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-1">
+        <Link
+          to={`/user/${encodeURIComponent(peer.username)}`}
+          className="text-primary hover:underline"
+        >
+          {peer.display_name}
+        </Link>
+        {isManagedPeer(peer) && peer.anonymous_uploader ? (
+          <span
+            className="inline-flex items-center gap-0.5 text-amber-500"
+            title="该账号是匿名发布者，仅管理视图可见"
+          >
+            <EyeOffIcon className="size-3" />
+            匿名发布者
+          </span>
+        ) : peer.uploader ? (
+          <span className="text-green-500" title="发布者">
+            发布者
+          </span>
+        ) : null}
+      </div>
+      {peer.display_name !== peer.username ? (
+        <div className="text-[11px] text-muted-foreground">
+          @{peer.username}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function PeerNetwork({ peer }: { peer: TorrentPeer }) {
+  const ipv4 = peer.address_families.includes("ipv4")
+  const ipv6 = peer.address_families.includes("ipv6")
+  return (
+    <div className="flex min-w-28 flex-wrap items-center gap-1">
+      {ipv4 && ipv6 ? (
+        <span
+          className="rounded bg-gradient-to-r from-slate-500 to-violet-500 px-1.5 py-0.5 text-[10px] font-medium text-white"
+          title="IPv4 + IPv6"
+        >
+          双栈
+        </span>
+      ) : ipv6 ? (
+        <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-500">
+          IPv6
+        </span>
+      ) : (
+        <span className="rounded bg-slate-500/15 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+          IPv4
+        </span>
+      )}
+      {peer.seedbox ? (
+        <span
+          className="rounded bg-gradient-to-r from-orange-500 to-amber-400 px-1.5 py-0.5 text-[10px] font-medium text-white"
+          title="该用户至少有一个活跃连接命中后台盒子规则"
+        >
+          盒子
+        </span>
+      ) : null}
+      <span
+        className="text-[10px] text-muted-foreground"
+        title="Tracker TTL 内存中的活跃连接数"
+      >
+        {peer.active_connections} 连接
+      </span>
+    </div>
+  )
+}
+
+function ManagedPeerAccount({ peer }: { peer: TorrentPeer }) {
+  if (!isManagedPeer(peer))
+    return <span className="text-muted-foreground">—</span>
+  return (
+    <div className="leading-tight">
+      <div className="font-medium">#{peer.user_numeric_id}</div>
+      <code className="text-[10px] text-muted-foreground" title={peer.user_id}>
+        {peer.user_id.slice(0, 8)}…
+      </code>
+    </div>
+  )
+}
+
+function isManagedPeer(peer: TorrentPeer): peer is ManagedTorrentPeer {
+  return "user_id" in peer
+}
+
+function isAnonymousMemberPeer(peer: TorrentPeer): peer is MemberTorrentPeer {
+  return !isManagedPeer(peer) && peer.anonymous
 }
 
 function PeerProgress({ basisPoints }: { basisPoints: number }) {
@@ -287,6 +465,10 @@ function ratioTone(uploaded: string, downloaded: string) {
   if (ratio >= 1) return "text-green-500"
   if (ratio >= 0.5) return "text-amber-500"
   return "text-destructive"
+}
+
+function formatSpeed(value: string) {
+  return `${formatBytes(value)}/s`
 }
 
 function swarmCount(value: number | undefined, confidence: string | undefined) {

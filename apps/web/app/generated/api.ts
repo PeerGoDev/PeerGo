@@ -7788,11 +7788,18 @@ export interface components {
             items: components["schemas"]["TorrentSummary"][];
         };
         TorrentPeer: {
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description 匿名发布者在会员视图中固定为 0，其他用户为公开数字编号。
+             */
             user_numeric_id: number;
             username: string;
             display_name: string;
+            /** @description 为 true 时用户名与数字编号均为匿名占位值，不可链接到真实账号。 */
+            anonymous: boolean;
             client_families: string[];
+            /** @description 仅返回 IPv4/IPv6 分类，用于双栈展示；不包含地址或端口。 */
+            address_families: ("ipv4" | "ipv6")[];
             active_connections: number;
             seeding_connections: number;
             leeching_connections: number;
@@ -7801,9 +7808,15 @@ export interface components {
             uploaded: string;
             /** @description 该用户活跃连接所汇报的最大累计下载字节数。 */
             downloaded: string;
+            /** @description Tracker 根据相邻内存汇报估算并按用户汇总的当前上传字节每秒，不持久化。 */
+            upload_speed: string;
+            /** @description Tracker 根据相邻内存汇报估算并按用户汇总的当前下载字节每秒，不持久化。 */
+            download_speed: string;
             /** Format: date-time */
             last_announce: string;
             uploader: boolean;
+            /** @description 任一活跃连接命中当前 Tracker 盒子规则时为 true。 */
+            seedbox: boolean;
         };
         TorrentPeerList: {
             /** Format: int64 */
@@ -7967,7 +7980,11 @@ export interface components {
             user_numeric_id: number;
             username: string;
             display_name: string;
+            /** @description 仅管理视图标记该真实账号是否为匿名发布者。 */
+            anonymous_uploader: boolean;
             client_families: string[];
+            /** @description 仅返回 IPv4/IPv6 分类，用于双栈展示；不包含地址或端口。 */
+            address_families: ("ipv4" | "ipv6")[];
             active_connections: number;
             seeding_connections: number;
             leeching_connections: number;
@@ -7976,9 +7993,15 @@ export interface components {
             uploaded: string;
             /** @description 该用户活跃连接所汇报的最大累计下载字节数。 */
             downloaded: string;
+            /** @description Tracker 根据相邻内存汇报估算并按用户汇总的当前上传字节每秒，不持久化。 */
+            upload_speed: string;
+            /** @description Tracker 根据相邻内存汇报估算并按用户汇总的当前下载字节每秒，不持久化。 */
+            download_speed: string;
             /** Format: date-time */
             last_announce: string;
             uploader: boolean;
+            /** @description 任一活跃连接命中当前 Tracker 盒子规则时为 true。 */
+            seedbox: boolean;
         };
         ManagedTorrentPeerList: {
             /** Format: int64 */

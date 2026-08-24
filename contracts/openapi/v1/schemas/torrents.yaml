@@ -1689,19 +1689,31 @@ TorrentPeer:
     - user_numeric_id
     - username
     - display_name
+    - anonymous
     - client_families
+    - address_families
     - active_connections
     - seeding_connections
     - leeching_connections
     - progress_basis_points
     - uploaded
     - downloaded
+    - upload_speed
+    - download_speed
     - last_announce
     - uploader
+    - seedbox
   properties:
-    user_numeric_id: { type: integer, format: int64, minimum: 1 }
+    user_numeric_id:
+      type: integer
+      format: int64
+      minimum: 0
+      description: 匿名发布者在会员视图中固定为 0，其他用户为公开数字编号。
     username: { type: string, minLength: 1, maxLength: 64 }
     display_name: { type: string, minLength: 1, maxLength: 80 }
+    anonymous:
+      type: boolean
+      description: 为 true 时用户名与数字编号均为匿名占位值，不可链接到真实账号。
     client_families:
       type: array
       maxItems: 8
@@ -1710,6 +1722,15 @@ TorrentPeer:
         type: string
         minLength: 1
         maxLength: 32
+    address_families:
+      type: array
+      minItems: 1
+      maxItems: 2
+      uniqueItems: true
+      description: 仅返回 IPv4/IPv6 分类，用于双栈展示；不包含地址或端口。
+      items:
+        type: string
+        enum: [ipv4, ipv6]
     active_connections: { type: integer, minimum: 1, maximum: 200 }
     seeding_connections: { type: integer, minimum: 0, maximum: 200 }
     leeching_connections: { type: integer, minimum: 0, maximum: 200 }
@@ -1722,8 +1743,19 @@ TorrentPeer:
       type: string
       pattern: "^(0|[1-9][0-9]{0,18})$"
       description: 该用户活跃连接所汇报的最大累计下载字节数。
+    upload_speed:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+      description: Tracker 根据相邻内存汇报估算并按用户汇总的当前上传字节每秒，不持久化。
+    download_speed:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+      description: Tracker 根据相邻内存汇报估算并按用户汇总的当前下载字节每秒，不持久化。
     last_announce: { type: string, format: date-time }
     uploader: { type: boolean }
+    seedbox:
+      type: boolean
+      description: 任一活跃连接命中当前 Tracker 盒子规则时为 true。
 
 TorrentPeerList:
   type: object
@@ -1752,20 +1784,28 @@ ManagedTorrentPeer:
     - user_numeric_id
     - username
     - display_name
+    - anonymous_uploader
     - client_families
+    - address_families
     - active_connections
     - seeding_connections
     - leeching_connections
     - progress_basis_points
     - uploaded
     - downloaded
+    - upload_speed
+    - download_speed
     - last_announce
     - uploader
+    - seedbox
   properties:
     user_id: { type: string, format: uuid }
     user_numeric_id: { type: integer, format: int64, minimum: 1 }
     username: { type: string, minLength: 1, maxLength: 64 }
     display_name: { type: string, minLength: 1, maxLength: 80 }
+    anonymous_uploader:
+      type: boolean
+      description: 仅管理视图标记该真实账号是否为匿名发布者。
     client_families:
       type: array
       maxItems: 8
@@ -1774,6 +1814,15 @@ ManagedTorrentPeer:
         type: string
         minLength: 1
         maxLength: 32
+    address_families:
+      type: array
+      minItems: 1
+      maxItems: 2
+      uniqueItems: true
+      description: 仅返回 IPv4/IPv6 分类，用于双栈展示；不包含地址或端口。
+      items:
+        type: string
+        enum: [ipv4, ipv6]
     active_connections: { type: integer, minimum: 1, maximum: 200 }
     seeding_connections: { type: integer, minimum: 0, maximum: 200 }
     leeching_connections: { type: integer, minimum: 0, maximum: 200 }
@@ -1786,8 +1835,19 @@ ManagedTorrentPeer:
       type: string
       pattern: "^(0|[1-9][0-9]{0,18})$"
       description: 该用户活跃连接所汇报的最大累计下载字节数。
+    upload_speed:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+      description: Tracker 根据相邻内存汇报估算并按用户汇总的当前上传字节每秒，不持久化。
+    download_speed:
+      type: string
+      pattern: "^(0|[1-9][0-9]{0,18})$"
+      description: Tracker 根据相邻内存汇报估算并按用户汇总的当前下载字节每秒，不持久化。
     last_announce: { type: string, format: date-time }
     uploader: { type: boolean }
+    seedbox:
+      type: boolean
+      description: 任一活跃连接命中当前 Tracker 盒子规则时为 true。
 
 ManagedTorrentPeerList:
   type: object

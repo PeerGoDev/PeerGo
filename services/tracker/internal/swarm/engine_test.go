@@ -141,16 +141,31 @@ func TestEngineReturnsBoundedPrivacyMinimizedActivePeers(t *testing.T) {
 	engine := testEngine(t, 10, 10)
 	now := time.Date(2026, 8, 22, 12, 0, 0, 0, time.UTC)
 	for index, user := range []string{"user-a", "user-b", "user-c"} {
-		request := testRequest(user, "192.0.2.1:6881", int64(index), now.Add(time.Duration(index)*time.Second))
+		endpoint := "192.0.2.1:6881"
+		if user == "user-c" {
+			endpoint = "[2001:db8::3]:6881"
+		}
+		request := testRequest(user, endpoint, int64(index), now.Add(time.Duration(index)*time.Second))
 		request.PeerID[0] = byte(index + 1)
 		request.Uploaded = int64(index + 10)
 		request.Downloaded = int64(index + 20)
+		request.Seedbox = user == "user-c"
 		if _, err := engine.Announce(request); err != nil {
 			t.Fatal(err)
 		}
 	}
-	peers, truncated := engine.ActivePeers([20]byte{1}, now.Add(3*time.Second), 2)
-	if !truncated || len(peers) != 2 || peers[0].UserID != "user-c" || peers[0].Uploaded != 12 || peers[0].Downloaded != 22 {
+	updated := testRequest("user-c", "[2001:db8::3]:6881", 2, now.Add(4*time.Second))
+	updated.PeerID[0] = 3
+	updated.Uploaded = 212
+	updated.Downloaded = 122
+	updated.Seedbox = true
+	if _, err := engine.Announce(updated); err != nil {
+		t.Fatal(err)
+	}
+	peers, truncated := engine.ActivePeers([20]byte{1}, now.Add(5*time.Second), 2)
+	if !truncated || len(peers) != 2 || peers[0].UserID != "user-c" || peers[0].Uploaded != 212 ||
+		peers[0].Downloaded != 122 || peers[0].UploadSpeed != 100 || peers[0].DownloadSpeed != 50 ||
+		peers[0].AddressFamily != 6 || !peers[0].Seedbox {
 		t.Fatalf("ActivePeers() = %+v, truncated=%v", peers, truncated)
 	}
 }

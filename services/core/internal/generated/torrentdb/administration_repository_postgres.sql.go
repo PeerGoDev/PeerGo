@@ -234,7 +234,8 @@ SELECT
     torrent.id,
     torrent.info_hash_v1,
     torrent.total_size_bytes,
-    torrent.uploader_id
+    torrent.uploader_id,
+    torrent.anonymous
 FROM torrents.torrents AS torrent
 WHERE torrent.id = $1::bigint
   AND torrent.state = 'published'
@@ -245,6 +246,7 @@ type GetManagedTorrentPeerTargetRow struct {
 	InfoHashV1     []byte
 	TotalSizeBytes int64
 	UploaderID     uuid.UUID
+	Anonymous      bool
 }
 
 func (q *Queries) GetManagedTorrentPeerTarget(ctx context.Context, torrentID int64) (GetManagedTorrentPeerTargetRow, error) {
@@ -255,6 +257,7 @@ func (q *Queries) GetManagedTorrentPeerTarget(ctx context.Context, torrentID int
 		&i.InfoHashV1,
 		&i.TotalSizeBytes,
 		&i.UploaderID,
+		&i.Anonymous,
 	)
 	return i, err
 }

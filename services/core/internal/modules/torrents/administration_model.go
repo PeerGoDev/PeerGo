@@ -84,6 +84,7 @@ type ManagedTorrentPeerTarget struct {
 	InfoHashV1     InfoHashV1
 	TotalSizeBytes int64
 	UploaderID     uuid.UUID
+	Anonymous      bool
 }
 
 type ManagedTorrentPeerIdentity struct {
@@ -101,14 +102,19 @@ type ManagedTorrentPeer struct {
 	Username            string
 	DisplayName         string
 	ClientFamilies      []string
+	AddressFamilies     []string
 	ActiveConnections   int
 	SeedingConnections  int
 	LeechingConnections int
 	ProgressBasisPoints int
 	Uploaded            int64
 	Downloaded          int64
+	UploadSpeed         int64
+	DownloadSpeed       int64
 	LastAnnounce        time.Time
 	Uploader            bool
+	AnonymousUploader   bool
+	Seedbox             bool
 }
 
 type ManagedTorrentPeerList struct {

@@ -60,7 +60,8 @@ func (repository *PostgresTorrentAdministrationRepository) ManagedPeerTarget(ctx
 	var infoHash InfoHashV1
 	copy(infoHash[:], row.InfoHashV1)
 	return ManagedTorrentPeerTarget{
-		TorrentID: torrentID, InfoHashV1: infoHash, TotalSizeBytes: row.TotalSizeBytes, UploaderID: row.UploaderID,
+		TorrentID: torrentID, InfoHashV1: infoHash, TotalSizeBytes: row.TotalSizeBytes,
+		UploaderID: row.UploaderID, Anonymous: row.Anonymous,
 	}, nil
 }
 

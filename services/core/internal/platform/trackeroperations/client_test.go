@@ -57,12 +57,13 @@ func TestClientReadsAuthenticatedActivePeers(t *testing.T) {
 		}
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(`{"generated_at":"2026-08-22T12:00:00Z","items":[{"user_id":"0198f20a-6da8-7e51-9c64-111111111111","client_family":"qbittorrent","uploaded":10,"downloaded":20,"left":30,"last_announce":"2026-08-22T11:59:00Z"}],"truncated":false}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"generated_at":"2026-08-22T12:00:00Z","items":[{"user_id":"0198f20a-6da8-7e51-9c64-111111111111","client_family":"qbittorrent","address_family":6,"seedbox":true,"uploaded":10,"downloaded":20,"upload_speed":1,"download_speed":2,"left":30,"last_announce":"2026-08-22T11:59:00Z"}],"truncated":false}`)),
 			Request:    request,
 		}, nil
 	})
 	page, err := client.ActivePeers(context.Background(), infoHash, 25)
-	if err != nil || len(page.Items) != 1 || page.Items[0].ClientFamily != "qbittorrent" {
+	if err != nil || len(page.Items) != 1 || page.Items[0].ClientFamily != "qbittorrent" ||
+		page.Items[0].AddressFamily != 6 || !page.Items[0].Seedbox || page.Items[0].DownloadSpeed != 2 {
 		t.Fatalf("ActivePeers() = %+v, err = %v", page, err)
 	}
 }

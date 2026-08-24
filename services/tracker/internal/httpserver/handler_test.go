@@ -51,7 +51,7 @@ func TestHandlerServesAuthenticatedBoundedActivePeersWithoutEndpoints(t *testing
 	}
 	var page trackeroperationsv1.ActivePeerPage
 	if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil || !page.Valid(10) || len(page.Items) != 1 ||
-		page.Items[0].ClientFamily != "qbittorrent" {
+		page.Items[0].ClientFamily != "qbittorrent" || page.Items[0].AddressFamily != 4 || page.Items[0].Seedbox {
 		t.Fatalf("active peer page=%+v error=%v", page, err)
 	}
 
@@ -322,6 +322,10 @@ func TestHandlerEmitsSeedboxClassificationWithoutSocketAddress(t *testing.T) {
 	encoded, err := announceevent.Encode(events.events[0])
 	if err != nil || bytes.Contains(encoded, []byte("192.0.2.10")) {
 		t.Fatalf("encoded event leaks socket address: %q, %v", encoded, err)
+	}
+	active, _ := handler.swarms.ActivePeers(hash, handler.now().UTC(), 10)
+	if len(active) != 1 || active[0].AddressFamily != 4 || !active[0].Seedbox {
+		t.Fatalf("active seedbox projection = %+v", active)
 	}
 }
 

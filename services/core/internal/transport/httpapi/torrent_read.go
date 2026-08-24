@@ -67,18 +67,37 @@ func (h *Handler) ListTorrentPeers(ctx context.Context, request generated.ListTo
 func torrentPeerListDTO(page torrents.ManagedTorrentPeerList) generated.TorrentPeerList {
 	items := make([]generated.TorrentPeer, 0, len(page.Items))
 	for _, peer := range page.Items {
+		userNumericID := peer.NumericID
+		username := peer.Username
+		displayName := peer.DisplayName
+		if peer.AnonymousUploader {
+			userNumericID = 0
+			username = "anonymous"
+			displayName = "匿名"
+		}
 		items = append(items, generated.TorrentPeer{
-			UserNumericId: peer.NumericID, Username: peer.Username, DisplayName: peer.DisplayName,
-			ClientFamilies: peer.ClientFamilies, ActiveConnections: peer.ActiveConnections,
+			UserNumericId: userNumericID, Username: username, DisplayName: displayName,
+			Anonymous: peer.AnonymousUploader, ClientFamilies: peer.ClientFamilies,
+			AddressFamilies: torrentPeerAddressFamiliesDTO(peer.AddressFamilies), ActiveConnections: peer.ActiveConnections,
 			SeedingConnections: peer.SeedingConnections, LeechingConnections: peer.LeechingConnections,
 			ProgressBasisPoints: peer.ProgressBasisPoints, Uploaded: strconv.FormatInt(peer.Uploaded, 10),
-			Downloaded: strconv.FormatInt(peer.Downloaded, 10), LastAnnounce: peer.LastAnnounce, Uploader: peer.Uploader,
+			Downloaded: strconv.FormatInt(peer.Downloaded, 10), UploadSpeed: strconv.FormatInt(peer.UploadSpeed, 10),
+			DownloadSpeed: strconv.FormatInt(peer.DownloadSpeed, 10), LastAnnounce: peer.LastAnnounce,
+			Uploader: peer.Uploader, Seedbox: peer.Seedbox,
 		})
 	}
 	return generated.TorrentPeerList{
 		TorrentId: int64(page.TorrentID), Items: items, TotalConnections: page.TotalConnections,
 		Truncated: page.Truncated, GeneratedAt: page.GeneratedAt,
 	}
+}
+
+func torrentPeerAddressFamiliesDTO(values []string) []generated.TorrentPeerAddressFamilies {
+	result := make([]generated.TorrentPeerAddressFamilies, 0, len(values))
+	for _, value := range values {
+		result = append(result, generated.TorrentPeerAddressFamilies(value))
+	}
+	return result
 }
 
 func (h *Handler) GetTorrentScreenshot(ctx context.Context, request generated.GetTorrentScreenshotRequestObject) (generated.GetTorrentScreenshotResponseObject, error) {

@@ -97,16 +97,27 @@ func managedTorrentPeerListDTO(page torrents.ManagedTorrentPeerList) generated.M
 	for _, peer := range page.Items {
 		items = append(items, generated.ManagedTorrentPeer{
 			UserId: peer.UserID, UserNumericId: peer.NumericID, Username: peer.Username, DisplayName: peer.DisplayName,
-			ClientFamilies: peer.ClientFamilies, ActiveConnections: peer.ActiveConnections,
+			AnonymousUploader: peer.AnonymousUploader, ClientFamilies: peer.ClientFamilies,
+			AddressFamilies: managedTorrentPeerAddressFamiliesDTO(peer.AddressFamilies), ActiveConnections: peer.ActiveConnections,
 			SeedingConnections: peer.SeedingConnections, LeechingConnections: peer.LeechingConnections,
 			ProgressBasisPoints: peer.ProgressBasisPoints, Uploaded: strconv.FormatInt(peer.Uploaded, 10),
-			Downloaded: strconv.FormatInt(peer.Downloaded, 10), LastAnnounce: peer.LastAnnounce, Uploader: peer.Uploader,
+			Downloaded: strconv.FormatInt(peer.Downloaded, 10), UploadSpeed: strconv.FormatInt(peer.UploadSpeed, 10),
+			DownloadSpeed: strconv.FormatInt(peer.DownloadSpeed, 10), LastAnnounce: peer.LastAnnounce,
+			Uploader: peer.Uploader, Seedbox: peer.Seedbox,
 		})
 	}
 	return generated.ManagedTorrentPeerList{
 		TorrentId: int64(page.TorrentID), Items: items, TotalConnections: page.TotalConnections,
 		Truncated: page.Truncated, GeneratedAt: page.GeneratedAt,
 	}
+}
+
+func managedTorrentPeerAddressFamiliesDTO(values []string) []generated.ManagedTorrentPeerAddressFamilies {
+	result := make([]generated.ManagedTorrentPeerAddressFamilies, 0, len(values))
+	for _, value := range values {
+		result = append(result, generated.ManagedTorrentPeerAddressFamilies(value))
+	}
+	return result
 }
 
 func (h *Handler) ChangeManagedTorrentAvailability(ctx context.Context, request generated.ChangeManagedTorrentAvailabilityRequestObject) (generated.ChangeManagedTorrentAvailabilityResponseObject, error) {

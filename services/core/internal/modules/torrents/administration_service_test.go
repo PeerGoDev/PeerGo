@@ -148,7 +148,7 @@ func TestTorrentAdministrationAggregatesBoundedTrackerPeersByUser(t *testing.T) 
 	uploaderID := uuid.MustParse("0198f20a-6da8-7e51-9c64-222222222222")
 	leecherID := uuid.MustParse("0198f20a-6da8-7e51-9c64-333333333333")
 	repository := &torrentAdministrationRepositoryStub{
-		peerTarget: ManagedTorrentPeerTarget{InfoHashV1: InfoHashV1{1}, TotalSizeBytes: 1_000, UploaderID: uploaderID},
+		peerTarget: ManagedTorrentPeerTarget{InfoHashV1: InfoHashV1{1}, TotalSizeBytes: 1_000, UploaderID: uploaderID, Anonymous: true},
 		peerIdentities: []ManagedTorrentPeerIdentity{
 			{UserID: uploaderID, NumericID: 7, Username: "uploader", DisplayName: "发布者"},
 			{UserID: leecherID, NumericID: 8, Username: "leecher", DisplayName: "下载者"},
@@ -157,9 +157,9 @@ func TestTorrentAdministrationAggregatesBoundedTrackerPeersByUser(t *testing.T) 
 	tracker := trackerPeerReaderStub{page: trackeroperationsv1.ActivePeerPage{
 		GeneratedAt: now,
 		Items: []trackeroperationsv1.ActivePeer{
-			{UserID: uploaderID.String(), ClientFamily: "qbittorrent", Uploaded: 500, Downloaded: 100, Left: 0, LastAnnounce: now.Add(-time.Minute)},
-			{UserID: uploaderID.String(), ClientFamily: "qbittorrent", Uploaded: 500, Downloaded: 100, Left: 0, LastAnnounce: now.Add(-2 * time.Minute)},
-			{UserID: leecherID.String(), ClientFamily: "transmission", Uploaded: 20, Downloaded: 700, Left: 300, LastAnnounce: now.Add(-3 * time.Minute)},
+			{UserID: uploaderID.String(), ClientFamily: "qbittorrent", AddressFamily: 4, Seedbox: true, Uploaded: 500, Downloaded: 100, UploadSpeed: 10, Left: 0, LastAnnounce: now.Add(-time.Minute)},
+			{UserID: uploaderID.String(), ClientFamily: "qbittorrent", AddressFamily: 6, Seedbox: true, Uploaded: 500, Downloaded: 100, UploadSpeed: 20, Left: 0, LastAnnounce: now.Add(-2 * time.Minute)},
+			{UserID: leecherID.String(), ClientFamily: "transmission", AddressFamily: 4, Uploaded: 20, Downloaded: 700, DownloadSpeed: 30, Left: 300, LastAnnounce: now.Add(-3 * time.Minute)},
 		},
 	}}
 	authorizer := &torrentAdministrationAuthorizerStub{decision: torrentAdministrationAllowedDecision(now)}
@@ -169,7 +169,8 @@ func TestTorrentAdministrationAggregatesBoundedTrackerPeersByUser(t *testing.T) 
 	}
 	page, err := service.ActivePeers(context.Background(), torrentAdministrationTestActor(), 42)
 	if err != nil || page.TotalConnections != 3 || len(page.Items) != 2 || !page.Items[0].Uploader ||
-		page.Items[0].ActiveConnections != 2 || page.Items[1].ProgressBasisPoints != 7000 {
+		page.Items[0].ActiveConnections != 2 || page.Items[0].UploadSpeed != 30 || !page.Items[0].Seedbox ||
+		!page.Items[0].AnonymousUploader || len(page.Items[0].AddressFamilies) != 2 || page.Items[1].ProgressBasisPoints != 7000 {
 		t.Fatalf("ActivePeers() = %+v, err = %v", page, err)
 	}
 	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionTorrentManageRead ||
