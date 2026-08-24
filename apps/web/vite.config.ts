@@ -10,6 +10,12 @@ const coreProxy = {
 
 export default defineConfig(({ mode }) => ({
   resolve: { tsconfigPaths: true },
+  build: {
+    // Keep this namespace stable after the 2026-08 cache-policy correction.
+    // It prevents previously cached negative /assets responses from shadowing
+    // a newly published content-addressed file with the same hash.
+    assetsDir: "assets/v2",
+  },
   // Vitest transforms JSX itself. Running the Framework plugin inside its
   // isolated DOM workers injects the dev preamble twice and breaks component
   // tests, so the plugin is only active for real app builds/dev servers.
