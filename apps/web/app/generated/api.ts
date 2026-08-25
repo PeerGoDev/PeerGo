@@ -6367,7 +6367,7 @@ export interface components {
         MagicStatementEntry: {
             sequence: components["schemas"]["UnsignedIntegerText"];
             /** @enum {string} */
-            transaction_type: "legacy_opening" | "seeding_reward" | "activity_reward" | "torrent_purchase" | "member_gift" | "tip" | "refund" | "adjustment";
+            transaction_type: "legacy_opening" | "seeding_reward" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "refund" | "adjustment";
             /** @enum {string} */
             entry_type: "legacy_opening" | "earn" | "spend" | "adjustment";
             amount: components["schemas"]["SignedIntegerText"];

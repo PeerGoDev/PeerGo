@@ -37,8 +37,12 @@ MagicStatementEntry:
           seeding_reward,
           activity_reward,
           torrent_purchase,
+          promotion_product_purchase,
+          medal_purchase,
           member_gift,
           tip,
+          social_red_packet_fund,
+          social_red_packet_claim,
           refund,
           adjustment,
         ]
