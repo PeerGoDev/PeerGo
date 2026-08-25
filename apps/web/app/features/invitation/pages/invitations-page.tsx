@@ -256,6 +256,7 @@ export function InvitationsPage() {
                 issueError={issue.isError ? issue.error : null}
                 inviteeEmail={inviteeEmail}
                 onInviteeEmailChange={setInviteeEmail}
+                canIssue={canIssue}
                 onIssue={(event) => void handleIssue(event)}
                 canIssue={canIssue}
               />
