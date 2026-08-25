@@ -59,7 +59,10 @@ export function RegistrationPage() {
   const [humanVerificationToken, setHumanVerificationToken] = React.useState("")
   const [humanVerificationResetKey, setHumanVerificationResetKey] =
     React.useState(0)
-  const idempotencyKey = React.useRef<string | null>(null)
+  const registrationAttempt = React.useRef<{
+    fingerprint: string
+    idempotencyKey: string
+  } | null>(null)
 
   React.useEffect(() => {
     if (linkedInvitation) {
@@ -164,10 +167,22 @@ export function RegistrationPage() {
     }
 
     setErrors({})
-    idempotencyKey.current ??= globalThis.crypto.randomUUID()
+    const fingerprint = JSON.stringify([
+      result.data.username,
+      result.data.displayName,
+      result.data.email,
+      result.data.password,
+      result.data.invitationToken ?? "",
+    ])
+    if (registrationAttempt.current?.fingerprint !== fingerprint) {
+      registrationAttempt.current = {
+        fingerprint,
+        idempotencyKey: globalThis.crypto.randomUUID(),
+      }
+    }
     try {
       await createRegistration.mutateAsync({
-        idempotencyKey: idempotencyKey.current,
+        idempotencyKey: registrationAttempt.current.idempotencyKey,
         input: {
           username: result.data.username,
           display_name: result.data.displayName,
@@ -186,8 +201,8 @@ export function RegistrationPage() {
         setHumanVerificationToken("")
         setHumanVerificationResetKey((current) => current + 1)
       }
-      // Keep both the form values and idempotency key in this page instance so
-      // a retry resumes the same server-side registration state machine.
+      // An unchanged retry resumes the same server-side registration. Editing
+      // any credential or identity field starts a new idempotent attempt.
     }
   }
 
@@ -215,7 +230,7 @@ export function RegistrationPage() {
                 </AlertTitle>
                 <AlertDescription>
                   {mode === "invite"
-                    ? "凭证将在提交注册时由服务端原子校验并消费。"
+                    ? "凭证将在提交注册时由服务端原子校验并消费；若邀请人绑定了邮箱，必须填写完全相同的邮箱。"
                     : "当前可直接注册；提交后仍会校验邀请码并记录邀请关系。"}
                 </AlertDescription>
               </Alert>
@@ -480,7 +495,7 @@ function InvitationRegistrationStep({
           className="h-10 w-full"
           disabled={!invitationToken.trim()}
         >
-          验证邀请凭证
+          继续填写注册资料
           <ArrowRightIcon data-icon="inline-end" />
         </Button>
         <p className="text-sm text-muted-foreground">
@@ -553,10 +568,8 @@ function registrationErrorTitle(error: Error) {
 }
 
 function registrationErrorDescription(error: Error) {
-  if (error instanceof ApiProblemError) {
-    return error.requestId
-      ? `当前输入尚未完成注册，可在本页安全重试。请求编号：${error.requestId}`
-      : "当前输入尚未完成注册，可在本页安全重试。"
-  }
-  return "服务暂时不可用，请保留当前页面并稍后重试。"
+  return requestErrorDescription(
+    error,
+    "服务暂时不可用，请保留当前页面并稍后重试。"
+  )
 }

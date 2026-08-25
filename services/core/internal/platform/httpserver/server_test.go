@@ -181,7 +181,7 @@ func (unavailableInvitationService) Overview(context.Context, string, int, int) 
 	return identity.InvitationOverview{}, identity.ErrSessionNotFound
 }
 
-func (unavailableInvitationService) Issue(context.Context, string, string) (identity.InvitationIssueResult, error) {
+func (unavailableInvitationService) Issue(context.Context, string, string, string) (identity.InvitationIssueResult, error) {
 	return identity.InvitationIssueResult{}, identity.ErrSessionNotFound
 }
 

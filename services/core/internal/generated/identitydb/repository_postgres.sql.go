@@ -827,7 +827,8 @@ const getAvailableRegistrationInvitationForUpdate = `-- name: GetAvailableRegist
 SELECT id
 FROM identity.registration_invitations
 WHERE token_sha256 = $1
-  AND expires_at > $2::timestamptz
+  AND (email_binding_hmac IS NULL OR email_binding_hmac = $2)
+  AND expires_at > $3::timestamptz
   AND revoked_at IS NULL
   AND consumed_at IS NULL
   AND claimed_by IS NULL
@@ -835,12 +836,13 @@ FOR UPDATE
 `
 
 type GetAvailableRegistrationInvitationForUpdateParams struct {
-	TokenSha256 []byte
-	AsOf        pgtype.Timestamptz
+	TokenSha256      []byte
+	EmailBindingHmac []byte
+	AsOf             pgtype.Timestamptz
 }
 
 func (q *Queries) GetAvailableRegistrationInvitationForUpdate(ctx context.Context, arg GetAvailableRegistrationInvitationForUpdateParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, getAvailableRegistrationInvitationForUpdate, arg.TokenSha256, arg.AsOf)
+	row := q.db.QueryRow(ctx, getAvailableRegistrationInvitationForUpdate, arg.TokenSha256, arg.EmailBindingHmac, arg.AsOf)
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
@@ -1952,6 +1954,7 @@ INSERT INTO identity.registration_invitations (
     expires_at,
     issuer_user_id,
     source_kind,
+    email_binding_hmac,
     issued_authorization_decision_id,
     created_at
 ) VALUES (
@@ -1962,7 +1965,8 @@ INSERT INTO identity.registration_invitations (
     $4,
     'member',
     $5,
-    $6
+    $6,
+    $7
 )
 RETURNING id, created_at, expires_at
 `
@@ -1972,6 +1976,7 @@ type InsertMemberInvitationParams struct {
 	TokenSha256             []byte
 	ExpiresAt               pgtype.Timestamptz
 	UserID                  pgtype.UUID
+	EmailBindingHmac        []byte
 	AuthorizationDecisionID pgtype.UUID
 	CreatedAt               pgtype.Timestamptz
 }
@@ -1988,6 +1993,7 @@ func (q *Queries) InsertMemberInvitation(ctx context.Context, arg InsertMemberIn
 		arg.TokenSha256,
 		arg.ExpiresAt,
 		arg.UserID,
+		arg.EmailBindingHmac,
 		arg.AuthorizationDecisionID,
 		arg.CreatedAt,
 	)
@@ -3529,18 +3535,25 @@ SELECT EXISTS (
     FROM identity.registration_invitations
     WHERE id = $1
       AND token_sha256 = $2
-      AND claimed_by = $3
+      AND (email_binding_hmac IS NULL OR email_binding_hmac = $3)
+      AND claimed_by = $4
 ) AS matches
 `
 
 type RegistrationInvitationMatchesParams struct {
-	InvitationID   uuid.UUID
-	TokenSha256    []byte
-	RegistrationID pgtype.UUID
+	InvitationID     uuid.UUID
+	TokenSha256      []byte
+	EmailBindingHmac []byte
+	RegistrationID   pgtype.UUID
 }
 
 func (q *Queries) RegistrationInvitationMatches(ctx context.Context, arg RegistrationInvitationMatchesParams) (bool, error) {
-	row := q.db.QueryRow(ctx, registrationInvitationMatches, arg.InvitationID, arg.TokenSha256, arg.RegistrationID)
+	row := q.db.QueryRow(ctx, registrationInvitationMatches,
+		arg.InvitationID,
+		arg.TokenSha256,
+		arg.EmailBindingHmac,
+		arg.RegistrationID,
+	)
 	var matches bool
 	err := row.Scan(&matches)
 	return matches, err

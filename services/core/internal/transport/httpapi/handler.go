@@ -72,7 +72,7 @@ type RegistrationService interface {
 // The issue result is the sole surface allowed to return a raw bearer token.
 type InvitationService interface {
 	Overview(context.Context, string, int, int) (identity.InvitationOverview, error)
-	Issue(context.Context, string, string) (identity.InvitationIssueResult, error)
+	Issue(context.Context, string, string, string) (identity.InvitationIssueResult, error)
 	Revoke(context.Context, string, string, uuid.UUID) (identity.MemberInvitation, error)
 }
 
@@ -2288,10 +2288,10 @@ func (h *Handler) CreateRegistration(ctx context.Context, request generated.Crea
 		problem := newProblemFromContext(ctx, http.StatusForbidden, "registration_closed", "暂未开放注册", "当前站点准入策略不接受新账户。")
 		return generated.CreateRegistration403ApplicationProblemPlusJSONResponse(problem), nil
 	case errors.Is(err, identity.ErrRegistrationInvitationInvalid):
-		problem := newProblemFromContext(ctx, http.StatusForbidden, "invitation_unavailable", "邀请凭证不可用", "邀请可能无效、已被使用或已经过期。")
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "invitation_unavailable", "邀请凭证不可用", "邀请可能无效、已被使用、已撤销或已经过期；若邀请绑定了邮箱，请填写签发时指定的邮箱。")
 		return generated.CreateRegistration403ApplicationProblemPlusJSONResponse(problem), nil
 	case errors.Is(err, identity.ErrRegistrationUnavailable):
-		problem := newProblemFromContext(ctx, http.StatusConflict, "registration_unavailable", "无法使用这些注册信息", "用户名或邮箱不可用，请更换后重试。")
+		problem := newProblemFromContext(ctx, http.StatusConflict, "registration_unavailable", "无法使用这些注册信息", "用户名或邮箱已被使用，请更换后重试；如本次使用邀请码，系统已释放本次未完成的占用。")
 		return generated.CreateRegistration409ApplicationProblemPlusJSONResponse(problem), nil
 	case errors.Is(err, identity.ErrRegistrationIdempotencyConflict):
 		problem := newProblemFromContext(ctx, http.StatusConflict, "idempotency_conflict", "本次注册内容已经变化", "请刷新页面后重新开始注册。")

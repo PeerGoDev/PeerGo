@@ -362,7 +362,7 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
     post:
       operationId: issueMyInvitation
-      summary: 签发一个自己的单次注册邀请码
+      summary: 为指定邮箱签发一个自己的单次注册邀请码
       tags:
         - identity
       x-audience:
@@ -372,6 +372,12 @@ paths:
       x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/WebCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueInvitationRequest'
       responses:
         '201':
           description: 邀请码已签发；明文 token 仅在本响应返回一次。
@@ -19352,6 +19358,7 @@ components:
         - id
         - source
         - status
+        - email_bound
         - created_at
         - expires_at
       properties:
@@ -19365,6 +19372,9 @@ components:
             - legacy_import
         status:
           $ref: '#/components/schemas/InvitationStatus'
+        email_bound:
+          type: boolean
+          description: 邀请凭证是否仅允许签发时指定的邮箱完成注册；不返回邮箱明文。
         invitee_username:
           type: string
           minLength: 3
@@ -19500,6 +19510,17 @@ components:
         observed_at:
           type: string
           format: date-time
+    IssueInvitationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: 本邀请码唯一允许注册的邮箱；Core 仅保存不可枚举的绑定摘要。
     InvitationIssueResult:
       type: object
       additionalProperties: false

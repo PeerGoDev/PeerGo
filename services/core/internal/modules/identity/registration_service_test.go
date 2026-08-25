@@ -17,8 +17,18 @@ type registrationRepositoryFixture struct {
 	prepareCommand PrepareRegistrationCommand
 	record         RegistrationRecord
 	prepareErr     error
+	cancelErr      error
+	cancelCalls    int
 	attachCalls    int
 	completeCalls  int
+}
+
+func (fixture *registrationRepositoryFixture) CancelRegistration(_ context.Context, registrationID uuid.UUID) error {
+	fixture.cancelCalls++
+	if registrationID != fixture.prepareCommand.ID {
+		return ErrRegistrationStateConflict
+	}
+	return fixture.cancelErr
 }
 
 func (fixture *registrationRepositoryFixture) PublicRegistrationPolicy(context.Context) (RegistrationPublicPolicy, error) {
@@ -107,6 +117,11 @@ func TestRegistrationServiceCompletesNormalizedInviteRegistration(t *testing.T) 
 	if string(repository.prepareCommand.InvitationDigest) != string(digest[:]) {
 		t.Fatal("PrepareRegistration() did not receive the invitation digest")
 	}
+	wantEmailBinding := invitationEmailBindingHMAC(token, "member@example.com")
+	if !bytes.Equal(repository.prepareCommand.InvitationEmailBinding, wantEmailBinding) ||
+		bytes.Contains(repository.prepareCommand.InvitationEmailBinding, []byte("member@example.com")) {
+		t.Fatal("PrepareRegistration() did not receive the privacy-preserving email binding")
+	}
 	if vault.provisioned.Username != "new_member" || vault.provisioned.Email != "member@example.com" {
 		t.Fatalf("normalized Vault input = %+v", vault.provisioned)
 	}
@@ -120,7 +135,7 @@ func TestRegistrationServiceCompletesNormalizedInviteRegistration(t *testing.T) 
 
 func TestNormalizeRegistrationInputAcceptsLegacyInvitationToken(t *testing.T) {
 	token := "a1" + strings.Repeat("0", 62)
-	_, digest, err := normalizeRegistrationInput(RegistrationInput{
+	_, digest, emailBinding, err := normalizeRegistrationInput(RegistrationInput{
 		ID: uuid.New(), Username: "legacy_member", DisplayName: "旧站成员",
 		Email: "legacy@example.com", Password: "PeerGo-member-2026!",
 		InvitationToken: token,
@@ -131,6 +146,9 @@ func TestNormalizeRegistrationInputAcceptsLegacyInvitationToken(t *testing.T) {
 	want := sha256.Sum256([]byte(token))
 	if !bytes.Equal(digest, want[:]) {
 		t.Fatal("legacy invitation token was not reduced to its digest")
+	}
+	if !bytes.Equal(emailBinding, invitationEmailBindingHMAC(token, "legacy@example.com")) {
+		t.Fatal("legacy invitation token did not bind its registration email")
 	}
 }
 
@@ -171,6 +189,31 @@ func TestRegistrationServiceLeavesReservationRecoverableWhenVaultFails(t *testin
 	}
 	if repository.attachCalls != 0 || repository.completeCalls != 0 || vault.activateCalls != 0 {
 		t.Fatal("later saga steps ran after Vault provisioning failed")
+	}
+	if repository.cancelCalls != 0 {
+		t.Fatal("transient Vault failure released a recoverable reservation")
+	}
+}
+
+func TestRegistrationServiceReleasesReservationWhenVaultRejectsIdentifiers(t *testing.T) {
+	repository := &registrationRepositoryFixture{record: RegistrationRecord{
+		Mode: RegistrationModeInvite, State: RegistrationStateReserved,
+	}}
+	vault := &registrationVaultFixture{provisionErr: ErrRegistrationUnavailable}
+	service, err := NewRegistrationService(repository, vault, time.Now)
+	if err != nil {
+		t.Fatalf("NewRegistrationService() error = %v", err)
+	}
+	_, err = service.Register(context.Background(), RegistrationInput{
+		ID: uuid.New(), Username: "taken_member", DisplayName: "新成员",
+		Email: "taken@example.com", Password: "PeerGo-member-2026!",
+		InvitationToken: "i" + strings.Repeat("a", 42),
+	})
+	if !errors.Is(err, ErrRegistrationUnavailable) {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if repository.cancelCalls != 1 || repository.attachCalls != 0 || repository.completeCalls != 0 {
+		t.Fatalf("cancel=%d attach=%d complete=%d", repository.cancelCalls, repository.attachCalls, repository.completeCalls)
 	}
 }
 

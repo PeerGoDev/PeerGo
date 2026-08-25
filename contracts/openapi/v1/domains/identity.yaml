@@ -83,7 +83,7 @@ MyInvitationsPath:
         $ref: "../responses.yaml#/ProblemResponse"
   post:
     operationId: issueMyInvitation
-    summary: 签发一个自己的单次注册邀请码
+    summary: 为指定邮箱签发一个自己的单次注册邀请码
     tags: [identity]
     x-audience: [web]
     x-owner: core-identity
@@ -91,6 +91,12 @@ MyInvitationsPath:
     x-credential-audience: web-session
     parameters:
       - $ref: "#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/IssueInvitationRequest"
     responses:
       "201":
         description: 邀请码已签发；明文 token 仅在本响应返回一次。

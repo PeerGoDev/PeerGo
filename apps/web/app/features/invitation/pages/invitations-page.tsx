@@ -10,6 +10,7 @@ import {
   GitForkIcon,
   GiftIcon,
   KeyRoundIcon,
+  LockIcon,
   LogInIcon,
   RefreshCwIcon,
   ShieldXIcon,
@@ -39,7 +40,6 @@ import { Badge } from "~/components/ui/badge"
 import { Button, buttonVariants } from "~/components/ui/button"
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -60,6 +60,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "~/components/ui/empty"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
 import { Skeleton } from "~/components/ui/skeleton"
 import { Spinner } from "~/components/ui/spinner"
@@ -104,6 +110,8 @@ export function InvitationsPage() {
   const issue = useIssueInvitation()
   const revoke = useRevokeInvitation()
   const [issued, setIssued] = React.useState<InvitationIssueResult>()
+  const [inviteeEmail, setInviteeEmail] = React.useState("")
+  const [issuedEmail, setIssuedEmail] = React.useState("")
   const [revokeTarget, setRevokeTarget] = React.useState<MemberInvitation>()
   const [copied, setCopied] = React.useState<"token" | "link">()
   const [copyError, setCopyError] = React.useState("")
@@ -111,11 +119,18 @@ export function InvitationsPage() {
     "invites" | "tree" | "harem" | "chain"
   >("invites")
 
-  async function handleIssue() {
+  async function handleIssue(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
     if (!session.data) return
-    const result = await issue.mutateAsync(session.data.csrf_token)
+    const normalizedEmail = inviteeEmail.trim().toLowerCase()
+    const result = await issue.mutateAsync({
+      csrfToken: session.data.csrf_token,
+      email: normalizedEmail,
+    })
     setCopied(undefined)
     setCopyError("")
+    setIssuedEmail(normalizedEmail)
+    setInviteeEmail("")
     setIssued(result)
   }
 
@@ -229,7 +244,9 @@ export function InvitationsPage() {
                 eligibility={overview.data.eligibility}
                 issuePending={issue.isPending}
                 issueError={issue.error}
-                onIssue={() => void handleIssue()}
+                inviteeEmail={inviteeEmail}
+                onInviteeEmailChange={setInviteeEmail}
+                onIssue={(event) => void handleIssue(event)}
               />
               <InvitationHistory
                 items={overview.data.items}
@@ -284,6 +301,17 @@ export function InvitationsPage() {
                 copied={copied === "token"}
                 onCopy={() => void copyValue("token")}
               />
+              <Alert>
+                <LockIcon />
+                <AlertTitle>已绑定注册邮箱</AlertTitle>
+                <AlertDescription>
+                  仅{" "}
+                  <span className="font-medium text-foreground">
+                    {issuedEmail}
+                  </span>{" "}
+                  可以使用这个邀请码完成注册，其他邮箱会被拒绝。
+                </AlertDescription>
+              </Alert>
               <CopyField
                 label="邀请注册链接"
                 value={`${typeof window === "undefined" ? "" : window.location.origin}/register?invite=${encodeURIComponent(issued.token)}`}
@@ -420,12 +448,16 @@ function InvitationSummary({
   eligibility,
   issuePending,
   issueError,
+  inviteeEmail,
+  onInviteeEmailChange,
   onIssue,
 }: {
   eligibility: import("~/features/invitation/api/invitations.queries").InvitationOverview["eligibility"]
   issuePending: boolean
   issueError: Error | null
-  onIssue: () => void
+  inviteeEmail: string
+  onInviteeEmailChange: (value: string) => void
+  onIssue: (event: React.FormEvent<HTMLFormElement>) => void
 }) {
   return (
     <div className="grid gap-4">
@@ -441,21 +473,51 @@ function InvitationSummary({
               {eligibility.minimum_level}。
             </CardDescription>
           </div>
-          <CardAction>
-            <Button
-              onClick={onIssue}
-              disabled={!eligibility.eligible || issuePending}
-            >
-              {issuePending ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <KeyRoundIcon data-icon="inline-start" />
-              )}
-              {issuePending ? "生成中…" : "生成邀请码"}
-            </Button>
-          </CardAction>
         </CardHeader>
         <CardContent className="grid gap-3">
+          <form onSubmit={onIssue}>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="invitee-email">被邀请人邮箱</FieldLabel>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="invitee-email"
+                    name="inviteeEmail"
+                    type="email"
+                    autoComplete="off"
+                    value={inviteeEmail}
+                    onChange={(event) =>
+                      onInviteeEmailChange(event.currentTarget.value)
+                    }
+                    placeholder="name@example.com"
+                    maxLength={254}
+                    required
+                    disabled={!eligibility.eligible || issuePending}
+                  />
+                  <Button
+                    type="submit"
+                    className="sm:shrink-0"
+                    disabled={
+                      !eligibility.eligible ||
+                      issuePending ||
+                      !inviteeEmail.trim()
+                    }
+                  >
+                    {issuePending ? (
+                      <Spinner data-icon="inline-start" />
+                    ) : (
+                      <KeyRoundIcon data-icon="inline-start" />
+                    )}
+                    {issuePending ? "生成中…" : "绑定邮箱并生成"}
+                  </Button>
+                </div>
+                <FieldDescription>
+                  邮箱将在注册时强制匹配；Core
+                  只保存不可还原的绑定摘要，不保存邮箱明文。
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+          </form>
           {!eligibility.eligible ? (
             <Alert>
               <CircleAlertIcon />
@@ -752,6 +814,11 @@ function InvitationHistory({
                       {item.source === "legacy_import"
                         ? "Rousi 继承"
                         : "PeerGo"}
+                    </Badge>
+                    <Badge variant="outline">
+                      {item.email_bound
+                        ? "已绑定邮箱"
+                        : "旧邀请码 · 未绑定邮箱"}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">

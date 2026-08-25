@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
@@ -170,7 +171,8 @@ WITH history AS (
         invitation.expires_at,
         invitation.claimed_at,
         invitation.consumed_at,
-        invitation.revoked_at
+        invitation.revoked_at,
+        invitation.email_binding_hmac IS NOT NULL AS email_bound
     FROM identity.registration_invitations AS invitation
     LEFT JOIN identity.registrations AS registration
       ON registration.id = invitation.claimed_by
@@ -195,7 +197,8 @@ WITH history AS (
         opening.source_valid_until,
         COALESCE(native_invitation.claimed_at, opening.source_claimed_at),
         COALESCE(native_invitation.consumed_at, opening.source_claimed_at),
-        native_invitation.revoked_at
+        native_invitation.revoked_at,
+        native_invitation.email_binding_hmac IS NOT NULL AS email_bound
     FROM migration.legacy_invitation_code_openings AS opening
     LEFT JOIN identity.users AS legacy_invitee
       ON legacy_invitee.id = opening.invitee_user_id
@@ -206,7 +209,7 @@ WITH history AS (
     WHERE opening.inviter_user_id = $1
 )
 SELECT id, record_source, status, invitee_username,
-       created_at, expires_at, claimed_at, consumed_at, revoked_at
+       created_at, expires_at, claimed_at, consumed_at, revoked_at, email_bound
 FROM history
 ORDER BY created_at DESC, id DESC
 LIMIT $3 OFFSET $4`, userID, asOf, limit, offset)
@@ -221,7 +224,7 @@ LIMIT $3 OFFSET $4`, userID, asOf, limit, offset)
 		var claimedAt, consumedAt, revokedAt pgtype.Timestamptz
 		if err := rows.Scan(
 			&item.ID, &source, &status, &inviteeUsername,
-			&item.CreatedAt, &item.ExpiresAt, &claimedAt, &consumedAt, &revokedAt,
+			&item.CreatedAt, &item.ExpiresAt, &claimedAt, &consumedAt, &revokedAt, &item.EmailBound,
 		); err != nil {
 			return nil, err
 		}
@@ -392,6 +395,7 @@ ORDER BY ancestors.depth ASC`, userID)
 // Concurrent requests from one member therefore cannot over-issue codes.
 func (repository *PostgresInvitationRepository) Issue(ctx context.Context, command IssueInvitationCommand) (MemberInvitation, error) {
 	if command.ID == uuid.Nil || command.UserID == uuid.Nil || len(command.TokenSHA256) != invitationTokenDigestBytes ||
+		len(command.EmailBindingHMAC) != sha256.Size ||
 		command.OccurredAt.IsZero() || command.Authorization.ID == uuid.Nil || !command.Authorization.Allow {
 		return MemberInvitation{}, ErrInvitationInput
 	}
@@ -437,7 +441,7 @@ func (repository *PostgresInvitationRepository) Issue(ctx context.Context, comma
 		}
 	}
 	row, err := queries.InsertMemberInvitation(ctx, identitydb.InsertMemberInvitationParams{
-		ID: command.ID, TokenSha256: command.TokenSHA256,
+		ID: command.ID, TokenSha256: command.TokenSHA256, EmailBindingHmac: command.EmailBindingHMAC,
 		ExpiresAt: invitationTimestamp(command.OccurredAt.AddDate(0, 0, snapshot.InviteValidDays)),
 		UserID:    invitationUUID(command.UserID), AuthorizationDecisionID: invitationUUID(command.Authorization.ID),
 		CreatedAt: invitationTimestamp(command.OccurredAt),
@@ -475,6 +479,7 @@ INSERT INTO identity.invitation_balance_events (
 	if err != nil {
 		return MemberInvitation{}, err
 	}
+	item.EmailBound = true
 	if err := tx.Commit(ctx); err != nil {
 		return MemberInvitation{}, fmt.Errorf("commit invitation issue: %w", err)
 	}
@@ -494,6 +499,7 @@ func (repository *PostgresInvitationRepository) Revoke(ctx context.Context, comm
 	var id uuid.UUID
 	var sourceKind string
 	var createdAt, expiresAt, revokedAt pgtype.Timestamptz
+	var emailBound bool
 	err = tx.QueryRow(ctx, `
 UPDATE identity.registration_invitations
 SET revoked_at = $1,
@@ -505,9 +511,10 @@ WHERE id = $4
   AND claimed_by IS NULL
   AND consumed_at IS NULL
   AND revoked_at IS NULL
-RETURNING id, source_kind, created_at, expires_at, revoked_at`,
+RETURNING id, source_kind, created_at, expires_at, revoked_at,
+          email_binding_hmac IS NOT NULL`,
 		command.OccurredAt, command.UserID, command.Authorization.ID, command.InvitationID,
-	).Scan(&id, &sourceKind, &createdAt, &expiresAt, &revokedAt)
+	).Scan(&id, &sourceKind, &createdAt, &expiresAt, &revokedAt, &emailBound)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return MemberInvitation{}, ErrInvitationUnavailable
 	}
@@ -547,6 +554,7 @@ INSERT INTO identity.invitation_balance_events (
 		return MemberInvitation{}, ErrInvitationInvariant
 	}
 	revokedAtValue := revokedAt.Time.UTC()
+	item.EmailBound = emailBound
 	item.Status = InvitationStatusRevoked
 	item.RevokedAt = &revokedAtValue
 	if err := tx.Commit(ctx); err != nil {

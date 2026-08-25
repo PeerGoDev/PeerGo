@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"time"
@@ -62,6 +63,10 @@ func (repository *PostgresRegistrationRepository) PublicRegistrationPolicy(ctx c
 }
 
 func (repository *PostgresRegistrationRepository) PrepareRegistration(ctx context.Context, command PrepareRegistrationCommand) (RegistrationRecord, error) {
+	if (len(command.InvitationDigest) == 0 && len(command.InvitationEmailBinding) != 0) ||
+		(len(command.InvitationDigest) != 0 && (len(command.InvitationDigest) != invitationTokenDigestBytes || len(command.InvitationEmailBinding) != sha256.Size)) {
+		return RegistrationRecord{}, ErrRegistrationInvitationInvalid
+	}
 	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return RegistrationRecord{}, fmt.Errorf("begin registration reservation: %w", err)
@@ -105,7 +110,7 @@ func (repository *PostgresRegistrationRepository) PrepareRegistration(ctx contex
 			}
 			matches, matchErr := queries.RegistrationInvitationMatches(ctx, identitydb.RegistrationInvitationMatchesParams{
 				InvitationID: *record.InvitationID, TokenSha256: command.InvitationDigest,
-				RegistrationID: pgtype.UUID{Bytes: command.ID, Valid: true},
+				RegistrationID: pgtype.UUID{Bytes: command.ID, Valid: true}, EmailBindingHmac: command.InvitationEmailBinding,
 			})
 			if matchErr != nil {
 				return RegistrationRecord{}, fmt.Errorf("validate resumed registration invitation: %w", matchErr)
@@ -139,7 +144,8 @@ func (repository *PostgresRegistrationRepository) PrepareRegistration(ctx contex
 	var invitationID pgtype.UUID
 	if admissionMode == RegistrationModeInvite {
 		id, inviteErr := queries.GetAvailableRegistrationInvitationForUpdate(ctx, identitydb.GetAvailableRegistrationInvitationForUpdateParams{
-			TokenSha256: command.InvitationDigest, AsOf: timestamp(command.OccurredAt),
+			TokenSha256: command.InvitationDigest, EmailBindingHmac: command.InvitationEmailBinding,
+			AsOf: timestamp(command.OccurredAt),
 		})
 		if errors.Is(inviteErr, pgx.ErrNoRows) {
 			return RegistrationRecord{}, ErrRegistrationInvitationInvalid
@@ -175,6 +181,68 @@ func (repository *PostgresRegistrationRepository) PrepareRegistration(ctx contex
 		return RegistrationRecord{}, registrationCoreWriteError("commit registration reservation", err)
 	}
 	return registrationRecord(row)
+}
+
+// CancelRegistration releases a claim only while the Core reservation has no
+// attached Vault credential. Vault identifier conflicts are terminal and
+// leave no provision behind, so retaining this row would otherwise strand a
+// reusable invitation token.
+func (repository *PostgresRegistrationRepository) CancelRegistration(ctx context.Context, registrationID uuid.UUID) error {
+	if registrationID == uuid.Nil {
+		return ErrRegistrationStateConflict
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin registration cancellation: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var state string
+	var credentialRef, invitationID pgtype.UUID
+	err = tx.QueryRow(ctx, `
+SELECT state, credential_ref, invitation_id
+FROM identity.registrations
+WHERE id = $1
+FOR UPDATE`, registrationID).Scan(&state, &credentialRef, &invitationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("lock registration for cancellation: %w", err)
+	}
+	if state != string(RegistrationStateReserved) || credentialRef.Valid {
+		return ErrRegistrationStateConflict
+	}
+	if invitationID.Valid {
+		tag, releaseErr := tx.Exec(ctx, `
+UPDATE identity.registration_invitations
+SET claimed_by = NULL, claimed_at = NULL
+WHERE id = $1
+  AND claimed_by = $2
+  AND consumed_at IS NULL
+  AND revoked_at IS NULL`, invitationID.Bytes, registrationID)
+		if releaseErr != nil {
+			return fmt.Errorf("release registration invitation: %w", releaseErr)
+		}
+		if tag.RowsAffected() != 1 {
+			return ErrRegistrationStateConflict
+		}
+	}
+	tag, err := tx.Exec(ctx, `
+DELETE FROM identity.registrations
+WHERE id = $1
+  AND state = 'reserved'
+  AND credential_ref IS NULL`, registrationID)
+	if err != nil {
+		return fmt.Errorf("delete registration reservation: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return ErrRegistrationStateConflict
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit registration cancellation: %w", err)
+	}
+	return nil
 }
 
 // registrationAdmissionMode separates the site's current registration policy

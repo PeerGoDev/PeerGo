@@ -40,10 +40,16 @@ func (h *Handler) GetMyInvitations(ctx context.Context, request generated.GetMyI
 }
 
 func (h *Handler) IssueMyInvitation(ctx context.Context, request generated.IssueMyInvitationRequestObject) (generated.IssueMyInvitationResponseObject, error) {
-	result, err := h.invitations.Issue(ctx, sessionTokenFromContext(ctx), string(request.Params.XCSRFToken))
+	if request.Body == nil {
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_invitation_issue", "无法签发邀请码", "请输入被邀请人的邮箱。")
+		return generated.IssueMyInvitation400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	}
+	result, err := h.invitations.Issue(ctx, sessionTokenFromContext(ctx), string(request.Params.XCSRFToken), string(request.Body.Email))
 	switch {
 	case errors.Is(err, identity.ErrInvitationInput):
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_invitation_issue", "无法签发邀请码", "当前签发请求无效，请刷新页面后重试。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_invitation_issue", "无法签发邀请码", "请输入有效的被邀请人邮箱。")
 		return generated.IssueMyInvitation400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil
@@ -159,7 +165,7 @@ func historicalInvitationRewardDTO(reward identity.HistoricalInvitationReward) g
 func memberInvitationDTO(item identity.MemberInvitation) generated.MemberInvitation {
 	return generated.MemberInvitation{
 		Id: item.ID, Source: generated.MemberInvitationSource(item.Source),
-		Status:          generated.InvitationStatus(item.Status),
+		Status: generated.InvitationStatus(item.Status), EmailBound: item.EmailBound,
 		InviteeUsername: item.InviteeUsername, CreatedAt: item.CreatedAt,
 		ExpiresAt: item.ExpiresAt, ClaimedAt: item.ClaimedAt,
 		ConsumedAt: item.ConsumedAt, RevokedAt: item.RevokedAt,
