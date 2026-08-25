@@ -36,6 +36,41 @@ require_value() {
 [[ "$(env_get PEERGO_ENV)" == production ]] || fail "PEERGO_ENV must be production"
 [[ "$(env_get PEERGO_PUBLIC_ORIGIN)" == https://* ]] || fail "PEERGO_PUBLIC_ORIGIN must use HTTPS"
 
+runtime_layout="$(env_get PEERGO_RUNTIME_LAYOUT)"
+runtime_layout="${runtime_layout:-compact}"
+[[ "${runtime_layout}" == compact || "${runtime_layout}" == split ]] ||
+    fail "PEERGO_RUNTIME_LAYOUT must be compact or split"
+
+docker_log_max_size="$(env_get PEERGO_DOCKER_LOG_MAX_SIZE)"
+if [[ "${docker_log_max_size}" =~ ^([1-9][0-9]*)([kKmMgG])$ ]]; then
+    docker_log_quantity=$((10#${BASH_REMATCH[1]}))
+    case "${BASH_REMATCH[2],,}" in
+        k) docker_log_max_bytes=$((docker_log_quantity * 1024)) ;;
+        m) docker_log_max_bytes=$((docker_log_quantity * 1024 * 1024)) ;;
+        g) docker_log_max_bytes=$((docker_log_quantity * 1024 * 1024 * 1024)) ;;
+    esac
+else
+    fail "PEERGO_DOCKER_LOG_MAX_SIZE must use a positive k, m or g suffix"
+fi
+((docker_log_max_bytes >= 1024 * 1024 && docker_log_max_bytes <= 1024 * 1024 * 1024)) ||
+    fail "PEERGO_DOCKER_LOG_MAX_SIZE must be between 1m and 1g"
+docker_log_max_files="$(env_get PEERGO_DOCKER_LOG_MAX_FILES)"
+[[ "${docker_log_max_files}" =~ ^[1-9][0-9]?$ ]] && ((10#${docker_log_max_files} <= 10)) ||
+    fail "PEERGO_DOCKER_LOG_MAX_FILES must be between 1 and 10"
+
+if [[ "${runtime_layout}" == compact ]]; then
+    [[ "$(env_get PEERGO_WEB_BIND_ADDRESS)" == 127.0.0.1 ]] ||
+        fail "compact PEERGO_WEB_BIND_ADDRESS must be 127.0.0.1"
+    api_host_port="$(env_get PEERGO_API_HOST_PORT)"
+    [[ "${api_host_port}" =~ ^[1-9][0-9]{0,4}$ ]] && ((10#${api_host_port} <= 65535)) ||
+        fail "PEERGO_API_HOST_PORT must be an integer between 1 and 65535"
+    web_root="$(env_get PEERGO_WEB_ROOT)"
+    [[ "${web_root}" = /* && "${web_root}" != "/" ]] ||
+        fail "PEERGO_WEB_ROOT must be an absolute host path other than /"
+    [[ -d "${web_root}" && ! -L "${web_root}" ]] ||
+        fail "PEERGO_WEB_ROOT must be an existing non-symlink directory"
+fi
+
 require_value PEERGO_SMTP_HOST
 require_value PEERGO_SMTP_USERNAME
 require_value PEERGO_SMTP_PASSWORD

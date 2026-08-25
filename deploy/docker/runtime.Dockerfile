@@ -12,6 +12,7 @@ COPY tools/migrator ./tools/migrator
 COPY tools/traffic-corpus ./tools/traffic-corpus
 
 RUN mkdir -p /out && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/peergo-runtime-supervisor ./services/runtime-supervisor/cmd/supervisor && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-api ./services/core/cmd/api && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-admin ./services/core/cmd/admin && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-tracker-rate-policy ./services/core/cmd/tracker-rate-policy && \

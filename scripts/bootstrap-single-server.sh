@@ -203,9 +203,19 @@ smtp_from_address="$(bootstrap_or_existing PEERGO_SMTP_FROM_ADDRESS PEERGO_BOOTS
 smtp_from_name="$(bootstrap_or_existing PEERGO_SMTP_FROM_NAME PEERGO_BOOTSTRAP_SMTP_FROM_NAME PeerGo)"
 smtp_tls_mode="$(bootstrap_or_existing PEERGO_SMTP_TLS_MODE PEERGO_BOOTSTRAP_SMTP_TLS_MODE starttls)"
 
+web_root="$(bootstrap_or_existing \
+    PEERGO_WEB_ROOT \
+    PEERGO_BOOTSTRAP_WEB_ROOT \
+    "/opt/1panel/www/sites/${origin_host}/index" \
+    /var/www/peergo)"
+[[ "${web_root}" = /* && "${web_root}" != "/" && ! -L "${web_root}" ]] ||
+    fail "PEERGO_WEB_ROOT must be a non-symlink absolute directory other than /"
+install -d -m 0755 "${web_root}"
+
 # A side-by-side cutover keeps the legacy Web/API listeners online until the
 # HTTPS proxy switches traffic. Bootstrap overrides make those loopback ports
 # explicit without changing container-to-container addresses.
+api_host_port="$(bootstrap_or_existing PEERGO_API_HOST_PORT PEERGO_BOOTSTRAP_API_HOST_PORT 18084 8080)"
 web_host_port="$(bootstrap_or_existing PEERGO_WEB_HOST_PORT PEERGO_BOOTSTRAP_WEB_HOST_PORT 8080 8080)"
 vault_host_port="$(bootstrap_or_existing PEERGO_VAULT_HOST_PORT PEERGO_BOOTSTRAP_VAULT_HOST_PORT 8081 8081)"
 audit_host_port="$(bootstrap_or_existing PEERGO_AUDIT_HOST_PORT PEERGO_BOOTSTRAP_AUDIT_HOST_PORT 8082 8082)"
@@ -217,7 +227,7 @@ email_relay_host_port="$(bootstrap_or_existing PEERGO_EMAIL_RELAY_HOST_PORT PEER
 claimed_host_port_values=()
 claimed_host_port_names=()
 for host_port_specification in \
-    "PEERGO_WEB_HOST_PORT:${web_host_port}" \
+    "PEERGO_API_HOST_PORT:${api_host_port}" \
     "PEERGO_VAULT_HOST_PORT:${vault_host_port}" \
     "PEERGO_AUDIT_HOST_PORT:${audit_host_port}" \
     "PEERGO_TRACKER_HOST_PORT:${tracker_host_port}" \
@@ -404,6 +414,9 @@ nats_container_path=/run/secrets/peergo-single-server-nats.creds
 
 set_env PEERGO_ENV production
 set_env PEERGO_DEPLOYMENT_MODE single-server
+set_env PEERGO_RUNTIME_LAYOUT compact
+set_env PEERGO_DOCKER_LOG_MAX_SIZE 100m
+set_env PEERGO_DOCKER_LOG_MAX_FILES 3
 set_env PEERGO_OBJECTS_VOLUME_SOURCE "${objects_dir}"
 set_env PEERGO_TRACKER_VOLUME_SOURCE "${tracker_dir}"
 set_env PEERGO_AUDIT_VOLUME_SOURCE "${audit_dir}"
@@ -428,6 +441,8 @@ set_env PEERGO_WEBAUTHN_RP_ID "${rp_id}"
 set_env PEERGO_WEBAUTHN_ORIGINS "${public_origin}"
 set_env PEERGO_TRACKER_CANONICAL_ORIGIN "${public_origin}"
 set_env PEERGO_TRACKER_OPERATIONS_ORIGIN http://tracker:8083
+set_env PEERGO_API_HOST_PORT "${api_host_port}"
+set_env PEERGO_WEB_ROOT "${web_root}"
 set_env PEERGO_WEB_HOST_PORT "${web_host_port}"
 set_env PEERGO_VAULT_HOST_PORT "${vault_host_port}"
 set_env PEERGO_AUDIT_HOST_PORT "${audit_host_port}"

@@ -125,13 +125,17 @@ def resolve_runtime(env: dict[str, str]) -> tuple[str, str]:
             raise BootstrapError("拒绝通过非 loopback Web 监听器执行生产策略初始化。")
         endpoint_host = f"[{address}]" if address.version == 6 else str(address)
 
-    raw_port = env.get("PEERGO_WEB_HOST_PORT", "8080").strip()
+    runtime_layout = env.get("PEERGO_RUNTIME_LAYOUT", "compact").strip()
+    if runtime_layout not in ("compact", "split"):
+        raise BootstrapError("PEERGO_RUNTIME_LAYOUT 必须是 compact 或 split。")
+    port_name = "PEERGO_API_HOST_PORT" if runtime_layout == "compact" else "PEERGO_WEB_HOST_PORT"
+    raw_port = env.get(port_name, "8080").strip()
     try:
         port = int(raw_port)
     except ValueError as exc:
-        raise BootstrapError("PEERGO_WEB_HOST_PORT 不是有效端口。") from exc
+        raise BootstrapError(f"{port_name} 不是有效端口。") from exc
     if port < 1 or port > 65535:
-        raise BootstrapError("PEERGO_WEB_HOST_PORT 超出有效范围。")
+        raise BootstrapError(f"{port_name} 超出有效范围。")
 
     public_origin = env.get("PEERGO_PUBLIC_ORIGIN", "").strip()
     parsed_origin = parse.urlsplit(public_origin)
