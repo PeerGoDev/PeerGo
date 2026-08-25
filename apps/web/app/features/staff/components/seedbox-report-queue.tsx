@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { CheckIcon, RefreshCwIcon, XIcon } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
@@ -102,6 +102,7 @@ function SeedboxReportItem({
   canDecide: boolean
 }) {
   const mutation = useDecideSeedboxReport()
+  const decideSeedboxReportRequestId = useRef<string | undefined>(undefined)
   const [reason, setReason] = useState("")
   const [error, setError] = useState("")
   const pending = report.status === "pending"
@@ -109,10 +110,13 @@ function SeedboxReportItem({
   async function decide(decision: "approve" | "reject") {
     if (reason.trim().length > 1000) return
     setError("")
+    const idempotencyKey =
+      decideSeedboxReportRequestId.current ?? crypto.randomUUID()
+    decideSeedboxReportRequestId.current = idempotencyKey
     try {
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         reportId: report.id,
         body: {
           expected_version: report.version,
@@ -120,6 +124,7 @@ function SeedboxReportItem({
           reason: reason.trim(),
         },
       })
+      decideSeedboxReportRequestId.current = undefined
     } catch (caught) {
       setError(
         caught instanceof ApiProblemError

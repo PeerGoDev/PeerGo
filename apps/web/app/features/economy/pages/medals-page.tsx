@@ -5,7 +5,6 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CircleAlertIcon,
-  CoinsIcon,
   DownloadIcon,
   LogInIcon,
   RefreshCwIcon,
@@ -45,6 +44,7 @@ import { Skeleton } from "~/components/ui/skeleton"
 import { Spinner } from "~/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group"
 import { useWebSession } from "~/features/auth/api/session.mutations"
+import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import {
   type MemberMedal,
   type MemberMedalOverview,
@@ -63,6 +63,7 @@ type MedalFilter = "owned" | "wearing" | "shop"
 
 export function MedalsPage() {
   const session = useWebSession()
+  const capabilities = useCapabilities(session.data?.user.id)
   const medals = useMemberMedals(session.data?.user.id)
   const purchase = usePurchaseMedal()
   const wearing = useUpdateMedalWearing()
@@ -70,7 +71,20 @@ export function MedalsPage() {
   const [filter, setFilter] = React.useState<MedalFilter>("owned")
   const csrfToken = session.data?.csrf_token ?? ""
   const purchaseRequestIds = React.useRef(new Map<string, string>())
-  const mutationError = purchase.error ?? wearing.error ?? priority.error
+  const canWear = Boolean(
+    capabilities.data?.items.some(
+      (capability) => capability.action === "economy.medal.wear.self"
+    )
+  )
+  const canPurchase = Boolean(
+    capabilities.data?.items.some(
+      (capability) => capability.action === "economy.medal.purchase.self"
+    )
+  )
+  const mutationError =
+    (purchase.isError ? purchase.error : undefined) ??
+    (wearing.isError ? wearing.error : undefined) ??
+    (priority.isError ? priority.error : undefined)
 
   if (session.isPending || (session.data && medals.isPending)) {
     return <MedalsPageSkeleton />
@@ -141,10 +155,15 @@ export function MedalsPage() {
           filter={filter}
           onFilterChange={setFilter}
           busyMedalId={
-            purchase.variables?.medalId ??
-            wearing.variables?.medalId ??
-            priority.variables?.medalId
+            (wearing.isPending ? wearing.variables?.medalId : undefined) ??
+            (priority.isPending ? priority.variables?.medalId : undefined)
           }
+          purchasePending={purchase.isPending}
+          purchaseMedalId={
+            purchase.isPending ? purchase.variables?.medalId : undefined
+          }
+          canWear={canWear}
+          canPurchase={canPurchase}
           onPurchase={async (medal) => {
             const idempotencyKey =
               purchaseRequestIds.current.get(medal.id) ?? crypto.randomUUID()
@@ -183,6 +202,10 @@ function MedalCenter({
   filter,
   onFilterChange,
   busyMedalId,
+  purchasePending,
+  purchaseMedalId,
+  canWear,
+  canPurchase,
   onPurchase,
   onWearing,
   onPriority,
@@ -191,6 +214,10 @@ function MedalCenter({
   filter: MedalFilter
   onFilterChange: (filter: MedalFilter) => void
   busyMedalId?: number
+  purchasePending: boolean
+  purchaseMedalId?: number
+  canWear: boolean
+  canPurchase: boolean
   onPurchase: (medal: MemberMedal) => Promise<void>
   onWearing: (medal: MemberMedal, wearing: boolean) => void
   onPriority: (medal: MemberMedal, direction: "up" | "down") => void
@@ -314,6 +341,10 @@ function MedalCenter({
                   medal={medal}
                   shop={filter === "shop"}
                   busy={busyMedalId === Number(medal.id)}
+                  purchasePending={purchasePending}
+                  purchaseBusy={purchaseMedalId === Number(medal.id)}
+                  canWear={canWear}
+                  canPurchase={canPurchase}
                   firstWearing={wearingIndex === 0}
                   lastWearing={wearingIndex === wearingItems.length - 1}
                   onPurchase={() => {
@@ -413,6 +444,10 @@ function MedalCard({
   medal,
   shop,
   busy,
+  purchasePending,
+  purchaseBusy,
+  canWear,
+  canPurchase,
   firstWearing,
   lastWearing,
   onPurchase,
@@ -422,6 +457,10 @@ function MedalCard({
   medal: MemberMedal
   shop: boolean
   busy: boolean
+  purchasePending: boolean
+  purchaseBusy: boolean
+  canWear: boolean
+  canPurchase: boolean
   firstWearing: boolean
   lastWearing: boolean
   onPurchase: () => void
@@ -497,10 +536,10 @@ function MedalCard({
         {shop ? (
           <Button
             className="flex-1"
-            disabled={!medal.purchasable || busy}
+            disabled={!medal.purchasable || purchasePending || !canPurchase}
             onClick={onPurchase}
           >
-            {busy ? (
+            {purchaseBusy ? (
               <Spinner data-icon="inline-start" />
             ) : (
               <ShoppingBagIcon data-icon="inline-start" />
@@ -520,7 +559,7 @@ function MedalCard({
                 medal.holding?.state === "wearing" ? "outline" : "default"
               }
               className="flex-1"
-              disabled={!holdingActive || busy}
+              disabled={!holdingActive || busy || !canWear}
               onClick={() => onWearing(medal.holding?.state !== "wearing")}
             >
               {busy ? <Spinner data-icon="inline-start" /> : null}
@@ -536,7 +575,7 @@ function MedalCard({
                   variant="ghost"
                   size="icon-sm"
                   aria-label="上移勋章"
-                  disabled={firstWearing || busy}
+                  disabled={firstWearing || busy || !canWear}
                   onClick={() => onPriority("up")}
                 >
                   <ChevronUpIcon />
@@ -545,7 +584,7 @@ function MedalCard({
                   variant="ghost"
                   size="icon-sm"
                   aria-label="下移勋章"
-                  disabled={lastWearing || busy}
+                  disabled={lastWearing || busy || !canWear}
                   onClick={() => onPriority("down")}
                 >
                   <ChevronDownIcon />

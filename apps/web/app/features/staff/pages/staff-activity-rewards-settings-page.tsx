@@ -208,6 +208,7 @@ function AttendancePolicyEditor({
   minimumEffectiveFrom: string
 }) {
   const mutation = useIssueAttendancePolicy()
+  const attendancePolicyRequestId = React.useRef<string | undefined>(undefined)
   const initial = initialPolicy.settings
   const [enabled, setEnabled] = React.useState(initial.enabled)
   const [timezone, setTimezone] = React.useState(initial.day_boundary_timezone)
@@ -278,12 +279,22 @@ function AttendancePolicyEditor({
       })),
       experience_reward: experienceReward,
     }
-    mutation.mutate({
-      csrfToken,
-      settings,
-      reason: reason.trim(),
-      idempotencyKey: globalThis.crypto.randomUUID(),
-    })
+    const idempotencyKey =
+      attendancePolicyRequestId.current ?? crypto.randomUUID()
+    attendancePolicyRequestId.current = idempotencyKey
+    mutation.mutate(
+      {
+        csrfToken,
+        settings,
+        reason: reason.trim(),
+        idempotencyKey,
+      },
+      {
+        onSuccess: () => {
+          attendancePolicyRequestId.current = undefined
+        },
+      }
+    )
   }
 
   const disabled = !canIssue || mutation.isPending

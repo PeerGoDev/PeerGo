@@ -453,6 +453,7 @@ function ReviewApplicationFooter({
 }) {
   const createApplication = useCreateWorkgroupApplication(userId)
   const [statement, setStatement] = React.useState("")
+  const requestId = React.useRef<string | undefined>(undefined)
   const pending = item.application?.status === "pending"
   const active = item.membership?.status === "active"
   if (pending || active || !item.eligibility?.eligible) {
@@ -481,7 +482,10 @@ function ReviewApplicationFooter({
           maxLength={1000}
           rows={4}
           placeholder="说明你对站点规则、资源质量和审核工作的理解。"
-          onChange={(event) => setStatement(event.target.value)}
+          onChange={(event) => {
+            requestId.current = undefined
+            setStatement(event.target.value)
+          }}
         />
         <FieldDescription>
           20 至 1000 个字符，审批记录会长期保留。
@@ -490,12 +494,18 @@ function ReviewApplicationFooter({
       <Button
         disabled={statement.trim().length < 20 || createApplication.isPending}
         onClick={() => {
+          const idempotencyKey =
+            requestId.current ?? globalThis.crypto.randomUUID()
+          requestId.current = idempotencyKey
           void createApplication
             .mutateAsync({
               csrfToken,
-              idempotencyKey: globalThis.crypto.randomUUID(),
+              idempotencyKey,
               groupKind: "review",
               statement: statement.trim(),
+            })
+            .then(() => {
+              requestId.current = undefined
             })
             .catch(() => undefined)
         }}

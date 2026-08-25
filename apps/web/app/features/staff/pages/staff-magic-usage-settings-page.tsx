@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   CircleAlertIcon,
@@ -371,6 +371,7 @@ function TransferPolicyEditor({
   const contentTipMutation = useIssueContentTipPolicy()
   const mutation =
     kind === "member-gift" ? memberGiftMutation : contentTipMutation
+  const transferPolicyRequestId = useRef<string | undefined>(undefined)
   const isGift = kind === "member-gift"
   const featureName = isGift ? "成员赠送" : "内容打赏"
   const featureDescription = isGift
@@ -409,18 +410,28 @@ function TransferPolicyEditor({
       setValidationError(error)
       return
     }
-    mutation.mutate({
-      csrfToken,
-      idempotencyKey: globalThis.crypto.randomUUID(),
-      settings: {
-        enabled,
-        minimum_amount: minimumAmount,
-        maximum_amount: maximumAmount,
-        daily_gross_limit: dailyLimit,
-        fee_bps: Math.round(Number(feePercent) * 100),
+    const idempotencyKey =
+      transferPolicyRequestId.current ?? crypto.randomUUID()
+    transferPolicyRequestId.current = idempotencyKey
+    mutation.mutate(
+      {
+        csrfToken,
+        idempotencyKey,
+        settings: {
+          enabled,
+          minimum_amount: minimumAmount,
+          maximum_amount: maximumAmount,
+          daily_gross_limit: dailyLimit,
+          fee_bps: Math.round(Number(feePercent) * 100),
+        },
+        reason: reason.trim(),
       },
-      reason: reason.trim(),
-    })
+      {
+        onSuccess: () => {
+          transferPolicyRequestId.current = undefined
+        },
+      }
+    )
   }
 
   return (

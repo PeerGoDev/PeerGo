@@ -82,6 +82,7 @@ export function HNRPolicyDialog({
   const [preview, setPreview] = React.useState<HNRPolicyPreview>()
   const previewMutation = usePreviewHNRPolicy()
   const issueMutation = useIssueHNRPolicy()
+  const hnrPolicyRequestId = React.useRef<string | undefined>(undefined)
   const policy = hnrPolicyFromDraft(draft)
   const reasonLength = Array.from(reason.trim()).length
   const minimumTimestamp = new Date(minimumEffectiveFrom).getTime()
@@ -104,6 +105,7 @@ export function HNRPolicyDialog({
     setPreview(undefined)
     previewMutation.reset()
     issueMutation.reset()
+    hnrPolicyRequestId.current = undefined
     // Mutation instances are stable; including them would make this reset on
     // every state transition instead of only when the dialog is reopened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,6 +119,7 @@ export function HNRPolicyDialog({
     setPreview(undefined)
     previewMutation.reset()
     issueMutation.reset()
+    hnrPolicyRequestId.current = undefined
   }
 
   async function handlePreview() {
@@ -131,14 +134,17 @@ export function HNRPolicyDialog({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!policy || !canIssue) return
+    const idempotencyKey = hnrPolicyRequestId.current ?? crypto.randomUUID()
+    hnrPolicyRequestId.current = idempotencyKey
     try {
       const revision = await issueMutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         policy,
         effectiveAt: new Date(effectiveAt).toISOString(),
         reason: reason.trim(),
       })
+      hnrPolicyRequestId.current = undefined
       onIssued(
         `H&R 第 ${revision.rule_version} 版规则已签发，将于 ${formatCompactDateTime(revision.effective_at)} 生效。`
       )
@@ -325,6 +331,7 @@ export function HNRPolicyDialog({
                     onChange={(event) => {
                       setReason(event.target.value)
                       issueMutation.reset()
+                      hnrPolicyRequestId.current = undefined
                     }}
                   />
                   <FieldDescription>

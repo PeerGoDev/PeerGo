@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -73,6 +73,56 @@ describe("AccountSecurityPage", () => {
       screen.getByRole("heading", { name: "撤销其他 1 个会话？" })
     ).toBeVisible()
     expect(screen.getByRole("button", { name: "全部撤销" })).toBeVisible()
+  })
+
+  it("clears the revoked session loading state after the request settles", async () => {
+    const user = userEvent.setup()
+    const queryClient = accountSecurityQueryClient()
+    queryClient.setDefaultOptions({
+      queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
+    })
+    const sessions: UserWebSessionList = {
+      items: [
+        {
+          id: "0198f20a-6da8-7e51-9c64-222222222222",
+          current: true,
+          created_at: "2026-08-06T08:00:00Z",
+          last_seen_at: "2026-08-06T09:00:00Z",
+          expires_at: "2026-09-05T08:00:00Z",
+        },
+        {
+          id: "0198f20a-6da8-7e51-9c64-333333333333",
+          current: false,
+          created_at: "2026-08-05T08:00:00Z",
+          last_seen_at: "2026-08-05T09:00:00Z",
+          expires_at: "2026-08-17T08:00:00Z",
+        },
+      ],
+    }
+    const fetchMock = vi.fn((input: Request) => {
+      if (input.method === "DELETE") {
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      return Promise.resolve(jsonResponse(sessions))
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(
+      <MemoryRouter initialEntries={["/account/security"]}>
+        <QueryClientProvider client={queryClient}>
+          <AccountSecurityPage />
+        </QueryClientProvider>
+      </MemoryRouter>
+    )
+
+    const revokeTrigger = await screen.findByRole("button", { name: "撤销" })
+    await user.click(revokeTrigger)
+    await user.click(await screen.findByRole("button", { name: "确认撤销" }))
+
+    await waitFor(() => {
+      expect(revokeTrigger).toBeEnabled()
+      expect(within(revokeTrigger).queryByRole("status")).toBeNull()
+    })
   })
 
   it("starts TOTP setup with a password reauthentication dialog", async () => {

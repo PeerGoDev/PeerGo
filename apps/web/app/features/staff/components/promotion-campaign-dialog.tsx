@@ -57,6 +57,7 @@ export function PromotionCampaignDialog({
   onCreated: (message: string) => void
 }) {
   const mutation = useSchedulePromotionCampaign()
+  const promotionCampaignRequestId = React.useRef<string | undefined>(undefined)
   const initial = React.useMemo(defaultWindow, [open])
   const [scope, setScope] = React.useState<"global" | "torrent">("global")
   const [torrentId, setTorrentId] = React.useState("")
@@ -83,6 +84,7 @@ export function PromotionCampaignDialog({
   React.useEffect(() => {
     if (!open) {
       mutation.reset()
+      promotionCampaignRequestId.current = undefined
       setScope("global")
       setTorrentId("")
       setPromotion("free")
@@ -96,10 +98,13 @@ export function PromotionCampaignDialog({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit) return
+    const idempotencyKey =
+      promotionCampaignRequestId.current ?? crypto.randomUUID()
+    promotionCampaignRequestId.current = idempotencyKey
     try {
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         body: {
           scope,
           torrent_id: scope === "torrent" ? torrentIDNumber : undefined,
@@ -109,6 +114,7 @@ export function PromotionCampaignDialog({
           reason: reason.trim(),
         },
       })
+      promotionCampaignRequestId.current = undefined
       onCreated(
         scope === "global"
           ? "全站优惠已签发，正在投递到 Settlement。"
@@ -250,6 +256,7 @@ export function PromotionCampaignDialog({
                 placeholder="可留空；系统会自动记录签发原因"
                 onChange={(event) => {
                   setReason(event.target.value)
+                  promotionCampaignRequestId.current = undefined
                   if (mutation.isError) mutation.reset()
                 }}
               />

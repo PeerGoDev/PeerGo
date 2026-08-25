@@ -38,6 +38,9 @@ export function TorrentPurchasePriceDialog({
   onChanged: (message: string) => void
 }) {
   const mutation = useUpdateTorrentPurchasePrice()
+  const updatePurchasePriceRequestId = React.useRef<string | undefined>(
+    undefined
+  )
   const [price, setPrice] = React.useState("")
   const [reason, setReason] = React.useState("")
   const parsedPrice = Number(price)
@@ -53,6 +56,7 @@ export function TorrentPurchasePriceDialog({
     setPrice(torrent?.purchase_price ?? "")
     setReason("")
     mutation.reset()
+    updatePurchasePriceRequestId.current = undefined
   }, [torrent]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
@@ -60,16 +64,20 @@ export function TorrentPurchasePriceDialog({
       return
     }
     try {
+      const idempotencyKey =
+        updatePurchasePriceRequestId.current ?? crypto.randomUUID()
+      updatePurchasePriceRequestId.current = idempotencyKey
       const result = await mutation.mutateAsync({
         torrentId: torrent.id,
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         body: {
           price: parsedPrice,
           expected_version: torrent.version,
           reason: reason.trim(),
         },
       })
+      updatePurchasePriceRequestId.current = undefined
       onChanged(
         `种子 #${result.torrent_id} 已${result.price === "0" ? "设为免费" : `设为 ${result.price} 魔力值`}。`
       )
@@ -120,7 +128,10 @@ export function TorrentPurchasePriceDialog({
               aria-invalid={(!priceValid && price !== "") || undefined}
               onChange={(event) => {
                 setPrice(event.target.value)
-                if (mutation.isError) mutation.reset()
+                if (mutation.isError) {
+                  mutation.reset()
+                  updatePurchasePriceRequestId.current = undefined
+                }
               }}
             />
             <FieldDescription>0–1,000,000，只允许整数。</FieldDescription>
@@ -143,7 +154,10 @@ export function TorrentPurchasePriceDialog({
               placeholder="例如：按当前活动规则调整该资源价格"
               onChange={(event) => {
                 setReason(event.target.value)
-                if (mutation.isError) mutation.reset()
+                if (mutation.isError) {
+                  mutation.reset()
+                  updatePurchasePriceRequestId.current = undefined
+                }
               }}
             />
             <FieldDescription>{reasonLength}/1000 字符</FieldDescription>
