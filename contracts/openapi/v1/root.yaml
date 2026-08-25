@@ -236,6 +236,20 @@ paths:
     $ref: "./domains/site.yaml#/AnnouncementDetailPath"
   /api/v1/announcements/{announcement_id}/comments:
     $ref: "./domains/comments.yaml#/AnnouncementCommentsPath"
+  /api/v1/wiki/pages:
+    $ref: "./domains/wiki.yaml#/WikiPagesPath"
+  /api/v1/wiki/pages/{slug}:
+    $ref: "./domains/wiki.yaml#/WikiPagePath"
+  /api/v1/wiki/pages/{page_id}/content:
+    $ref: "./domains/wiki.yaml#/AssignedWikiPageContentPath"
+  /api/v1/admin/wiki/pages:
+    $ref: "./domains/wiki.yaml#/ManagedWikiPagesPath"
+  /api/v1/admin/wiki/pages/{page_id}:
+    $ref: "./domains/wiki.yaml#/ManagedWikiPagePath"
+  /api/v1/admin/wiki/pages/{page_id}/revisions:
+    $ref: "./domains/wiki.yaml#/ManagedWikiRevisionsPath"
+  /api/v1/admin/wiki/pages/{page_id}/revisions/{revision_number}/restore:
+    $ref: "./domains/wiki.yaml#/ManagedWikiRevisionRestorePath"
   /api/v1/categories:
     $ref: "./domains/catalog.yaml#/CategoriesPath"
   /api/v1/categories/{category_id}/facets:

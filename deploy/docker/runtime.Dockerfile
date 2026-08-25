@@ -34,6 +34,7 @@ RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-evidence-consumer-init ./services/core/cmd/seeding-evidence-consumer-init && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-hnr-consumer-init ./services/core/cmd/hnr-consumer-init && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-swarm-consumer-init ./services/core/cmd/swarm-consumer-init && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-legacy-wikis ./services/core/cmd/legacy-wikis && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/peergo-preflight ./services/core/cmd/preflight && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/vault-api ./services/privacy-vault/cmd/api && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/email-relay ./services/email-relay/cmd/email-relay && \

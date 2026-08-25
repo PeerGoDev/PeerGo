@@ -1,0 +1,311 @@
+WikiPagesPath:
+  get:
+    operationId: listWikiPages
+    summary: 搜索当前调用者可见的 Wiki 页面
+    tags: [wiki]
+    x-audience: [web]
+    x-owner: core-wiki
+    x-permission: wiki.page.read
+    x-visibility-permissions:
+      public: wiki.page.read
+      members: wiki.page.read.member
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/WikiQueryParameter"
+      - $ref: "#/WikiLimitParameter"
+      - $ref: "#/WikiOffsetParameter"
+    responses:
+      "200":
+        description: 公开页面对匿名访问者可见；登录成员同时看到成员页面。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiPageList"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+WikiPagePath:
+  get:
+    operationId: getWikiPage
+    summary: 按稳定路由键读取一篇 Wiki
+    tags: [wiki]
+    x-audience: [web]
+    x-owner: core-wiki
+    x-permission: wiki.page.read
+    x-visibility-permissions:
+      public: wiki.page.read
+      members: wiki.page.read.member
+    x-credential-audience: anonymous
+    parameters:
+      - $ref: "#/WikiSlugPathParameter"
+    responses:
+      "200":
+        description: Wiki 当前正文、协作者与版本信息。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiPage"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+AssignedWikiPageContentPath:
+  put:
+    operationId: updateAssignedWikiPage
+    summary: 编辑自己创建或获指派协作的 Wiki 正文
+    tags: [wiki]
+    x-audience: [web]
+    x-owner: core-wiki
+    x-permission: wiki.page.update.assigned
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/WikiPageIDPathParameter"
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/wiki.yaml#/UpdateAssignedWikiPageRequest"
+    responses:
+      "200":
+        description: 新修订已经提交，旧修订按每页最多 50 个的策略保留。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiPage"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedWikiPagesPath:
+  get:
+    operationId: listManagedWikiPages
+    summary: 搜索 Wiki 管理投影
+    tags: [wiki]
+    x-audience: [staff]
+    x-owner: core-wiki
+    x-permission: wiki.page.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/WikiQueryParameter"
+      - $ref: "#/WikiLimitParameter"
+      - $ref: "#/WikiOffsetParameter"
+      - name: include_archived
+        in: query
+        required: false
+        schema: { type: boolean, default: true }
+    responses:
+      "200":
+        description: 包含停用页面的有界管理列表。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiPageList"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: createManagedWikiPage
+    summary: 创建 Wiki 页面及首个修订
+    tags: [wiki]
+    x-audience: [staff]
+    x-owner: core-wiki
+    x-permission: wiki.page.create
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "./authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/wiki.yaml#/CreateManagedWikiPageRequest"
+    responses:
+      "201":
+        description: 当前投影、协作者和初始修订已原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiPage"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedWikiPagePath:
+  parameters:
+    - $ref: "#/WikiPageIDPathParameter"
+  get:
+    operationId: getManagedWikiPage
+    summary: 读取 Wiki 完整管理投影
+    tags: [wiki]
+    x-audience: [staff]
+    x-owner: core-wiki
+    x-permission: wiki.page.manage.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 包括已停用页面和协作者的编辑投影。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiPage"
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  put:
+    operationId: updateManagedWikiPage
+    summary: 修改 Wiki 配置、正文、协作者或停用状态
+    tags: [wiki]
+    x-audience: [staff]
+    x-owner: core-wiki
+    x-permission: wiki.page.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "./authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/wiki.yaml#/UpdateManagedWikiPageRequest"
+    responses:
+      "200":
+        description: 修改已作为一个新修订原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiPage"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedWikiRevisionsPath:
+  get:
+    operationId: listManagedWikiRevisions
+    summary: 读取 Wiki 最近的有界修订历史
+    tags: [wiki]
+    x-audience: [staff]
+    x-owner: core-wiki
+    x-permission: wiki.page.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/WikiPageIDPathParameter"
+      - name: limit
+        in: query
+        required: false
+        schema: { type: integer, minimum: 1, maximum: 50, default: 50 }
+      - $ref: "#/WikiOffsetParameter"
+    responses:
+      "200":
+        description: 修订号倒序的最近 50 个真实内容版本。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiRevisionPage"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedWikiRevisionRestorePath:
+  post:
+    operationId: restoreManagedWikiRevision
+    summary: 将历史修订复制为新的当前修订
+    tags: [wiki]
+    x-audience: [staff]
+    x-owner: core-wiki
+    x-permission: wiki.page.restore
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/WikiPageIDPathParameter"
+      - $ref: "#/WikiRevisionNumberPathParameter"
+      - $ref: "./authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/wiki.yaml#/RestoreManagedWikiPageRequest"
+    responses:
+      "200":
+        description: 目标内容已作为新的可回滚修订恢复。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/wiki.yaml#/WikiPage"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+WikiSlugPathParameter:
+  name: slug
+  in: path
+  required: true
+  schema:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9-]{0,95}$"
+
+WikiPageIDPathParameter:
+  name: page_id
+  in: path
+  required: true
+  schema:
+    type: string
+    format: uuid
+
+WikiRevisionNumberPathParameter:
+  name: revision_number
+  in: path
+  required: true
+  schema:
+    type: integer
+    format: int64
+    minimum: 1
+    maximum: 9007199254740991
+
+WikiQueryParameter:
+  name: query
+  in: query
+  required: false
+  schema:
+    type: string
+    maxLength: 100
+
+WikiLimitParameter:
+  name: limit
+  in: query
+  required: false
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 50
+
+WikiOffsetParameter:
+  name: offset
+  in: query
+  required: false
+  schema:
+    type: integer
+    minimum: 0
+    maximum: 100000
+    default: 0

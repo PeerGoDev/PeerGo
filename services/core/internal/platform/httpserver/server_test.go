@@ -42,6 +42,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	"github.com/peergo/peergo/services/core/internal/modules/trackercontrol"
 	"github.com/peergo/peergo/services/core/internal/modules/traffic"
+	"github.com/peergo/peergo/services/core/internal/modules/wiki"
 	"github.com/peergo/peergo/services/core/internal/modules/workgroups"
 	"github.com/peergo/peergo/services/core/internal/transport/httpapi"
 )
@@ -1732,6 +1733,44 @@ func (unavailableAnnouncementAdministrationService) UpdateDraft(context.Context,
 
 func (unavailableAnnouncementAdministrationService) ChangePublication(context.Context, authz.StaffActor, catalog.ChangeAnnouncementPublicationInput) (catalog.ManagedAnnouncement, error) {
 	return catalog.ManagedAnnouncement{}, authz.ErrForbidden
+}
+
+type unavailableWikiService struct{}
+
+func (unavailableWikiService) List(context.Context, string, wiki.ListInput) (wiki.PageList, error) {
+	return wiki.PageList{}, identity.ErrSessionNotFound
+}
+
+func (unavailableWikiService) Get(context.Context, string, string) (wiki.Page, error) {
+	return wiki.Page{}, wiki.ErrPageNotFound
+}
+
+func (unavailableWikiService) UpdateAssigned(context.Context, string, string, wiki.UpdateAssignedInput) (wiki.Page, error) {
+	return wiki.Page{}, authz.ErrForbidden
+}
+
+func (unavailableWikiService) ListManaged(context.Context, authz.StaffActor, wiki.ListInput) (wiki.PageList, error) {
+	return wiki.PageList{}, authz.ErrForbidden
+}
+
+func (unavailableWikiService) GetManaged(context.Context, authz.StaffActor, uuid.UUID) (wiki.Page, error) {
+	return wiki.Page{}, authz.ErrForbidden
+}
+
+func (unavailableWikiService) CreateManaged(context.Context, authz.StaffActor, wiki.CreateManagedInput) (wiki.Page, error) {
+	return wiki.Page{}, authz.ErrForbidden
+}
+
+func (unavailableWikiService) UpdateManaged(context.Context, authz.StaffActor, wiki.UpdateManagedInput) (wiki.Page, error) {
+	return wiki.Page{}, authz.ErrForbidden
+}
+
+func (unavailableWikiService) Revisions(context.Context, authz.StaffActor, uuid.UUID, int, int) (wiki.RevisionPage, error) {
+	return wiki.RevisionPage{}, authz.ErrForbidden
+}
+
+func (unavailableWikiService) RestoreManaged(context.Context, authz.StaffActor, wiki.RestoreManagedInput) (wiki.Page, error) {
+	return wiki.Page{}, authz.ErrForbidden
 }
 
 type unavailableSiteDisplaySettingsService struct{}
@@ -4723,6 +4762,7 @@ func TestNewRejectsAmbiguousOrWidenedSessionCookieBoundaries(t *testing.T) {
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5147,6 +5187,7 @@ func testHandlerWithTorrentUpload(t *testing.T, torrentUpload httpapi.TorrentUpl
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5202,6 +5243,7 @@ func testHandlerWithTraffic(t *testing.T, trafficOverview httpapi.TrafficOvervie
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5257,6 +5299,7 @@ func testHandlerWithNotifications(t *testing.T, notificationService httpapi.Noti
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               notificationService,
@@ -5312,6 +5355,7 @@ func testHandlerWithTorrentBookmarks(t *testing.T, torrentBookmarks httpapi.Torr
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5367,6 +5411,7 @@ func testHandlerWithComments(t *testing.T, comments httpapi.CommentService) http
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5422,6 +5467,7 @@ func testHandlerWithCommentModeration(t *testing.T, staffIdentity httpapi.StaffI
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5477,6 +5523,7 @@ func testHandlerWithTorrentDownload(t *testing.T, torrentDownload httpapi.Torren
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5531,6 +5578,7 @@ func testHandlerWithTorrentRead(t *testing.T, torrentRead httpapi.TorrentReadSer
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5586,6 +5634,7 @@ func testHandlerWithTorrentReview(t *testing.T, staffIdentity httpapi.StaffIdent
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5653,6 +5702,7 @@ func testHandlerWithTorrentSubmissionMaintenance(
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5769,6 +5819,7 @@ func testHandlerWithSessionSecurity(t *testing.T, sessionSecurity httpapi.Sessio
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5824,6 +5875,7 @@ func testHandlerWithTwoFactor(t *testing.T, twoFactor httpapi.TwoFactorService) 
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -5898,6 +5950,7 @@ func testHandlerWithEveryServiceAndUsers(t *testing.T, identityService httpapi.I
 		GrantAdministration:         grantAdministrationService,
 		CategoryAdministration:      categoryAdministrationService,
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         siteDisplaySettingsService,
 		UserAdministration:          userAdministrationService,
 		Notifications:               unavailableNotificationService{},
@@ -5962,6 +6015,7 @@ func testHandlerWithRegistrationAndHumanVerification(t *testing.T, registrationS
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},
@@ -6017,6 +6071,7 @@ func testHandlerWithPasswordRecovery(t *testing.T, passwordRecovery httpapi.Pass
 		GrantAdministration:         unavailableGrantAdministrationService{},
 		CategoryAdministration:      unavailableCategoryAdministrationService{},
 		AnnouncementAdministration:  unavailableAnnouncementAdministrationService{},
+		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         unavailableSiteDisplaySettingsService{},
 		UserAdministration:          unavailableUserAdministrationService{},
 		Notifications:               unavailableNotificationService{},

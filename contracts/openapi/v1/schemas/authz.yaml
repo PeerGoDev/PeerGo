@@ -147,6 +147,13 @@ CapabilityAction:
     - user.downloadrestriction.restrict
     - user.downloadrestriction.revoke
     - user.vip.manage
+    - wiki.page.create
+    - wiki.page.manage.read
+    - wiki.page.read
+    - wiki.page.read.member
+    - wiki.page.restore
+    - wiki.page.update
+    - wiki.page.update.assigned
     - workgroup.application.create.self
     - workgroup.application.decide
     - workgroup.contribution.policy.issue

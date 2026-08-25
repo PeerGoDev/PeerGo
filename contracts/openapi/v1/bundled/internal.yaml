@@ -5430,6 +5430,326 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/wiki/pages:
+    get:
+      operationId: listWikiPages
+      summary: 搜索当前调用者可见的 Wiki 页面
+      tags:
+        - wiki
+      x-audience:
+        - web
+      x-owner: core-wiki
+      x-permission: wiki.page.read
+      x-visibility-permissions:
+        public: wiki.page.read
+        members: wiki.page.read.member
+      x-credential-audience: anonymous
+      parameters:
+        - $ref: '#/components/parameters/WikiQueryParameter'
+        - $ref: '#/components/parameters/WikiLimitParameter'
+        - $ref: '#/components/parameters/WikiOffsetParameter'
+      responses:
+        '200':
+          description: 公开页面对匿名访问者可见；登录成员同时看到成员页面。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiPageList'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/wiki/pages/{slug}:
+    get:
+      operationId: getWikiPage
+      summary: 按稳定路由键读取一篇 Wiki
+      tags:
+        - wiki
+      x-audience:
+        - web
+      x-owner: core-wiki
+      x-permission: wiki.page.read
+      x-visibility-permissions:
+        public: wiki.page.read
+        members: wiki.page.read.member
+      x-credential-audience: anonymous
+      parameters:
+        - $ref: '#/components/parameters/WikiSlugPathParameter'
+      responses:
+        '200':
+          description: Wiki 当前正文、协作者与版本信息。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/wiki/pages/{page_id}/content:
+    put:
+      operationId: updateAssignedWikiPage
+      summary: 编辑自己创建或获指派协作的 Wiki 正文
+      tags:
+        - wiki
+      x-audience:
+        - web
+      x-owner: core-wiki
+      x-permission: wiki.page.update.assigned
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WikiPageIDPathParameter'
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAssignedWikiPageRequest'
+      responses:
+        '200':
+          description: 新修订已经提交，旧修订按每页最多 50 个的策略保留。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/wiki/pages:
+    get:
+      operationId: listManagedWikiPages
+      summary: 搜索 Wiki 管理投影
+      tags:
+        - wiki
+      x-audience:
+        - staff
+      x-owner: core-wiki
+      x-permission: wiki.page.manage.read
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/WikiQueryParameter'
+        - $ref: '#/components/parameters/WikiLimitParameter'
+        - $ref: '#/components/parameters/WikiOffsetParameter'
+        - name: include_archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: 包含停用页面的有界管理列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiPageList'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    post:
+      operationId: createManagedWikiPage
+      summary: 创建 Wiki 页面及首个修订
+      tags:
+        - wiki
+      x-audience:
+        - staff
+      x-owner: core-wiki
+      x-permission: wiki.page.create
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManagedWikiPageRequest'
+      responses:
+        '201':
+          description: 当前投影、协作者和初始修订已原子提交。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/wiki/pages/{page_id}:
+    parameters:
+      - $ref: '#/components/parameters/WikiPageIDPathParameter'
+    get:
+      operationId: getManagedWikiPage
+      summary: 读取 Wiki 完整管理投影
+      tags:
+        - wiki
+      x-audience:
+        - staff
+      x-owner: core-wiki
+      x-permission: wiki.page.manage.read
+      x-credential-audience: staff-session
+      responses:
+        '200':
+          description: 包括已停用页面和协作者的编辑投影。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiPage'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    put:
+      operationId: updateManagedWikiPage
+      summary: 修改 Wiki 配置、正文、协作者或停用状态
+      tags:
+        - wiki
+      x-audience:
+        - staff
+      x-owner: core-wiki
+      x-permission: wiki.page.update
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateManagedWikiPageRequest'
+      responses:
+        '200':
+          description: 修改已作为一个新修订原子提交。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/wiki/pages/{page_id}/revisions:
+    get:
+      operationId: listManagedWikiRevisions
+      summary: 读取 Wiki 最近的有界修订历史
+      tags:
+        - wiki
+      x-audience:
+        - staff
+      x-owner: core-wiki
+      x-permission: wiki.page.manage.read
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/WikiPageIDPathParameter'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 50
+        - $ref: '#/components/parameters/WikiOffsetParameter'
+      responses:
+        '200':
+          description: 修订号倒序的最近 50 个真实内容版本。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiRevisionPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/wiki/pages/{page_id}/revisions/{revision_number}/restore:
+    post:
+      operationId: restoreManagedWikiRevision
+      summary: 将历史修订复制为新的当前修订
+      tags:
+        - wiki
+      x-audience:
+        - staff
+      x-owner: core-wiki
+      x-permission: wiki.page.restore
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/WikiPageIDPathParameter'
+        - $ref: '#/components/parameters/WikiRevisionNumberPathParameter'
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreManagedWikiPageRequest'
+      responses:
+        '200':
+          description: 目标内容已作为新的可回滚修订恢复。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WikiPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/categories:
     get:
       operationId: listCategories
@@ -11417,6 +11737,13 @@ components:
         - user.downloadrestriction.restrict
         - user.downloadrestriction.revoke
         - user.vip.manage
+        - wiki.page.create
+        - wiki.page.manage.read
+        - wiki.page.read
+        - wiki.page.read.member
+        - wiki.page.restore
+        - wiki.page.update
+        - wiki.page.update.assigned
         - workgroup.application.create.self
         - workgroup.application.decide
         - workgroup.contribution.policy.issue
@@ -22098,6 +22425,319 @@ components:
           type: string
           nullable: true
           maxLength: 2048
+    WikiVisibility:
+      type: string
+      enum:
+        - public
+        - members
+    WikiPageSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - slug
+        - title
+        - summary
+        - visibility
+        - sort_order
+        - version
+        - revision_number
+        - can_edit
+        - archived
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,95}$
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        summary:
+          type: string
+          maxLength: 500
+        visibility:
+          $ref: '#/components/schemas/WikiVisibility'
+        sort_order:
+          type: integer
+          minimum: -100000
+          maximum: 100000
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        revision_number:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        can_edit:
+          type: boolean
+        archived:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+    WikiPageList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/WikiPageSummary'
+        total:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 100000
+    WikiUserReference:
+      type: object
+      additionalProperties: false
+      required:
+        - numeric_id
+        - username
+        - display_name
+      properties:
+        numeric_id:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+    WikiPage:
+      allOf:
+        - $ref: '#/components/schemas/WikiPageSummary'
+        - type: object
+          additionalProperties: false
+          required:
+            - body
+            - creator
+            - updater
+            - editors
+            - migrated
+            - created_at
+          properties:
+            body:
+              type: string
+              minLength: 1
+              maxLength: 100000
+            creator:
+              $ref: '#/components/schemas/WikiUserReference'
+            updater:
+              $ref: '#/components/schemas/WikiUserReference'
+            editors:
+              type: array
+              maxItems: 20
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/WikiUserReference'
+            migrated:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+            archived_at:
+              type: string
+              format: date-time
+              nullable: true
+    UpdateAssignedWikiPageRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - summary
+        - body
+        - expected_version
+        - reason
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        summary:
+          type: string
+          maxLength: 500
+        body:
+          type: string
+          minLength: 1
+          maxLength: 100000
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          type: string
+          minLength: 0
+          maxLength: 500
+          description: 可留空；服务端自动生成稳定的版本说明。
+    CreateManagedWikiPageRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - slug
+        - title
+        - summary
+        - body
+        - visibility
+        - sort_order
+        - editor_numeric_ids
+        - reason
+      properties:
+        slug:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,95}$
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        summary:
+          type: string
+          maxLength: 500
+        body:
+          type: string
+          minLength: 1
+          maxLength: 100000
+        visibility:
+          $ref: '#/components/schemas/WikiVisibility'
+        sort_order:
+          type: integer
+          minimum: -100000
+          maximum: 100000
+        editor_numeric_ids:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 9007199254740991
+        reason:
+          type: string
+          minLength: 0
+          maxLength: 500
+    UpdateManagedWikiPageRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateManagedWikiPageRequest'
+        - type: object
+          additionalProperties: false
+          required:
+            - expected_version
+            - archived
+          properties:
+            expected_version:
+              type: integer
+              format: int64
+              minimum: 1
+              maximum: 9007199254740991
+            archived:
+              type: boolean
+    WikiRevisionOrigin:
+      type: string
+      enum:
+        - migration
+        - member
+        - staff
+        - restore
+    WikiRevisionSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - revision_number
+        - title
+        - reason
+        - origin
+        - editor
+        - created_at
+      properties:
+        revision_number:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+        origin:
+          $ref: '#/components/schemas/WikiRevisionOrigin'
+        editor:
+          $ref: '#/components/schemas/WikiUserReference'
+        created_at:
+          type: string
+          format: date-time
+    WikiRevisionPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/WikiRevisionSummary'
+        total:
+          type: integer
+          minimum: 0
+          maximum: 50
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 50
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 100000
+    RestoreManagedWikiPageRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+        - reason
+      properties:
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          type: string
+          minLength: 0
+          maxLength: 500
     CategoryWithCount:
       type: object
       additionalProperties: false
@@ -25953,6 +26593,54 @@ components:
         minLength: 1
         maxLength: 120
         pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$
+    WikiQueryParameter:
+      name: query
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 100
+    WikiLimitParameter:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    WikiOffsetParameter:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 100000
+        default: 0
+    WikiSlugPathParameter:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-z0-9][a-z0-9-]{0,95}$
+    WikiPageIDPathParameter:
+      name: page_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    WikiRevisionNumberPathParameter:
+      name: revision_number
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        maximum: 9007199254740991
     CategoryIDPathParameter:
       name: category_id
       in: path

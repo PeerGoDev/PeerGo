@@ -165,6 +165,13 @@ const (
 	ActionUserDownloadRestrictionRevoke           Action = "user.downloadrestriction.revoke"
 	ActionUserProfileReadMember                   Action = "user.profile.read.member"
 	ActionUserVIPManage                           Action = "user.vip.manage"
+	ActionWikiPageCreate                          Action = "wiki.page.create"
+	ActionWikiPageManageRead                      Action = "wiki.page.manage.read"
+	ActionWikiPageRead                            Action = "wiki.page.read"
+	ActionWikiPageReadMember                      Action = "wiki.page.read.member"
+	ActionWikiPageRestore                         Action = "wiki.page.restore"
+	ActionWikiPageUpdate                          Action = "wiki.page.update"
+	ActionWikiPageUpdateAssigned                  Action = "wiki.page.update.assigned"
 	ActionWorkgroupApplicationCreateSelf          Action = "workgroup.application.create.self"
 	ActionWorkgroupApplicationDecide              Action = "workgroup.application.decide"
 	ActionWorkgroupContributionPolicyIssue        Action = "workgroup.contribution.policy.issue"
@@ -976,6 +983,40 @@ var permissionCatalog = []PermissionDefinition{
 	{
 		Action: ActionUserVIPManage, Description: "签发、续期或撤销一个账户的 VIP 身份", Risk: RiskHigh,
 		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionWikiPageCreate, Description: "创建并配置 Wiki 页面", Risk: RiskMedium,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionWikiPageManageRead, Description: "读取 Wiki 管理与版本视图", Risk: RiskMedium,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionWikiPageRead, Description: "查看公开 Wiki 页面", Risk: RiskLow,
+		Relationship: RelationshipNone, CredentialAudience: AudienceAnonymous,
+	},
+	{
+		Action: ActionWikiPageReadMember, Description: "查看仅站内成员可见的 Wiki 页面", Risk: RiskLow,
+		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionWikiPageRestore, Description: "从历史修订恢复 Wiki 页面", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionWikiPageUpdate, Description: "修改 Wiki 页面配置、正文与协作者", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionWikiPageUpdateAssigned, Description: "修改自己创建或被指派协作的 Wiki 正文", Risk: RiskMedium,
+		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},
 	{

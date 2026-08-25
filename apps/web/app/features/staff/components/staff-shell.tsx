@@ -36,6 +36,7 @@ import {
   MedalIcon,
   RocketIcon,
   MessageCircleMoreIcon,
+  BookOpenTextIcon,
 } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
@@ -283,6 +284,12 @@ const contentNavigation = [
     to: "/staff/content/announcements",
     icon: MegaphoneIcon,
     action: "announcement.manage.read" as const,
+  },
+  {
+    label: "Wiki 管理",
+    to: "/staff/content/wiki",
+    icon: BookOpenTextIcon,
+    action: "wiki.page.manage.read" as const,
   },
   {
     label: "评论审核",
