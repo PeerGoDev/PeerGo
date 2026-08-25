@@ -249,6 +249,7 @@ function TrackerPolicyForm({
   canUpdate: boolean
 }) {
   const mutation = useIssueTrackerPolicy()
+  const trackerPolicyRequestId = React.useRef<string | undefined>(undefined)
   const [settings, setSettings] = React.useState(() => cloneSettings(initial))
   const [reason, setReason] = React.useState("")
   const [error, setError] = React.useState("")
@@ -319,16 +320,19 @@ function TrackerPolicyForm({
       return
     }
     setError("")
+    const idempotencyKey = trackerPolicyRequestId.current ?? crypto.randomUUID()
+    trackerPolicyRequestId.current = idempotencyKey
     try {
       const issued = await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         body: {
           expected_sequence: expectedSequence,
           settings,
           reason: reason.trim(),
         },
       })
+      trackerPolicyRequestId.current = undefined
       setReason("")
       setSuccess(
         `政策 #${issued.sequence} 已保存，将在下一轮签名发布后由 Tracker 自动热加载。`

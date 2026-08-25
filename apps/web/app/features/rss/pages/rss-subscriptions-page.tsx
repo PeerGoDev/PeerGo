@@ -163,7 +163,10 @@ export function RSSSubscriptionsPage() {
   const [copied, setCopied] = React.useState(false)
 
   const mutationError =
-    create.error ?? update.error ?? rotate.error ?? remove.error
+    (create.isError ? create.error : undefined) ??
+    (update.isError ? update.error : undefined) ??
+    (rotate.isError ? rotate.error : undefined) ??
+    (remove.isError ? remove.error : undefined)
 
   async function save(input: RSSSubscriptionInput) {
     if (!session.data || !editing) return

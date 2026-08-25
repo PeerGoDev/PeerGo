@@ -351,7 +351,7 @@ export function PostComposer({
         </div>
       ) : null}
 
-      {createPost.error || uploadMedia.error ? (
+      {createPost.isError || uploadMedia.isError ? (
         <Alert variant="destructive" className="mt-3">
           <AlertTitle>发布失败</AlertTitle>
           <AlertDescription>

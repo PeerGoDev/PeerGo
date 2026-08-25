@@ -229,25 +229,34 @@ function TaskSubmissionDialog({
 }) {
   const mutation = useSubmitWorkgroupTask(userId)
   const [statement, setStatement] = React.useState("")
+  const requestId = React.useRef<string | undefined>(undefined)
   const valid = statement.trim().length >= 10 && statement.trim().length <= 2000
 
   React.useEffect(() => {
     if (assignment) {
       setStatement(assignment.latest_submission?.statement ?? "")
+      requestId.current = undefined
       mutation.reset()
     }
   }, [assignment]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = () => {
     if (!assignment || !valid) return
+    const idempotencyKey = requestId.current ?? crypto.randomUUID()
+    requestId.current = idempotencyKey
     mutation.mutate(
       {
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         assignmentId: assignment.id,
         statement: statement.trim(),
       },
-      { onSuccess: () => onOpenChange(false) }
+      {
+        onSuccess: () => {
+          requestId.current = undefined
+          onOpenChange(false)
+        },
+      }
     )
   }
 
@@ -270,7 +279,10 @@ function TaskSubmissionDialog({
             <Textarea
               id="workgroup-task-statement"
               value={statement}
-              onChange={(event) => setStatement(event.target.value)}
+              onChange={(event) => {
+                requestId.current = undefined
+                setStatement(event.target.value)
+              }}
               rows={7}
               maxLength={2000}
               aria-invalid={statement.length > 0 && !valid}

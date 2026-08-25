@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "~/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group"
+import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import {
   type AttendanceMode,
   type AttendanceOverview,
@@ -49,6 +50,12 @@ export function AttendanceCard({
 }) {
   const query = useAttendanceOverview(userId)
   const mutation = useClaimAttendance(userId)
+  const capabilities = useCapabilities(userId)
+  const canClaim = Boolean(
+    capabilities.data?.items.some(
+      (capability) => capability.action === "economy.attendance.claim.self"
+    )
+  )
 
   if (query.isPending) {
     return <Skeleton className="h-64 rounded-lg" />
@@ -77,7 +84,8 @@ export function AttendanceCard({
     <AttendanceContent
       overview={query.data}
       pending={mutation.isPending}
-      error={mutation.error}
+      error={mutation.isError ? mutation.error : null}
+      canClaim={canClaim}
       onClaim={(mode) =>
         mutation.mutate({
           csrfToken,
@@ -93,11 +101,13 @@ function AttendanceContent({
   overview,
   pending,
   error,
+  canClaim,
   onClaim,
 }: {
   overview: AttendanceOverview
   pending: boolean
   error: Error | null
+  canClaim: boolean
   onClaim: (mode: AttendanceMode) => void
 }) {
   const policy = overview.policy
@@ -204,7 +214,7 @@ function AttendanceContent({
             </div>
             <Button
               className="mt-4 w-full sm:w-auto"
-              disabled={pending}
+              disabled={pending || !canClaim}
               onClick={() => onClaim(mode)}
             >
               {pending ? (
