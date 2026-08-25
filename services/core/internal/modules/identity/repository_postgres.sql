@@ -416,6 +416,7 @@ INSERT INTO identity.registration_invitations (
     expires_at,
     issuer_user_id,
     source_kind,
+    email_binding_hmac,
     issued_authorization_decision_id,
     created_at
 ) VALUES (
@@ -425,6 +426,7 @@ INSERT INTO identity.registration_invitations (
     sqlc.arg(expires_at),
     sqlc.arg(user_id),
     'member',
+    sqlc.arg(email_binding_hmac),
     sqlc.arg(authorization_decision_id),
     sqlc.arg(created_at)
 )
@@ -679,6 +681,7 @@ SELECT EXISTS (
 SELECT id
 FROM identity.registration_invitations
 WHERE token_sha256 = sqlc.arg(token_sha256)
+  AND (email_binding_hmac IS NULL OR email_binding_hmac = sqlc.arg(email_binding_hmac))
   AND expires_at > sqlc.arg(as_of)::timestamptz
   AND revoked_at IS NULL
   AND consumed_at IS NULL
@@ -691,6 +694,7 @@ SELECT EXISTS (
     FROM identity.registration_invitations
     WHERE id = sqlc.arg(invitation_id)
       AND token_sha256 = sqlc.arg(token_sha256)
+      AND (email_binding_hmac IS NULL OR email_binding_hmac = sqlc.arg(email_binding_hmac))
       AND claimed_by = sqlc.arg(registration_id)
 ) AS matches;
 

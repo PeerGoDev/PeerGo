@@ -92,14 +92,14 @@ describe("RegistrationPage", () => {
       screen.queryByRole("button", { name: "注册" })
     ).not.toBeInTheDocument()
     await user.type(screen.getByLabelText("邀请凭证"), "invalid")
-    await user.click(screen.getByRole("button", { name: "验证邀请凭证" }))
+    await user.click(screen.getByRole("button", { name: "继续填写注册资料" }))
 
     expect(screen.getByText("请输入有效的邀请码")).toBeVisible()
     expect(screen.getByLabelText("邀请凭证")).toHaveFocus()
 
     await user.clear(screen.getByLabelText("邀请凭证"))
     await user.type(screen.getByLabelText("邀请凭证"), "i".repeat(43))
-    await user.click(screen.getByRole("button", { name: "验证邀请凭证" }))
+    await user.click(screen.getByRole("button", { name: "继续填写注册资料" }))
 
     expect(screen.getByText("邀请凭证已填写")).toBeVisible()
     expect(screen.getByRole("button", { name: "更换邀请凭证" })).toBeVisible()
@@ -179,6 +179,54 @@ describe("RegistrationPage", () => {
       screen.queryByRole("heading", { name: "注册" })
     ).not.toBeInTheDocument()
   })
+
+  it("reuses an unchanged attempt key and replaces it after form edits", async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
+      jsonResponse(
+        {
+          type: "about:blank",
+          title: "无法使用这些注册信息",
+          status: 409,
+          code: "registration_unavailable",
+          detail:
+            "用户名或邮箱已被使用；如本次使用邀请码，系统已释放本次未完成的占用。",
+          request_id: "0198f20a-6da8-7e51-9c64-333333333333",
+        },
+        409
+      )
+    )
+    vi.stubGlobal("fetch", fetchMock)
+    renderWithMode("open")
+
+    await user.type(screen.getByLabelText("用户名"), "new_member")
+    await user.type(screen.getByLabelText("显示名称"), "新成员")
+    await user.type(screen.getByLabelText("邮箱"), "new@example.com")
+    await user.type(
+      screen.getByLabelText("密码", { exact: true }),
+      "PeerGo-member-2026!"
+    )
+    await user.type(screen.getByLabelText("确认密码"), "PeerGo-member-2026!")
+
+    await user.click(screen.getByRole("button", { name: "注册" }))
+    expect(await screen.findByText(/系统已释放本次未完成的占用/)).toBeVisible()
+    await user.click(screen.getByRole("button", { name: "注册" }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+
+    const first = fetchMock.mock.calls[0]?.[0] as Request
+    const second = fetchMock.mock.calls[1]?.[0] as Request
+    expect(second.headers.get("Idempotency-Key")).toBe(
+      first.headers.get("Idempotency-Key")
+    )
+
+    await user.type(screen.getByLabelText("用户名"), "2")
+    await user.click(screen.getByRole("button", { name: "注册" }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+    const third = fetchMock.mock.calls[2]?.[0] as Request
+    expect(third.headers.get("Idempotency-Key")).not.toBe(
+      first.headers.get("Idempotency-Key")
+    )
+  })
 })
 
 function LocationProbe() {
@@ -200,4 +248,11 @@ const activeSession: WebSession = {
   },
   expires_at: "2026-09-05T12:00:00Z",
   csrf_token: "c".repeat(43),
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
 }

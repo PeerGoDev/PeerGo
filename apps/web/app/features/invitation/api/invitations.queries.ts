@@ -45,10 +45,16 @@ export function invitationOverviewQueryOptions(
 export function useIssueInvitation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (csrfToken: string): Promise<InvitationIssueResult> => {
+    mutationFn: async (input: {
+      csrfToken: string
+      email: string
+    }): Promise<InvitationIssueResult> => {
       const { data, error, response } = await apiClient.POST(
         "/api/v1/me/invitations",
-        { params: { header: { "X-CSRF-Token": csrfToken } } }
+        {
+          params: { header: { "X-CSRF-Token": input.csrfToken } },
+          body: { email: input.email },
+        }
       )
       if (!response.ok || !data) {
         throw new ApiProblemError(response.status, error)

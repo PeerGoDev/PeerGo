@@ -62,6 +62,7 @@ type MemberInvitation struct {
 	ID              uuid.UUID
 	Source          InvitationRecordSource
 	Status          InvitationStatus
+	EmailBound      bool
 	InviteeUsername *string
 	CreatedAt       time.Time
 	ExpiresAt       time.Time
@@ -146,11 +147,12 @@ type invitationIssuerSnapshot struct {
 }
 
 type IssueInvitationCommand struct {
-	ID            uuid.UUID
-	UserID        uuid.UUID
-	TokenSHA256   []byte
-	OccurredAt    time.Time
-	Authorization authz.Decision
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	TokenSHA256      []byte
+	EmailBindingHMAC []byte
+	OccurredAt       time.Time
+	Authorization    authz.Decision
 }
 
 type RevokeInvitationCommand struct {

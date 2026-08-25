@@ -23,6 +23,7 @@ var (
 type RegistrationRepository interface {
 	PublicRegistrationPolicy(context.Context) (RegistrationPublicPolicy, error)
 	PrepareRegistration(context.Context, PrepareRegistrationCommand) (RegistrationRecord, error)
+	CancelRegistration(context.Context, uuid.UUID) error
 	AttachRegistrationCredential(context.Context, uuid.UUID, uuid.UUID, time.Time) (RegistrationRecord, error)
 	CompleteRegistration(context.Context, uuid.UUID, time.Time) (RegistrationRecord, error)
 }
@@ -85,19 +86,20 @@ func (service *RegistrationService) UpdatePolicy(ctx context.Context, actor auth
 }
 
 func (service *RegistrationService) Register(ctx context.Context, input RegistrationInput) (RegistrationResult, error) {
-	normalized, invitationDigest, err := normalizeRegistrationInput(input)
+	normalized, invitationDigest, invitationEmailBinding, err := normalizeRegistrationInput(input)
 	if err != nil {
 		return RegistrationResult{}, err
 	}
 	now := service.now().UTC()
 	record, err := service.repository.PrepareRegistration(ctx, PrepareRegistrationCommand{
-		ID:               normalized.ID,
-		UserID:           uuid.New(),
-		Username:         normalized.Username,
-		DisplayName:      normalized.DisplayName,
-		EmailDomain:      registrationEmailDomain(normalized.Email),
-		InvitationDigest: invitationDigest,
-		OccurredAt:       now,
+		ID:                     normalized.ID,
+		UserID:                 uuid.New(),
+		Username:               normalized.Username,
+		DisplayName:            normalized.DisplayName,
+		EmailDomain:            registrationEmailDomain(normalized.Email),
+		InvitationDigest:       invitationDigest,
+		InvitationEmailBinding: invitationEmailBinding,
+		OccurredAt:             now,
 	})
 	if err != nil {
 		return RegistrationResult{}, err
@@ -108,6 +110,11 @@ func (service *RegistrationService) Register(ctx context.Context, input Registra
 	// replayed with a different email or password after a network timeout.
 	credentialRef, err := service.vault.ProvisionRegistration(ctx, normalized)
 	if err != nil {
+		if errors.Is(err, ErrRegistrationUnavailable) {
+			if cancelErr := service.repository.CancelRegistration(ctx, record.ID); cancelErr != nil {
+				return RegistrationResult{}, ErrRegistrationStateConflict
+			}
+		}
 		return RegistrationResult{}, err
 	}
 	record, err = service.repository.AttachRegistrationCredential(ctx, record.ID, credentialRef, now)
@@ -170,7 +177,7 @@ func registrationPolicyAllowsNewAccount(policy RegistrationPolicy, username, ema
 	return nil
 }
 
-func normalizeRegistrationInput(input RegistrationInput) (RegistrationInput, []byte, error) {
+func normalizeRegistrationInput(input RegistrationInput) (RegistrationInput, []byte, []byte, error) {
 	input.Username = strings.ToLower(strings.TrimSpace(input.Username))
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
@@ -178,21 +185,25 @@ func normalizeRegistrationInput(input RegistrationInput) (RegistrationInput, []b
 	if input.ID == uuid.Nil || !registrationUsernamePattern.MatchString(input.Username) ||
 		utf8.RuneCountInString(input.DisplayName) < 1 || utf8.RuneCountInString(input.DisplayName) > 40 ||
 		len(input.Password) < 12 || len(input.Password) > maxPasswordBytes {
-		return RegistrationInput{}, nil, ErrInvalidInput
+		return RegistrationInput{}, nil, nil, ErrInvalidInput
 	}
 	normalizedEmail, err := normalizeEmailAddress(input.Email)
 	if err != nil || normalizedEmail != input.Email {
-		return RegistrationInput{}, nil, ErrInvalidInput
+		return RegistrationInput{}, nil, nil, ErrInvalidInput
 	}
 	var invitationDigest []byte
 	if input.InvitationToken != "" {
 		if len(input.InvitationToken) != 43 && !legacyRegistrationInvitationToken.MatchString(input.InvitationToken) {
-			return RegistrationInput{}, nil, ErrInvalidInput
+			return RegistrationInput{}, nil, nil, ErrInvalidInput
 		}
 		digest := sha256.Sum256([]byte(input.InvitationToken))
 		invitationDigest = append([]byte(nil), digest[:]...)
 	}
-	return input, invitationDigest, nil
+	var invitationEmailBinding []byte
+	if input.InvitationToken != "" {
+		invitationEmailBinding = invitationEmailBindingHMAC(input.InvitationToken, input.Email)
+	}
+	return input, invitationDigest, invitationEmailBinding, nil
 }
 
 var _ interface {

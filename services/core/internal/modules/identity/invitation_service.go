@@ -2,16 +2,20 @@ package identity
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 )
+
+const invitationEmailBindingDomain = "peergo:registration-invitation-email:v1\x00"
 
 type InvitationRepository interface {
 	Overview(context.Context, uuid.UUID, time.Time, int, int) (invitationIssuerSnapshot, []MemberInvitation, int, InvitationNetwork, error)
@@ -87,10 +91,15 @@ func (service *InvitationService) Overview(ctx context.Context, cookieToken stri
 	}, nil
 }
 
-func (service *InvitationService) Issue(ctx context.Context, cookieToken, csrfToken string) (InvitationIssueResult, error) {
+func (service *InvitationService) Issue(ctx context.Context, cookieToken, csrfToken, inviteeEmail string) (InvitationIssueResult, error) {
 	session, err := service.authenticator.AuthenticateWrite(ctx, cookieToken, csrfToken)
 	if err != nil {
 		return InvitationIssueResult{}, err
+	}
+	inviteeEmail = strings.ToLower(strings.TrimSpace(inviteeEmail))
+	normalizedEmail, err := normalizeEmailAddress(inviteeEmail)
+	if err != nil || normalizedEmail != inviteeEmail {
+		return InvitationIssueResult{}, ErrInvitationInput
 	}
 	now := service.now().UTC()
 	decision, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionInvitationIssueSelf, now)
@@ -103,14 +112,22 @@ func (service *InvitationService) Issue(ctx context.Context, cookieToken, csrfTo
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	digest := sha256.Sum256([]byte(token))
+	emailBinding := invitationEmailBindingHMAC(token, normalizedEmail)
 	invitation, err := service.repository.Issue(ctx, IssueInvitationCommand{
 		ID: uuid.New(), UserID: session.User.ID, TokenSHA256: digest[:],
-		OccurredAt: now, Authorization: decision,
+		EmailBindingHMAC: emailBinding, OccurredAt: now, Authorization: decision,
 	})
 	if err != nil {
 		return InvitationIssueResult{}, err
 	}
 	return InvitationIssueResult{Invitation: invitation, Token: token}, nil
+}
+
+func invitationEmailBindingHMAC(token, normalizedEmail string) []byte {
+	mac := hmac.New(sha256.New, []byte(token))
+	_, _ = mac.Write([]byte(invitationEmailBindingDomain))
+	_, _ = mac.Write([]byte(normalizedEmail))
+	return mac.Sum(nil)
 }
 
 func (service *InvitationService) Revoke(ctx context.Context, cookieToken, csrfToken string, invitationID uuid.UUID) (MemberInvitation, error) {

@@ -29,7 +29,9 @@ describe("InvitationsPage", () => {
     expect(screen.getByText("剩余邀请")).toBeVisible()
     expect(screen.getByText("5")).toBeVisible()
     expect(screen.getByText("成员邀请暂未开放")).toBeVisible()
-    expect(screen.getByRole("button", { name: "生成邀请码" })).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: "绑定邮箱并生成" })
+    ).toBeDisabled()
   })
 
   it("shows the raw invitation credential only in the successful issue result", async () => {
@@ -40,6 +42,7 @@ describe("InvitationsPage", () => {
       id: invitationId,
       source: "member" as const,
       status: "available" as const,
+      email_bound: true,
       created_at: "2026-08-17T12:00:00Z",
       expires_at: "2026-08-24T12:00:00Z",
     }
@@ -62,7 +65,11 @@ describe("InvitationsPage", () => {
     vi.stubGlobal("fetch", fetchMock)
 
     renderPage(queryClient)
-    await user.click(await screen.findByRole("button", { name: "生成邀请码" }))
+    await user.type(
+      await screen.findByLabelText("被邀请人邮箱"),
+      "Friend@Example.com"
+    )
+    await user.click(screen.getByRole("button", { name: "绑定邮箱并生成" }))
 
     expect(
       await screen.findByRole("heading", { name: "邀请码已生成" })
@@ -77,6 +84,10 @@ describe("InvitationsPage", () => {
     expect(request.url).toContain("/api/v1/me/invitations")
     expect(request.method).toBe("POST")
     expect(request.headers.get("X-CSRF-Token")).toBe("c".repeat(43))
+    await expect(request.clone().json()).resolves.toEqual({
+      email: "friend@example.com",
+    })
+    expect(screen.getByText("friend@example.com")).toBeVisible()
   })
 
   it("shows migrated invitation relationships without crediting legacy rewards again", async () => {

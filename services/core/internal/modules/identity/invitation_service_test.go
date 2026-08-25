@@ -50,7 +50,7 @@ func (stub *invitationRepositoryStub) Overview(context.Context, uuid.UUID, time.
 
 func (stub *invitationRepositoryStub) Issue(_ context.Context, command IssueInvitationCommand) (MemberInvitation, error) {
 	stub.command = command
-	return MemberInvitation{ID: command.ID, Source: InvitationRecordMember, Status: InvitationStatusAvailable, CreatedAt: command.OccurredAt, ExpiresAt: command.OccurredAt.Add(7 * 24 * time.Hour)}, nil
+	return MemberInvitation{ID: command.ID, Source: InvitationRecordMember, Status: InvitationStatusAvailable, EmailBound: true, CreatedAt: command.OccurredAt, ExpiresAt: command.OccurredAt.Add(7 * 24 * time.Hour)}, nil
 }
 
 func (stub *invitationRepositoryStub) Revoke(context.Context, RevokeInvitationCommand) (MemberInvitation, error) {
@@ -107,7 +107,7 @@ func TestInvitationIssueReturnsOneTimeTokenAndPersistsOnlyDigest(t *testing.T) {
 		}
 		return len(target), nil
 	}
-	result, err := service.Issue(context.Background(), "cookie", "csrf")
+	result, err := service.Issue(context.Background(), "cookie", "csrf", "Member@Example.COM ")
 	if err != nil {
 		t.Fatalf("Issue() error = %v", err)
 	}
@@ -117,6 +117,11 @@ func TestInvitationIssueReturnsOneTimeTokenAndPersistsOnlyDigest(t *testing.T) {
 	wantDigest := sha256.Sum256([]byte(result.Token))
 	if string(repository.command.TokenSHA256) != string(wantDigest[:]) || string(repository.command.TokenSHA256) == result.Token {
 		t.Fatalf("repository received a non-canonical digest")
+	}
+	wantBinding := invitationEmailBindingHMAC(result.Token, "member@example.com")
+	if string(repository.command.EmailBindingHMAC) != string(wantBinding) ||
+		string(repository.command.EmailBindingHMAC) == "member@example.com" || !result.Invitation.EmailBound {
+		t.Fatalf("repository received a non-canonical email binding")
 	}
 	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionInvitationIssueSelf {
 		t.Fatalf("authorization requests = %+v", authorizer.requests)

@@ -86,13 +86,14 @@ type RegistrationRecord struct {
 }
 
 type PrepareRegistrationCommand struct {
-	ID               uuid.UUID
-	UserID           uuid.UUID
-	Username         string
-	DisplayName      string
-	EmailDomain      string
-	InvitationDigest []byte
-	OccurredAt       time.Time
+	ID                     uuid.UUID
+	UserID                 uuid.UUID
+	Username               string
+	DisplayName            string
+	EmailDomain            string
+	InvitationDigest       []byte
+	InvitationEmailBinding []byte
+	OccurredAt             time.Time
 }
 
 // RegistrationAuditInput is deliberately free of usernames, display names,

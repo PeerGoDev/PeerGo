@@ -288,7 +288,7 @@ InvitationEligibility:
 MemberInvitation:
   type: object
   additionalProperties: false
-  required: [id, source, status, created_at, expires_at]
+  required: [id, source, status, email_bound, created_at, expires_at]
   properties:
     id:
       type: string
@@ -298,6 +298,9 @@ MemberInvitation:
       enum: [member, legacy_import]
     status:
       $ref: "#/InvitationStatus"
+    email_bound:
+      type: boolean
+      description: 邀请凭证是否仅允许签发时指定的邮箱完成注册；不返回邮箱明文。
     invitee_username:
       type: string
       minLength: 3
@@ -438,6 +441,17 @@ InvitationIssueResult:
       maxLength: 43
       pattern: "^[A-Za-z0-9_-]{43}$"
       description: 只在成功签发响应中返回一次，之后无法找回。
+
+IssueInvitationRequest:
+  type: object
+  additionalProperties: false
+  required: [email]
+  properties:
+    email:
+      type: string
+      format: email
+      maxLength: 254
+      description: 本邀请码唯一允许注册的邮箱；Core 仅保存不可枚举的绑定摘要。
 
 CreateRegistrationRequest:
   type: object

@@ -135,7 +135,7 @@ export interface paths {
         /** 查看自己的邀请资格、名额与邀请记录 */
         get: operations["getMyInvitations"];
         put?: never;
-        /** 签发一个自己的单次注册邀请码 */
+        /** 为指定邮箱签发一个自己的单次注册邀请码 */
         post: operations["issueMyInvitation"];
         delete?: never;
         options?: never;
@@ -6850,6 +6850,8 @@ export interface components {
             /** @enum {string} */
             source: "member" | "legacy_import";
             status: components["schemas"]["InvitationStatus"];
+            /** @description 邀请凭证是否仅允许签发时指定的邮箱完成注册；不返回邮箱明文。 */
+            email_bound: boolean;
             invitee_username?: string;
             /** Format: date-time */
             created_at: string;
@@ -6899,6 +6901,13 @@ export interface components {
             offset: number;
             /** Format: date-time */
             observed_at: string;
+        };
+        IssueInvitationRequest: {
+            /**
+             * Format: email
+             * @description 本邀请码唯一允许注册的邮箱；Core 仅保存不可枚举的绑定摘要。
+             */
+            email: string;
         };
         InvitationIssueResult: {
             invitation: components["schemas"]["MemberInvitation"];
@@ -9699,7 +9708,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueInvitationRequest"];
+            };
+        };
         responses: {
             /** @description 邀请码已签发；明文 token 仅在本响应返回一次。 */
             201: {
