@@ -36,6 +36,8 @@ read_env_value() {
 
 deployment_mode="$(read_env_value PEERGO_DEPLOYMENT_MODE)"
 deployment_mode="${deployment_mode:-cluster}"
+runtime_layout="$(read_env_value PEERGO_RUNTIME_LAYOUT)"
+runtime_layout="${runtime_layout:-compact}"
 compose_files=(-f "${repo_root}/deploy/compose/compose.production.yaml")
 
 case "${deployment_mode}" in
@@ -49,9 +51,22 @@ case "${deployment_mode}" in
         ;;
 esac
 
+case "${runtime_layout}" in
+    compact)
+        runtime_profile=compact-runtime
+        ;;
+    split)
+        runtime_profile=split-runtime
+        ;;
+    *)
+        printf 'PeerGo production compose: invalid PEERGO_RUNTIME_LAYOUT=%s\n' "${runtime_layout}" >&2
+        exit 1
+        ;;
+esac
+
 if [[ "${include_cutover}" == true ]]; then
     compose_files+=(-f "${repo_root}/deploy/compose/compose.cutover.yaml")
 fi
 
 export PEERGO_ENV_FILE="${env_file}"
-exec docker compose --env-file "${env_file}" "${compose_files[@]}" "$@"
+exec docker compose --env-file "${env_file}" "${compose_files[@]}" --profile "${runtime_profile}" "$@"

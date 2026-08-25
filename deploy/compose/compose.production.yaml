@@ -96,6 +96,95 @@ services:
       tracker-migrate:
         condition: service_completed_successfully
 
+  # Compact production is the default. The supervisor preserves the existing
+  # process boundaries and restart semantics while removing per-process Docker
+  # containers. The former layout remains available through split-runtime.
+  peergo-api:
+    <<: *long-running
+    profiles: ["compact-runtime"]
+    command: ["peergo-runtime-supervisor", "api"]
+    environment:
+      PEERGO_CORE_ADDR: ":8080"
+      PEERGO_SETTLEMENT_CONTROL_ADDR: ":8085"
+      PEERGO_EMAIL_RELAY_ADDR: ":8086"
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      tracker-migrate:
+        condition: service_completed_successfully
+      startup-preflight:
+        condition: service_completed_successfully
+    networks:
+      default:
+        aliases:
+          - core-api
+          - settlement-control-api
+          - email-relay
+    ports:
+      - "${PEERGO_WEB_BIND_ADDRESS:-127.0.0.1}:${PEERGO_API_HOST_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8099/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 9
+      start_period: 20s
+
+  peergo-worker:
+    <<: *long-running
+    profiles: ["compact-runtime"]
+    command: ["peergo-runtime-supervisor", "worker"]
+    environment:
+      PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL: ${PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL:-30s}
+    depends_on:
+      core-migrate:
+        condition: service_completed_successfully
+      tracker-migrate:
+        condition: service_completed_successfully
+      snapshot-bootstrap:
+        condition: service_completed_successfully
+      settlement-announce-consumer-init:
+        condition: service_completed_successfully
+      settlement-seeding-snapshot-consumer-init:
+        condition: service_completed_successfully
+      settlement-traffic-stream-init:
+        condition: service_completed_successfully
+      settlement-seeding-evidence-stream-init:
+        condition: service_completed_successfully
+      settlement-hnr-stream-init:
+        condition: service_completed_successfully
+      core-traffic-consumer-init:
+        condition: service_completed_successfully
+      core-seeding-evidence-consumer-init:
+        condition: service_completed_successfully
+      core-hnr-consumer-init:
+        condition: service_completed_successfully
+      core-swarm-consumer-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8099/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 9
+      start_period: 30s
+
+  # The operator-owned OpenResty serves the SPA directly. This one-shot task
+  # publishes a release into its host document root and then exits.
+  web-release:
+    profiles: ["compact-runtime"]
+    image: ${PEERGO_WEB_IMAGE:-peergo/web:local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+    entrypoint: ["/docker-entrypoint.d/40-install-web-release.sh"]
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: ${PEERGO_DOCKER_LOG_MAX_SIZE:-100m}
+        max-file: ${PEERGO_DOCKER_LOG_MAX_FILES:-3}
+    volumes:
+      - ${PEERGO_WEB_ROOT:-/var/www/peergo}:/usr/share/nginx/html
+
   vault-api:
     <<: *long-running
     command: ["vault-api"]
@@ -116,6 +205,7 @@ services:
   # HTTPS endpoint configured by PEERGO_EMAIL_DELIVERY_URL.
   email-relay:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["email-relay"]
     ports:
       - "127.0.0.1:${PEERGO_EMAIL_RELAY_HOST_PORT:-8086}:8086"
@@ -140,6 +230,7 @@ services:
 
   settlement-control-api:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-control-api"]
     depends_on: *tracker-migrated
     ports:
@@ -153,6 +244,7 @@ services:
 
   core-api:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-api"]
     depends_on:
       core-migrate:
@@ -167,6 +259,7 @@ services:
       start_period: 15s
 
   web:
+    profiles: ["split-runtime"]
     image: ${PEERGO_WEB_IMAGE:-peergo/web:local}
     build:
       context: ../..
@@ -202,6 +295,7 @@ services:
 
   snapshot-publisher:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-snapshot-publisher"]
     environment:
       PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL: ${PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL:-30s}
@@ -308,46 +402,55 @@ services:
 
   core-audit-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-audit-worker"]
     depends_on: *core-migrated
 
   core-control-projector:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-control-projector"]
     depends_on: *core-migrated
 
   core-policy-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-policy-worker"]
     depends_on: *core-migrated
 
   core-image-derivative-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-image-derivative-worker"]
     depends_on: *core-migrated
 
   core-seeding-reward-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-seeding-reward-worker"]
     depends_on: *core-migrated
 
   core-contribution-experience-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-contribution-experience-worker"]
     depends_on: *core-migrated
 
   core-storage-maintenance:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-storage-maintenance"]
     depends_on: *core-migrated
 
   core-progression-level-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-progression-level-worker"]
     depends_on: *core-migrated
 
   settlement-ingest:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-ingest"]
     depends_on:
       tracker-migrate:
@@ -357,6 +460,7 @@ services:
 
   settlement-seeding-snapshot-projector:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-seeding-snapshot-projector"]
     depends_on:
       tracker-migrate:
@@ -366,21 +470,25 @@ services:
 
   settlement-seeding-evidence-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-seeding-evidence-worker"]
     depends_on: *tracker-migrated
 
   settlement-policy-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-policy-worker"]
     depends_on: *tracker-migrated
 
   settlement-storage-maintenance:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-storage-maintenance"]
     depends_on: *tracker-migrated
 
   settlement-traffic-dispatcher:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-traffic-dispatcher"]
     depends_on:
       tracker-migrate:
@@ -390,6 +498,7 @@ services:
 
   settlement-seeding-evidence-dispatcher:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-seeding-evidence-dispatcher"]
     depends_on:
       tracker-migrate:
@@ -399,11 +508,13 @@ services:
 
   settlement-hnr-worker:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-hnr-worker"]
     depends_on: *tracker-migrated
 
   settlement-hnr-dispatcher:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["settlement-hnr-dispatcher"]
     depends_on:
       tracker-migrate:
@@ -413,6 +524,7 @@ services:
 
   core-traffic-projector:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-traffic-projector"]
     depends_on:
       core-migrate:
@@ -422,6 +534,7 @@ services:
 
   core-seeding-evidence-projector:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-seeding-evidence-projector"]
     depends_on:
       core-migrate:
@@ -431,6 +544,7 @@ services:
 
   core-hnr-projector:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-hnr-projector"]
     depends_on:
       core-migrate:
@@ -440,6 +554,7 @@ services:
 
   core-swarm-projector:
     <<: *long-running
+    profiles: ["split-runtime"]
     command: ["core-swarm-projector"]
     depends_on:
       core-migrate:

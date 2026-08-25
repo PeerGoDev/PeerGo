@@ -3,6 +3,7 @@
 本文提供两种明确模式：默认 `cluster` 保持 PostgreSQL/NATS 全链路 TLS 与多副本；
 `single-server` 面向当前 RousiPro 主机，复用 1Panel PostgreSQL，并由 PeerGo 编排一个
 不暴露宿主机端口的单节点 NATS。两种模式的公网 Web/Tracker 都必须经过 HTTPS 入口。
+单机默认使用[六容器紧凑布局](./compact-runtime.md)，原有逐进程容器只保留为回滚选项。
 
 ## 1. 发布基线
 
@@ -19,8 +20,8 @@ git rev-parse HEAD
 代码只放在 `/opt/peergo/app`。三包放 `/opt/peergo/input`，运行数据分别落到
 `/opt/peergo/storage`、`tracker`、`audit`、`nats` 和 `cutovers`；更新代码不会覆盖数据。
 记录提交 SHA，并保留上一版本镜像、环境文件、数据库快照和入口配置。正式切流前不要删除 RousiPro。
-Web 的 `peergo_web_assets` 卷会合并当前构建并保留约三天的旧哈希资源，随后在容器启动时按
-文件年龄清理；HTML 始终替换为当前版本。这样旧浏览器标签页可跨发布完成动态模块加载，
+一次性 `web-release` 会把当前构建写入宿主机 OpenResty 文档目录，并保留约三天的旧哈希资源；
+HTML 通过同文件系统原子替换。这样旧浏览器标签页可跨发布完成动态模块加载，
 同时避免历史静态资源无界占用磁盘。
 
 ## 2. 外部依赖
@@ -32,8 +33,8 @@ Web 的 `peergo_web_assets` 卷会合并当前构建并保留约三天的旧哈�
    owner 与迁移读取角色分离。
 2. 启用 TLS 和 JetStream 的 NATS 集群。生产默认按三副本 stream/durable 验证漂移；
    各 publisher、consumer、provisioner 使用独立 `.creds`。
-3. Web 与 Tracker 两个 HTTPS 入口。Web 反代宿主机 `127.0.0.1:8080`；Tracker 反代
-   `127.0.0.1:8083`。Tracker 入口必须覆盖写入单值
+3. Web 与 Tracker 两个 HTTPS 入口。OpenResty 直接提供 Web 静态文件，并仅把 API/RSS
+   反代到 `PEERGO_API_HOST_PORT`；Tracker 反代 `PEERGO_TRACKER_HOST_PORT`。Tracker 入口必须覆盖写入单值
    `X-Forwarded-For $remote_addr`，不能沿用客户端传入的链；不得转发 `9093` 指标端口。
 4. 本地对象存储卷及其快照。首版默认
    `filesystem:/var/lib/peergo/objects`，原图、三档 WebP 和 `.torrent` 都进入该卷。
@@ -77,7 +78,7 @@ PEERGO_SINGLE_SERVER_PUBLIC_ORIGIN='https://rousi.pro' \
 分配并记录一组临时 loopback 端口；容器私网地址不会改变。例如 RousiPro 并行验收使用：
 
 ```bash
-PEERGO_BOOTSTRAP_WEB_HOST_PORT=18080 \
+PEERGO_BOOTSTRAP_API_HOST_PORT=18084 \
 PEERGO_BOOTSTRAP_VAULT_HOST_PORT=18081 \
 PEERGO_BOOTSTRAP_TRACKER_HOST_PORT=18083 \
 PEERGO_BOOTSTRAP_TRACKER_METRICS_HOST_PORT=19093 \

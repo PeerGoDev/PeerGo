@@ -12,14 +12,21 @@ fi
 
 mkdir -p "${serve_root}" "${serve_root}/assets"
 
-# Root documents describe only the current release and must be replaced. The
-# hashed asset directory is merged so browser tabs opened before a deploy can
-# finish their next navigation without receiving HTML in place of JavaScript.
-find "${serve_root}" -mindepth 1 -maxdepth 1 ! -name assets -exec rm -rf -- {} +
-find "${release_root}" -mindepth 1 -maxdepth 1 ! -name assets -exec cp -Rf -- {} "${serve_root}/" \;
+# Publish hashed assets first. The old index remains readable until the new
+# release is complete, so a deployment never exposes a half-written SPA.
 if [ -d "${release_root}/assets" ]; then
     cp -Rf "${release_root}/assets/." "${serve_root}/assets/"
 fi
+
+find "${serve_root}" -mindepth 1 -maxdepth 1 ! -name assets ! -name index.html -exec rm -rf -- {} +
+find "${release_root}" -mindepth 1 -maxdepth 1 ! -name assets ! -name index.html -exec cp -Rf -- {} "${serve_root}/" \;
+
+temporary_index="$(mktemp "${serve_root}/.peergo-index.XXXXXX")"
+trap '[ -z "${temporary_index:-}" ] || rm -f "${temporary_index}"' EXIT
+cp "${release_root}/index.html" "${temporary_index}"
+chmod 0644 "${temporary_index}"
+mv -f "${temporary_index}" "${serve_root}/index.html"
+temporary_index=
 
 # BusyBox find measures whole days. +2 keeps previous releases for roughly
 # three days while bounding the persistent volume instead of growing forever.

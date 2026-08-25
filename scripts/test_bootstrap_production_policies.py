@@ -23,13 +23,25 @@ class ProductionPolicyBootstrapTest(unittest.TestCase):
         endpoint, origin = MODULE.resolve_runtime(
             {
                 "PEERGO_DEPLOYMENT_MODE": "single-server",
+                "PEERGO_RUNTIME_LAYOUT": "compact",
+                "PEERGO_WEB_BIND_ADDRESS": "127.0.0.1",
+                "PEERGO_API_HOST_PORT": "18084",
+                "PEERGO_PUBLIC_ORIGIN": "https://rousi.pro",
+            }
+        )
+        self.assertEqual(endpoint, "http://127.0.0.1:18084")
+        self.assertEqual(origin, "https://rousi.pro")
+
+        endpoint, _ = MODULE.resolve_runtime(
+            {
+                "PEERGO_DEPLOYMENT_MODE": "single-server",
+                "PEERGO_RUNTIME_LAYOUT": "split",
                 "PEERGO_WEB_BIND_ADDRESS": "127.0.0.1",
                 "PEERGO_WEB_HOST_PORT": "18080",
                 "PEERGO_PUBLIC_ORIGIN": "https://rousi.pro",
             }
         )
         self.assertEqual(endpoint, "http://127.0.0.1:18080")
-        self.assertEqual(origin, "https://rousi.pro")
 
         with self.assertRaises(MODULE.BootstrapError):
             MODULE.resolve_runtime(
