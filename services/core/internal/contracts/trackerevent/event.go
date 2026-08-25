@@ -126,7 +126,7 @@ func Validate(event Event) error {
 	}
 	if err := json.Unmarshal(event.Payload, &envelope); err != nil ||
 		envelope.SchemaVersion != event.SchemaVersion || envelope.EventType != event.Type ||
-		envelope.EventID != event.ID || !envelope.OccurredAt.Equal(event.OccurredAt) ||
+		envelope.EventID != event.ID || !samePersistedTimestamp(envelope.OccurredAt, event.OccurredAt) ||
 		envelope.TorrentID != event.AggregateID || envelope.TorrentVersion != event.AggregateVersion {
 		return errors.New("Tracker control event envelope does not match metadata")
 	}
@@ -135,4 +135,11 @@ func Validate(event Event) error {
 		return errors.New("Tracker control event digest does not match")
 	}
 	return nil
+}
+
+// PostgreSQL timestamptz stores microsecond precision. Payloads retain the
+// producer's nanoseconds, so compare the envelope at the durable precision
+// used by the outbox row instead of rejecting an otherwise identical event.
+func samePersistedTimestamp(left, right time.Time) bool {
+	return left.UTC().Truncate(time.Microsecond).Equal(right.UTC().Truncate(time.Microsecond))
 }
