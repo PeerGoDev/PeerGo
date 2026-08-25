@@ -1,7 +1,6 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
-  CalendarClockIcon,
   CheckCircle2Icon,
   CircleAlertIcon,
   ClipboardCheckIcon,
@@ -285,6 +284,7 @@ function PublishTaskDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const mutation = usePublishWorkgroupTask()
+  const publishTaskRequestId = React.useRef<string | undefined>(undefined)
   const [taskType, setTaskType] = React.useState<WorkgroupTaskType>("task")
   const [title, setTitle] = React.useState("")
   const [description, setDescription] = React.useState("")
@@ -310,6 +310,7 @@ function PublishTaskDialog({
     setStartsAt(toDateTimeLocal(start))
     setDueAt(toDateTimeLocal(due))
     mutation.reset()
+    publishTaskRequestId.current = undefined
     // Reset publication fields whenever a fresh dialog is opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, groupKind])
@@ -318,9 +319,11 @@ function PublishTaskDialog({
     event.preventDefault()
     if (!valid) return
     try {
+      const idempotencyKey = publishTaskRequestId.current ?? crypto.randomUUID()
+      publishTaskRequestId.current = idempotencyKey
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         groupKind,
         taskType,
         title: title.trim(),
@@ -328,6 +331,7 @@ function PublishTaskDialog({
         startsAt: new Date(startsAt).toISOString(),
         dueAt: new Date(dueAt).toISOString(),
       })
+      publishTaskRequestId.current = undefined
       onOpenChange(false)
     } catch {
       // Keep the form open so the typed API problem remains visible.
@@ -589,6 +593,7 @@ function ReviewSubmissionDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const mutation = useReviewWorkgroupTaskSubmission()
+  const reviewSubmissionRequestId = React.useRef<string | undefined>(undefined)
   const [reason, setReason] = React.useState("")
   const valid = reason.trim().length >= 10 && reason.trim().length <= 1000
   const submission = state.assignment.latest_submission
@@ -596,6 +601,7 @@ function ReviewSubmissionDialog({
   React.useEffect(() => {
     setReason("")
     mutation.reset()
+    reviewSubmissionRequestId.current = undefined
     // Reset only when a different submission is selected.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submission?.id, state.decision])
@@ -604,13 +610,17 @@ function ReviewSubmissionDialog({
     event.preventDefault()
     if (!submission || !valid) return
     try {
+      const idempotencyKey =
+        reviewSubmissionRequestId.current ?? crypto.randomUUID()
+      reviewSubmissionRequestId.current = idempotencyKey
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         submissionId: submission.id,
         decision: state.decision,
         reason: reason.trim(),
       })
+      reviewSubmissionRequestId.current = undefined
       onOpenChange(false)
     } catch {
       // Keep the dialog open so the typed API problem remains visible.

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   BadgeCheckIcon,
@@ -172,6 +172,7 @@ function SeedboxPolicyEditor({
   refreshReports: () => void
 }) {
   const mutation = useIssueTrackerPolicy()
+  const seedboxPolicyRequestId = useRef<string | undefined>(undefined)
   const [enabled, setEnabled] = useState(configured.seedbox.enabled)
   const [uploadFactor, setUploadFactor] = useState(
     String(configured.seedbox.upload_factor_basis_points / 10_000)
@@ -228,10 +229,12 @@ function SeedboxPolicyEditor({
       return
     }
     setValidationError("")
+    const idempotencyKey = seedboxPolicyRequestId.current ?? crypto.randomUUID()
+    seedboxPolicyRequestId.current = idempotencyKey
     try {
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         body: {
           expected_sequence: configuredSequence,
           reason: reason.trim(),
@@ -251,6 +254,7 @@ function SeedboxPolicyEditor({
           },
         },
       })
+      seedboxPolicyRequestId.current = undefined
       setReason("")
     } catch (error) {
       setValidationError(

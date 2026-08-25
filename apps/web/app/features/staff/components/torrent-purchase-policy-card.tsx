@@ -51,6 +51,9 @@ export function TorrentPurchasePolicyCard({
   canUpdate: boolean
 }) {
   const mutation = useUpdateTorrentPurchasePolicySettings()
+  const updatePurchasePolicyRequestId = React.useRef<string | undefined>(
+    undefined
+  )
   const [enabled, setEnabled] = React.useState(purchase.enabled)
   const [feePercent, setFeePercent] = React.useState(
     String(purchase.tax_basis_points / 100)
@@ -83,9 +86,12 @@ export function TorrentPurchasePolicyCard({
       return
     }
     try {
+      const idempotencyKey =
+        updatePurchasePolicyRequestId.current ?? crypto.randomUUID()
+      updatePurchasePolicyRequestId.current = idempotencyKey
       const result = await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         body: {
           enabled,
           tax_basis_points: basisPoints,
@@ -93,6 +99,7 @@ export function TorrentPurchasePolicyCard({
           reason: reason.trim(),
         },
       })
+      updatePurchasePolicyRequestId.current = undefined
       setReason("")
       setConfirmationOpen(false)
       setSuccess(
@@ -152,6 +159,7 @@ export function TorrentPurchasePolicyCard({
                 setEnabled(value)
                 setSuccess("")
                 mutation.reset()
+                updatePurchasePolicyRequestId.current = undefined
               }}
             />
           </Field>
@@ -174,6 +182,7 @@ export function TorrentPurchasePolicyCard({
                   setFeePercent(event.target.value)
                   setSuccess("")
                   mutation.reset()
+                  updatePurchasePolicyRequestId.current = undefined
                 }}
               />
               <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
@@ -205,6 +214,7 @@ export function TorrentPurchasePolicyCard({
                 setReason(event.target.value)
                 setSuccess("")
                 mutation.reset()
+                updatePurchasePolicyRequestId.current = undefined
               }}
             />
             <FieldDescription>{reasonLength}/1000 字符</FieldDescription>

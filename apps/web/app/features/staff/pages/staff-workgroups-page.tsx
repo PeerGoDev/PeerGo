@@ -548,6 +548,7 @@ function ContributionPolicyDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const mutation = useIssueWorkgroupContributionPolicy()
+  const issuePolicyRequestId = React.useRef<string | undefined>(undefined)
   const minimumMonth = monthInputValue(page.minimum_effective_from)
   const [effectiveMonth, setEffectiveMonth] = React.useState(minimumMonth)
   const [target, setTarget] = React.useState("")
@@ -570,6 +571,7 @@ function ContributionPolicyDialog({
     setTarget("")
     setReason("")
     mutation.reset()
+    issuePolicyRequestId.current = undefined
     // Reset only when the dialog opens for a new group or policy page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, groupKind, minimumMonth])
@@ -578,14 +580,17 @@ function ContributionPolicyDialog({
     event.preventDefault()
     if (targetValidationError || reason.trim().length < 10) return
     try {
+      const idempotencyKey = issuePolicyRequestId.current ?? crypto.randomUUID()
+      issuePolicyRequestId.current = idempotencyKey
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         groupKind,
         targetValue: contributionTargetValue(groupKind, targetNumber),
         effectiveFrom: monthToEffectiveFrom(effectiveMonth),
         reason: reason.trim(),
       })
+      issuePolicyRequestId.current = undefined
       onOpenChange(false)
     } catch {
       // Keep the dialog open so the typed API error remains visible.
@@ -1074,18 +1079,23 @@ function ContributionReminderDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const mutation = useIssueWorkgroupContributionReminder()
+  const issueReminderRequestId = React.useRef<string | undefined>(undefined)
   const [reason, setReason] = React.useState("")
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     try {
+      const idempotencyKey =
+        issueReminderRequestId.current ?? crypto.randomUUID()
+      issueReminderRequestId.current = idempotencyKey
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         groupKind: membership.group_kind,
         membershipId: membership.id,
         periodStartsAt: cycle.period_starts_at,
         reason: reason.trim(),
       })
+      issueReminderRequestId.current = undefined
       onOpenChange(false)
     } catch {
       // Keep the immutable snapshot visible while staff reviews the API error.
@@ -1173,17 +1183,22 @@ function ApplicationDecisionDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const mutation = useDecideWorkgroupApplication()
+  const decideApplicationRequestId = React.useRef<string | undefined>(undefined)
   const [reason, setReason] = React.useState("")
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     try {
+      const idempotencyKey =
+        decideApplicationRequestId.current ?? crypto.randomUUID()
+      decideApplicationRequestId.current = idempotencyKey
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         application: state.application,
         decision: state.decision,
         reason: reason.trim(),
       })
+      decideApplicationRequestId.current = undefined
       onOpenChange(false)
     } catch {
       // Keep the dialog open so the typed API error remains visible.
@@ -1247,18 +1262,23 @@ function GrantMembershipDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const mutation = useGrantWorkgroupMembership()
+  const grantMembershipRequestId = React.useRef<string | undefined>(undefined)
   const [userId, setUserId] = React.useState("")
   const [reason, setReason] = React.useState("")
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     try {
+      const idempotencyKey =
+        grantMembershipRequestId.current ?? crypto.randomUUID()
+      grantMembershipRequestId.current = idempotencyKey
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         groupKind,
         userNumericId: Number(userId),
         reason: reason.trim(),
       })
+      grantMembershipRequestId.current = undefined
       setUserId("")
       setReason("")
       onOpenChange(false)
@@ -1332,17 +1352,22 @@ function MembershipChangeDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const mutation = useChangeWorkgroupMembership()
+  const changeMembershipRequestId = React.useRef<string | undefined>(undefined)
   const [reason, setReason] = React.useState("")
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     try {
+      const idempotencyKey =
+        changeMembershipRequestId.current ?? crypto.randomUUID()
+      changeMembershipRequestId.current = idempotencyKey
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         membership: state.membership,
         transition: state.transition,
         reason: reason.trim(),
       })
+      changeMembershipRequestId.current = undefined
       onOpenChange(false)
     } catch {
       // Keep the dialog open so the typed API error remains visible.

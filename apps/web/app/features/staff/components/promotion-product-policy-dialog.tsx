@@ -60,6 +60,9 @@ export function PromotionProductPolicyDialog({
   onUpdated: (message: string) => void
 }) {
   const mutation = useUpdatePromotionProductPolicy()
+  const promotionProductPolicyRequestId = React.useRef<string | undefined>(
+    undefined
+  )
   const [promotionEnabled, setPromotionEnabled] = React.useState(
     policy.promotion_enabled
   )
@@ -97,6 +100,7 @@ export function PromotionProductPolicyDialog({
   React.useEffect(() => {
     if (!open) return
     mutation.reset()
+    promotionProductPolicyRequestId.current = undefined
     setPromotionEnabled(policy.promotion_enabled)
     setStickyEnabled(policy.sticky_enabled)
     setPrices(productPrices(policy))
@@ -109,10 +113,13 @@ export function PromotionProductPolicyDialog({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit || mutation.isPending) return
+    const idempotencyKey =
+      promotionProductPolicyRequestId.current ?? crypto.randomUUID()
+    promotionProductPolicyRequestId.current = idempotencyKey
     try {
       await mutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         body: {
           expected_revision: policy.revision,
           promotion_enabled: promotionEnabled,
@@ -139,6 +146,7 @@ export function PromotionProductPolicyDialog({
           reason: reason.trim(),
         },
       })
+      promotionProductPolicyRequestId.current = undefined
       onUpdated("新的付费优惠与置顶价格已经生效，历史订单价格保持不变。")
       onOpenChange(false)
     } catch {

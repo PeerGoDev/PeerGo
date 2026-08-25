@@ -99,6 +99,7 @@ export function SocialPostCard({
   const follow = useSocialFollow()
   const vote = useSocialPollVote()
   const claimPacket = useClaimSocialRedPacket()
+  const claimPacketRequestId = React.useRef<string | undefined>(undefined)
   const staffSession = useStaffSession(Boolean(currentUserId && csrfToken))
   const staffCapabilities = useStaffCapabilities(staffSession.data?.user.id)
   const moderatePost = useModerateSocialPost()
@@ -108,7 +109,9 @@ export function SocialPostCard({
     "social.post.moderate"
   )
   const deletingAsModerator = canModerate && !isOwner
-  const removalError = deletePost.error ?? moderatePost.error
+  const removalError =
+    (deletePost.isError ? deletePost.error : undefined) ??
+    (moderatePost.isError ? moderatePost.error : undefined)
   const topics = post.topics ?? []
   const media = post.media ?? []
 
@@ -186,7 +189,7 @@ export function SocialPostCard({
         className="min-h-28 resize-y"
         aria-label="编辑动态正文"
       />
-      {updatePost.error ? (
+      {updatePost.isError ? (
         <ProblemAlert title="编辑失败" error={updatePost.error} />
       ) : null}
       <div className="flex justify-end gap-2">
@@ -495,7 +498,7 @@ export function SocialPostCard({
               </div>
             </div>
 
-            {claimPacket.error ? (
+            {claimPacket.isError ? (
               <div className="mt-3 flex items-start gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm ring-1 ring-white/10">
                 <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
                 <span>
@@ -550,11 +553,21 @@ export function SocialPostCard({
                   onClick={() => {
                     if (!csrfToken) return
                     claimPacket.reset()
-                    claimPacket.mutate({
-                      postId: post.id,
-                      csrfToken,
-                      idempotencyKey: crypto.randomUUID(),
-                    })
+                    const idempotencyKey =
+                      claimPacketRequestId.current ?? crypto.randomUUID()
+                    claimPacketRequestId.current = idempotencyKey
+                    claimPacket.mutate(
+                      {
+                        postId: post.id,
+                        csrfToken,
+                        idempotencyKey,
+                      },
+                      {
+                        onSuccess: () => {
+                          claimPacketRequestId.current = undefined
+                        },
+                      }
+                    )
                   }}
                   disabled={
                     !csrfToken ||

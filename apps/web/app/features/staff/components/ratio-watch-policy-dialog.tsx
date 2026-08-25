@@ -71,6 +71,7 @@ export function RatioWatchPolicyDialog({
   const [preview, setPreview] = React.useState<RatioWatchPolicyImpactPreview>()
   const previewMutation = usePreviewRatioWatchPolicy()
   const issueMutation = useIssueRatioWatchPolicy()
+  const ratioWatchPolicyRequestId = React.useRef<string | undefined>(undefined)
   const policy = ratioWatchPolicyFromDraft(draft)
   const reasonLength = Array.from(reason.trim()).length
   const effectiveTimestamp = new Date(effectiveAt).getTime()
@@ -93,6 +94,7 @@ export function RatioWatchPolicyDialog({
     setPreview(undefined)
     previewMutation.reset()
     issueMutation.reset()
+    ratioWatchPolicyRequestId.current = undefined
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, current, minimumEffectiveFrom])
 
@@ -104,6 +106,7 @@ export function RatioWatchPolicyDialog({
     setPreview(undefined)
     previewMutation.reset()
     issueMutation.reset()
+    ratioWatchPolicyRequestId.current = undefined
   }
 
   async function handlePreview() {
@@ -118,14 +121,18 @@ export function RatioWatchPolicyDialog({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!policy || !canIssue) return
+    const idempotencyKey =
+      ratioWatchPolicyRequestId.current ?? crypto.randomUUID()
+    ratioWatchPolicyRequestId.current = idempotencyKey
     try {
       const revision = await issueMutation.mutateAsync({
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         policy,
         effectiveAt: new Date(effectiveAt).toISOString(),
         reason: reason.trim(),
       })
+      ratioWatchPolicyRequestId.current = undefined
       onIssued(
         `长期分享率第 ${revision.rule_version} 版规则已签发，将于 ${formatCompactDateTime(revision.effective_at)} 生效。`
       )
@@ -248,6 +255,7 @@ export function RatioWatchPolicyDialog({
                     onChange={(event) => {
                       setEffectiveAt(event.target.value)
                       issueMutation.reset()
+                      ratioWatchPolicyRequestId.current = undefined
                     }}
                   />
                   <FieldDescription>
@@ -274,6 +282,7 @@ export function RatioWatchPolicyDialog({
                     onChange={(event) => {
                       setReason(event.target.value)
                       issueMutation.reset()
+                      ratioWatchPolicyRequestId.current = undefined
                     }}
                   />
                   <FieldDescription>

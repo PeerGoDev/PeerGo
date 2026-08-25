@@ -38,24 +38,30 @@ export function TorrentPurchaseRefundDialog({
   onRefunded: (message: string) => void
 }) {
   const mutation = useRefundTorrentPurchase()
+  const refundPurchaseRequestId = React.useRef<string | undefined>(undefined)
   const [reason, setReason] = React.useState("")
   const reasonLength = Array.from(reason.trim()).length
 
   React.useEffect(() => {
     setReason("")
     mutation.reset()
+    refundPurchaseRequestId.current = undefined
   }, [purchase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (!purchase || reasonLength < 10 || reasonLength > 1000) return
     try {
+      const idempotencyKey =
+        refundPurchaseRequestId.current ?? crypto.randomUUID()
+      refundPurchaseRequestId.current = idempotencyKey
       const result = await mutation.mutateAsync({
         buyerNumericId: purchase.buyer_numeric_id,
         torrentId: purchase.torrent_id,
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         body: { reason: reason.trim() },
       })
+      refundPurchaseRequestId.current = undefined
       onRefunded(
         `已撤销用户 #${result.buyer_numeric_id} 对种子 #${result.torrent_id} 的购买权限，并返还 ${formatInteger(result.refund_amount)} 魔力值。`
       )
@@ -110,7 +116,10 @@ export function TorrentPurchaseRefundDialog({
               placeholder="例如：核实为重复购买，按工单结论执行全额退款"
               onChange={(event) => {
                 setReason(event.target.value)
-                if (mutation.isError) mutation.reset()
+                if (mutation.isError) {
+                  mutation.reset()
+                  refundPurchaseRequestId.current = undefined
+                }
               }}
             />
             <FieldDescription>{reasonLength}/1000 字符</FieldDescription>

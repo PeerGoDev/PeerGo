@@ -36,6 +36,9 @@ export function TorrentAvailabilityDialog({
   onChanged: (message: string) => void
 }) {
   const mutation = useChangeTorrentAvailability()
+  const changeAvailabilityRequestId = React.useRef<string | undefined>(
+    undefined
+  )
   const [reason, setReason] = React.useState("")
   const isDisable = torrent?.state === "published"
   const action = isDisable ? "disable" : "restore"
@@ -46,6 +49,7 @@ export function TorrentAvailabilityDialog({
     if (!torrent) {
       setReason("")
       mutation.reset()
+      changeAvailabilityRequestId.current = undefined
     }
   }, [torrent]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -54,16 +58,20 @@ export function TorrentAvailabilityDialog({
       return
     }
     try {
+      const idempotencyKey =
+        changeAvailabilityRequestId.current ?? crypto.randomUUID()
+      changeAvailabilityRequestId.current = idempotencyKey
       await mutation.mutateAsync({
         torrentId: torrent.id,
         csrfToken,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
         body: {
           expected_version: torrent.version,
           action,
           reason: reason.trim(),
         },
       })
+      changeAvailabilityRequestId.current = undefined
       onChanged(`种子 #${torrent.id} 已${isDisable ? "下架" : "恢复发布"}。`)
       onOpenChange(false)
     } catch {
@@ -112,7 +120,10 @@ export function TorrentAvailabilityDialog({
             placeholder="请输入至少 10 个字符，便于后续审计与交接"
             onChange={(event) => {
               setReason(event.target.value)
-              if (mutation.isError) mutation.reset()
+              if (mutation.isError) {
+                mutation.reset()
+                changeAvailabilityRequestId.current = undefined
+              }
             }}
           />
           <FieldDescription>{reasonLength}/1000 字符</FieldDescription>

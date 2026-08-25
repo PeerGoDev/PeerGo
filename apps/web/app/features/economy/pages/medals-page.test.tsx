@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { sessionKeys } from "~/features/auth/api/session.mutations"
+import { capabilityKeys } from "~/features/authz/api/capabilities.queries"
 import {
   type MemberMedalOverview,
   medalKeys,
@@ -14,6 +15,10 @@ import { MedalsPage } from "~/features/economy/pages/medals-page"
 const userId = "0198f20a-6da8-7e51-9c64-111111111111"
 
 describe("MedalsPage", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it("presents migrated holdings and shop entries using the Rousi-compatible structure", async () => {
     const user = userEvent.setup()
     const queryClient = medalQueryClient()
@@ -43,6 +48,43 @@ describe("MedalsPage", () => {
     expect(screen.getByText("2,500 魔力值")).toBeVisible()
     expect(screen.getByRole("button", { name: "购买" })).toBeEnabled()
   })
+
+  it("clears the wearing button loading state after the request settles", async () => {
+    const user = userEvent.setup()
+    const queryClient = medalQueryClient()
+
+    let resolveWearing!: (value: Response) => void
+    const wearingResponse = new Promise<Response>((resolve) => {
+      resolveWearing = resolve
+    })
+    const fetchMock = vi.fn((input: Request) => {
+      if (input.url.includes("/wearing")) return wearingResponse
+      return Promise.resolve(jsonResponse(overviewAfterWear))
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(
+      <MemoryRouter initialEntries={["/medals"]}>
+        <QueryClientProvider client={queryClient}>
+          <MedalsPage />
+        </QueryClientProvider>
+      </MemoryRouter>
+    )
+
+    const wearButton = await screen.findByRole("button", { name: "取下" })
+    await user.click(wearButton)
+
+    expect(wearButton).toBeDisabled()
+    expect(within(wearButton).getByRole("status")).toBeInTheDocument()
+
+    resolveWearing(jsonResponse(holdingAfterWear))
+
+    await waitFor(() => {
+      expect(wearButton).toBeEnabled()
+      expect(wearButton).toHaveTextContent("佩戴")
+      expect(within(wearButton).queryByRole("status")).toBeNull()
+    })
+  })
 })
 
 function medalQueryClient() {
@@ -60,6 +102,23 @@ function medalQueryClient() {
     csrf_token: "c".repeat(43),
   })
   queryClient.setQueryData(medalKeys.current(userId), overview)
+  queryClient.setQueryData(capabilityKeys.current(userId), {
+    policy_version: "2026-08-19",
+    items: [
+      {
+        action: "economy.medal.wear.self",
+        description: "佩戴、取下并调整勋章顺序",
+        scope: { type: "site", id: "peergo" },
+        expires_at: "2026-09-19T12:00:00Z",
+      },
+      {
+        action: "economy.medal.purchase.self",
+        description: "购买勋章",
+        scope: { type: "site", id: "peergo" },
+        expires_at: "2026-09-19T12:00:00Z",
+      },
+    ],
+  })
   return queryClient
 }
 
@@ -145,4 +204,27 @@ const overview: MemberMedalOverview = {
       purchasable: true,
     },
   ],
+}
+
+const holdingAfterWear = {
+  id: "102",
+  state: "owned" as const,
+  priority: 0,
+  acquired_at: "2026-08-01T00:00:00Z",
+  version: 2,
+}
+
+const overviewAfterWear: MemberMedalOverview = {
+  ...overview,
+  wearing_count: "1",
+  items: overview.items.map((item) =>
+    item.id === "2" ? { ...item, holding: holdingAfterWear } : item
+  ),
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
 }
