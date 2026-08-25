@@ -47,3 +47,25 @@ func TestTorrentEligibilityEventRejectsTampering(t *testing.T) {
 		t.Fatalf("DecodeTorrentEligibilityChanged() error = %v", err)
 	}
 }
+
+func TestTorrentEligibilityEventAcceptsPostgresTimestampPrecision(t *testing.T) {
+	t.Parallel()
+	var hash [20]byte
+	hash[0] = 1
+	event, err := NewTorrentEligibilityChanged(TorrentEligibilityInput{
+		EventID:    uuid.New(),
+		OccurredAt: time.Date(2026, time.August, 25, 10, 45, 29, 827722974, time.UTC),
+		TorrentID:  2017, InfoHashV1: hash, TotalSizeBytes: 1, Enabled: true, TorrentVersion: 3,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	event.OccurredAt = event.OccurredAt.Truncate(time.Microsecond)
+	if err := Validate(event); err != nil {
+		t.Fatalf("Validate() rejected PostgreSQL timestamp precision: %v", err)
+	}
+	event.OccurredAt = event.OccurredAt.Add(time.Microsecond)
+	if err := Validate(event); err == nil {
+		t.Fatal("Validate() accepted a timestamp from a different microsecond")
+	}
+}
