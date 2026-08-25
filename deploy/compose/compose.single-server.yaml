@@ -13,6 +13,11 @@ services:
     read_only: true
     restart: unless-stopped
     stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: ${PEERGO_DOCKER_LOG_MAX_SIZE:-100m}
+        max-file: ${PEERGO_DOCKER_LOG_MAX_FILES:-3}
     security_opt:
       - no-new-privileges:true
     tmpfs:

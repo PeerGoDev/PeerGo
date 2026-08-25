@@ -16,6 +16,8 @@ type PostgresRepository struct {
 	pool *pgxpool.Pool
 }
 
+const snapshotEntryCleanupPassLimit = 4
+
 func NewPostgresRepository(pool *pgxpool.Pool) (*PostgresRepository, error) {
 	if pool == nil {
 		return nil, ErrInput
@@ -74,7 +76,10 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	}
 	result.SeedingSources = int64(len(seedingSourceCandidates))
 	rawIntervalCandidates = append(rawIntervalCandidates, seedingSourceCandidates...)
-	if result.SnapshotEntries, err = queries.StorageCleanupDeleteSnapshotEntries(ctx, ledgerdb.StorageCleanupDeleteSnapshotEntriesParams{DetailBefore: detail, BatchSize: batch}); err != nil {
+	result.SnapshotEntries, err = drainSnapshotEntryBacklog(ctx, func(ctx context.Context) (int64, error) {
+		return queries.StorageCleanupDeleteSnapshotEntries(ctx, ledgerdb.StorageCleanupDeleteSnapshotEntriesParams{DetailBefore: detail, BatchSize: batch})
+	})
+	if err != nil {
 		return result, cleanupError("delete redundant snapshot entries", err)
 	}
 	if result.SnapshotChunks, err = queries.StorageCleanupDeleteSnapshotChunks(ctx, ledgerdb.StorageCleanupDeleteSnapshotChunksParams{DetailBefore: detail, BatchSize: batch}); err != nil {
@@ -115,6 +120,26 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 		return result, cleanupError("delete unreferenced legacy inbox payloads", err)
 	}
 	return result, nil
+}
+
+// drainSnapshotEntryBacklog gives the high-volume full-swarm snapshot ledger
+// enough bounded delete throughput to keep pace with ingestion. Each call is
+// still a separate batch-sized transaction, and the worker still yields for
+// its configured interval after this pass so foreground Tracker traffic and
+// autovacuum are not starved.
+func drainSnapshotEntryBacklog(ctx context.Context, deleteBatch func(context.Context) (int64, error)) (int64, error) {
+	var total int64
+	for range snapshotEntryCleanupPassLimit {
+		rows, err := deleteBatch(ctx)
+		total += rows
+		if err != nil {
+			return total, err
+		}
+		if rows == 0 {
+			break
+		}
+	}
+	return total, nil
 }
 
 func (repository *PostgresRepository) cleanupTrafficDetails(ctx context.Context, detailBefore pgtype.Timestamptz, batchSize int32) ([]uuid.UUID, int64, error) {
