@@ -10,6 +10,7 @@ import {
   type LucideIcon,
   AwardIcon,
   BookmarkIcon,
+  BookOpenIcon,
   ChartNoAxesCombinedIcon,
   ChevronDownIcon,
   ClockAlertIcon,
@@ -184,6 +185,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const canReadWorkgroups = capabilities.data?.items.some(
     (capability) => capability.action === "workgroup.read.self"
   )
+  const canReadWiki = capabilities.data?.items.some(
+    (capability) => capability.action === "wiki.page.read.member"
+  )
   const canReadSeedboxes = capabilities.data?.items.some(
     (capability) => capability.action === "tracker.seedbox.read.self"
   )
@@ -221,6 +225,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     notificationSummary.data?.unread_count
   )
   const communityNavigationItems: NavigationItem[] = [
+    ...(canReadWiki
+      ? [
+          {
+            label: "Wiki",
+            to: "/wiki",
+            icon: BookOpenIcon,
+          },
+        ]
+      : []),
     ...(canReadInvitations
       ? [
           {
@@ -935,6 +948,9 @@ function navigationItemIsActive(
     return (
       pathname === "/announcements" || pathname.startsWith("/announcements/")
     )
+  }
+  if (target === "/wiki") {
+    return pathname === "/wiki" || pathname.startsWith("/wiki/")
   }
   if (target === "/notifications") {
     return pathname === "/notifications"

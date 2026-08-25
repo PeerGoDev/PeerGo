@@ -37,8 +37,8 @@ func NormalizeField(field, value string) (string, bool) {
 	return normalize(value, fallback), true
 }
 
-// Reason normalizes the reason part used by multipart commands, which do not
-// pass through the JSON request-body middleware.
+// Reason normalizes the reason part used by commands that do not pass through
+// shared request-body normalization.
 func Reason(value string) string {
 	normalized, _ := NormalizeField("reason", value)
 	return normalized

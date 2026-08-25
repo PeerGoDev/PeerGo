@@ -36,6 +36,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	"github.com/peergo/peergo/services/core/internal/modules/trackercontrol"
 	"github.com/peergo/peergo/services/core/internal/modules/traffic"
+	"github.com/peergo/peergo/services/core/internal/modules/wiki"
 	"github.com/peergo/peergo/services/core/internal/modules/workgroups"
 )
 
@@ -159,6 +160,20 @@ type AnnouncementAdministrationService interface {
 	Create(context.Context, authz.StaffActor, catalog.CreateAnnouncementDraftInput) (catalog.ManagedAnnouncement, error)
 	UpdateDraft(context.Context, authz.StaffActor, catalog.UpdateAnnouncementDraftInput) (catalog.ManagedAnnouncement, error)
 	ChangePublication(context.Context, authz.StaffActor, catalog.ChangeAnnouncementPublicationInput) (catalog.ManagedAnnouncement, error)
+}
+
+// WikiService exposes public/member reads, assigned-editor writes and the
+// independently authenticated staff editorial surface.
+type WikiService interface {
+	List(context.Context, string, wiki.ListInput) (wiki.PageList, error)
+	Get(context.Context, string, string) (wiki.Page, error)
+	UpdateAssigned(context.Context, string, string, wiki.UpdateAssignedInput) (wiki.Page, error)
+	ListManaged(context.Context, authz.StaffActor, wiki.ListInput) (wiki.PageList, error)
+	GetManaged(context.Context, authz.StaffActor, uuid.UUID) (wiki.Page, error)
+	CreateManaged(context.Context, authz.StaffActor, wiki.CreateManagedInput) (wiki.Page, error)
+	UpdateManaged(context.Context, authz.StaffActor, wiki.UpdateManagedInput) (wiki.Page, error)
+	Revisions(context.Context, authz.StaffActor, uuid.UUID, int, int) (wiki.RevisionPage, error)
+	RestoreManaged(context.Context, authz.StaffActor, wiki.RestoreManagedInput) (wiki.Page, error)
 }
 
 // SiteDisplaySettingsService is the catalog-owned typed settings section. It
@@ -442,6 +457,7 @@ type Handler struct {
 	grantAdministration         GrantAdministrationService
 	categoryAdministration      CategoryAdministrationService
 	announcementAdministration  AnnouncementAdministrationService
+	wiki                        WikiService
 	siteDisplaySettings         SiteDisplaySettingsService
 	userAdministration          UserAdministrationService
 	notifications               NotificationService
@@ -477,7 +493,7 @@ type Handler struct {
 }
 
 // NewHandler creates the Core HTTP adapter.
-func NewHandler(catalogService *catalog.Service, identityService IdentityService, registrationService RegistrationService, humanVerificationService identity.HumanVerificationVerifier, invitationService InvitationService, emailVerificationService EmailVerificationService, passwordRecoveryService PasswordRecoveryService, sessionSecurityService SessionSecurityService, twoFactorService TwoFactorService, staffIdentityService StaffIdentityService, staffEnrollmentService StaffEnrollmentService, authorizationService AuthorizationService, grantAdministrationService GrantAdministrationService, categoryAdministrationService CategoryAdministrationService, announcementAdministrationService AnnouncementAdministrationService, siteDisplaySettingsService SiteDisplaySettingsService, userAdministrationService UserAdministrationService, notificationService NotificationService, trafficOverviewService TrafficOverviewService, economyOverviewService EconomyOverviewService, attendanceService AttendanceService, memberGiftService MemberGiftService, contentTipService ContentTipService, workgroupService WorkgroupService, seedingRewardAdministrationService SeedingRewardAdministrationService, levelPolicyAdministrationService LevelPolicyAdministrationService, contributionExperiencePolicyService ContributionExperiencePolicyService, medalAdministrationService MedalAdministrationService, memberMedalService MemberMedalService, hnrPolicyAdministrationService HNRPolicyAdministrationService, ratioWatchAdministrationService RatioWatchAdministrationService, newcomerAdministrationService NewcomerAdministrationService, operationsService OperationsService, torrentBookmarkService TorrentBookmarkService, commentService CommentService, socialPostService SocialPostService, commentModerationService CommentModerationService, torrentReadService TorrentReadService, torrentUploadService TorrentUploadService, torrentDownloadService TorrentDownloadService, torrentReviewService TorrentReviewService, torrentResubmissionService TorrentResubmissionService, torrentMaintenanceService TorrentMaintenanceService, promotionAdministrationService PromotionAdministrationService, rssService RSSService, sessionCookie, staffSessionCookie SessionCookieConfig) *Handler {
+func NewHandler(catalogService *catalog.Service, identityService IdentityService, registrationService RegistrationService, humanVerificationService identity.HumanVerificationVerifier, invitationService InvitationService, emailVerificationService EmailVerificationService, passwordRecoveryService PasswordRecoveryService, sessionSecurityService SessionSecurityService, twoFactorService TwoFactorService, staffIdentityService StaffIdentityService, staffEnrollmentService StaffEnrollmentService, authorizationService AuthorizationService, grantAdministrationService GrantAdministrationService, categoryAdministrationService CategoryAdministrationService, announcementAdministrationService AnnouncementAdministrationService, wikiService WikiService, siteDisplaySettingsService SiteDisplaySettingsService, userAdministrationService UserAdministrationService, notificationService NotificationService, trafficOverviewService TrafficOverviewService, economyOverviewService EconomyOverviewService, attendanceService AttendanceService, memberGiftService MemberGiftService, contentTipService ContentTipService, workgroupService WorkgroupService, seedingRewardAdministrationService SeedingRewardAdministrationService, levelPolicyAdministrationService LevelPolicyAdministrationService, contributionExperiencePolicyService ContributionExperiencePolicyService, medalAdministrationService MedalAdministrationService, memberMedalService MemberMedalService, hnrPolicyAdministrationService HNRPolicyAdministrationService, ratioWatchAdministrationService RatioWatchAdministrationService, newcomerAdministrationService NewcomerAdministrationService, operationsService OperationsService, torrentBookmarkService TorrentBookmarkService, commentService CommentService, socialPostService SocialPostService, commentModerationService CommentModerationService, torrentReadService TorrentReadService, torrentUploadService TorrentUploadService, torrentDownloadService TorrentDownloadService, torrentReviewService TorrentReviewService, torrentResubmissionService TorrentResubmissionService, torrentMaintenanceService TorrentMaintenanceService, promotionAdministrationService PromotionAdministrationService, rssService RSSService, sessionCookie, staffSessionCookie SessionCookieConfig) *Handler {
 	return &Handler{
 		catalog:                     catalogService,
 		identity:                    identityService,
@@ -494,6 +510,7 @@ func NewHandler(catalogService *catalog.Service, identityService IdentityService
 		grantAdministration:         grantAdministrationService,
 		categoryAdministration:      categoryAdministrationService,
 		announcementAdministration:  announcementAdministrationService,
+		wiki:                        wikiService,
 		siteDisplaySettings:         siteDisplaySettingsService,
 		userAdministration:          userAdministrationService,
 		notifications:               notificationService,

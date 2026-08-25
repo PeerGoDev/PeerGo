@@ -2070,6 +2070,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/wiki/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 搜索当前调用者可见的 Wiki 页面 */
+        get: operations["listWikiPages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wiki/pages/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 按稳定路由键读取一篇 Wiki */
+        get: operations["getWikiPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wiki/pages/{page_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 编辑自己创建或获指派协作的 Wiki 正文 */
+        put: operations["updateAssignedWikiPage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wiki/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 搜索 Wiki 管理投影 */
+        get: operations["listManagedWikiPages"];
+        put?: never;
+        /** 创建 Wiki 页面及首个修订 */
+        post: operations["createManagedWikiPage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wiki/pages/{page_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: components["parameters"]["WikiPageIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        /** 读取 Wiki 完整管理投影 */
+        get: operations["getManagedWikiPage"];
+        /** 修改 Wiki 配置、正文、协作者或停用状态 */
+        put: operations["updateManagedWikiPage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wiki/pages/{page_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取 Wiki 最近的有界修订历史 */
+        get: operations["listManagedWikiRevisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/wiki/pages/{page_id}/revisions/{revision_number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 将历史修订复制为新的当前修订 */
+        post: operations["restoreManagedWikiRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/categories": {
         parameters: {
             query?: never;
@@ -4162,7 +4285,7 @@ export interface components {
             expected_state_version: number;
         };
         /** @enum {string} */
-        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.vip.manage" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
+        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
         CapabilityScope: {
             /** @enum {string} */
             type: "site" | "category";
@@ -7866,6 +7989,95 @@ export interface components {
             name: string;
             image_path?: string | null;
         };
+        /** @enum {string} */
+        WikiVisibility: "public" | "members";
+        WikiPageSummary: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            title: string;
+            summary: string;
+            visibility: components["schemas"]["WikiVisibility"];
+            sort_order: number;
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            revision_number: number;
+            can_edit: boolean;
+            archived: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        WikiPageList: {
+            items: components["schemas"]["WikiPageSummary"][];
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        WikiUserReference: {
+            /** Format: int64 */
+            numeric_id: number;
+            username: string;
+            display_name: string;
+        };
+        WikiPage: components["schemas"]["WikiPageSummary"] & {
+            body: string;
+            creator: components["schemas"]["WikiUserReference"];
+            updater: components["schemas"]["WikiUserReference"];
+            editors: components["schemas"]["WikiUserReference"][];
+            migrated: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            archived_at?: string | null;
+        };
+        UpdateAssignedWikiPageRequest: {
+            title: string;
+            summary: string;
+            body: string;
+            /** Format: int64 */
+            expected_version: number;
+            /** @description 可留空；服务端自动生成稳定的版本说明。 */
+            reason: string;
+        };
+        CreateManagedWikiPageRequest: {
+            slug: string;
+            title: string;
+            summary: string;
+            body: string;
+            visibility: components["schemas"]["WikiVisibility"];
+            sort_order: number;
+            editor_numeric_ids: number[];
+            reason: string;
+        };
+        UpdateManagedWikiPageRequest: components["schemas"]["CreateManagedWikiPageRequest"] & {
+            /** Format: int64 */
+            expected_version: number;
+            archived: boolean;
+        };
+        /** @enum {string} */
+        WikiRevisionOrigin: "migration" | "member" | "staff" | "restore";
+        WikiRevisionSummary: {
+            /** Format: int64 */
+            revision_number: number;
+            title: string;
+            reason: string;
+            origin: components["schemas"]["WikiRevisionOrigin"];
+            editor: components["schemas"]["WikiUserReference"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        WikiRevisionPage: {
+            items: components["schemas"]["WikiRevisionSummary"][];
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        RestoreManagedWikiPageRequest: {
+            /** Format: int64 */
+            expected_version: number;
+            reason: string;
+        };
         CategoryWithCount: {
             id: string;
             name: string;
@@ -9155,6 +9367,12 @@ export interface components {
         AnnouncementOffsetQueryParameter: number;
         /** @description 公告的稳定路由键；兼容旧站数字 ID 与 PeerGo slug。 */
         AnnouncementIDPathParameter: string;
+        WikiQueryParameter: string;
+        WikiLimitParameter: number;
+        WikiOffsetParameter: number;
+        WikiSlugPathParameter: string;
+        WikiPageIDPathParameter: string;
+        WikiRevisionNumberPathParameter: number;
         /** @description 创建后不可变的分类稳定标识。 */
         CategoryIDPathParameter: string;
         /** @description 评论举报案件的稳定公开 UUID。 */
@@ -13542,6 +13760,284 @@ export interface operations {
             404: components["responses"]["ProblemResponse"];
             409: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listWikiPages: {
+        parameters: {
+            query?: {
+                query?: components["parameters"]["WikiQueryParameter"];
+                limit?: components["parameters"]["WikiLimitParameter"];
+                offset?: components["parameters"]["WikiOffsetParameter"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 公开页面对匿名访问者可见；登录成员同时看到成员页面。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPageList"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getWikiPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["WikiSlugPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Wiki 当前正文、协作者与版本信息。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    updateAssignedWikiPage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                page_id: components["parameters"]["WikiPageIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAssignedWikiPageRequest"];
+            };
+        };
+        responses: {
+            /** @description 新修订已经提交，旧修订按每页最多 50 个的策略保留。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listManagedWikiPages: {
+        parameters: {
+            query?: {
+                query?: components["parameters"]["WikiQueryParameter"];
+                limit?: components["parameters"]["WikiLimitParameter"];
+                offset?: components["parameters"]["WikiOffsetParameter"];
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 包含停用页面的有界管理列表。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPageList"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    createManagedWikiPage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateManagedWikiPageRequest"];
+            };
+        };
+        responses: {
+            /** @description 当前投影、协作者和初始修订已原子提交。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getManagedWikiPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: components["parameters"]["WikiPageIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 包括已停用页面和协作者的编辑投影。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPage"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    updateManagedWikiPage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                page_id: components["parameters"]["WikiPageIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateManagedWikiPageRequest"];
+            };
+        };
+        responses: {
+            /** @description 修改已作为一个新修订原子提交。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listManagedWikiRevisions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: components["parameters"]["WikiOffsetParameter"];
+            };
+            header?: never;
+            path: {
+                page_id: components["parameters"]["WikiPageIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 修订号倒序的最近 50 个真实内容版本。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiRevisionPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    restoreManagedWikiRevision: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                page_id: components["parameters"]["WikiPageIDPathParameter"];
+                revision_number: components["parameters"]["WikiRevisionNumberPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreManagedWikiPageRequest"];
+            };
+        };
+        responses: {
+            /** @description 目标内容已作为新的可回滚修订恢复。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };

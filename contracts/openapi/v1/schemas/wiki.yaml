@@ -1,0 +1,291 @@
+WikiVisibility:
+  type: string
+  enum: [public, members]
+
+WikiRevisionOrigin:
+  type: string
+  enum: [migration, member, staff, restore]
+
+WikiUserReference:
+  type: object
+  additionalProperties: false
+  required: [numeric_id, username, display_name]
+  properties:
+    numeric_id:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    username:
+      type: string
+      minLength: 1
+      maxLength: 64
+    display_name:
+      type: string
+      minLength: 1
+      maxLength: 80
+
+WikiPageSummary:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - slug
+    - title
+    - summary
+    - visibility
+    - sort_order
+    - version
+    - revision_number
+    - can_edit
+    - archived
+    - updated_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    slug:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,95}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      maxLength: 500
+    visibility:
+      $ref: "#/WikiVisibility"
+    sort_order:
+      type: integer
+      minimum: -100000
+      maximum: 100000
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    revision_number:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    can_edit:
+      type: boolean
+    archived:
+      type: boolean
+    updated_at:
+      type: string
+      format: date-time
+
+WikiPageList:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 100
+      items:
+        $ref: "#/WikiPageSummary"
+    total:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 100000
+WikiPage:
+  allOf:
+    - $ref: "#/WikiPageSummary"
+    - type: object
+      additionalProperties: false
+      required:
+        - body
+        - creator
+        - updater
+        - editors
+        - migrated
+        - created_at
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 100000
+        creator:
+          $ref: "#/WikiUserReference"
+        updater:
+          $ref: "#/WikiUserReference"
+        editors:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items:
+            $ref: "#/WikiUserReference"
+        migrated:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+
+UpdateAssignedWikiPageRequest:
+  type: object
+  additionalProperties: false
+  required: [title, summary, body, expected_version, reason]
+  properties:
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      maxLength: 500
+    body:
+      type: string
+      minLength: 1
+      maxLength: 100000
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    reason:
+      type: string
+      minLength: 0
+      maxLength: 500
+      description: 可留空；服务端自动生成稳定的版本说明。
+
+CreateManagedWikiPageRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - slug
+    - title
+    - summary
+    - body
+    - visibility
+    - sort_order
+    - editor_numeric_ids
+    - reason
+  properties:
+    slug:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,95}$"
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    summary:
+      type: string
+      maxLength: 500
+    body:
+      type: string
+      minLength: 1
+      maxLength: 100000
+    visibility:
+      $ref: "#/WikiVisibility"
+    sort_order:
+      type: integer
+      minimum: -100000
+      maximum: 100000
+    editor_numeric_ids:
+      type: array
+      maxItems: 20
+      uniqueItems: true
+      items:
+        type: integer
+        format: int64
+        minimum: 1
+        maximum: 9007199254740991
+    reason:
+      type: string
+      minLength: 0
+      maxLength: 500
+
+UpdateManagedWikiPageRequest:
+  allOf:
+    - $ref: "#/CreateManagedWikiPageRequest"
+    - type: object
+      additionalProperties: false
+      required: [expected_version, archived]
+      properties:
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        archived:
+          type: boolean
+
+RestoreManagedWikiPageRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_version, reason]
+  properties:
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    reason:
+      type: string
+      minLength: 0
+      maxLength: 500
+
+WikiRevisionSummary:
+  type: object
+  additionalProperties: false
+  required: [revision_number, title, reason, origin, editor, created_at]
+  properties:
+    revision_number:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    title:
+      type: string
+      minLength: 1
+      maxLength: 160
+    reason:
+      type: string
+      minLength: 1
+      maxLength: 500
+    origin:
+      $ref: "#/WikiRevisionOrigin"
+    editor:
+      $ref: "#/WikiUserReference"
+    created_at:
+      type: string
+      format: date-time
+
+WikiRevisionPage:
+  type: object
+  additionalProperties: false
+  required: [items, total, limit, offset]
+  properties:
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: "#/WikiRevisionSummary"
+    total:
+      type: integer
+      minimum: 0
+      maximum: 50
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    offset:
+      type: integer
+      minimum: 0
+      maximum: 100000

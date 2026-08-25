@@ -15,6 +15,9 @@ export default [
   route("list", "routes/legacy-list.tsx"),
   route("torrent/:torrentId", "routes/legacy-torrent.$torrentId.tsx"),
   route("announcements", "routes/announcements.tsx"),
+  route("wiki", "routes/wiki.tsx"),
+  route("wiki/:slug/edit", "routes/wiki.$slug.edit.tsx"),
+  route("wiki/:slug", "routes/wiki.$slug.tsx"),
   route("notifications", "routes/notifications.tsx"),
   route("social", "routes/social.tsx"),
   route("social/notifications", "routes/social.notifications.tsx"),
@@ -61,6 +64,7 @@ export default [
     "staff/content/announcements",
     "routes/staff.content.announcements.tsx"
   ),
+  route("staff/content/wiki", "routes/staff.content.wiki.tsx"),
   route("staff/content/comments", "routes/staff.content.comments.tsx"),
   route("staff/content/social", "routes/staff.content.social.tsx"),
   route("staff/content/torrents", "routes/staff.content.torrents.tsx"),

@@ -41,6 +41,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	"github.com/peergo/peergo/services/core/internal/modules/trackercontrol"
 	"github.com/peergo/peergo/services/core/internal/modules/traffic"
+	"github.com/peergo/peergo/services/core/internal/modules/wiki"
 	"github.com/peergo/peergo/services/core/internal/modules/workgroups"
 	"github.com/peergo/peergo/services/core/internal/platform/config"
 	"github.com/peergo/peergo/services/core/internal/platform/httpserver"
@@ -887,6 +888,16 @@ func main() {
 		logger.Error("compose announcement administration service", "error", err)
 		os.Exit(1)
 	}
+	wikiRepository, err := wiki.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose Wiki repository", "error", err)
+		os.Exit(1)
+	}
+	wikiService, err := wiki.NewService(identityService, authorizationService, wikiRepository, time.Now)
+	if err != nil {
+		logger.Error("compose Wiki service", "error", err)
+		os.Exit(1)
+	}
 	siteDisplaySettingsRepository, err := catalog.NewPostgresSiteDisplaySettingsRepository(
 		pool,
 		siteDisplaySettingsChangeEventBuilder,
@@ -981,6 +992,7 @@ func main() {
 		GrantAdministration:         grantAdministrationService,
 		CategoryAdministration:      categoryAdministrationService,
 		AnnouncementAdministration:  announcementAdministrationService,
+		Wiki:                        wikiService,
 		SiteDisplaySettings:         siteDisplaySettingsService,
 		UserAdministration:          userAdministrationService,
 		Notifications:               notificationService,
