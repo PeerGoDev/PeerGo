@@ -33,7 +33,7 @@ export function AccountProfilePage() {
   if (session.isPending) {
     return (
       <ProfileFrame>
-        <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+        <Card className="gap-0 py-0">
           <CardHeader className="px-6 pt-6 pb-5">
             <Skeleton className="h-7 w-28" />
           </CardHeader>
@@ -50,7 +50,7 @@ export function AccountProfilePage() {
   if (!session.data) {
     return (
       <ProfileFrame>
-        <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+        <Card className="gap-0 py-0">
           <CardHeader className="px-6 pt-6 pb-3">
             <CardTitle className="text-2xl leading-none">需要登录</CardTitle>
             <CardDescription>登录后可以查看自己的账户资料。</CardDescription>
@@ -111,7 +111,7 @@ function ProfileEditor({
         : ""
 
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-6">
         <CardTitle>
           <h2 className="text-2xl leading-none font-semibold">个人资料</h2>

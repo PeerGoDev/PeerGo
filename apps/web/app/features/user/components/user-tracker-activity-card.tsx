@@ -31,7 +31,7 @@ export function UserTrackerActivityCard({
     activity?.items.filter((item) => item.leeching_connections > 0).length ?? 0
 
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -66,7 +66,7 @@ export function UserTrackerActivityCard({
             当前没有在线 BT 任务。
           </p>
         ) : (
-          <div className="divide-y rounded-lg border">
+          <div className="divide-y rounded-lg">
             {activity.items.map((item) => {
               const progress = item.progress_basis_points / 100
               return (
@@ -77,7 +77,7 @@ export function UserTrackerActivityCard({
                   <div className="min-w-0">
                     <Link
                       to={`/torrents/${item.torrent_id}`}
-                      className="font-medium underline-offset-4 hover:text-primary hover:underline"
+                      className="font-medium text-title underline-offset-4 transition-colors hover:text-title-hover hover:underline"
                     >
                       种子 #{item.torrent_id}
                     </Link>

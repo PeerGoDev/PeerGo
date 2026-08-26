@@ -63,7 +63,7 @@ describe("HitAndRunPage", () => {
     expect(screen.getByRole("heading", { name: "H&R" })).toBeVisible()
     expect(
       screen.getByText("考察概览").closest("[data-slot=card]")
-    ).toHaveClass("shadow-sm")
+    ).toHaveClass("shadow-soft")
     expect(screen.getByText("考察概览")).toBeVisible()
     expect(
       screen.getByRole("group", { name: "按 H&R 状态筛选" }).parentElement

@@ -80,7 +80,7 @@ export function AnnouncementDetailPage() {
         </Button>
 
         <article>
-          <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+          <Card className="gap-0 py-0">
             <CardHeader className="p-6">
               <CardTitle className="flex items-start gap-2 text-2xl leading-none font-semibold tracking-tight">
                 <PinIcon className="mt-0.5 size-4 shrink-0 text-primary" />

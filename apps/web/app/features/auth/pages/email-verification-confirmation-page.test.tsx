@@ -42,12 +42,17 @@ describe("EmailVerificationConfirmationPage", () => {
 
     const message = screen.getByText("缺少验证令牌")
     expect(message).toBeVisible()
-    expect(message.closest("main")).toHaveClass("mt-4", "min-h-svh", "lg:mt-6")
+    expect(message.closest("main")).toHaveClass(
+      "flex",
+      "min-h-svh",
+      "items-center",
+      "justify-center"
+    )
     const card = message.closest('[data-slot="card"]')
-    expect(card).toHaveClass("gap-0", "py-0")
-    expect(card?.querySelector('[data-slot="card-header"]')).toHaveClass("p-6")
+    expect(card).toHaveClass("rounded-3xl", "border-0", "shadow-soft")
+    expect(card?.querySelector('[data-slot="card-header"]')).toHaveClass("px-6")
     expect(card?.querySelector('[data-slot="card-content"]')).toHaveClass(
-      "pb-6"
+      "px-6"
     )
     expect(
       screen.queryByRole("button", { name: "确认验证" })

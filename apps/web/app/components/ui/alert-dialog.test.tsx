@@ -51,7 +51,8 @@ describe("AlertDialog", () => {
     ).toHaveClass(
       "max-w-[calc(100%-2rem)]",
       "data-[size=default]:sm:max-w-[425px]",
-      "rounded-lg",
+      "rounded-3xl",
+      "shadow-soft",
       "p-6"
     )
     expect(screen.getByRole("button", { name: "关闭" })).toBeVisible()

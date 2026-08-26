@@ -61,7 +61,7 @@ export function TorrentSwarmOverview({
               <SwarmFact
                 label="下载"
                 value={swarmValue(swarm.data.leechers, swarm.data.confidence)}
-                tone="primary"
+                tone="destructive"
               />
               <SwarmFact
                 label="完成"
@@ -92,7 +92,7 @@ function SwarmFact({
 }: {
   label: string
   value: string
-  tone?: "success" | "primary"
+  tone?: "success" | "destructive"
 }) {
   return (
     <div className="flex min-w-0 items-baseline gap-1.5">
@@ -100,10 +100,10 @@ function SwarmFact({
       <dd
         className={
           tone === "success"
-            ? "font-semibold text-success-foreground tabular-nums"
-            : tone === "primary"
-              ? "font-semibold text-primary tabular-nums"
-              : "font-semibold tabular-nums"
+            ? "font-mono font-semibold text-success-foreground tabular-nums"
+            : tone === "destructive"
+              ? "font-mono font-semibold text-destructive tabular-nums"
+              : "font-mono font-semibold tabular-nums"
         }
       >
         {value}

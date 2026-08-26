@@ -104,7 +104,7 @@ export function PublishedContentChangeReview({
                   <div className="min-w-0">
                     <Link
                       to={`/torrents/${item.change.torrent_id}`}
-                      className="block truncate text-sm font-medium hover:text-primary hover:underline"
+                      className="block truncate text-sm font-bold text-title transition-colors hover:text-title-hover hover:underline"
                     >
                       #{item.change.torrent_id} {item.torrent_title}
                     </Link>

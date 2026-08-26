@@ -44,12 +44,8 @@ function EmailVerificationConfirmationContent({ token }: { token: string }) {
           : "验证失败"
 
   return (
-    <AuthEntryCard
-      viewport="full"
-      className="gap-0 py-0"
-      aria-labelledby="email-confirmation-title"
-    >
-      <CardHeader className="gap-1.5 p-6 text-center">
+    <AuthEntryCard aria-labelledby="email-confirmation-title">
+      <CardHeader className="gap-1.5 px-6 text-center">
         <div className="mx-auto mb-4">
           {status === "loading" ? (
             <div className="rounded-full bg-primary/10 p-4">
@@ -78,7 +74,7 @@ function EmailVerificationConfirmationContent({ token }: { token: string }) {
           </h1>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4 px-6 pb-6 text-center">
+      <CardContent className="flex flex-col gap-4 px-6 text-center">
         <p className="leading-6 text-muted-foreground">
           {status === "invalid"
             ? "缺少验证令牌"

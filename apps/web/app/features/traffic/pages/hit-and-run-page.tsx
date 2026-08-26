@@ -226,7 +226,7 @@ function HitAndRunContent({
   return (
     <>
       <section aria-labelledby="hnr-summary-title">
-        <Card className="gap-0 py-0 shadow-sm">
+        <Card className="gap-0 py-0">
           <CardHeader className="border-b py-3.5">
             <CardTitle id="hnr-summary-title">考察概览</CardTitle>
             <CardDescription>只统计当前账户的做种考察状态。</CardDescription>

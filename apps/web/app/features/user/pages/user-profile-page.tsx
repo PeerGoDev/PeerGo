@@ -522,7 +522,7 @@ function SeedingRewardCard({
   loading: boolean
 }) {
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-4">
         <CardTitle>
           <h2 className="flex items-center gap-2">
@@ -566,7 +566,7 @@ function RewardMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-muted/50 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium">{value}</p>
+      <p className="mt-1 font-mono text-sm font-medium tabular-nums">{value}</p>
     </div>
   )
 }
@@ -582,7 +582,7 @@ function ProfileStateCard({
 }) {
   return (
     <PageLayout className="items-center justify-center">
-      <Card className="w-full max-w-md gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="w-full max-w-md gap-0 py-0">
         <CardHeader className="px-6 pt-6 pb-3">
           <div className="flex items-start gap-3">
             <CircleAlertIcon className="mt-0.5 size-5 text-muted-foreground" />
@@ -610,14 +610,9 @@ function ProfileCard({
   className?: string
 }) {
   return (
-    <Card
-      className={cn(
-        "gap-0 rounded-lg border py-0 shadow-sm ring-0 md:min-h-[262px]",
-        className
-      )}
-    >
+    <Card className={cn("gap-0 py-0 md:min-h-[262px]", className)}>
       <CardHeader className="px-6 pt-6 pb-2">
-        <CardTitle className="text-base leading-6 font-semibold">
+        <CardTitle className="leading-6">
           <h2>{title}</h2>
         </CardTitle>
       </CardHeader>
@@ -645,7 +640,9 @@ function ProfileMetric({
         {Icon ? <Icon className={cn("size-3.5", iconClassName)} /> : null}
         {label}
       </span>
-      <span className="min-w-0 text-right break-all">{value}</span>
+      <span className="min-w-0 text-right font-mono break-all tabular-nums">
+        {value}
+      </span>
     </div>
   )
 }

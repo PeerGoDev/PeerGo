@@ -64,10 +64,7 @@ export function UserTorrentActivityCard({
 
   return (
     <Card
-      className={cn(
-        "min-h-[218px] gap-0 rounded-lg border py-0 shadow-sm ring-0",
-        className
-      )}
+      className={cn("min-h-[218px] gap-0 py-0", className)}
       aria-busy={loading}
     >
       <CardHeader className="overflow-x-auto px-6 pt-6 pb-0">
@@ -85,7 +82,7 @@ export function UserTorrentActivityCard({
             <ToggleGroupItem
               key={value}
               value={value}
-              className="gap-1.5 rounded-md bg-muted/50 px-3 text-muted-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+              className="gap-1.5 rounded-lg bg-muted/50 px-3.5 text-muted-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
             >
               <Icon data-icon="inline-start" />
               {label}
@@ -119,7 +116,7 @@ function ActivityTable({
   const showState = activeTab !== "published"
 
   return (
-    <div className="overflow-hidden rounded-lg border">
+    <div className="overflow-hidden rounded-lg">
       <Table>
         <TableHeader className="bg-muted text-xs text-muted-foreground">
           <TableRow>
@@ -163,23 +160,26 @@ function ActivityTable({
 }
 
 function SubmissionName({ submission }: { submission: Submission }) {
+  const published = submission.state === "published"
   const content = (
     <>
-      <span className="truncate font-medium">{submission.title}</span>
-      <span className="truncate text-xs text-muted-foreground">
+      <span className={cn("truncate", published ? "font-bold" : "font-medium")}>
+        {submission.title}
+      </span>
+      <span className="truncate text-xs font-normal text-muted-foreground">
         {submission.subtitle || submission.content_name}
       </span>
     </>
   )
 
-  if (submission.state !== "published") {
+  if (!published) {
     return <div className="flex min-w-0 flex-col gap-0.5">{content}</div>
   }
 
   return (
     <Link
       to={`/torrents/${submission.id}`}
-      className="flex min-w-0 flex-col gap-0.5 rounded-sm underline-offset-4 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="flex min-w-0 flex-col gap-0.5 rounded-sm text-title underline-offset-4 transition-colors hover:text-title-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       {content}
     </Link>

@@ -131,7 +131,7 @@ describe("StaffTorrentReviewsPage", () => {
     expect(screen.getByRole("button", { name: "刷新队列" })).toBeVisible()
     expect(screen.getByRole("heading", { name: "种子审核终审" })).toBeVisible()
     const pendingTab = screen.getByText("待审核")
-    expect(pendingTab).toHaveClass("border-primary", "text-primary")
+    expect(pendingTab).toHaveClass("bg-primary", "text-primary-foreground")
     expect(pendingTab?.querySelector("[data-slot=badge]")).toHaveAttribute(
       "data-variant",
       "destructiveSolid"

@@ -119,7 +119,7 @@ export function EmailVerificationPage() {
       description="验证登录邮箱，保障账户恢复与安全通知。"
     >
       <Card
-        className="w-full gap-0 rounded-lg py-0 shadow-sm ring-0"
+        className="w-full gap-0 py-0"
         aria-labelledby="email-verification-title"
       >
         <CardHeader className="gap-2 px-6 pt-6 pb-6">
@@ -230,7 +230,7 @@ function EmailVerificationFrame({ children }: { children: React.ReactNode }) {
       title="邮箱验证"
       description="验证登录邮箱，保障账户恢复与安全通知。"
     >
-      <Card className="w-full gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="w-full gap-0 py-0">
         <CardHeader>
           <CardTitle className="text-2xl leading-none font-semibold">
             验证邮箱

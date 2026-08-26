@@ -34,7 +34,7 @@ export function UserWorkgroupTasksCard({
     (item) => item.state !== "accepted" && item.task.timeline_state !== "closed"
   )
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-4">
         <CardTitle>
           <h2>活跃工作组任务</h2>

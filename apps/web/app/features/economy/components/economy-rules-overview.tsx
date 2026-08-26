@@ -465,7 +465,7 @@ function LevelRulesCard({ overview }: { overview: EconomyOverview }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
+        <Table containerClassName="px-3">
           <TableHeader>
             <TableRow>
               <TableHead>等级</TableHead>
@@ -481,6 +481,7 @@ function LevelRulesCard({ overview }: { overview: EconomyOverview }) {
                 <TableRow
                   key={level.level}
                   data-state={current ? "selected" : undefined}
+                  className="h-[52px]"
                 >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">

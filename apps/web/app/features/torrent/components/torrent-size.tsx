@@ -23,7 +23,7 @@ export function TorrentSize({
 
   return (
     <span className={className}>
-      <span className="font-medium tabular-nums">{size.value}</span>
+      <span className="font-mono font-medium tabular-nums">{size.value}</span>
       <span className={cn("ml-0.5", unitToneClass[size.tone])}>
         {size.unit}
       </span>

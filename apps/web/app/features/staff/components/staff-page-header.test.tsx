@@ -16,9 +16,12 @@ describe("StaffPageHeader", () => {
     )
 
     expect(screen.getByRole("heading", { name: "分类管理" })).toHaveClass(
-      "text-xl",
+      "text-[15px]",
       "font-semibold"
     )
+    expect(
+      screen.getByRole("heading", { name: "分类管理" }).closest("header")
+    ).toHaveClass("bg-glass", "shadow-soft")
     expect(screen.getByText("管理分类顺序与状态。")).toBeVisible()
     expect(screen.getByText("10 条记录")).toBeVisible()
     expect(screen.getByRole("button", { name: "新建分类" })).toBeVisible()

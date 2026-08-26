@@ -2,10 +2,13 @@ import { reactRouter } from "@react-router/dev/vite"
 import tailwindcss from "@tailwindcss/vite"
 import { configDefaults, defineConfig } from "vitest/config"
 
+// Overridable so a dev Core on a non-default port (for example when 8080 is
+// occupied by another local service) can back this dev server.
+const coreTarget = process.env.PEERGO_CORE_PROXY ?? "http://127.0.0.1:8080"
 const coreProxy = {
-  "/api": "http://127.0.0.1:8080",
-  "/rss": "http://127.0.0.1:8080",
-  "/healthz": "http://127.0.0.1:8080",
+  "/api": coreTarget,
+  "/rss": coreTarget,
+  "/healthz": coreTarget,
 }
 
 export default defineConfig(({ mode }) => ({
@@ -34,5 +37,12 @@ export default defineConfig(({ mode }) => ({
     // The suite renders several full shadcn/Base UI pages. Bounding worker
     // count keeps interaction tests deterministic while local services run.
     maxWorkers: 4,
+    // Node >= 22 defines a globalThis.localStorage that is non-functional
+    // without --localstorage-file (an empty object whose setItem/clear are
+    // undefined). Vitest's jsdom environment skips window keys that already
+    // exist on globalThis, so that broken stub shadows jsdom's real Storage
+    // and every localStorage-backed test throws. Disabling the built-in Web
+    // Storage in test workers lets jsdom's implementation through.
+    execArgv: ["--no-experimental-webstorage"],
   },
 }))

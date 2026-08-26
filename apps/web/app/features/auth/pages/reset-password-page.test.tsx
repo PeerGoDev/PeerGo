@@ -44,12 +44,17 @@ describe("ResetPasswordPage", () => {
     const title = screen.getByText("链接无效或已过期")
     expect(title).toBeVisible()
     expect(title.closest("main")).toHaveClass(
-      "mt-4",
-      "min-h-[calc(100svh-7.5rem)]",
-      "lg:mt-6"
+      "flex",
+      "min-h-svh",
+      "items-center",
+      "justify-center"
     )
-    expect(title.closest("[data-slot='card']")).toHaveClass("gap-0", "py-0")
-    expect(title.closest("[data-slot='card-content']")).toHaveClass("p-6")
+    expect(title.closest("[data-slot='card']")).toHaveClass(
+      "rounded-3xl",
+      "border-0",
+      "shadow-soft"
+    )
+    expect(title.closest("[data-slot='card-content']")).toHaveClass("px-6")
     expect(
       screen.queryByRole("button", { name: "重置密码" })
     ).not.toBeInTheDocument()

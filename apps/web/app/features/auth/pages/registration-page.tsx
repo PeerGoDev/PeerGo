@@ -212,7 +212,7 @@ export function RegistrationPage() {
         <CardTitle>
           <h1
             id="registration-title"
-            className="text-2xl leading-none font-semibold tracking-tight"
+            className="text-[22px] leading-none font-semibold tracking-tight"
           >
             注册
           </h1>
@@ -398,7 +398,7 @@ function ClosedRegistrationState({ siteName }: { siteName: string }) {
         <CardTitle>
           <h1
             id="registration-closed-title"
-            className="text-2xl leading-none font-semibold tracking-tight"
+            className="text-[22px] leading-none font-semibold tracking-tight"
           >
             注册已关闭
           </h1>
@@ -453,7 +453,7 @@ function InvitationRegistrationStep({
         <CardTitle>
           <h1
             id="invitation-registration-title"
-            className="text-2xl leading-none font-semibold tracking-tight"
+            className="text-[22px] leading-none font-semibold tracking-tight"
           >
             邀请注册
           </h1>
@@ -530,7 +530,7 @@ function RegistrationFrame({ children }: { children: React.ReactNode }) {
   return (
     <AuthEntryCard>
       <CardHeader>
-        <CardTitle className="text-2xl leading-none font-semibold">
+        <CardTitle className="text-[22px] leading-none font-semibold">
           注册
         </CardTitle>
         <CardDescription>创建站点账户</CardDescription>

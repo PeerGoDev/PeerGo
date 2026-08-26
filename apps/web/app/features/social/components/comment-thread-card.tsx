@@ -290,7 +290,7 @@ export function CommentThreadCard({
     >
       <CardHeader
         className={cn(
-          torrentAppearance ? "p-6 pb-2" : "border-b",
+          torrentAppearance ? "p-6 pb-4" : "border-b",
           announcementAppearance && "border-0 p-0 pb-4",
           socialAppearance && "sr-only"
         )}
@@ -510,9 +510,9 @@ export function CommentThreadCard({
             <div
               className={cn(
                 torrentAppearance
-                  ? "flex flex-col gap-4 border-t pt-4"
+                  ? "flex flex-col gap-5 border-t pt-5"
                   : "divide-y",
-                announcementAppearance && "flex flex-col gap-4 border-0 pt-0",
+                announcementAppearance && "flex flex-col gap-5 border-0 pt-0",
                 socialAppearance && "border-t-0"
               )}
             >
@@ -1147,11 +1147,7 @@ function CommentRow({
             onSubmit={onUpdate}
           />
         ) : (
-          <CommentBody
-            comment={comment}
-            compactLineHeight={torrentAppearance}
-            collapsible={socialAppearance}
-          />
+          <CommentBody comment={comment} collapsible={socialAppearance} />
         )}
         {socialAppearance && !editing ? actions : null}
         {socialAppearance && replying && visible && !editing ? (
@@ -1341,11 +1337,9 @@ function CommentEditForm({
 
 function CommentBody({
   comment,
-  compactLineHeight = false,
   collapsible = false,
 }: {
   comment: Comment
-  compactLineHeight?: boolean
   collapsible?: boolean
 }) {
   const [expanded, setExpanded] = React.useState(false)
@@ -1361,26 +1355,21 @@ function CommentBody({
 
   if (comment.state === "author_deleted") {
     return (
-      <p className="mt-1 text-sm text-muted-foreground italic">
+      <p className="mt-2 text-sm text-muted-foreground italic">
         该评论已由作者删除。
       </p>
     )
   }
   if (comment.state === "moderator_hidden") {
     return (
-      <p className="mt-1 text-sm text-muted-foreground italic">
+      <p className="mt-2 text-sm text-muted-foreground italic">
         该评论已被管理人员隐藏。
       </p>
     )
   }
   return (
-    <div className="mt-1 flex flex-col gap-1">
-      <p
-        className={cn(
-          "text-sm break-words whitespace-pre-wrap",
-          compactLineHeight ? "leading-5" : "leading-relaxed"
-        )}
-      >
+    <div className="mt-2 flex flex-col gap-1">
+      <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
         {visibleBody}
         {shouldCollapse && !expanded ? (
           <span className="text-muted-foreground">...</span>

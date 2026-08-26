@@ -94,10 +94,10 @@ describe("MyTorrentBookmarksPage", () => {
     const table = screen.getByRole("table")
     expect(table).toHaveClass("block", "min-w-0")
     expect(table).not.toHaveClass("min-w-[900px]")
-    expect(table.querySelector("thead")).toHaveClass("block", "bg-muted")
+    expect(table.querySelector("thead")).toHaveClass("block")
     expect(screen.getAllByText("Saved Release")[0].closest("tr")).toHaveClass(
-      "border-t!",
-      "border-b-0!"
+      "px-3.5",
+      "py-2.5"
     )
     expect(screen.getByText("上传时间")).toBeInTheDocument()
     expect(screen.getAllByText("Saved Release").length).toBeGreaterThan(0)

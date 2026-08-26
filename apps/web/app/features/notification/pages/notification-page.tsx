@@ -239,9 +239,9 @@ export function NotificationPage() {
             ) : null}
             <Button
               type="button"
-              variant="secondary"
+              variant="soft"
               size="legacy"
-              className="h-10 min-w-0 border-0 whitespace-nowrap text-foreground md:shrink-0"
+              className="h-10 min-w-0 border-0 whitespace-nowrap md:shrink-0"
               onClick={() => setUnreadOnly(!unreadOnly)}
             >
               {unreadOnly ? "显示全部" : "仅未读"}
@@ -249,7 +249,7 @@ export function NotificationPage() {
             {canWrite ? (
               <Button
                 type="button"
-                variant="actionSuccess"
+                variant="soft"
                 size="legacy"
                 className="h-10 min-w-0 border-0 whitespace-nowrap md:shrink-0"
                 disabled={
@@ -266,7 +266,7 @@ export function NotificationPage() {
             {canArchive ? (
               <Button
                 type="button"
-                variant="actionDestructive"
+                variant="softDestructive"
                 size="legacy"
                 className="h-10 min-w-0 border-0 whitespace-nowrap md:shrink-0"
                 onClick={() => setArchiveConfirmOpen(true)}
@@ -341,7 +341,7 @@ export function NotificationPage() {
           aria-label="站内消息"
           className="grid grid-cols-1 gap-6 md:grid-cols-3"
         >
-          <Card className="gap-0 rounded-lg border py-0 text-base shadow ring-0 md:col-span-1 md:min-h-[640px]">
+          <Card className="gap-0 py-0 md:col-span-1 md:min-h-[640px]">
             <CardHeader className="border-b p-4">
               <CardTitle className="text-base leading-6 font-semibold">
                 <h2 id="notification-list-title">消息列表</h2>
@@ -368,7 +368,7 @@ export function NotificationPage() {
                           )}
                           onClick={() => selectNotification(notification)}
                         >
-                          <span className="mb-1 flex items-start justify-between gap-2">
+                          <span className="mb-1.5 flex items-start justify-between gap-2">
                             <span className="text-sm font-semibold">
                               系统消息
                             </span>
@@ -376,7 +376,7 @@ export function NotificationPage() {
                               <Badge aria-label="未读">未读</Badge>
                             ) : null}
                           </span>
-                          <span className="mb-1 block truncate text-sm font-medium">
+                          <span className="mb-1.5 block truncate text-sm font-medium">
                             {notificationListTitle(notification)}
                           </span>
                           <time
@@ -410,7 +410,7 @@ export function NotificationPage() {
             ) : null}
           </Card>
 
-          <Card className="min-w-0 gap-0 rounded-lg border py-0 text-base shadow ring-0 md:col-span-2 md:min-h-[640px]">
+          <Card className="min-w-0 gap-0 py-0 md:col-span-2 md:min-h-[640px]">
             <CardContent className="p-6">
               {selectedNotification ? (
                 <NotificationDetail notification={selectedNotification} />
@@ -667,7 +667,7 @@ function ContentTipNotificationDetail({
         </div>
       </header>
 
-      <dl className="mt-6 grid gap-3 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
+      <dl className="mt-6 grid gap-4 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-muted-foreground">到账魔力值</dt>
           <dd className="mt-1 text-lg font-semibold">{amount}</dd>
@@ -737,7 +737,7 @@ function MemberGiftNotificationDetail({
         </div>
       </header>
 
-      <dl className="mt-6 grid gap-3 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
+      <dl className="mt-6 grid gap-4 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-muted-foreground">到账魔力值</dt>
           <dd className="mt-1 text-lg font-semibold">{amount}</dd>
@@ -804,7 +804,7 @@ function WorkgroupContributionNotificationDetail({
       <p className="mt-6 text-base leading-7 whitespace-pre-wrap">
         {notification.workgroup_reason ?? "请关注本期工作组贡献进度。"}
       </p>
-      <dl className="mt-6 grid gap-3 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
+      <dl className="mt-6 grid gap-4 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-muted-foreground">贡献周期</dt>
           <dd className="mt-1 font-medium">
@@ -1039,7 +1039,7 @@ function RatioWatchNotificationDetail({
         )}
       </p>
 
-      <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
+      <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-muted-foreground">当时分享率</dt>
           <dd className="mt-1 font-medium">{currentRatio}</dd>

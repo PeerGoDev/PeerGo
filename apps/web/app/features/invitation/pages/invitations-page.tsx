@@ -421,7 +421,7 @@ function InvitationTabs({
     { id: "chain" as const, label: "邀请链", icon: ChevronRightIcon },
   ]
   return (
-    <div className="flex gap-1 overflow-x-auto border-b" role="tablist">
+    <div className="flex gap-0.5 overflow-x-auto" role="tablist">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -430,10 +430,10 @@ function InvitationTabs({
           aria-selected={active === tab.id}
           onClick={() => onChange(tab.id)}
           className={cn(
-            "-mb-px flex min-h-11 items-center gap-2 border-b-2 px-4 text-sm whitespace-nowrap transition-colors",
+            "flex h-9 items-center gap-2 rounded-lg px-3.5 text-sm whitespace-nowrap transition-colors",
             active === tab.id
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
           <tab.icon className="size-4" />

@@ -81,10 +81,10 @@ export function TorrentScreenshotsCard({
 
   return (
     <>
-      <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="gap-0 py-0">
         <CardHeader className="p-6 pb-2">
-          <CardTitle className="flex items-center gap-2 text-2xl leading-none font-semibold">
-            <ImageIcon className="size-5" />
+          <CardTitle className="flex items-center gap-2">
+            <ImageIcon className="size-4" />
             截图 ({positions.length})
           </CardTitle>
         </CardHeader>

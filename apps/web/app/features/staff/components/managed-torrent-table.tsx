@@ -202,27 +202,33 @@ export function ManagedTorrentTable({
 }
 
 function TorrentIdentity({ torrent }: { torrent: ManagedTorrent }) {
-  const content = (
-    <div className="flex min-w-0 flex-col">
-      <span className="truncate font-medium text-foreground">
-        {torrent.title}
-      </span>
-      {torrent.subtitle ? (
-        <span className="truncate text-xs text-muted-foreground">
-          {torrent.subtitle}
+  if (torrent.state !== "published") {
+    return (
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate font-medium text-foreground">
+          {torrent.title}
         </span>
-      ) : null}
-    </div>
-  )
-  return torrent.state === "published" ? (
-    <Link
-      to={`/torrents/${torrent.id}`}
-      className="block min-w-0 hover:text-primary"
-    >
-      {content}
+        {torrent.subtitle ? (
+          <span className="truncate text-xs text-muted-foreground">
+            {torrent.subtitle}
+          </span>
+        ) : null}
+      </div>
+    )
+  }
+  return (
+    <Link to={`/torrents/${torrent.id}`} className="group block min-w-0">
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate font-bold text-title transition-colors group-hover:text-title-hover">
+          {torrent.title}
+        </span>
+        {torrent.subtitle ? (
+          <span className="truncate text-xs text-muted-foreground">
+            {torrent.subtitle}
+          </span>
+        ) : null}
+      </div>
     </Link>
-  ) : (
-    content
   )
 }
 

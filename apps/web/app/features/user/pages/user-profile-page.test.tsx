@@ -51,7 +51,7 @@ describe("UserProfilePage", () => {
     )
     expect(
       screen.getByRole("heading", { name: "基本信息" }).parentElement
-    ).toHaveClass("leading-6", "font-semibold")
+    ).toHaveClass("leading-6", "font-bold")
     expect(screen.queryByText(/等级|魔力值|PT币/)).not.toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "最新动态" })).toBeVisible()
     expect(screen.getByText("(1 条)")).toBeVisible()

@@ -19,6 +19,20 @@ export function torrentPromotionLabel(promotion: TorrentPromotionValue) {
   return promotion === "none" ? null : promotionLabels[promotion]
 }
 
+// Semantic promotion tones: green = free download, blue = discounted
+// download, primary orange = pure upload bonus.
+const promotionToneClasses: Record<
+  Exclude<TorrentPromotionValue, "none">,
+  string
+> = {
+  free: "bg-success/10 text-success-foreground",
+  double_upload: "bg-primary/10 text-sidebar-accent-foreground",
+  double_upload_free: "bg-success/10 text-success-foreground",
+  half_download: "bg-info/10 text-info",
+  double_upload_half_download: "bg-info/10 text-info",
+  thirty_percent_download: "bg-info/10 text-info",
+}
+
 export function TorrentPromotion({
   promotion,
   className,
@@ -27,12 +41,19 @@ export function TorrentPromotion({
   className?: string
 }) {
   const label = torrentPromotionLabel(promotion)
-  if (!label) {
+  if (!label || promotion === "none") {
     return null
   }
 
   return (
-    <Badge variant="destructive" className={cn("h-5", className)}>
+    <Badge
+      variant="outline"
+      className={cn(
+        "h-5 border-transparent",
+        promotionToneClasses[promotion],
+        className
+      )}
+    >
       {label}
     </Badge>
   )
@@ -55,7 +76,7 @@ export function TorrentSticky({
     <Badge
       variant="outline"
       className={cn(
-        "h-5 border-warning/40 bg-warning/10 text-warning-foreground",
+        "h-5 border-transparent bg-destructive/10 text-title",
         className
       )}
       title={`置顶至 ${new Date(stickyUntil).toLocaleString("zh-CN")}`}

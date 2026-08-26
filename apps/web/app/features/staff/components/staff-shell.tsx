@@ -231,7 +231,10 @@ const operationsNavigation = [
 ]
 
 const staffNavigationButtonClass =
-  "h-11 justify-end gap-3 rounded-none px-4 group-data-[collapsible=icon]:h-11! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center [&_svg]:size-[18px]"
+  "h-10 justify-start gap-3 rounded-lg px-3 font-medium group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center [&_svg]:size-[18px]"
+
+const staffSubNavigationButtonClass =
+  "h-9 translate-x-0 justify-start gap-3 rounded-lg px-3 text-sidebar-foreground transition-colors hover:bg-muted hover:text-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>svg]:text-current"
 
 const userNavigation = [
   {
@@ -415,21 +418,22 @@ export function StaffShell({ children }: { children: ReactNode }) {
       defaultOpen
       style={
         {
-          "--sidebar-width": "12.5rem",
+          "--sidebar-width":
+            "calc(var(--shell-sidebar-width) + 2 * var(--shell-gap))",
           "--sidebar-width-icon": "3.75rem",
         } as CSSProperties
       }
     >
-      <Sidebar collapsible="icon">
-        <SidebarHeader className="h-[60px] justify-center border-b px-4">
+      <Sidebar variant="floating" collapsible="icon">
+        <SidebarHeader className="h-(--shell-header-height) shrink-0 justify-center border-b px-5">
           <Link
             to="/staff"
-            className="flex w-full min-w-0 items-center justify-end text-primary outline-none group-data-[collapsible=icon]:justify-center focus-visible:ring-2 focus-visible:ring-sidebar-ring max-lg:w-[calc(100%-2.5rem)] max-lg:self-start"
+            className="flex w-full min-w-0 items-center text-primary outline-none group-data-[collapsible=icon]:justify-center focus-visible:ring-2 focus-visible:ring-sidebar-ring max-lg:w-[calc(100%-2.5rem)] max-lg:self-start"
           >
-            <span className="font-heading text-xl font-semibold tracking-tight text-primary group-data-[collapsible=icon]:hidden">
+            <span className="font-heading text-lg font-bold tracking-tight text-primary group-data-[collapsible=icon]:hidden">
               管理后台
             </span>
-            <span className="hidden font-heading text-base font-semibold text-primary group-data-[collapsible=icon]:inline">
+            <span className="hidden font-heading text-base font-bold text-primary group-data-[collapsible=icon]:inline">
               {compactSiteMark.toLocaleUpperCase()}
             </span>
           </Link>
@@ -493,15 +497,15 @@ export function StaffShell({ children }: { children: ReactNode }) {
           <Separator />
           <Link
             to="/"
-            className="flex h-11 items-center justify-end gap-3 px-5 text-sm text-muted-foreground transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="flex h-11 items-center gap-3 px-5 text-sm text-muted-foreground transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 hover:bg-muted hover:text-foreground"
           >
+            <HomeIcon className="size-5" />
             <span className="group-data-[collapsible=icon]:hidden">
               返回用户端
             </span>
-            <HomeIcon className="size-5" />
           </Link>
           <Separator />
-          <div className="px-4 py-3 text-right text-xs text-muted-foreground/60 group-data-[collapsible=icon]:hidden">
+          <div className="px-5 py-3 text-left text-xs text-muted-foreground/60 group-data-[collapsible=icon]:hidden">
             Powered by PeerGo
           </div>
         </SidebarFooter>
@@ -509,8 +513,8 @@ export function StaffShell({ children }: { children: ReactNode }) {
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-20 h-[60px] shrink-0 border-b bg-background">
-          <div className="flex size-full items-center gap-2 px-4 lg:px-6">
+        <header className="sticky top-0 z-20 shrink-0 px-4 pt-(--shell-gap) lg:px-6">
+          <div className="flex h-(--shell-header-height) w-full items-center gap-2 rounded-lg bg-glass px-4 shadow-soft backdrop-blur-[7px]">
             <SidebarTrigger
               aria-label="切换后台侧栏"
               className="lg:hidden [&_svg]:size-5"
@@ -651,12 +655,12 @@ function StaffSettingsNavigationGroup({
   pathname: string
 }) {
   return (
-    <SidebarGroup className="p-0">
-      <SidebarGroupLabel className="px-5 text-right group-data-[collapsible=icon]:sr-only">
+    <SidebarGroup className="px-2.5 py-0">
+      <SidebarGroupLabel className="px-3 text-[10.5px] font-semibold tracking-wider text-muted-foreground group-data-[collapsible=icon]:sr-only">
         设置
       </SidebarGroupLabel>
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="gap-0.5">
           <StaffSettingsNavigationSection
             label="站点设置"
             icon={Settings2Icon}
@@ -688,10 +692,10 @@ function StaffSettingsNavigationGroup({
                   render={<Link to={item.to} prefetch="intent" />}
                   className={staffNavigationButtonClass}
                 >
+                  <item.icon />
                   <span className="group-data-[collapsible=icon]:hidden">
                     {item.label}
                   </span>
-                  <item.icon />
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )
@@ -735,12 +739,12 @@ function StaffSettingsNavigationSection({
           />
         }
       >
-        <ChevronDownIcon className="transition-transform group-data-[collapsible=icon]:hidden in-data-open:rotate-180" />
-        <span className="group-data-[collapsible=icon]:hidden">{label}</span>
         <Icon />
+        <span className="group-data-[collapsible=icon]:hidden">{label}</span>
+        <ChevronDownIcon className="ml-auto transition-transform group-data-[collapsible=icon]:hidden in-data-open:rotate-180" />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <SidebarMenuSub className="mx-0 gap-0 border-l-0 px-0 py-0">
+        <SidebarMenuSub className="mx-0 gap-0.5 border-l-0 px-0 py-0.5">
           {items.map((item) => {
             const itemActive =
               pathname === item.to || pathname.startsWith(`${item.to}/`)
@@ -749,10 +753,10 @@ function StaffSettingsNavigationSection({
                 <SidebarMenuSubButton
                   render={<Link to={item.to} prefetch="intent" />}
                   isActive={itemActive}
-                  className="h-9 translate-x-0 justify-end rounded-none border-r-2 border-transparent px-4 text-muted-foreground transition-colors data-active:border-primary data-active:bg-primary/10 data-active:text-primary"
+                  className={staffSubNavigationButtonClass}
                 >
-                  <span>{item.label}</span>
                   <item.icon />
+                  <span>{item.label}</span>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
             )
@@ -777,14 +781,14 @@ function StaffNavigationGroup({
   pathname: string
 }) {
   return (
-    <SidebarGroup className="p-0">
+    <SidebarGroup className="px-2.5 py-0">
       {label ? (
-        <SidebarGroupLabel className="px-5 text-right group-data-[collapsible=icon]:sr-only">
+        <SidebarGroupLabel className="px-3 text-[10.5px] font-semibold tracking-wider text-muted-foreground group-data-[collapsible=icon]:sr-only">
           {label}
         </SidebarGroupLabel>
       ) : null}
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="gap-0.5">
           {items.map((item) => {
             const active =
               item.to === "/staff"
@@ -799,10 +803,10 @@ function StaffNavigationGroup({
                   render={<Link to={item.to} prefetch="intent" />}
                   className={staffNavigationButtonClass}
                 >
+                  <item.icon />
                   <span className="group-data-[collapsible=icon]:hidden">
                     {item.label}
                   </span>
-                  <item.icon />
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )

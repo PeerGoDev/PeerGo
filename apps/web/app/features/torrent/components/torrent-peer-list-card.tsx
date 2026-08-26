@@ -90,11 +90,11 @@ export function TorrentPeerListCard({ torrentId }: { torrentId: number }) {
     : swarmCount(swarm.data?.leechers, swarm.data?.confidence)
 
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CardHeader className="p-6 pb-2">
           <CollapsibleTrigger className="w-full cursor-pointer transition-colors hover:text-primary">
-            <CardTitle className="flex items-center justify-between gap-4 text-base font-semibold max-sm:items-start">
+            <CardTitle className="flex items-center justify-between gap-4 max-sm:items-start">
               <span className="flex items-center gap-2">
                 <UsersIcon className="size-4" />
                 用户列表
@@ -234,21 +234,25 @@ function PeerSection({
           <Table className={seeding ? "min-w-[1040px]" : "min-w-[1120px]"}>
             <TableHeader>
               <TableRow className="bg-muted/30 text-xs text-muted-foreground">
-                <TableHead className="px-3 py-2">用户</TableHead>
-                <TableHead className="px-3 py-2">网络</TableHead>
+                <TableHead className="px-3 py-2.5">用户</TableHead>
+                <TableHead className="px-3 py-2.5">网络</TableHead>
                 {managedView ? (
-                  <TableHead className="px-3 py-2">账号</TableHead>
+                  <TableHead className="px-3 py-2.5">账号</TableHead>
                 ) : null}
                 {!seeding ? (
-                  <TableHead className="px-3 py-2 text-center">进度</TableHead>
+                  <TableHead className="px-3 py-2.5 text-center">
+                    进度
+                  </TableHead>
                 ) : null}
-                <TableHead className="px-3 py-2 text-center">分享率</TableHead>
-                <TableHead className="px-3 py-2 text-right">上传量</TableHead>
-                <TableHead className="px-3 py-2 text-right">下载量</TableHead>
-                <TableHead className="px-3 py-2 text-right">↑速度</TableHead>
-                <TableHead className="px-3 py-2 text-right">↓速度</TableHead>
-                <TableHead className="px-3 py-2">客户端</TableHead>
-                <TableHead className="px-3 py-2 text-right">汇报</TableHead>
+                <TableHead className="px-3 py-2.5 text-center">
+                  分享率
+                </TableHead>
+                <TableHead className="px-3 py-2.5 text-right">上传量</TableHead>
+                <TableHead className="px-3 py-2.5 text-right">下载量</TableHead>
+                <TableHead className="px-3 py-2.5 text-right">↑速度</TableHead>
+                <TableHead className="px-3 py-2.5 text-right">↓速度</TableHead>
+                <TableHead className="px-3 py-2.5">客户端</TableHead>
+                <TableHead className="px-3 py-2.5 text-right">汇报</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -257,40 +261,40 @@ function PeerSection({
                   key={`${kind}:${peer.username}`}
                   className="text-xs hover:bg-muted/50"
                 >
-                  <TableCell className="px-3 py-2">
+                  <TableCell className="px-3 py-2.5">
                     <PeerIdentity peer={peer} />
                   </TableCell>
-                  <TableCell className="px-3 py-2">
+                  <TableCell className="px-3 py-2.5">
                     <PeerNetwork peer={peer} />
                   </TableCell>
                   {managedView ? (
-                    <TableCell className="px-3 py-2">
+                    <TableCell className="px-3 py-2.5">
                       <ManagedPeerAccount peer={peer} />
                     </TableCell>
                   ) : null}
                   {!seeding ? (
-                    <TableCell className="px-3 py-2 text-center">
+                    <TableCell className="px-3 py-2.5 text-center">
                       <PeerProgress basisPoints={peer.progress_basis_points} />
                     </TableCell>
                   ) : null}
-                  <TableCell className="px-3 py-2 text-center">
+                  <TableCell className="px-3 py-2.5 text-center">
                     <span className={ratioTone(peer.uploaded, peer.downloaded)}>
                       {formatRatio(peer.uploaded, peer.downloaded)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-right text-green-500">
+                  <TableCell className="px-3 py-2.5 text-right text-green-500">
                     {formatBytes(peer.uploaded)}
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-right text-blue-500">
+                  <TableCell className="px-3 py-2.5 text-right text-blue-500">
                     {formatBytes(peer.downloaded)}
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-right text-green-500">
+                  <TableCell className="px-3 py-2.5 text-right text-green-500">
                     {formatSpeed(peer.upload_speed)}
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-right text-blue-500">
+                  <TableCell className="px-3 py-2.5 text-right text-blue-500">
                     {formatSpeed(peer.download_speed)}
                   </TableCell>
-                  <TableCell className="px-3 py-2">
+                  <TableCell className="px-3 py-2.5">
                     <div className="flex max-w-40 flex-wrap items-center gap-1">
                       <span title={peer.client_families.join(" / ")}>
                         {peer.client_families.map(clientLabel).join(" / ") ||
@@ -306,7 +310,7 @@ function PeerSection({
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-right text-muted-foreground">
+                  <TableCell className="px-3 py-2.5 text-right text-muted-foreground">
                     <time
                       dateTime={peer.last_announce}
                       title={formatCompactDateTime(peer.last_announce)}

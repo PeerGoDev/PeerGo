@@ -118,10 +118,10 @@ describe("StaffShell navigation", () => {
     )
     expect(activeAnnouncement).toHaveAttribute("data-active")
     expect(activeAnnouncement).toHaveClass(
-      "h-11",
-      "justify-end",
-      "rounded-none",
-      "group-data-[collapsible=icon]:h-11!",
+      "h-10",
+      "justify-start",
+      "rounded-lg",
+      "group-data-[collapsible=icon]:h-10!",
       "group-data-[collapsible=icon]:w-full!"
     )
     expect(activeAnnouncement).toHaveAttribute("data-active")

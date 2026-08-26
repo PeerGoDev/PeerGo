@@ -191,7 +191,7 @@ export function MyTorrentPurchasesPage() {
                           {item.torrent_state === "published" ? (
                             <Link
                               to={`/torrents/${item.torrent_id}`}
-                              className="truncate font-medium hover:text-primary"
+                              className="truncate font-bold text-title transition-colors hover:text-title-hover"
                             >
                               {item.title}
                             </Link>
@@ -239,7 +239,7 @@ export function MyTorrentPurchasesPage() {
                         {item.torrent_state === "published" ? (
                           <Link
                             to={`/torrents/${item.torrent_id}`}
-                            className="line-clamp-2 font-medium hover:text-primary"
+                            className="line-clamp-2 font-bold text-title transition-colors hover:text-title-hover"
                           >
                             {item.title}
                           </Link>

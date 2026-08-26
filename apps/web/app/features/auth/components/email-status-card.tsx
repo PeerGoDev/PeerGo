@@ -8,7 +8,7 @@ export function EmailStatusCard({ verified }: { verified: boolean }) {
   return (
     <Card
       className={cn(
-        "gap-0 rounded-lg py-0 shadow-sm ring-0",
+        "gap-0 py-0",
         verified ? "border-success/30" : "border-warning/30"
       )}
     >

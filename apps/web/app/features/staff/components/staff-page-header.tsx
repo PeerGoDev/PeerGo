@@ -30,8 +30,8 @@ export function StaffPageHeader({
   return (
     <header
       className={cn(
-        "flex flex-col gap-3 sm:flex-row sm:justify-between",
-        hero ? "sm:items-center" : "sm:items-start",
+        "flex min-h-[50px] flex-col gap-3 rounded-lg border-b border-muted bg-glass px-5 py-2.5 shadow-soft backdrop-blur-[7px] sm:flex-row sm:justify-between",
+        hero ? "sm:items-center" : "sm:items-center",
         className
       )}
     >
@@ -50,7 +50,7 @@ export function StaffPageHeader({
           <h1
             className={cn(
               "font-heading",
-              hero ? "text-3xl font-bold md:text-4xl" : "text-xl font-semibold"
+              hero ? "text-xl font-bold" : "text-[15px] font-semibold"
             )}
           >
             {title}
@@ -62,7 +62,7 @@ export function StaffPageHeader({
         {description ? (
           <p
             className={cn(
-              "text-sm text-muted-foreground",
+              "text-xs text-muted-foreground",
               descriptionClassName
             )}
           >

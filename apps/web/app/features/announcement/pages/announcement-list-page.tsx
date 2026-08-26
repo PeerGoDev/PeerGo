@@ -101,7 +101,7 @@ export function AnnouncementListPage() {
 
       {announcements.data ? (
         announcements.data.items.length === 0 ? (
-          <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+          <Card className="gap-0 py-0">
             <CardContent className="py-12 text-center text-muted-foreground">
               <NewspaperIcon className="mx-auto mb-4 size-12 opacity-50" />
               <p className="text-lg">暂无公告</p>
@@ -117,8 +117,8 @@ export function AnnouncementListPage() {
                     to={`/announcements/${encodeURIComponent(announcement.id)}`}
                     className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Card className="cursor-pointer gap-0 rounded-lg border py-0 shadow-sm ring-0 transition-colors hover:border-primary">
-                      <CardContent className="p-4">
+                    <Card className="cursor-pointer gap-0 py-0 ring-2 ring-transparent transition-shadow hover:ring-primary/50">
+                      <CardContent className="p-5">
                         <div className="mb-2 flex items-center gap-2">
                           <PinIcon className="size-3.5 shrink-0 fill-primary text-primary" />
                           <h2 className="text-lg font-semibold break-words">

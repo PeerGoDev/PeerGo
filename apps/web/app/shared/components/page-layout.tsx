@@ -28,13 +28,21 @@ export function PageHeader({
   ...props
 }: PageHeaderProps) {
   return (
-    <header className={cn("flex flex-col gap-1", className)} {...props}>
+    <header
+      className={cn(
+        "flex min-h-[50px] flex-wrap items-center gap-x-3.5 gap-y-1 rounded-lg border-b border-muted bg-glass px-5 py-2.5 shadow-soft backdrop-blur-[7px]",
+        className
+      )}
+      {...props}
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="font-heading text-3xl font-bold">{title}</h1>
+        <h1 className="font-heading text-[15px] font-semibold">{title}</h1>
         {badge}
       </div>
       {description ? (
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-xs text-muted-foreground sm:border-l sm:border-border sm:pl-3.5">
+          {description}
+        </p>
       ) : null}
     </header>
   )

@@ -100,14 +100,20 @@ describe("TorrentTable", () => {
     const table = screen.getByRole("table")
     expect(table).toHaveClass("block", "min-w-0")
     expect(table.closest("[data-slot=card]")).toHaveClass("hidden", "md:flex")
-    expect(table.querySelector("thead")).toHaveClass("block", "bg-muted")
+    expect(table.querySelector("thead")).toHaveClass("block")
+    expect(screen.getByText("名称").closest("tr")).toHaveClass(
+      "rounded-lg",
+      "bg-muted"
+    )
     expect(screen.getByText("名称").closest("tr")).toHaveClass(
       "grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px]"
     )
     expect(screen.getByText("Example Release").closest("tr")).toHaveClass(
-      "border-t!",
-      "border-b-0!",
-      "py-2"
+      "px-3.5",
+      "py-2.5"
+    )
+    expect(screen.getByText("Example Release").closest("tr")).not.toHaveClass(
+      "border-t!"
     )
     expect(screen.getByText("Example Release")).not.toHaveClass("text-base")
     expect(screen.getByText("免费")).toBeInTheDocument()

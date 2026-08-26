@@ -170,11 +170,11 @@ function TorrentDetailContent({
   const promotionLabel = torrentPromotionLabel(detail.promotion)
 
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardContent className="p-6">
         <div className="mb-2 flex items-start justify-between gap-4 max-sm:flex-col max-sm:gap-2">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold break-all max-sm:text-base">
+            <h1 className="text-xl font-bold break-all text-title max-sm:text-base">
               {detail.title}
             </h1>
           </div>
@@ -244,7 +244,7 @@ function TorrentDetailContent({
               <p className="text-sm text-muted-foreground">{detail.subtitle}</p>
             ) : null}
 
-            <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <dl className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <div className="flex min-w-0 items-baseline gap-1">
                 <dt className="text-muted-foreground">分类:</dt>
                 <dd>
@@ -270,7 +270,7 @@ function TorrentDetailContent({
             </dl>
 
             {detail.external_identifiers.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
                 {sortExternalIdentifiers(detail.external_identifiers).map(
                   (identifier) => {
                     const href = externalIdentifierURL(
@@ -302,7 +302,7 @@ function TorrentDetailContent({
             ) : null}
 
             {tagFacets.length > 0 ? (
-              <dl className="flex flex-col gap-1 text-sm">
+              <dl className="flex flex-col gap-2 text-sm">
                 {tagFacets.map((facet) => (
                   <div key={facet.id} className="flex items-center gap-1.5">
                     <dt className="text-xs text-muted-foreground">
@@ -345,7 +345,7 @@ function TorrentDetailContent({
           <div className="flex items-center gap-2">
             <TorrentSticky stickyUntil={detail.sticky_until} />
             {promotionLabel ? (
-              <div className="inline-flex h-[30px] items-center gap-1.5 rounded-sm border border-destructive/20 bg-destructive/10 px-3 text-sm font-semibold text-destructive">
+              <div className="inline-flex h-[30px] items-center gap-1.5 rounded-full bg-destructive/10 px-3 text-sm font-semibold text-destructive">
                 <ZapIcon className="size-3.5" />
                 <span>{promotionLabel}</span>
                 {detail.promotion_ends_at ? (
@@ -359,14 +359,14 @@ function TorrentDetailContent({
               </div>
             ) : null}
           </div>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 max-md:w-full max-md:flex-col max-md:items-start md:min-w-[678px]">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-2 max-md:w-full max-md:flex-col max-md:items-start md:min-w-[678px]">
             <TorrentSwarmOverview
               torrentId={detail.id}
               compact
               showFreshness={false}
               className="w-auto"
             />
-            <dl className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1 text-sm">
+            <dl className="flex flex-wrap items-center justify-start gap-x-4 gap-y-2 text-sm">
               <InlineDetailFact
                 label="上传者"
                 value={
@@ -573,14 +573,11 @@ function TorrentFilesCard({
   }
 
   return (
-    <Card
-      className="gap-0 rounded-lg py-0 shadow-sm"
-      aria-labelledby="torrent-files-title"
-    >
+    <Card className="gap-0 py-0" aria-labelledby="torrent-files-title">
       <CardHeader className="p-6 pb-2">
         <CardTitle
           id="torrent-files-title"
-          className="flex flex-wrap items-center justify-between gap-2 text-base font-semibold"
+          className="flex flex-wrap items-center justify-between gap-2"
         >
           <span className="flex items-center gap-2">
             <FileArchiveIcon className="size-4" />
@@ -648,7 +645,7 @@ function TorrentFilesCard({
               {visibleFiles.map((file) => (
                 <div
                   key={file.file_index}
-                  className="flex items-center justify-between gap-4 border-b py-1.5 text-sm last:border-0"
+                  className="flex items-center justify-between gap-4 border-b py-2.5 text-sm last:border-0"
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     <FileArchiveIcon className="size-3.5 shrink-0 text-muted-foreground" />

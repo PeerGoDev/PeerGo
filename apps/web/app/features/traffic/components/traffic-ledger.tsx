@@ -52,7 +52,7 @@ export function TrafficLedger({
 }) {
   const total = exactNonNegativeInteger(totalEntries)?.toLocaleString("zh-CN")
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="gap-0 py-0">
       <CardHeader className="border-b py-3.5">
         <CardTitle>最近流量</CardTitle>
         <CardDescription>
@@ -78,7 +78,7 @@ export function TrafficLedger({
         ) : (
           <>
             <div className="hidden md:block">
-              <Table>
+              <Table containerClassName="px-3">
                 <TableHeader className="bg-secondary/70">
                   <TableRow>
                     <TableHead className="w-full min-w-72 pl-4 text-muted-foreground">

@@ -16,4 +16,15 @@ describe("Card", () => {
       "data-[size=sm]:text-sm"
     )
   })
+
+  it("uses the Direction I borderless soft-shadow shell", () => {
+    render(<Card>方向 I 卡片</Card>)
+
+    expect(screen.getByText("方向 I 卡片")).toHaveClass(
+      "rounded-3xl",
+      "border-0",
+      "shadow-soft"
+    )
+    expect(screen.getByText("方向 I 卡片")).not.toHaveClass("shadow-sm")
+  })
 })

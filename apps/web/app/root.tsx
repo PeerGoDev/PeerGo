@@ -30,7 +30,44 @@ const LazyStaffShell = lazy(() =>
     default: StaffShell,
   }))
 )
+const LazyAuthShell = lazy(() =>
+  import("~/features/auth/components/auth-shell").then(({ AuthShell }) => ({
+    default: AuthShell,
+  }))
+)
 const pendingNavigationStorageKey = "peergo.pending-navigation.v1"
+
+// Public auth routes render without the sidebar/header chrome. Exact-or-child
+// matching keeps sibling routes such as /registered untouched.
+const authShellPathPrefixes = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+]
+
+export function isAuthShellPathname(pathname: string) {
+  return authShellPathPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
+// Applies the persisted (or system) theme before first paint so the glass
+// chrome never flashes light while the shell mounts. Keep the storage key in
+// sync with features/shell/model/use-theme.ts, which owns theme switching.
+const themeInitScript = `try {
+  var theme = localStorage.getItem("peergo-theme");
+  if (theme !== "dark" && theme !== "light") {
+    theme =
+      typeof matchMedia === "function" &&
+      matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+  }
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.style.colorScheme = theme;
+} catch (error) {}`
 
 export const meta: Route.MetaFunction = () => [
   { title: "PeerGo" },
@@ -42,10 +79,11 @@ export const meta: Route.MetaFunction = () => [
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <Meta />
         <Links />
       </head>
@@ -60,10 +98,11 @@ export function Layout({ children }: { children: ReactNode }) {
 
 export default function App() {
   const location = useLocation()
-  const shell = location.pathname.startsWith("/staff")
+  const Shell = location.pathname.startsWith("/staff")
     ? LazyStaffShell
-    : LazyAppShell
-  const Shell = shell
+    : isAuthShellPathname(location.pathname)
+      ? LazyAuthShell
+      : LazyAppShell
   useStaleAssetRecovery()
 
   return (

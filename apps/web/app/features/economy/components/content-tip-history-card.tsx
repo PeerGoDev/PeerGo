@@ -84,7 +84,7 @@ export function ContentTipHistoryCard({ userId }: { userId: string }) {
             还没有内容打赏记录。
           </div>
         ) : (
-          <Table>
+          <Table containerClassName="px-3">
             <TableHeader>
               <TableRow>
                 <TableHead>时间</TableHead>

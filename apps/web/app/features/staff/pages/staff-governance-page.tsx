@@ -191,18 +191,18 @@ function GovernanceContent({
           const selected = values[0] as GovernanceSection | undefined
           if (selected) setSection(selected)
         }}
-        className="w-full justify-start border-b"
+        className="w-full justify-start gap-0.5"
         aria-label="权限治理页面"
       >
         <ToggleGroupItem
           value="grants"
-          className="h-10 rounded-b-none aria-pressed:border-b-2 aria-pressed:border-primary"
+          className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
         >
           角色授权
         </ToggleGroupItem>
         <ToggleGroupItem
           value="requests"
-          className="h-10 rounded-b-none aria-pressed:border-b-2 aria-pressed:border-primary"
+          className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
         >
           撤权复核
           {pendingCount > 0 ? (

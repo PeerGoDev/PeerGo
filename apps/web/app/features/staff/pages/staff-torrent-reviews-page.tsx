@@ -120,8 +120,8 @@ function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
 
       {reviews.data ? (
         <section aria-label="待审核种子" className="flex flex-col gap-6">
-          <div className="flex items-end border-b">
-            <div className="-mb-px flex h-[38px] items-center gap-2 border-b-2 border-primary px-4 text-sm font-medium text-primary">
+          <div className="flex items-end">
+            <div className="flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground">
               <Clock3Icon className="size-3.5" />
               待审核
               <Badge
@@ -134,7 +134,7 @@ function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
           </div>
 
           {reviews.data.items.length === 0 ? (
-            <Card className="gap-0 rounded-lg py-0 shadow-sm">
+            <Card className="gap-0 py-0">
               <CardContent className="p-0">
                 <Empty className="min-h-60 border-0 py-12">
                   <EmptyHeader>
@@ -154,10 +154,7 @@ function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
           ) : (
             <div className="flex flex-col gap-4">
               {reviews.data.items.map((torrent) => (
-                <Card
-                  key={torrent.id}
-                  className="h-[130px] gap-0 rounded-lg py-0 shadow-sm"
-                >
+                <Card key={torrent.id} className="h-[130px] gap-0 py-0">
                   <CardContent className="h-full p-4">
                     <article className="flex h-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0 flex-1">

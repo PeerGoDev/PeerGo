@@ -75,7 +75,7 @@ export function HitAndRunList({
   const showAppeals =
     canCreateAppeal || page.items.some((entry) => entry.appeal !== null)
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="gap-0 py-0">
       <CardHeader className="border-b py-3.5">
         <CardTitle>{filterTitle(filter)}</CardTitle>
         <CardDescription>
@@ -91,7 +91,7 @@ export function HitAndRunList({
         ) : (
           <>
             <div className="hidden md:block">
-              <Table>
+              <Table containerClassName="px-3">
                 <TableHeader className="bg-secondary/70">
                   <TableRow>
                     <TableHead className="w-full min-w-72 pl-4 text-muted-foreground">
@@ -167,12 +167,12 @@ function HitAndRunTableRow({
   onAppeal: (entry: HitAndRunEntry) => void
 }) {
   return (
-    <TableRow className="h-14 hover:bg-accent/70">
+    <TableRow className="h-14">
       <TableCell className="max-w-0 pl-4">
         <div className="flex min-w-0 flex-col gap-1">
           <Link
             to={`/torrents/${entry.torrent.id}`}
-            className="truncate font-medium hover:underline"
+            className="truncate font-bold text-title transition-colors hover:text-title-hover hover:underline"
           >
             {entry.torrent.title}
           </Link>
@@ -221,7 +221,7 @@ function HitAndRunMobileCard({
         <div className="flex min-w-0 flex-col gap-1">
           <Link
             to={`/torrents/${entry.torrent.id}`}
-            className="line-clamp-2 font-medium hover:underline"
+            className="line-clamp-2 font-bold text-title transition-colors hover:text-title-hover hover:underline"
           >
             {entry.torrent.title}
           </Link>
