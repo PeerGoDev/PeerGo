@@ -258,7 +258,6 @@ export function InvitationsPage() {
                 onInviteeEmailChange={setInviteeEmail}
                 canIssue={canIssue}
                 onIssue={(event) => void handleIssue(event)}
-                canIssue={canIssue}
               />
               <InvitationHistory
                 items={overview.data.items}
