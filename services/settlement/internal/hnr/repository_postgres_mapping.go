@@ -231,11 +231,13 @@ func assessmentFromRow(row ledgerdb.LedgerHnrCompletionAssessment) (completionAs
 
 func sameCompletionAssessment(row ledgerdb.LedgerHnrCompletionAssessment, raw rawWork) bool {
 	assessment, err := assessmentFromRow(row)
+	// completion_id identifies the Swarm completion transition, not one
+	// delivery event. A Tracker retry can therefore have a new event UUID,
+	// timestamp or control sequence while carrying the same completion_id.
+	// Keep the first immutable assessment authoritative and accept the replay
+	// only when its cryptographic identity and accounting subject still match.
 	return err == nil && bytes.Equal(assessment.CompletionID, raw.CompletionID) &&
-		assessment.CompletionEventID == raw.EventID && assessment.UserID == raw.UserID && assessment.TorrentID == raw.TorrentID &&
-		assessment.TorrentControlSequence == raw.TorrentControlSequence && assessment.SubjectControlSequence == raw.SubjectControlSequence &&
-		assessment.CompletedAt.Equal(raw.EndsAt) && assessment.InitialUploaded == raw.CurrentUploaded &&
-		assessment.RawDownloaded == raw.CurrentDownloaded
+		assessment.UserID == raw.UserID && assessment.TorrentID == raw.TorrentID
 }
 
 func obligationFromRow(row ledgerdb.ListTrackingHNRObligationsForUpdateRow) (obligationRecord, error) {
