@@ -475,6 +475,11 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
+		Action: ActionNewcomerAssessmentAssign, Description: "为现有用户分配新人考核", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
 		Action: ActionNewcomerAssessmentExempt, Description: "人工豁免一条新人考核", Risk: RiskHigh,
 		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
 		Grantable: true, Discoverable: true,
