@@ -25,6 +25,18 @@ type Repository interface {
 
 type PostgresRepository struct{ pool *pgxpool.Pool }
 
+type commandExecutor interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}
+
+const touchCredentialUsageQuery = `
+UPDATE identity.personal_api_keys
+SET last_used_at = $2::timestamptz,
+    updated_at = GREATEST(updated_at, $2::timestamptz)
+WHERE user_id = $1
+  AND version = $3
+  AND (last_used_at IS NULL OR last_used_at <= $4::timestamptz)`
+
 func NewPostgresRepository(pool *pgxpool.Pool) (*PostgresRepository, error) {
 	if pool == nil {
 		return nil, errors.New("personal API key PostgreSQL pool is required")
@@ -196,18 +208,24 @@ WHERE credential.token_hash = $1
 	result.User.EmailVerifiedAt = optionalTime(emailVerified)
 
 	// Frequent tool traffic produces at most one small status write per key per
-	// six hours. PeerGo does not persist an API request log here.
-	if _, err := repository.pool.Exec(ctx, `
-UPDATE identity.personal_api_keys
-SET last_used_at = $2, updated_at = GREATEST(updated_at, $2)
-WHERE user_id = $1
-  AND version = $3
-  AND (last_used_at IS NULL OR last_used_at <= $2 - interval '6 hours')`,
-		result.User.ID, now, result.Credential.Version,
-	); err != nil {
-		return AuthenticatedCredential{}, fmt.Errorf("touch personal API key: %w", err)
-	}
+	// six hours. This metadata is deliberately best-effort: a failed usage touch
+	// must never turn an already authenticated tool request into a 500 response.
+	touchCredentialUsage(repository.pool, ctx, result.User.ID, now, result.Credential.Version)
 	return result, nil
+}
+
+func touchCredentialUsage(executor commandExecutor, ctx context.Context, userID uuid.UUID, now time.Time, version int64) {
+	// Pass the cutoff as a timestamp and cast both time parameters explicitly.
+	// Otherwise PostgreSQL can infer `$2 - interval` as an interval expression
+	// and reject the timestamptz comparison at execution time.
+	_, _ = executor.Exec(
+		ctx,
+		touchCredentialUsageQuery,
+		userID,
+		now,
+		version,
+		now.Add(-6*time.Hour),
+	)
 }
 
 func (repository *PostgresRepository) ResolveActiveUser(ctx context.Context, userID uuid.UUID, version int64, requiredScope Scope, now time.Time) (identity.User, error) {
