@@ -1018,7 +1018,13 @@ production-build: production-config
 	./scripts/production-compose.sh build peergo-api web-release
 
 production-up: production-ready production-build
-	./scripts/production-compose.sh up -d --wait
+	# Start the full dependency graph first so migrations, stream initialization
+	# and the atomic Web release must complete successfully before dependents.
+	# Compose 5 treats a successful one-shot exit as a --wait failure, so the
+	# health wait is deliberately limited to the six long-running services.
+	./scripts/production-compose.sh up -d
+	./scripts/production-compose.sh up -d --no-deps --wait \
+		peergo-nats audit-sink vault-api tracker peergo-api peergo-worker
 	$(MAKE) production-prune-one-shots
 
 # Migration and stream/bootstrap containers are disposable after their state is

@@ -49,8 +49,14 @@ PEERGO_DOCKER_LOG_MAX_FILES=3
 ```bash
 make production-ready
 make production-build
-./scripts/production-compose.sh up -d --wait
+./scripts/production-compose.sh up -d
+./scripts/production-compose.sh up -d --no-deps --wait \
+  peergo-nats audit-sink vault-api tracker peergo-api peergo-worker
 ```
+
+第一步必须让 migration、stream 初始化和原子 Web 发布完整成功；第二步只等待六个常驻服务
+健康。不要对包含一次性任务的完整 Compose 图直接使用 `--wait`：Compose 5 会把任务成功退出
+误判成等待失败。
 
 静态文件发布完成且 `peergo-api` 健康后，安装并校验
 `deploy/openresty/rousi.pro.conf`，再 reload OpenResty。配置文件把 API 指向
