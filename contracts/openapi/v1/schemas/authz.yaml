@@ -46,8 +46,8 @@ CapabilityAction:
     - hnr.policy.issue
     - hnr.policy.read
     - hnr.read.self
-    - integration.moviepilot.manage.self
-    - integration.moviepilot.read.self
+    - integration.apikey.manage.self
+    - integration.apikey.read.self
     - invitation.issue.self
     - invitation.read.self
     - invitation.revoke.self

@@ -15,6 +15,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/economy/attendance"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/moviepilot"
+	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 )
 
@@ -31,28 +32,28 @@ type moviePilotResponse struct {
 // present. Ordinary PeerGo browser calls continue through OpenAPI validation.
 // It must be mounted after private response headers and before same-origin
 // enforcement because API-key clients are not browser-cookie audiences.
-func MoviePilotCompatibility(service MoviePilotService) func(http.Handler) http.Handler {
+func MoviePilotCompatibility(apiKeys PersonalAPIKeyService, service MoviePilotService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if service == nil {
+			if apiKeys == nil || service == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
 			switch {
 			case r.Method == http.MethodGet && r.URL.Path == "/api/v1/profile":
-				handleMoviePilotProfile(service, w, r)
+				handleMoviePilotProfile(apiKeys, service, w, r)
 				return
 			case r.Method == http.MethodGet && r.URL.Path == "/api/v1/torrents" && hasMoviePilotCredentialHeader(r):
-				handleMoviePilotTorrentList(service, w, r)
+				handleMoviePilotTorrentList(apiKeys, service, w, r)
 				return
 			case r.Method == http.MethodGet && moviePilotTorrentID(r.URL.Path) > 0 && hasMoviePilotCredentialHeader(r):
-				handleMoviePilotTorrent(service, w, r)
+				handleMoviePilotTorrent(apiKeys, service, w, r)
 				return
 			case r.Method == http.MethodPost && r.URL.Path == "/api/points/attendance":
-				handleMoviePilotAttendanceClaim(service, w, r)
+				handleMoviePilotAttendanceClaim(apiKeys, service, w, r)
 				return
 			case r.Method == http.MethodGet && r.URL.Path == "/api/points/attendance/stats":
-				handleMoviePilotAttendanceStats(service, w, r)
+				handleMoviePilotAttendanceStats(apiKeys, service, w, r)
 				return
 			case r.Method == http.MethodGet && moviePilotDownloadTorrentID(r.URL.Path) > 0:
 				handleMoviePilotDownload(service, w, r)
@@ -64,8 +65,8 @@ func MoviePilotCompatibility(service MoviePilotService) func(http.Handler) http.
 	}
 }
 
-func handleMoviePilotProfile(service MoviePilotService, w http.ResponseWriter, r *http.Request) {
-	credential, ok := authenticateMoviePilot(service, w, r)
+func handleMoviePilotProfile(apiKeys PersonalAPIKeyService, service MoviePilotService, w http.ResponseWriter, r *http.Request) {
+	credential, ok := authenticateMoviePilot(apiKeys, w, r)
 	if !ok {
 		return
 	}
@@ -92,8 +93,8 @@ func handleMoviePilotProfile(service MoviePilotService, w http.ResponseWriter, r
 	}})
 }
 
-func handleMoviePilotTorrentList(service MoviePilotService, w http.ResponseWriter, r *http.Request) {
-	credential, ok := authenticateMoviePilot(service, w, r)
+func handleMoviePilotTorrentList(apiKeys PersonalAPIKeyService, service MoviePilotService, w http.ResponseWriter, r *http.Request) {
+	credential, ok := authenticateMoviePilot(apiKeys, w, r)
 	if !ok {
 		return
 	}
@@ -122,8 +123,8 @@ func handleMoviePilotTorrentList(service MoviePilotService, w http.ResponseWrite
 	}})
 }
 
-func handleMoviePilotTorrent(service MoviePilotService, w http.ResponseWriter, r *http.Request) {
-	credential, ok := authenticateMoviePilot(service, w, r)
+func handleMoviePilotTorrent(apiKeys PersonalAPIKeyService, service MoviePilotService, w http.ResponseWriter, r *http.Request) {
+	credential, ok := authenticateMoviePilot(apiKeys, w, r)
 	if !ok {
 		return
 	}
@@ -143,8 +144,8 @@ func handleMoviePilotTorrent(service MoviePilotService, w http.ResponseWriter, r
 	}})
 }
 
-func handleMoviePilotAttendanceClaim(service MoviePilotService, w http.ResponseWriter, r *http.Request) {
-	credential, ok := authenticateMoviePilot(service, w, r)
+func handleMoviePilotAttendanceClaim(apiKeys PersonalAPIKeyService, service MoviePilotService, w http.ResponseWriter, r *http.Request) {
+	credential, ok := authenticateMoviePilot(apiKeys, w, r)
 	if !ok {
 		return
 	}
@@ -180,8 +181,8 @@ func handleMoviePilotAttendanceClaim(service MoviePilotService, w http.ResponseW
 	}})
 }
 
-func handleMoviePilotAttendanceStats(service MoviePilotService, w http.ResponseWriter, r *http.Request) {
-	credential, ok := authenticateMoviePilot(service, w, r)
+func handleMoviePilotAttendanceStats(apiKeys PersonalAPIKeyService, service MoviePilotService, w http.ResponseWriter, r *http.Request) {
+	credential, ok := authenticateMoviePilot(apiKeys, w, r)
 	if !ok {
 		return
 	}
@@ -202,7 +203,7 @@ func handleMoviePilotDownload(service MoviePilotService, w http.ResponseWriter, 
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {
-		case errors.Is(err, moviepilot.ErrCapabilityInvalid), errors.Is(err, moviepilot.ErrCredentialInvalid):
+		case errors.Is(err, moviepilot.ErrCapabilityInvalid), errors.Is(err, personalapikey.ErrInvalid):
 			status = http.StatusUnauthorized
 		case errors.Is(err, moviepilot.ErrRateLimited):
 			status = http.StatusTooManyRequests
@@ -226,22 +227,22 @@ func handleMoviePilotDownload(service MoviePilotService, w http.ResponseWriter, 
 	_, _ = w.Write(result.Data)
 }
 
-func authenticateMoviePilot(service MoviePilotService, w http.ResponseWriter, r *http.Request) (moviepilot.AuthenticatedCredential, bool) {
+func authenticateMoviePilot(service PersonalAPIKeyService, w http.ResponseWriter, r *http.Request) (personalapikey.AuthenticatedCredential, bool) {
 	raw, valid := moviePilotCredentialFromRequest(r)
 	if !valid {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="PeerGo MoviePilot"`)
 		writeMoviePilotJSON(w, http.StatusUnauthorized, moviePilotResponse{Code: 401, Message: "API Key 无效或已撤销"})
-		return moviepilot.AuthenticatedCredential{}, false
+		return personalapikey.AuthenticatedCredential{}, false
 	}
 	credential, err := service.Authenticate(r.Context(), raw)
-	if errors.Is(err, moviepilot.ErrCredentialInvalid) {
+	if errors.Is(err, personalapikey.ErrInvalid) {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="PeerGo MoviePilot"`)
 		writeMoviePilotJSON(w, http.StatusUnauthorized, moviePilotResponse{Code: 401, Message: "API Key 无效或已撤销"})
-		return moviepilot.AuthenticatedCredential{}, false
+		return personalapikey.AuthenticatedCredential{}, false
 	}
 	if err != nil {
 		writeMoviePilotJSON(w, http.StatusInternalServerError, moviePilotResponse{Code: 500, Message: "服务暂时不可用"})
-		return moviepilot.AuthenticatedCredential{}, false
+		return personalapikey.AuthenticatedCredential{}, false
 	}
 	return credential, true
 }
@@ -341,9 +342,9 @@ func writeMoviePilotServiceError(w http.ResponseWriter, err error) bool {
 	}
 	status, code, message := http.StatusInternalServerError, 500, "服务暂时不可用"
 	switch {
-	case errors.Is(err, moviepilot.ErrCredentialInvalid), errors.Is(err, identity.ErrSessionNotFound):
+	case errors.Is(err, personalapikey.ErrInvalid), errors.Is(err, identity.ErrSessionNotFound):
 		status, code, message = http.StatusUnauthorized, 401, "API Key 无效或已撤销"
-	case errors.Is(err, authz.ErrForbidden):
+	case errors.Is(err, personalapikey.ErrScopeDenied), errors.Is(err, authz.ErrForbidden):
 		status, code, message = http.StatusForbidden, 403, "当前账号没有执行该操作的权限"
 	case errors.Is(err, moviepilot.ErrInput), errors.Is(err, attendance.ErrInput), errors.Is(err, catalog.ErrInvalidLimit), errors.Is(err, catalog.ErrInvalidQuery), errors.Is(err, catalog.ErrInvalidTorrentPage), errors.Is(err, catalog.ErrInvalidTorrentFilter):
 		status, code, message = http.StatusBadRequest, 400, "请求参数无效"

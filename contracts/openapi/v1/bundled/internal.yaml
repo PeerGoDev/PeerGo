@@ -3403,16 +3403,16 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
-  /api/v1/me/moviepilot-credential:
+  /api/v1/me/api-key:
     get:
-      operationId: getMyMoviePilotCredential
-      summary: 查看自己的 MoviePilot API Key 状态
+      operationId: getMyPersonalAPIKey
+      summary: 查看自己的个人 API Key 状态
       tags:
         - integrations
       x-audience:
         - web
       x-owner: core-integrations
-      x-permission: integration.moviepilot.read.self
+      x-permission: integration.apikey.read.self
       x-credential-audience: web-session
       responses:
         '200':
@@ -3420,7 +3420,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoviePilotCredentialStatus'
+                $ref: '#/components/schemas/PersonalAPIKeyStatus'
         '401':
           $ref: '#/components/responses/ProblemResponse'
         '403':
@@ -3428,14 +3428,14 @@ paths:
         default:
           $ref: '#/components/responses/ProblemResponse'
     delete:
-      operationId: revokeMyMoviePilotCredential
-      summary: 撤销自己的 MoviePilot API Key
+      operationId: revokeMyPersonalAPIKey
+      summary: 撤销自己的个人 API Key
       tags:
         - integrations
       x-audience:
         - web
       x-owner: core-integrations
-      x-permission: integration.moviepilot.manage.self
+      x-permission: integration.apikey.manage.self
       x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/WebCSRFHeader'
@@ -3462,16 +3462,16 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
-  /api/v1/me/moviepilot-credential/rotations:
+  /api/v1/me/api-key/rotations:
     post:
-      operationId: rotateMyMoviePilotCredential
-      summary: 创建或轮换自己的 MoviePilot API Key
+      operationId: rotateMyPersonalAPIKey
+      summary: 创建或轮换自己的个人 API Key
       tags:
         - integrations
       x-audience:
         - web
       x-owner: core-integrations
-      x-permission: integration.moviepilot.manage.self
+      x-permission: integration.apikey.manage.self
       x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/WebCSRFHeader'
@@ -3480,14 +3480,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RotateMoviePilotCredentialRequest'
+              $ref: '#/components/schemas/RotatePersonalAPIKeyRequest'
       responses:
         '201':
           description: 原始 API Key 仅在本响应返回一次；旧密钥立即失效。
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IssuedMoviePilotCredential'
+                $ref: '#/components/schemas/IssuedPersonalAPIKey'
         '400':
           $ref: '#/components/responses/ProblemResponse'
         '401':
@@ -11826,8 +11826,8 @@ components:
         - hnr.policy.issue
         - hnr.policy.read
         - hnr.read.self
-        - integration.moviepilot.manage.self
-        - integration.moviepilot.read.self
+        - integration.apikey.manage.self
+        - integration.apikey.read.self
         - invitation.issue.self
         - invitation.read.self
         - invitation.revoke.self
@@ -13769,7 +13769,7 @@ components:
           type: string
           minLength: 10
           maxLength: 500
-    MoviePilotCredentialStatus:
+    PersonalAPIKeyStatus:
       type: object
       additionalProperties: false
       required:
@@ -13790,11 +13790,12 @@ components:
           maximum: 9007199254740991
         scopes:
           type: array
-          minItems: 5
+          minItems: 0
           maxItems: 5
           uniqueItems: true
           items:
-            $ref: '#/components/schemas/MoviePilotCredentialScope'
+            $ref: '#/components/schemas/PersonalAPIKeyScope'
+          description: 当前密钥实际拥有的权限；未创建密钥时为空数组。
         created_at:
           type: string
           format: date-time
@@ -13802,9 +13803,11 @@ components:
           type: string
           format: date-time
           description: 最多每六小时合并更新一次，不构成逐请求活动记录。
-    RotateMoviePilotCredentialRequest:
+    RotatePersonalAPIKeyRequest:
       type: object
       additionalProperties: false
+      required:
+        - scopes
       properties:
         expected_version:
           type: integer
@@ -13812,7 +13815,15 @@ components:
           minimum: 1
           maximum: 9007199254740991
           description: 首次创建时省略；轮换现有密钥时必须与当前版本一致。
-    IssuedMoviePilotCredential:
+        scopes:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/PersonalAPIKeyScope'
+          description: 新密钥可以调用的最小权限集合。
+    IssuedPersonalAPIKey:
       type: object
       additionalProperties: false
       required:
@@ -13820,7 +13831,7 @@ components:
         - api_key
       properties:
         credential:
-          $ref: '#/components/schemas/MoviePilotCredentialStatus'
+          $ref: '#/components/schemas/PersonalAPIKeyStatus'
         api_key:
           type: string
           minLength: 47
@@ -22415,8 +22426,9 @@ components:
         - all
         - free
         - paid
-    MoviePilotCredentialScope:
+    PersonalAPIKeyScope:
       type: string
+      description: 可授予个人 API Key 的最小权限范围；所有适配器共享同一套范围。
       enum:
         - profile:read
         - torrent:read

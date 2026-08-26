@@ -2,49 +2,27 @@ package moviepilot
 
 import (
 	"bytes"
-	"crypto/sha256"
+	"context"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
+	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 )
 
-func TestNewAPIKeyReturnsOnlyHighEntropyRawValueAndDigest(t *testing.T) {
-	random := bytes.Repeat([]byte{0x5a}, rawAPIKeyBytes)
-	service := &Service{readRandom: func(target []byte) (int, error) {
-		return copy(target, random), nil
-	}}
-
-	raw, digest, prefix, err := service.newAPIKey()
-	if err != nil {
-		t.Fatalf("newAPIKey() error = %v", err)
+func TestMoviePilotAdapterEnforcesSharedPersonalAPIKeyScopes(t *testing.T) {
+	service := &Service{}
+	credential := personalapikey.AuthenticatedCredential{
+		Credential: personalapikey.Credential{Scopes: []personalapikey.Scope{personalapikey.ScopeTorrentRead}},
 	}
-	if len(raw) != 47 || raw[:4] != apiKeyPrefix || prefix != raw[:12] {
-		t.Fatalf("unexpected API key shape: len=%d prefix=%q", len(raw), prefix)
+	if _, err := service.Profile(context.Background(), credential); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("Profile() scope error = %v", err)
 	}
-	expectedDigest := sha256.Sum256([]byte(raw))
-	if !bytes.Equal(digest, expectedDigest[:]) {
-		t.Fatal("newAPIKey() did not return the SHA-256 digest of the raw key")
-	}
-	parsed, err := apiKeyDigest(raw)
-	if err != nil || !bytes.Equal(parsed, digest) {
-		t.Fatalf("apiKeyDigest() = %x, %v", parsed, err)
-	}
-	if _, err := apiKeyDigest(raw + "x"); !errors.Is(err, ErrCredentialInvalid) {
-		t.Fatalf("apiKeyDigest(invalid) error = %v", err)
-	}
-}
-
-func TestNewAPIKeyRejectsShortRandomRead(t *testing.T) {
-	service := &Service{readRandom: func(target []byte) (int, error) {
-		return copy(target, []byte("short")), nil
-	}}
-	if _, _, _, err := service.newAPIKey(); err == nil {
-		t.Fatal("newAPIKey() accepted a short random read")
+	if _, err := service.Torrent(context.Background(), credential, 9830); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("Torrent() download scope error = %v", err)
 	}
 }
 
@@ -99,16 +77,5 @@ func TestMoviePilotCategoryAndPromotionCompatibility(t *testing.T) {
 	result := promotion(catalog.PromotionDoubleUploadHalfDownload, nil)
 	if !result.Active || result.Type != 6 || result.TimeType != 1 || result.UploadFactor != 2 || result.DownloadFactor != 0.5 {
 		t.Fatalf("promotion() = %+v", result)
-	}
-}
-
-func TestMoviePilotCredentialWriteConflictMapping(t *testing.T) {
-	for _, code := range []string{"23505", "40001", "40P01"} {
-		if !moviePilotCredentialWriteConflict(&pgconn.PgError{Code: code}) {
-			t.Fatalf("PostgreSQL error %s was not classified as a credential conflict", code)
-		}
-	}
-	if moviePilotCredentialWriteConflict(&pgconn.PgError{Code: "23503"}) {
-		t.Fatal("foreign-key violation was classified as a credential conflict")
 	}
 }

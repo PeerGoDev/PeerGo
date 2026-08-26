@@ -59,7 +59,7 @@ func EnforceSameOrigin(allowedOrigins []string) func(http.Handler) http.Handler 
 func PrivateResponseHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/session" || r.URL.Path == "/api/v1/me/capabilities" ||
-			strings.HasPrefix(r.URL.Path, "/api/v1/me/moviepilot-credential") ||
+			strings.HasPrefix(r.URL.Path, "/api/v1/me/api-key") ||
 			r.URL.Path == "/api/v1/me/avatar" ||
 			r.URL.Path == "/api/v1/me/profile" || r.URL.Path == "/api/v1/me/security" || strings.HasPrefix(r.URL.Path, "/api/v1/me/download-restriction") || r.URL.Path == "/api/v1/me/traffic" || r.URL.Path == "/api/v1/me/hit-and-runs" ||
 			strings.HasPrefix(r.URL.Path, "/api/v1/me/torrent-submissions") ||

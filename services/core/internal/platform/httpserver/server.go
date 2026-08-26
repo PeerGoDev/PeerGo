@@ -73,6 +73,7 @@ type Dependencies struct {
 	TorrentResubmission         httpapi.TorrentResubmissionService
 	TorrentMaintenance          httpapi.TorrentMaintenanceService
 	PromotionAdministration     httpapi.PromotionAdministrationService
+	PersonalAPIKeys             httpapi.PersonalAPIKeyService
 	MoviePilot                  httpapi.MoviePilotService
 	RSS                         httpapi.RSSService
 	TorrentUploadMaxBytes       int
@@ -128,8 +129,8 @@ func New(dependencies Dependencies, logger *slog.Logger) (http.Handler, error) {
 	router.Use(middleware.Timeout(15 * time.Second))
 	router.Use(httpapi.PrivateResponseHeaders)
 	router.Use(httpapi.CaptureSessionCookies(dependencies.SessionCookie.Name, dependencies.StaffSessionCookie.Name))
-	if dependencies.MoviePilot != nil {
-		router.Use(httpapi.MoviePilotCompatibility(dependencies.MoviePilot))
+	if dependencies.PersonalAPIKeys != nil && dependencies.MoviePilot != nil {
+		router.Use(httpapi.MoviePilotCompatibility(dependencies.PersonalAPIKeys, dependencies.MoviePilot))
 	}
 	router.Use(httpapi.EnforceSameOrigin(dependencies.AllowedOrigins))
 
@@ -154,7 +155,7 @@ func New(dependencies Dependencies, logger *slog.Logger) (http.Handler, error) {
 	})
 
 	strictHandler := generated.NewStrictHandlerWithOptions(
-		httpapi.NewHandler(dependencies.Catalog, dependencies.Identity, dependencies.Registration, dependencies.HumanVerification, dependencies.Invitations, dependencies.EmailVerification, dependencies.PasswordRecovery, dependencies.SessionSecurity, dependencies.TwoFactor, dependencies.StaffIdentity, dependencies.StaffEnrollment, dependencies.Authorization, dependencies.GrantAdministration, dependencies.CategoryAdministration, dependencies.AnnouncementAdministration, dependencies.Wiki, dependencies.SiteDisplaySettings, dependencies.UserAdministration, dependencies.Notifications, dependencies.TrafficOverview, dependencies.EconomyOverview, dependencies.Attendance, dependencies.MemberGifts, dependencies.ContentTips, dependencies.Workgroups, dependencies.SeedingRewardAdministration, dependencies.LevelPolicyAdministration, dependencies.ContributionExperience, dependencies.MedalAdministration, dependencies.MemberMedals, dependencies.HNRPolicyAdministration, dependencies.RatioWatchAdministration, dependencies.NewcomerAdministration, dependencies.Operations, dependencies.TorrentBookmarks, dependencies.Comments, dependencies.SocialPosts, dependencies.CommentModeration, dependencies.TorrentRead, dependencies.TorrentUpload, dependencies.TorrentDownload, dependencies.TorrentReview, dependencies.TorrentResubmission, dependencies.TorrentMaintenance, dependencies.PromotionAdministration, dependencies.MoviePilot, dependencies.RSS, dependencies.SessionCookie, dependencies.StaffSessionCookie),
+		httpapi.NewHandler(dependencies.Catalog, dependencies.Identity, dependencies.Registration, dependencies.HumanVerification, dependencies.Invitations, dependencies.EmailVerification, dependencies.PasswordRecovery, dependencies.SessionSecurity, dependencies.TwoFactor, dependencies.StaffIdentity, dependencies.StaffEnrollment, dependencies.Authorization, dependencies.GrantAdministration, dependencies.CategoryAdministration, dependencies.AnnouncementAdministration, dependencies.Wiki, dependencies.SiteDisplaySettings, dependencies.UserAdministration, dependencies.Notifications, dependencies.TrafficOverview, dependencies.EconomyOverview, dependencies.Attendance, dependencies.MemberGifts, dependencies.ContentTips, dependencies.Workgroups, dependencies.SeedingRewardAdministration, dependencies.LevelPolicyAdministration, dependencies.ContributionExperience, dependencies.MedalAdministration, dependencies.MemberMedals, dependencies.HNRPolicyAdministration, dependencies.RatioWatchAdministration, dependencies.NewcomerAdministration, dependencies.Operations, dependencies.TorrentBookmarks, dependencies.Comments, dependencies.SocialPosts, dependencies.CommentModeration, dependencies.TorrentRead, dependencies.TorrentUpload, dependencies.TorrentDownload, dependencies.TorrentReview, dependencies.TorrentResubmission, dependencies.TorrentMaintenance, dependencies.PromotionAdministration, dependencies.PersonalAPIKeys, dependencies.MoviePilot, dependencies.RSS, dependencies.SessionCookie, dependencies.StaffSessionCookie),
 		nil,
 		generated.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {

@@ -56,8 +56,8 @@ const (
 	ActionHNRPolicyIssue                          Action = "hnr.policy.issue"
 	ActionHNRPolicyRead                           Action = "hnr.policy.read"
 	ActionHNRReadSelf                             Action = "hnr.read.self"
-	ActionIntegrationMoviePilotManageSelf         Action = "integration.moviepilot.manage.self"
-	ActionIntegrationMoviePilotReadSelf           Action = "integration.moviepilot.read.self"
+	ActionIntegrationAPIKeyManageSelf             Action = "integration.apikey.manage.self"
+	ActionIntegrationAPIKeyReadSelf               Action = "integration.apikey.read.self"
 	ActionInvitationIssueSelf                     Action = "invitation.issue.self"
 	ActionInvitationReadSelf                      Action = "invitation.read.self"
 	ActionInvitationRevokeSelf                    Action = "invitation.revoke.self"
@@ -449,12 +449,12 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionIntegrationMoviePilotManageSelf, Description: "创建、轮换或撤销自己的 MoviePilot API Key", Risk: RiskHigh,
+		Action: ActionIntegrationAPIKeyManageSelf, Description: "创建、轮换或撤销自己的个人 API Key", Risk: RiskHigh,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionIntegrationMoviePilotReadSelf, Description: "查看自己的 MoviePilot API Key 状态", Risk: RiskLow,
+		Action: ActionIntegrationAPIKeyReadSelf, Description: "查看自己的个人 API Key 状态", Risk: RiskLow,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},

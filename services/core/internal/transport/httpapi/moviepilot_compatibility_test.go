@@ -15,12 +15,14 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/economy/attendance"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/moviepilot"
+	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 )
 
 func TestMoviePilotCompatibilityLeavesAnonymousTorrentListOnOpenAPIHandler(t *testing.T) {
 	called := false
-	handler := MoviePilotCompatibility(&moviePilotCompatibilityStub{})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	stub := &moviePilotCompatibilityStub{}
+	handler := MoviePilotCompatibility(stub, stub)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -47,7 +49,7 @@ func TestMoviePilotCompatibilityReturnsOfficialTorrentShape(t *testing.T) {
 			Total: 1, Page: 1, PageSize: 100, TotalPages: 1,
 		},
 	}
-	handler := MoviePilotCompatibility(stub)(http.NotFoundHandler())
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/torrents?page=1&page_size=100&category=movie", nil)
 	request.Header.Set("Authorization", "Bearer pgk_test-key")
 	response := httptest.NewRecorder()
@@ -82,8 +84,8 @@ func TestMoviePilotCompatibilityReturnsOfficialTorrentShape(t *testing.T) {
 }
 
 func TestMoviePilotCompatibilityFailsClosedForInvalidCredential(t *testing.T) {
-	stub := &moviePilotCompatibilityStub{authenticateErr: moviepilot.ErrCredentialInvalid}
-	handler := MoviePilotCompatibility(stub)(http.NotFoundHandler())
+	stub := &moviePilotCompatibilityStub{authenticateErr: personalapikey.ErrInvalid}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/profile", nil)
 	request.Header.Set("Authorization", "Bearer leaked-value")
 	response := httptest.NewRecorder()
@@ -100,7 +102,7 @@ func TestMoviePilotCompatibilityFailsClosedForInvalidCredential(t *testing.T) {
 
 func TestMoviePilotCompatibilityStreamsCapabilityDownloadWithoutAPIKeyInURL(t *testing.T) {
 	stub := &moviePilotCompatibilityStub{download: torrents.TorrentDownloadResult{Data: []byte("torrent-bytes"), Filename: "[Rousi] Example.torrent"}}
-	handler := MoviePilotCompatibility(stub)(http.NotFoundHandler())
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
 	request := httptest.NewRequest(http.MethodGet, "/api/compat/moviepilot/v1/torrents/9830/download?capability=signed", nil)
 	response := httptest.NewRecorder()
 
@@ -114,19 +116,19 @@ func TestMoviePilotCompatibilityStreamsCapabilityDownloadWithoutAPIKeyInURL(t *t
 	}
 }
 
-func TestPrivateResponseHeadersProtectIssuedMoviePilotCredential(t *testing.T) {
+func TestPrivateResponseHeadersProtectIssuedPersonalAPIKey(t *testing.T) {
 	next := http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
 		response.WriteHeader(http.StatusCreated)
 	})
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/me/moviepilot-credential/rotations", nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/me/api-key/rotations", nil)
 
 	PrivateResponseHeaders(next).ServeHTTP(response, request)
 
 	if response.Header().Get("Cache-Control") != "no-store" ||
 		response.Header().Get("Pragma") != "no-cache" ||
 		response.Header().Get("X-Content-Type-Options") != "nosniff" {
-		t.Fatalf("MoviePilot credential security headers = %#v", response.Header())
+		t.Fatalf("personal API key security headers = %#v", response.Header())
 	}
 }
 
@@ -137,35 +139,35 @@ type moviePilotCompatibilityStub struct {
 	download           torrents.TorrentDownloadResult
 }
 
-func (stub moviePilotCompatibilityStub) CredentialStatus(context.Context, string) (moviepilot.CredentialStatus, error) {
-	return moviepilot.CredentialStatus{}, errors.New("not implemented")
+func (stub moviePilotCompatibilityStub) Status(context.Context, string) (personalapikey.Status, error) {
+	return personalapikey.Status{}, errors.New("not implemented")
 }
 
-func (stub moviePilotCompatibilityStub) RotateCredential(context.Context, string, string, *int64) (moviepilot.IssuedCredential, error) {
-	return moviepilot.IssuedCredential{}, errors.New("not implemented")
+func (stub moviePilotCompatibilityStub) Rotate(context.Context, string, string, *int64, []personalapikey.Scope) (personalapikey.IssuedCredential, error) {
+	return personalapikey.IssuedCredential{}, errors.New("not implemented")
 }
 
-func (stub moviePilotCompatibilityStub) RevokeCredential(context.Context, string, string, int64) error {
+func (stub moviePilotCompatibilityStub) Revoke(context.Context, string, string, int64) error {
 	return errors.New("not implemented")
 }
 
-func (stub *moviePilotCompatibilityStub) Authenticate(_ context.Context, raw string) (moviepilot.AuthenticatedCredential, error) {
+func (stub *moviePilotCompatibilityStub) Authenticate(_ context.Context, raw string) (personalapikey.AuthenticatedCredential, error) {
 	stub.authenticatedToken = raw
 	if stub.authenticateErr != nil {
-		return moviepilot.AuthenticatedCredential{}, stub.authenticateErr
+		return personalapikey.AuthenticatedCredential{}, stub.authenticateErr
 	}
-	return moviepilot.AuthenticatedCredential{User: identity.User{ID: uuid.MustParse("0198f20a-6da8-7e51-9c64-111111111111")}}, nil
+	return personalapikey.AuthenticatedCredential{User: identity.User{ID: uuid.MustParse("0198f20a-6da8-7e51-9c64-111111111111")}}, nil
 }
 
-func (stub moviePilotCompatibilityStub) Profile(context.Context, moviepilot.AuthenticatedCredential) (moviepilot.Profile, error) {
+func (stub moviePilotCompatibilityStub) Profile(context.Context, personalapikey.AuthenticatedCredential) (moviepilot.Profile, error) {
 	return moviepilot.Profile{}, nil
 }
 
-func (stub moviePilotCompatibilityStub) ListTorrents(context.Context, moviepilot.AuthenticatedCredential, int, int, string, string) (moviepilot.TorrentPage, error) {
+func (stub moviePilotCompatibilityStub) ListTorrents(context.Context, personalapikey.AuthenticatedCredential, int, int, string, string) (moviepilot.TorrentPage, error) {
 	return stub.torrentPage, nil
 }
 
-func (stub moviePilotCompatibilityStub) Torrent(context.Context, moviepilot.AuthenticatedCredential, int64) (moviepilot.TorrentDownloadDescriptor, error) {
+func (stub moviePilotCompatibilityStub) Torrent(context.Context, personalapikey.AuthenticatedCredential, int64) (moviepilot.TorrentDownloadDescriptor, error) {
 	return moviepilot.TorrentDownloadDescriptor{}, errors.New("not implemented")
 }
 
@@ -173,10 +175,10 @@ func (stub moviePilotCompatibilityStub) Download(context.Context, int64, string)
 	return stub.download, nil
 }
 
-func (stub moviePilotCompatibilityStub) AttendanceOverview(context.Context, moviepilot.AuthenticatedCredential) (attendance.Overview, error) {
+func (stub moviePilotCompatibilityStub) AttendanceOverview(context.Context, personalapikey.AuthenticatedCredential) (attendance.Overview, error) {
 	return attendance.Overview{}, nil
 }
 
-func (stub moviePilotCompatibilityStub) ClaimAttendance(context.Context, moviepilot.AuthenticatedCredential, attendance.Mode) (attendance.Record, error) {
+func (stub moviePilotCompatibilityStub) ClaimAttendance(context.Context, personalapikey.AuthenticatedCredential, attendance.Mode) (attendance.Record, error) {
 	return attendance.Record{}, nil
 }

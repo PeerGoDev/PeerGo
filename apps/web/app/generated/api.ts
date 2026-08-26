@@ -1338,25 +1338,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/moviepilot-credential": {
+    "/api/v1/me/api-key": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 查看自己的 MoviePilot API Key 状态 */
-        get: operations["getMyMoviePilotCredential"];
+        /** 查看自己的个人 API Key 状态 */
+        get: operations["getMyPersonalAPIKey"];
         put?: never;
         post?: never;
-        /** 撤销自己的 MoviePilot API Key */
-        delete: operations["revokeMyMoviePilotCredential"];
+        /** 撤销自己的个人 API Key */
+        delete: operations["revokeMyPersonalAPIKey"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/moviepilot-credential/rotations": {
+    "/api/v1/me/api-key/rotations": {
         parameters: {
             query?: never;
             header?: never;
@@ -1365,8 +1365,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 创建或轮换自己的 MoviePilot API Key */
-        post: operations["rotateMyMoviePilotCredential"];
+        /** 创建或轮换自己的个人 API Key */
+        post: operations["rotateMyPersonalAPIKey"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4320,7 +4320,7 @@ export interface components {
             expected_state_version: number;
         };
         /** @enum {string} */
-        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.moviepilot.manage.self" | "integration.moviepilot.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
+        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
         CapabilityScope: {
             /** @enum {string} */
             type: "site" | "category";
@@ -4941,12 +4941,13 @@ export interface components {
             expected_version: number;
             reason: string;
         };
-        MoviePilotCredentialStatus: {
+        PersonalAPIKeyStatus: {
             active: boolean;
             key_prefix?: string;
             /** Format: int64 */
             version?: number;
-            scopes: components["schemas"]["MoviePilotCredentialScope"][];
+            /** @description 当前密钥实际拥有的权限；未创建密钥时为空数组。 */
+            scopes: components["schemas"]["PersonalAPIKeyScope"][];
             /** Format: date-time */
             created_at?: string;
             /**
@@ -4955,15 +4956,17 @@ export interface components {
              */
             last_used_at?: string;
         };
-        RotateMoviePilotCredentialRequest: {
+        RotatePersonalAPIKeyRequest: {
             /**
              * Format: int64
              * @description 首次创建时省略；轮换现有密钥时必须与当前版本一致。
              */
             expected_version?: number;
+            /** @description 新密钥可以调用的最小权限集合。 */
+            scopes: components["schemas"]["PersonalAPIKeyScope"][];
         };
-        IssuedMoviePilotCredential: {
-            credential: components["schemas"]["MoviePilotCredentialStatus"];
+        IssuedPersonalAPIKey: {
+            credential: components["schemas"]["PersonalAPIKeyStatus"];
             /** @description 仅在创建或轮换成功响应中出现一次的 256 位随机 API Key。 */
             api_key: string;
         };
@@ -7891,8 +7894,11 @@ export interface components {
         RSSPromotionFilter: "free" | "double_upload" | "double_upload_free" | "half_download" | "double_upload_half_download" | "thirty_percent_download";
         /** @enum {string} */
         RSSPriceFilter: "all" | "free" | "paid";
-        /** @enum {string} */
-        MoviePilotCredentialScope: "profile:read" | "torrent:read" | "torrent:download" | "attendance:read" | "attendance:claim";
+        /**
+         * @description 可授予个人 API Key 的最小权限范围；所有适配器共享同一套范围。
+         * @enum {string}
+         */
+        PersonalAPIKeyScope: "profile:read" | "torrent:read" | "torrent:download" | "attendance:read" | "attendance:claim";
         TorrentPurchaseHistoryItem: {
             /** Format: int64 */
             torrent_id: number;
@@ -12156,7 +12162,7 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
-    getMyMoviePilotCredential: {
+    getMyPersonalAPIKey: {
         parameters: {
             query?: never;
             header?: never;
@@ -12171,7 +12177,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MoviePilotCredentialStatus"];
+                    "application/json": components["schemas"]["PersonalAPIKeyStatus"];
                 };
             };
             401: components["responses"]["ProblemResponse"];
@@ -12179,7 +12185,7 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
-    revokeMyMoviePilotCredential: {
+    revokeMyPersonalAPIKey: {
         parameters: {
             query: {
                 expected_version: number;
@@ -12208,7 +12214,7 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
-    rotateMyMoviePilotCredential: {
+    rotateMyPersonalAPIKey: {
         parameters: {
             query?: never;
             header: {
@@ -12220,7 +12226,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RotateMoviePilotCredentialRequest"];
+                "application/json": components["schemas"]["RotatePersonalAPIKeyRequest"];
             };
         };
         responses: {
@@ -12230,7 +12236,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IssuedMoviePilotCredential"];
+                    "application/json": components["schemas"]["IssuedPersonalAPIKey"];
                 };
             };
             400: components["responses"]["ProblemResponse"];

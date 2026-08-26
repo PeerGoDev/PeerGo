@@ -156,10 +156,10 @@ paths:
     $ref: "./domains/rss.yaml#/MyRSSSubscriptionPath"
   /api/v1/me/rss-subscriptions/{subscription_id}/token-rotations:
     $ref: "./domains/rss.yaml#/MyRSSSubscriptionTokenRotationsPath"
-  /api/v1/me/moviepilot-credential:
-    $ref: "./domains/integrations.yaml#/MoviePilotCredentialPath"
-  /api/v1/me/moviepilot-credential/rotations:
-    $ref: "./domains/integrations.yaml#/MoviePilotCredentialRotationsPath"
+  /api/v1/me/api-key:
+    $ref: "./domains/integrations.yaml#/PersonalAPIKeyPath"
+  /api/v1/me/api-key/rotations:
+    $ref: "./domains/integrations.yaml#/PersonalAPIKeyRotationsPath"
   /api/v1/torrents/{torrent_id}/reports:
     $ref: "./domains/torrents.yaml#/TorrentReportsPath"
   /api/v1/me/torrent-bookmarks:
@@ -652,12 +652,12 @@ components:
       $ref: "./schemas/rss.yaml#/RSSSettings"
     UpdateRSSSettingsRequest:
       $ref: "./schemas/rss.yaml#/UpdateRSSSettingsRequest"
-    MoviePilotCredentialStatus:
-      $ref: "./schemas/integrations.yaml#/MoviePilotCredentialStatus"
-    RotateMoviePilotCredentialRequest:
-      $ref: "./schemas/integrations.yaml#/RotateMoviePilotCredentialRequest"
-    IssuedMoviePilotCredential:
-      $ref: "./schemas/integrations.yaml#/IssuedMoviePilotCredential"
+    PersonalAPIKeyStatus:
+      $ref: "./schemas/integrations.yaml#/PersonalAPIKeyStatus"
+    RotatePersonalAPIKeyRequest:
+      $ref: "./schemas/integrations.yaml#/RotatePersonalAPIKeyRequest"
+    IssuedPersonalAPIKey:
+      $ref: "./schemas/integrations.yaml#/IssuedPersonalAPIKey"
     RegistrationPolicySettings:
       $ref: "./schemas/identity.yaml#/RegistrationPolicySettings"
     UpdateRegistrationPolicySettingsRequest:

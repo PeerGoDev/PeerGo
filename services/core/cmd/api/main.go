@@ -33,6 +33,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/newcomer"
 	"github.com/peergo/peergo/services/core/internal/modules/notifications"
 	"github.com/peergo/peergo/services/core/internal/modules/operations"
+	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 	"github.com/peergo/peergo/services/core/internal/modules/progression"
 	"github.com/peergo/peergo/services/core/internal/modules/promotions"
 	"github.com/peergo/peergo/services/core/internal/modules/ratiowatch"
@@ -553,6 +554,21 @@ func main() {
 		logger.Error("compose torrent download service", "error", err)
 		os.Exit(1)
 	}
+	personalAPIKeyRepository, err := personalapikey.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose personal API key repository", "error", err)
+		os.Exit(1)
+	}
+	personalAPIKeyService, err := personalapikey.NewService(
+		personalAPIKeyRepository,
+		identityService,
+		authorizationService,
+		personalapikey.ServiceConfig{},
+	)
+	if err != nil {
+		logger.Error("compose personal API key service", "error", err)
+		os.Exit(1)
+	}
 	moviePilotRepository, err := moviepilot.NewPostgresRepository(pool)
 	if err != nil {
 		logger.Error("compose MoviePilot repository", "error", err)
@@ -560,8 +576,7 @@ func main() {
 	}
 	moviePilotService, err := moviepilot.NewService(
 		moviePilotRepository,
-		identityService,
-		authorizationService,
+		personalAPIKeyService,
 		catalogService,
 		torrentReadService,
 		torrentDownloadService,
@@ -1042,6 +1057,7 @@ func main() {
 		TorrentResubmission:         torrentResubmissionService,
 		TorrentMaintenance:          torrentMaintenanceService,
 		PromotionAdministration:     promotionApplication,
+		PersonalAPIKeys:             personalAPIKeyService,
 		MoviePilot:                  moviePilotService,
 		RSS:                         rssService,
 		TorrentUploadMaxBytes:       settings.TorrentUploadMaxBytes,
