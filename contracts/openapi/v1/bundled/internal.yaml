@@ -1417,6 +1417,52 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/users/{user_id}/reactivations:
+    post:
+      operationId: reactivateManagedUser
+      summary: 解除已停用账户的封禁状态
+      description: 同时恢复 Privacy Vault 凭据并将 Core 账户从 disabled 变为 active； 使用账户版本防止覆盖并发处置，且只保存一条最小化的不可变解封证据。
+      tags:
+        - identity
+      x-audience:
+        - staff
+      x-owner: core-identity
+      x-permission: user.account.restriction.revoke
+      x-credential-audience: staff-session
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReactivateManagedUserRequest'
+      responses:
+        '200':
+          description: 已解除封禁并返回最新账户详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedUserDetail'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/users/{user_id}/manual-download-restriction:
     parameters:
       - name: user_id
@@ -4383,6 +4429,45 @@ paths:
         '401':
           $ref: '#/components/responses/ProblemResponse'
         '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    post:
+      operationId: assignNewcomerAssessment
+      summary: 为一个现有用户分配当前新人考核
+      description: 仅可为正常且从未进入新人考核的账户分配；使用当前生效规则， 从分配时刻起计算期限，并保存最小化的不可变分配证据。
+      tags:
+        - newcomer
+      x-audience:
+        - staff
+      x-owner: core-newcomer
+      x-permission: newcomer.assessment.assign
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignNewcomerAssessmentRequest'
+      responses:
+        '201':
+          description: 已创建新人考核。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewcomerAssessment'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
@@ -11831,6 +11916,7 @@ components:
         - invitation.issue.self
         - invitation.read.self
         - invitation.revoke.self
+        - newcomer.assessment.assign
         - newcomer.assessment.exempt
         - newcomer.assessment.read
         - newcomer.assessment.read.self
@@ -20581,6 +20667,20 @@ components:
           type: string
           format: date-time
           description: Tracker 生成当前瞬时视图的服务端时间。
+    ReactivateManagedUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_user_version
+      properties:
+        expected_user_version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          maxLength: 500
+          description: 可留空；留空时记录为管理员手动解除账户封禁。
     ManualDownloadRestrictionReasonCode:
       type: string
       enum:
@@ -22865,6 +22965,19 @@ components:
           type: integer
           minimum: 0
           maximum: 1000000
+    AssignNewcomerAssessmentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          maxLength: 1000
+          description: 可留空；留空时记录为管理员手动分配。
     ExemptNewcomerAssessmentRequest:
       type: object
       additionalProperties: false

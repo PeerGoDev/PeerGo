@@ -62,6 +62,7 @@ const (
 	ActionInvitationReadSelf                      Action = "invitation.read.self"
 	ActionInvitationRevokeSelf                    Action = "invitation.revoke.self"
 	ActionNewcomerAssessmentExempt                Action = "newcomer.assessment.exempt"
+	ActionNewcomerAssessmentAssign                Action = "newcomer.assessment.assign"
 	ActionNewcomerAssessmentRead                  Action = "newcomer.assessment.read"
 	ActionNewcomerAssessmentReadSelf              Action = "newcomer.assessment.read.self"
 	ActionNewcomerPolicyIssue                     Action = "newcomer.policy.issue"

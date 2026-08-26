@@ -229,6 +229,7 @@ type UserAdministrationService interface {
 	Get(context.Context, authz.StaffActor, uuid.UUID) (identity.ManagedUserDetail, error)
 	CreateRestriction(context.Context, authz.StaffActor, identity.CreateAccountRestrictionInput) (identity.ManagedUserDetail, error)
 	RevokeRestriction(context.Context, authz.StaffActor, identity.RevokeAccountRestrictionInput) (identity.ManagedUserDetail, error)
+	Reactivate(context.Context, authz.StaffActor, identity.ReactivateManagedUserInput) (identity.ManagedUserDetail, error)
 	CreateManualDownloadRestriction(context.Context, authz.StaffActor, identity.CreateManualDownloadRestrictionInput) (identity.ManagedUserDetail, error)
 	UpdateManualDownloadRestriction(context.Context, authz.StaffActor, identity.UpdateManualDownloadRestrictionInput) (identity.ManagedUserDetail, error)
 	RevokeManualDownloadRestriction(context.Context, authz.StaffActor, identity.RevokeManualDownloadRestrictionInput) (identity.ManagedUserDetail, error)
@@ -346,6 +347,7 @@ type NewcomerAdministrationService interface {
 	Policies(context.Context, authz.StaffActor, int, int) (newcomer.PolicyPage, error)
 	Issue(context.Context, authz.StaffActor, newcomer.IssueInput) (newcomer.PolicyRevision, error)
 	Assessments(context.Context, authz.StaffActor, newcomer.AssessmentQuery) (newcomer.AssessmentPage, error)
+	Assign(context.Context, authz.StaffActor, newcomer.AssignInput) (newcomer.Assessment, error)
 	Exempt(context.Context, authz.StaffActor, newcomer.ExemptInput) (newcomer.Assessment, error)
 }
 
@@ -1189,6 +1191,49 @@ func (h *Handler) RevokeManagedUserAccountRestriction(ctx context.Context, reque
 	return generated.RevokeManagedUserAccountRestriction200JSONResponse(managedUserDetailDTO(result)), nil
 }
 
+func (h *Handler) ReactivateManagedUser(ctx context.Context, request generated.ReactivateManagedUserRequestObject) (generated.ReactivateManagedUserResponseObject, error) {
+	if request.Body == nil {
+		return managedUserReactivationBadRequest(ctx), nil
+	}
+	session, authenticationProblem, err := h.authenticateStaffWrite(ctx, request.Params.XCSRFToken)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.ReactivateManagedUser401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.ReactivateManagedUser403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	reason := ""
+	if request.Body.Reason != nil {
+		reason = *request.Body.Reason
+	}
+	result, err := h.userAdministration.Reactivate(ctx, staffActor(session), identity.ReactivateManagedUserInput{
+		ReactivationID: request.Params.IdempotencyKey, UserID: request.UserId,
+		Reason: reason, ExpectedUserVersion: request.Body.ExpectedUserVersion,
+	})
+	switch {
+	case errors.Is(err, identity.ErrUserAdministrationInput):
+		return managedUserReactivationBadRequest(ctx), nil
+	case errors.Is(err, authz.ErrForbidden), errors.Is(err, identity.ErrAccountRestrictionSelfTarget):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "user_reactivation_denied", "无法解除账户封禁", "当前后台身份无权解封该账户。")
+		return generated.ReactivateManagedUser403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "managed_user_not_found", "账户不存在", "目标账户不存在或已被移除。")
+		return generated.ReactivateManagedUser404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserNotDisabled), errors.Is(err, identity.ErrManagedUserVersionConflict):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "managed_user_reactivation_conflict", "账户状态已变化", "该账户已不是封禁状态，或账户版本已经变化；请刷新详情后重试。")
+		return generated.ReactivateManagedUser409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserCredentialUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "managed_user_credential_unavailable", "暂时无法恢复登录凭据", "隐私凭据服务暂时不可用，账户仍保持封禁；请稍后重试。")
+		return generated.ReactivateManagedUserdefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.ReactivateManagedUser200JSONResponse(managedUserDetailDTO(result)), nil
+}
+
 func (h *Handler) CreateManagedUserManualDownloadRestriction(ctx context.Context, request generated.CreateManagedUserManualDownloadRestrictionRequestObject) (generated.CreateManagedUserManualDownloadRestrictionResponseObject, error) {
 	if request.Body == nil {
 		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_manual_download_restriction", "人工下载限制无效", "请检查处置类别、账户版本、限制版本和人工理由。")
@@ -1440,6 +1485,13 @@ func isAccountRestrictionConflict(err error) bool {
 		errors.Is(err, identity.ErrAccountRestrictionNotActive) ||
 		errors.Is(err, identity.ErrAccountRestrictionVersionConflict) ||
 		errors.Is(err, identity.ErrAccountRestrictionSelfTarget)
+}
+
+func managedUserReactivationBadRequest(ctx context.Context) generated.ReactivateManagedUser400ApplicationProblemPlusJSONResponse {
+	problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_managed_user_reactivation", "解封参数无效", "请刷新账户版本后重试；原因可留空，由系统自动记录。")
+	return generated.ReactivateManagedUser400ApplicationProblemPlusJSONResponse{
+		ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+	}
 }
 
 func accountRestrictionConflict(err error) (string, string, string) {

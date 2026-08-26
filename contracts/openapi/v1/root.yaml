@@ -70,6 +70,8 @@ paths:
     $ref: "./domains/identity.yaml#/ManagedUserAccountRestrictionsPath"
   /api/v1/admin/users/{user_id}/account-restrictions/{restriction_id}/revocations:
     $ref: "./domains/identity.yaml#/ManagedUserAccountRestrictionRevocationsPath"
+  /api/v1/admin/users/{user_id}/reactivations:
+    $ref: "./domains/identity.yaml#/ManagedUserReactivationsPath"
   /api/v1/admin/users/{user_id}/manual-download-restriction:
     $ref: "./domains/identity.yaml#/ManagedUserManualDownloadRestrictionPath"
   /api/v1/admin/users/{user_id}/manual-download-restriction/revocations:

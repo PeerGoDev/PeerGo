@@ -52,6 +52,10 @@ func (r *loginProtectionRepositoryRecorder) ActivateRegistration(context.Context
 	return uuid.Nil, ErrRegistrationProvisionNotFound
 }
 
+func (r *loginProtectionRepositoryRecorder) IdentifierExists(context.Context, []byte) (bool, error) {
+	return false, nil
+}
+
 func (r *loginProtectionRepositoryRecorder) CredentialByLookupHMAC(_ context.Context, lookup []byte) (Credential, error) {
 	r.credentialCalls++
 	if string(lookup) != string(r.lookup) {
@@ -102,6 +106,10 @@ func (r fixtureRepository) ProvisionRegistration(context.Context, RegistrationPr
 
 func (r fixtureRepository) ActivateRegistration(context.Context, uuid.UUID, time.Time) (uuid.UUID, error) {
 	return uuid.Nil, ErrRegistrationProvisionNotFound
+}
+
+func (r fixtureRepository) IdentifierExists(context.Context, []byte) (bool, error) {
+	return false, nil
 }
 
 func (r fixtureRepository) CredentialByLookupHMAC(_ context.Context, lookup []byte) (Credential, error) {

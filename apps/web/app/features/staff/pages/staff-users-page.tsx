@@ -89,6 +89,10 @@ export function StaffUsersPage() {
             "user.downloadrestriction.revoke"
           )}
           canManageVIP={hasCapability(capabilities, "user.vip.manage")}
+          canAssignAssessment={hasCapability(
+            capabilities,
+            "newcomer.assessment.assign"
+          )}
           canReadAppeals={hasCapability(
             capabilities,
             "user.account.appeal.read"
@@ -111,6 +115,7 @@ function UsersContent({
   canDownloadRestrict,
   canDownloadRevoke,
   canManageVIP,
+  canAssignAssessment,
   canReadAppeals,
   canDecideAppeals,
 }: {
@@ -121,6 +126,7 @@ function UsersContent({
   canDownloadRestrict: boolean
   canDownloadRevoke: boolean
   canManageVIP: boolean
+  canAssignAssessment: boolean
   canReadAppeals: boolean
   canDecideAppeals: boolean
 }) {
@@ -315,6 +321,7 @@ function UsersContent({
         canDownloadRestrict={canDownloadRestrict}
         canDownloadRevoke={canDownloadRevoke}
         canManageVIP={canManageVIP}
+        canAssignAssessment={canAssignAssessment}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedUserId(undefined)

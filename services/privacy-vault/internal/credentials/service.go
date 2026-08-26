@@ -41,6 +41,7 @@ type Repository interface {
 	EnableCredentialAfterAccountAppeal(context.Context, uuid.UUID, time.Time) error
 	ProvisionRegistration(context.Context, RegistrationProvisionRecord) (uuid.UUID, error)
 	ActivateRegistration(context.Context, uuid.UUID, time.Time) (uuid.UUID, error)
+	IdentifierExists(context.Context, []byte) (bool, error)
 }
 
 // SecondFactorVerifier is a purpose-limited decision port. It never returns a
@@ -56,6 +57,24 @@ type Service struct {
 	identifierKey []byte
 	dummyHash     string
 	now           func() time.Time
+}
+
+// EmailRegistered returns only an equality decision. The normalized email and
+// its keyed lookup value remain inside Vault and are never stored by Core.
+func (s *Service) EmailRegistered(ctx context.Context, email string) (bool, error) {
+	normalized, err := normalizeEmailAddress(email)
+	if err != nil {
+		return false, ErrRegistrationInput
+	}
+	lookup, err := LookupHMAC(s.identifierKey, normalized)
+	if err != nil {
+		return false, ErrRegistrationInput
+	}
+	exists, err := s.repository.IdentifierExists(ctx, lookup)
+	if err != nil {
+		return false, fmt.Errorf("check email registration: %w", err)
+	}
+	return exists, nil
 }
 
 // NewService creates one dummy Argon2id record. Unknown identifiers are checked

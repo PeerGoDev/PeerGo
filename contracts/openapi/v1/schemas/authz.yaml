@@ -51,6 +51,7 @@ CapabilityAction:
     - invitation.issue.self
     - invitation.read.self
     - invitation.revoke.self
+    - newcomer.assessment.assign
     - newcomer.assessment.exempt
     - newcomer.assessment.read
     - newcomer.assessment.read.self

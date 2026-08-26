@@ -20,6 +20,7 @@ import {
 import { Skeleton } from "~/components/ui/skeleton"
 import { managedUserDetailQueryOptions } from "~/features/staff/api/user-administration.queries"
 import { AccountRestrictionControls } from "~/features/staff/components/account-restriction-controls"
+import { ManagedUserAccountActions } from "~/features/staff/components/managed-user-account-actions"
 import { ManualDownloadRestrictionControls } from "~/features/staff/components/manual-download-restriction-controls"
 import { VIPControls } from "~/features/staff/components/vip-controls"
 import { ManagedUserStateBadges } from "~/features/staff/components/managed-user-table"
@@ -38,6 +39,7 @@ export function ManagedUserDetailSheet({
   canDownloadRestrict,
   canDownloadRevoke,
   canManageVIP,
+  canAssignAssessment,
   onOpenChange,
 }: {
   userId?: string
@@ -48,6 +50,7 @@ export function ManagedUserDetailSheet({
   canDownloadRestrict: boolean
   canDownloadRevoke: boolean
   canManageVIP: boolean
+  canAssignAssessment: boolean
   onOpenChange: (open: boolean) => void
 }) {
   const detail = useQuery(managedUserDetailQueryOptions(userId ?? ""))
@@ -212,6 +215,16 @@ export function ManagedUserDetailSheet({
               currentStaffUserId={currentStaffUserId}
               canRestrict={canDownloadRestrict}
               canRevoke={canDownloadRevoke}
+            />
+
+            <Separator />
+
+            <ManagedUserAccountActions
+              detail={detail.data}
+              csrfToken={csrfToken}
+              currentStaffUserId={currentStaffUserId}
+              canReactivate={canRevoke}
+              canAssignAssessment={canAssignAssessment}
             />
 
             <Separator />

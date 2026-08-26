@@ -37,10 +37,16 @@ type AccountRestrictionCommandRepository interface {
 	UpdateManualDownloadRestriction(context.Context, ManualDownloadRestrictionCommand) (ManagedUserDetail, error)
 	RevokeManualDownloadRestriction(context.Context, ManualDownloadRestrictionCommand) (ManagedUserDetail, error)
 	ChangeVIP(context.Context, ChangeVIPCommand) (ManagedUserDetail, error)
+	ManagedUserReactivationPreflight(context.Context, uuid.UUID) (ManagedUserReactivationPreflight, error)
+	ReactivateManagedUser(context.Context, ReactivateManagedUserCommand) (ManagedUserDetail, error)
 }
 
 type ManagedUserContactDirectory interface {
 	Emails(context.Context, []uuid.UUID) (map[uuid.UUID]string, error)
+}
+
+type ManagedUserCredentialLifecycle interface {
+	EnableAfterAccountAppeal(context.Context, uuid.UUID) error
 }
 
 type UserAdministrationService struct {
@@ -48,6 +54,7 @@ type UserAdministrationService struct {
 	restrictionRepository AccountRestrictionCommandRepository
 	authorizer            authz.Authorizer
 	contactDirectory      ManagedUserContactDirectory
+	credentialLifecycle   ManagedUserCredentialLifecycle
 	now                   func() time.Time
 }
 
@@ -68,10 +75,74 @@ func NewUserAdministrationService(repository UserAdministrationRepository, restr
 		}
 		contactDirectory = contactDirectories[0]
 	}
+	var credentialLifecycle ManagedUserCredentialLifecycle
+	if contactDirectory != nil {
+		credentialLifecycle, _ = contactDirectory.(ManagedUserCredentialLifecycle)
+	}
 	return &UserAdministrationService{
 		repository: repository, restrictionRepository: restrictionRepository,
-		authorizer: authorizer, contactDirectory: contactDirectory, now: now,
+		authorizer: authorizer, contactDirectory: contactDirectory,
+		credentialLifecycle: credentialLifecycle, now: now,
 	}, nil
+}
+
+func (service *UserAdministrationService) Reactivate(ctx context.Context, actor authz.StaffActor, input ReactivateManagedUserInput) (ManagedUserDetail, error) {
+	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = "管理员手动解除账户封禁"
+	}
+	if input.ReactivationID == uuid.Nil || input.UserID == uuid.Nil || input.ExpectedUserVersion < 1 || !validAdministrationReason(input.Reason) {
+		return ManagedUserDetail{}, ErrUserAdministrationInput
+	}
+	if input.UserID == actor.Subject.ID {
+		return ManagedUserDetail{}, ErrAccountRestrictionSelfTarget
+	}
+	if service.credentialLifecycle == nil {
+		return ManagedUserDetail{}, ErrManagedUserCredentialUnavailable
+	}
+	now := service.now().UTC().Round(0)
+	decision, err := authz.AuthorizeStaffAction(ctx, service.authorizer, actor, authz.ActionUserAccountRestrictionRevoke, authz.SiteScope(), now, "identity-account-reactivation")
+	if err != nil {
+		return ManagedUserDetail{}, err
+	}
+	preflight, err := service.restrictionRepository.ManagedUserReactivationPreflight(ctx, input.UserID)
+	if err != nil {
+		return ManagedUserDetail{}, err
+	}
+	if preflight.Version != input.ExpectedUserVersion {
+		// A completed idempotent replay has already advanced the version once.
+		if preflight.Status != AccountStatusActive || preflight.Version != input.ExpectedUserVersion+1 {
+			return ManagedUserDetail{}, ErrManagedUserVersionConflict
+		}
+		result, err := service.restrictionRepository.ReactivateManagedUser(ctx, ReactivateManagedUserCommand{
+			ReactivateManagedUserInput: input, ActorID: actor.Subject.ID, OccurredAt: now, Authorization: decision,
+		})
+		if err != nil {
+			return ManagedUserDetail{}, fmt.Errorf("replay managed user reactivation: %w", err)
+		}
+		if err := service.enrichManagedUser(ctx, &result.ManagedUserSummary); err != nil {
+			return ManagedUserDetail{}, err
+		}
+		return result, nil
+	}
+	if preflight.Status != AccountStatusDisabled {
+		return ManagedUserDetail{}, ErrManagedUserNotDisabled
+	}
+	// Vault first and Core second is fail-closed: a Core race still leaves the
+	// disabled account projection blocking login and the command can be retried.
+	if err := service.credentialLifecycle.EnableAfterAccountAppeal(ctx, preflight.CredentialRef); err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("%w: %v", ErrManagedUserCredentialUnavailable, err)
+	}
+	result, err := service.restrictionRepository.ReactivateManagedUser(ctx, ReactivateManagedUserCommand{
+		ReactivateManagedUserInput: input, ActorID: actor.Subject.ID, OccurredAt: now, Authorization: decision,
+	})
+	if err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("reactivate managed user: %w", err)
+	}
+	if err := service.enrichManagedUser(ctx, &result.ManagedUserSummary); err != nil {
+		return ManagedUserDetail{}, err
+	}
+	return result, nil
 }
 
 func (service *UserAdministrationService) List(ctx context.Context, actor authz.StaffActor, input ListManagedUsersInput) (ManagedUserPage, error) {

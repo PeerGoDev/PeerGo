@@ -26,6 +26,8 @@ var (
 	ErrVIPAlreadyActive                  = errors.New("VIP is already active with the requested expiry")
 	ErrVIPNotActive                      = errors.New("VIP is not active")
 	ErrManagedUserContactUnavailable     = errors.New("managed user contact directory is unavailable")
+	ErrManagedUserCredentialUnavailable  = errors.New("managed user credential lifecycle is unavailable")
+	ErrManagedUserNotDisabled            = errors.New("managed user is not disabled")
 )
 
 type AccountStatus string
@@ -327,6 +329,26 @@ type ChangeVIPCommand struct {
 	ActorID       uuid.UUID
 	OccurredAt    time.Time
 	Authorization authz.Decision
+}
+
+type ReactivateManagedUserInput struct {
+	ReactivationID      uuid.UUID
+	UserID              uuid.UUID
+	Reason              string
+	ExpectedUserVersion int64
+}
+
+type ReactivateManagedUserCommand struct {
+	ReactivateManagedUserInput
+	ActorID       uuid.UUID
+	OccurredAt    time.Time
+	Authorization authz.Decision
+}
+
+type ManagedUserReactivationPreflight struct {
+	CredentialRef uuid.UUID
+	Status        AccountStatus
+	Version       int64
 }
 
 // AccountRestrictionAuditState is the canonical security state hashed into

@@ -2006,3 +2006,17 @@ RevokeAccountRestrictionRequest:
       type: integer
       format: int64
       minimum: 1
+
+ReactivateManagedUserRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_user_version]
+  properties:
+    expected_user_version:
+      type: integer
+      format: int64
+      minimum: 1
+    reason:
+      type: string
+      maxLength: 500
+      description: 可留空；留空时记录为管理员手动解除账户封禁。

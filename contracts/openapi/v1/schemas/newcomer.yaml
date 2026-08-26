@@ -174,3 +174,14 @@ ExemptNewcomerAssessmentRequest:
   properties:
     expected_version: { type: integer, format: int64, minimum: 1 }
     reason: { type: string, minLength: 10, maxLength: 1000 }
+
+AssignNewcomerAssessmentRequest:
+  type: object
+  additionalProperties: false
+  required: [user_id]
+  properties:
+    user_id: { type: string, format: uuid }
+    reason:
+      type: string
+      maxLength: 1000
+      description: 可留空；留空时记录为管理员手动分配。

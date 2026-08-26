@@ -12,18 +12,46 @@ import (
 )
 
 type userAdministrationRepositoryStub struct {
-	listResult     ManagedUserPage
-	detail         ManagedUserDetail
-	listQuery      ManagedUserListQuery
-	getUserID      uuid.UUID
-	getAsOf        time.Time
-	createCommand  CreateAccountRestrictionCommand
-	revokeCommand  RevokeAccountRestrictionCommand
-	manualCommand  ManualDownloadRestrictionCommand
-	manualMutation string
-	vipCommand     ChangeVIPCommand
-	commandResult  ManagedUserDetail
-	commandErr     error
+	listResult        ManagedUserPage
+	detail            ManagedUserDetail
+	listQuery         ManagedUserListQuery
+	getUserID         uuid.UUID
+	getAsOf           time.Time
+	createCommand     CreateAccountRestrictionCommand
+	revokeCommand     RevokeAccountRestrictionCommand
+	manualCommand     ManualDownloadRestrictionCommand
+	manualMutation    string
+	vipCommand        ChangeVIPCommand
+	preflight         ManagedUserReactivationPreflight
+	reactivateCommand ReactivateManagedUserCommand
+	commandResult     ManagedUserDetail
+	commandErr        error
+}
+
+func (stub *userAdministrationRepositoryStub) ManagedUserReactivationPreflight(context.Context, uuid.UUID) (ManagedUserReactivationPreflight, error) {
+	return stub.preflight, stub.commandErr
+}
+
+func (stub *userAdministrationRepositoryStub) ReactivateManagedUser(_ context.Context, command ReactivateManagedUserCommand) (ManagedUserDetail, error) {
+	stub.reactivateCommand = command
+	return stub.commandResult, stub.commandErr
+}
+
+type managedUserLifecycleStub struct {
+	enabled uuid.UUID
+}
+
+func (stub *managedUserLifecycleStub) EnableAfterAccountAppeal(_ context.Context, credentialRef uuid.UUID) error {
+	stub.enabled = credentialRef
+	return nil
+}
+
+func (stub *managedUserLifecycleStub) Emails(_ context.Context, refs []uuid.UUID) (map[uuid.UUID]string, error) {
+	result := make(map[uuid.UUID]string, len(refs))
+	for _, ref := range refs {
+		result[ref] = "member@example.com"
+	}
+	return result, nil
 }
 
 func (stub *userAdministrationRepositoryStub) ChangeVIP(_ context.Context, command ChangeVIPCommand) (ManagedUserDetail, error) {
@@ -133,6 +161,35 @@ func TestUserAdministrationGetUsesOneProjectionInstant(t *testing.T) {
 	}
 	if result.ID != userID || repository.getUserID != userID || !repository.getAsOf.Equal(now) {
 		t.Fatalf("result=%+v user_id=%s as_of=%v", result, repository.getUserID, repository.getAsOf)
+	}
+}
+
+func TestUserAdministrationReactivationRestoresCredentialAndDefaultsReason(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+	targetID, credentialRef := uuid.New(), uuid.New()
+	repository := &userAdministrationRepositoryStub{
+		preflight: ManagedUserReactivationPreflight{
+			CredentialRef: credentialRef, Status: AccountStatusDisabled, Version: 4,
+		},
+		commandResult: ManagedUserDetail{ManagedUserSummary: ManagedUserSummary{
+			ID: targetID, credentialRef: credentialRef, Status: AccountStatusActive, Version: 5,
+		}},
+	}
+	lifecycle := &managedUserLifecycleStub{}
+	service, err := NewUserAdministrationService(repository, repository, &userAdministrationAuthorizerStub{}, func() time.Time { return now }, lifecycle)
+	if err != nil {
+		t.Fatalf("NewUserAdministrationService() error = %v", err)
+	}
+	result, err := service.Reactivate(context.Background(), userAdministrationActor(now), ReactivateManagedUserInput{
+		ReactivationID: uuid.New(), UserID: targetID, ExpectedUserVersion: 4,
+	})
+	if err != nil {
+		t.Fatalf("Reactivate() error = %v", err)
+	}
+	if lifecycle.enabled != credentialRef || repository.reactivateCommand.Reason != "管理员手动解除账户封禁" ||
+		repository.reactivateCommand.ExpectedUserVersion != 4 || result.Status != AccountStatusActive {
+		t.Fatalf("lifecycle=%+v command=%+v result=%+v", lifecycle, repository.reactivateCommand, result)
 	}
 }
 

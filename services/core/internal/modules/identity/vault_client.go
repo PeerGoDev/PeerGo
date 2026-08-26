@@ -35,6 +35,7 @@ type VaultClient struct {
 	twoFactorCredentialURL      string
 	trackerCredentialURL        string
 	emailDirectoryURL           string
+	emailRegistrationURL        string
 	emailOperationsURL          string
 	emailOperationsTestURL      string
 	serviceToken                string
@@ -81,6 +82,8 @@ func NewVaultClient(baseURL, serviceToken string, timeout time.Duration) (*Vault
 	trackerCredentialURL.Path = basePath + "/internal/v1/credentials"
 	emailDirectoryURL := *parsed
 	emailDirectoryURL.Path = basePath + "/internal/v1/identifiers/emails"
+	emailRegistrationURL := *parsed
+	emailRegistrationURL.Path = basePath + "/internal/v1/identifiers/email-registration"
 	emailOperationsURL := *parsed
 	emailOperationsURL.Path = basePath + "/internal/v1/operations/email"
 	emailOperationsTestURL := *parsed
@@ -97,6 +100,7 @@ func NewVaultClient(baseURL, serviceToken string, timeout time.Duration) (*Vault
 		twoFactorCredentialURL:      strings.TrimRight(twoFactorCredentialURL.String(), "/"),
 		trackerCredentialURL:        strings.TrimRight(trackerCredentialURL.String(), "/"),
 		emailDirectoryURL:           emailDirectoryURL.String(),
+		emailRegistrationURL:        emailRegistrationURL.String(),
 		emailOperationsURL:          emailOperationsURL.String(),
 		emailOperationsTestURL:      emailOperationsTestURL.String(),
 		serviceToken:                serviceToken,
@@ -107,6 +111,37 @@ func NewVaultClient(baseURL, serviceToken string, timeout time.Duration) (*Vault
 			},
 		},
 	}, nil
+}
+
+func (c *VaultClient) EmailRegistered(ctx context.Context, email string) (bool, error) {
+	payload, err := json.Marshal(struct {
+		Email string `json:"email"`
+	}{email})
+	if err != nil {
+		return false, ErrInvitationEmailDirectoryUnavailable
+	}
+	response, err := c.postJSON(ctx, c.emailRegistrationURL, payload)
+	if err != nil {
+		return false, fmt.Errorf("%w: %v", ErrInvitationEmailDirectoryUnavailable, err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, vaultResponseLimit))
+		return false, fmt.Errorf("%w: Vault returned status %d", ErrInvitationEmailDirectoryUnavailable, response.StatusCode)
+	}
+	var result struct {
+		Registered bool `json:"registered"`
+	}
+	decoder := json.NewDecoder(io.LimitReader(response.Body, vaultResponseLimit))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&result); err != nil {
+		return false, fmt.Errorf("%w: decode Vault response", ErrInvitationEmailDirectoryUnavailable)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("%w: Vault response has trailing data", ErrInvitationEmailDirectoryUnavailable)
+	}
+	return result.Registered, nil
 }
 
 // TestEmail forwards a single authorized recipient to Vault without storing it

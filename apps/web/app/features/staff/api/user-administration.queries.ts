@@ -21,6 +21,8 @@ export type ChangeManualDownloadRestrictionRequest =
 export type RevokeManualDownloadRestrictionRequest =
   components["schemas"]["RevokeManualDownloadRestrictionRequest"]
 export type ChangeVIPRequest = components["schemas"]["ChangeVIPRequest"]
+export type ReactivateManagedUserRequest =
+  components["schemas"]["ReactivateManagedUserRequest"]
 
 export const userAdministrationKeys = {
   all: ["staff", "identity", "users"] as const,
@@ -126,6 +128,42 @@ export function useRevokeAccountRestriction() {
               restriction_id: input.restrictionId,
             },
             header: { "X-CSRF-Token": input.csrfToken },
+          },
+          body: input.body,
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    onSuccess: async (detail) => {
+      queryClient.setQueryData(userAdministrationKeys.detail(detail.id), detail)
+      await queryClient.invalidateQueries({
+        queryKey: userAdministrationKeys.all,
+      })
+    },
+  })
+}
+
+export function useReactivateManagedUser() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      userId: string
+      csrfToken: string
+      idempotencyKey: string
+      body: ReactivateManagedUserRequest
+    }): Promise<ManagedUserDetail> => {
+      const { data, error, response } = await apiClient.POST(
+        "/api/v1/admin/users/{user_id}/reactivations",
+        {
+          params: {
+            path: { user_id: input.userId },
+            header: {
+              "X-CSRF-Token": input.csrfToken,
+              "Idempotency-Key": input.idempotencyKey,
+            },
           },
           body: input.body,
         }

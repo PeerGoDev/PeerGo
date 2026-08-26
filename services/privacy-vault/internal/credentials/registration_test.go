@@ -52,6 +52,10 @@ func (repository *registrationRepositoryRecorder) ActivateRegistration(_ context
 	return repository.credentialRef, nil
 }
 
+func (repository *registrationRepositoryRecorder) IdentifierExists(context.Context, []byte) (bool, error) {
+	return false, nil
+}
+
 func TestProvisionRegistrationTransformsSecretsBeforePersistence(t *testing.T) {
 	key := []byte("0123456789abcdef0123456789abcdef")
 	registrationID := uuid.MustParse("0198f20a-6da8-7e51-9c64-303030303030")

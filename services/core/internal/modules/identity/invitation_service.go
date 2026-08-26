@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -28,35 +29,45 @@ type InvitationSessionAuthenticator interface {
 	AuthenticateWrite(context.Context, string, string) (WebSession, error)
 }
 
+// InvitationEmailDirectory is a boolean-only privacy boundary. Core may ask
+// whether an already-authorized invitation target is occupied, but it cannot
+// enumerate or persist Vault identifiers.
+type InvitationEmailDirectory interface {
+	EmailRegistered(context.Context, string) (bool, error)
+}
+
 // InvitationService keeps bearer-token generation above persistence and below
 // transport. This prevents SQL rows, list DTOs and logs from ever receiving the
 // recoverable invitation credential.
 type InvitationService struct {
-	authenticator InvitationSessionAuthenticator
-	authorizer    authz.Authorizer
-	repository    InvitationRepository
-	now           func() time.Time
-	random        func([]byte) (int, error)
+	authenticator  InvitationSessionAuthenticator
+	authorizer     authz.Authorizer
+	repository     InvitationRepository
+	emailDirectory InvitationEmailDirectory
+	now            func() time.Time
+	random         func([]byte) (int, error)
 }
 
 func NewInvitationService(
 	authenticator InvitationSessionAuthenticator,
 	authorizer authz.Authorizer,
 	repository InvitationRepository,
+	emailDirectory InvitationEmailDirectory,
 	now func() time.Time,
 ) (*InvitationService, error) {
-	if authenticator == nil || authorizer == nil || repository == nil {
+	if authenticator == nil || authorizer == nil || repository == nil || emailDirectory == nil {
 		return nil, errors.New("invitation service dependencies are required")
 	}
 	if now == nil {
 		now = time.Now
 	}
 	return &InvitationService{
-		authenticator: authenticator,
-		authorizer:    authorizer,
-		repository:    repository,
-		now:           now,
-		random:        rand.Read,
+		authenticator:  authenticator,
+		authorizer:     authorizer,
+		repository:     repository,
+		emailDirectory: emailDirectory,
+		now:            now,
+		random:         rand.Read,
 	}, nil
 }
 
@@ -105,6 +116,13 @@ func (service *InvitationService) Issue(ctx context.Context, cookieToken, csrfTo
 	decision, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionInvitationIssueSelf, now)
 	if err != nil {
 		return InvitationIssueResult{}, err
+	}
+	registered, err := service.emailDirectory.EmailRegistered(ctx, normalizedEmail)
+	if err != nil {
+		return InvitationIssueResult{}, fmt.Errorf("%w: %v", ErrInvitationEmailDirectoryUnavailable, err)
+	}
+	if registered {
+		return InvitationIssueResult{}, ErrInvitationEmailRegistered
 	}
 	raw := make([]byte, 32)
 	if n, err := service.random(raw); err != nil || n != len(raw) {

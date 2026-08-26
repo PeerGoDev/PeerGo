@@ -1485,6 +1485,10 @@ func (unavailableNewcomerAdministrationService) Assessments(context.Context, aut
 	return newcomer.AssessmentPage{}, authz.ErrForbidden
 }
 
+func (unavailableNewcomerAdministrationService) Assign(context.Context, authz.StaffActor, newcomer.AssignInput) (newcomer.Assessment, error) {
+	return newcomer.Assessment{}, authz.ErrForbidden
+}
+
 func (unavailableNewcomerAdministrationService) Exempt(context.Context, authz.StaffActor, newcomer.ExemptInput) (newcomer.Assessment, error) {
 	return newcomer.Assessment{}, authz.ErrForbidden
 }
@@ -1856,6 +1860,10 @@ func (unavailableUserAdministrationService) RevokeRestriction(context.Context, a
 	return identity.ManagedUserDetail{}, authz.ErrForbidden
 }
 
+func (unavailableUserAdministrationService) Reactivate(context.Context, authz.StaffActor, identity.ReactivateManagedUserInput) (identity.ManagedUserDetail, error) {
+	return identity.ManagedUserDetail{}, authz.ErrForbidden
+}
+
 func (unavailableUserAdministrationService) CreateManualDownloadRestriction(context.Context, authz.StaffActor, identity.CreateManualDownloadRestrictionInput) (identity.ManagedUserDetail, error) {
 	return identity.ManagedUserDetail{}, authz.ErrForbidden
 }
@@ -1913,6 +1921,11 @@ func (service *recordingUserAdministrationService) CreateRestriction(_ context.C
 func (service *recordingUserAdministrationService) RevokeRestriction(_ context.Context, actor authz.StaffActor, input identity.RevokeAccountRestrictionInput) (identity.ManagedUserDetail, error) {
 	service.revokeActor = actor
 	service.revokeInput = input
+	return service.revokeResult, service.err
+}
+
+func (service *recordingUserAdministrationService) Reactivate(_ context.Context, actor authz.StaffActor, input identity.ReactivateManagedUserInput) (identity.ManagedUserDetail, error) {
+	service.revokeActor = actor
 	return service.revokeResult, service.err
 }
 

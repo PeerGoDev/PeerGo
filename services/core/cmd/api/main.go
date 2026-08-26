@@ -781,6 +781,7 @@ func main() {
 		identityService,
 		authorizationService,
 		invitationRepository,
+		vaultClient,
 		time.Now,
 	)
 	if err != nil {

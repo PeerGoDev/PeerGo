@@ -46,13 +46,15 @@ const (
 )
 
 var (
-	ErrInvitationInput       = errors.New("invitation input is invalid")
-	ErrInvitationDisabled    = errors.New("member invitation issuance is disabled")
-	ErrInvitationIneligible  = errors.New("member is not eligible to issue invitations")
-	ErrInvitationQuota       = errors.New("member invitation quota is exhausted")
-	ErrInvitationNotFound    = errors.New("member invitation was not found")
-	ErrInvitationUnavailable = errors.New("member invitation cannot be revoked")
-	ErrInvitationInvariant   = errors.New("invitation projection violates persisted invariants")
+	ErrInvitationInput                     = errors.New("invitation input is invalid")
+	ErrInvitationDisabled                  = errors.New("member invitation issuance is disabled")
+	ErrInvitationIneligible                = errors.New("member is not eligible to issue invitations")
+	ErrInvitationQuota                     = errors.New("member invitation quota is exhausted")
+	ErrInvitationNotFound                  = errors.New("member invitation was not found")
+	ErrInvitationUnavailable               = errors.New("member invitation cannot be revoked")
+	ErrInvitationEmailRegistered           = errors.New("invitation email already belongs to an account")
+	ErrInvitationEmailDirectoryUnavailable = errors.New("invitation email directory is unavailable")
+	ErrInvitationInvariant                 = errors.New("invitation projection violates persisted invariants")
 )
 
 // MemberInvitation never contains the bearer token or its digest. The raw

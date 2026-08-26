@@ -1269,6 +1269,43 @@ ManagedUserAccountRestrictionRevocationsPath:
       default:
         $ref: "../responses.yaml#/ProblemResponse"
 
+ManagedUserReactivationsPath:
+  post:
+    operationId: reactivateManagedUser
+    summary: 解除已停用账户的封禁状态
+    description: >-
+      同时恢复 Privacy Vault 凭据并将 Core 账户从 disabled 变为 active；
+      使用账户版本防止覆盖并发处置，且只保存一条最小化的不可变解封证据。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.account.restriction.revoke
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/identity.yaml#/ReactivateManagedUserRequest" }
+    responses:
+      "200":
+        description: 已解除封禁并返回最新账户详情。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/identity.yaml#/ManagedUserDetail" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
 ManagedUserManualDownloadRestrictionPath:
   parameters:
     - name: user_id
