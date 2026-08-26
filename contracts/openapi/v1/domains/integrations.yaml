@@ -1,0 +1,68 @@
+MoviePilotCredentialPath:
+  get:
+    operationId: getMyMoviePilotCredential
+    summary: 查看自己的 MoviePilot API Key 状态
+    tags: [integrations]
+    x-audience: [web]
+    x-owner: core-integrations
+    x-permission: integration.moviepilot.read.self
+    x-credential-audience: web-session
+    responses:
+      "200":
+        description: 仅返回不可用于认证的密钥前缀和按六小时合并的最近使用时间。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/integrations.yaml#/MoviePilotCredentialStatus" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  delete:
+    operationId: revokeMyMoviePilotCredential
+    summary: 撤销自己的 MoviePilot API Key
+    tags: [integrations]
+    x-audience: [web]
+    x-owner: core-integrations
+    x-permission: integration.moviepilot.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+      - name: expected_version
+        in: query
+        required: true
+        schema: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    responses:
+      "204": { description: API Key 与尚未过期的下载能力均已失效。 }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MoviePilotCredentialRotationsPath:
+  post:
+    operationId: rotateMyMoviePilotCredential
+    summary: 创建或轮换自己的 MoviePilot API Key
+    tags: [integrations]
+    x-audience: [web]
+    x-owner: core-integrations
+    x-permission: integration.moviepilot.manage.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/integrations.yaml#/RotateMoviePilotCredentialRequest" }
+    responses:
+      "201":
+        description: 原始 API Key 仅在本响应返回一次；旧密钥立即失效。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/integrations.yaml#/IssuedMoviePilotCredential" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }

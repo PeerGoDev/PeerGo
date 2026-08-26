@@ -32,6 +32,7 @@ export default [
   route("account", "routes/account.tsx"),
   route("account/email", "routes/account.email.tsx"),
   route("account/security", "routes/account.security.tsx"),
+  route("account/api-key", "routes/account.api-key.tsx"),
   route("account/rss", "routes/account.rss.tsx"),
   route("account/traffic", "routes/account.traffic.tsx"),
   route("account/seedbox", "routes/account.seedbox.tsx"),

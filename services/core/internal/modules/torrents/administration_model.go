@@ -131,6 +131,7 @@ type ManagedTorrentPeerList struct {
 type UserTrackerTask struct {
 	TorrentID           TorrentID
 	InfoHashV1          string
+	TotalSizeBytes      int64
 	ClientFamilies      []string
 	AddressFamilies     []string
 	ActiveConnections   int

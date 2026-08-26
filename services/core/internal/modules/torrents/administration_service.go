@@ -114,11 +114,14 @@ func (service *TorrentAdministrationService) userActivePeers(ctx context.Context
 		}
 		task := grouped[active.TorrentID]
 		if task == nil {
-			task = &UserTrackerTask{TorrentID: TorrentID(active.TorrentID), InfoHashV1: active.InfoHashV1}
+			task = &UserTrackerTask{
+				TorrentID: TorrentID(active.TorrentID), InfoHashV1: active.InfoHashV1,
+				TotalSizeBytes: active.TotalSizeBytes,
+			}
 			grouped[active.TorrentID] = task
 			clients[active.TorrentID] = make(map[string]struct{})
 			addressFamilies[active.TorrentID] = make(map[string]struct{})
-		} else if task.InfoHashV1 != active.InfoHashV1 {
+		} else if task.InfoHashV1 != active.InfoHashV1 || task.TotalSizeBytes != active.TotalSizeBytes {
 			return UserTrackerActivity{}, ErrTorrentReadInvariant
 		}
 		task.ActiveConnections++

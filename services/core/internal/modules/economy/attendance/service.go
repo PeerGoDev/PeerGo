@@ -70,6 +70,31 @@ func (service *MemberService) Claim(ctx context.Context, cookieToken, csrfToken 
 	return service.repository.Claim(ctx, ClaimCommand{RequestID: requestID, UserID: session.User.ID, Mode: mode, Now: now})
 }
 
+// OverviewForIntegration reuses the canonical attendance projection after a
+// separately provisioned fixed-scope integration credential has authenticated
+// the user. The credential is the authority at this boundary, matching RSS;
+// avoiding a Web-audience authorization decision on every poll also prevents
+// an external client from growing the durable decision journal.
+func (service *MemberService) OverviewForIntegration(ctx context.Context, user identity.User) (Overview, error) {
+	if user.ID == uuid.Nil {
+		return Overview{}, ErrInput
+	}
+	now := canonicalTime(service.now())
+	return service.repository.Overview(ctx, user.ID, now, DefaultHistoryLimit)
+}
+
+// ClaimForIntegration is the API-key counterpart of Claim. Credential
+// validation and fixed claim scope are enforced at the MoviePilot boundary;
+// the actual settlement keeps the same idempotency and ledger transaction as
+// the Web flow without writing a redundant Web-audience decision per request.
+func (service *MemberService) ClaimForIntegration(ctx context.Context, user identity.User, requestID uuid.UUID, mode Mode) (Record, error) {
+	now := canonicalTime(service.now())
+	if user.ID == uuid.Nil || requestID == uuid.Nil || (mode != ModeFixed && mode != ModeRandom) {
+		return Record{}, ErrInput
+	}
+	return service.repository.Claim(ctx, ClaimCommand{RequestID: requestID, UserID: user.ID, Mode: mode, Now: now})
+}
+
 type AdministrationService struct {
 	repository Repository
 	authorizer authz.Authorizer
@@ -186,6 +211,14 @@ func (service *Service) MyOverview(ctx context.Context, cookieToken string) (Ove
 
 func (service *Service) Claim(ctx context.Context, cookieToken, csrfToken string, requestID uuid.UUID, mode Mode) (Record, error) {
 	return service.member.Claim(ctx, cookieToken, csrfToken, requestID, mode)
+}
+
+func (service *Service) OverviewForIntegration(ctx context.Context, user identity.User) (Overview, error) {
+	return service.member.OverviewForIntegration(ctx, user)
+}
+
+func (service *Service) ClaimForIntegration(ctx context.Context, user identity.User, requestID uuid.UUID, mode Mode) (Record, error) {
+	return service.member.ClaimForIntegration(ctx, user, requestID, mode)
 }
 
 func (service *Service) ListPolicies(ctx context.Context, actor authz.StaffActor, limit, offset int) (PolicyPage, error) {

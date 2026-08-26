@@ -9,6 +9,7 @@ import (
 
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
+	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/imaging"
 )
 
@@ -358,6 +359,21 @@ func (service *TorrentReadService) MyTrackerActivity(ctx context.Context, cookie
 		return UserTrackerActivity{}, ErrManagedTorrentPeersUnavailable
 	}
 	return service.administration.userActivePeers(ctx, session.User.ID)
+}
+
+// UserTrackerActivityForIntegration exposes the same privacy-minimized,
+// in-memory Tracker aggregate after a dedicated integration credential has
+// authenticated the account and its fixed traffic-read scope. No endpoint,
+// peer ID, passkey, Web-audience authorization decision or durable activity
+// record crosses this boundary.
+func (service *TorrentReadService) UserTrackerActivityForIntegration(ctx context.Context, user identity.User) (UserTrackerActivity, error) {
+	if user.ID == uuid.Nil {
+		return UserTrackerActivity{}, ErrTorrentReadInput
+	}
+	if service.administration == nil {
+		return UserTrackerActivity{}, ErrManagedTorrentPeersUnavailable
+	}
+	return service.administration.userActivePeers(ctx, user.ID)
 }
 
 func (service *TorrentReadService) Cover(ctx context.Context, torrentID TorrentID) (PublicCover, error) {

@@ -56,6 +56,8 @@ const (
 	ActionHNRPolicyIssue                          Action = "hnr.policy.issue"
 	ActionHNRPolicyRead                           Action = "hnr.policy.read"
 	ActionHNRReadSelf                             Action = "hnr.read.self"
+	ActionIntegrationMoviePilotManageSelf         Action = "integration.moviepilot.manage.self"
+	ActionIntegrationMoviePilotReadSelf           Action = "integration.moviepilot.read.self"
 	ActionInvitationIssueSelf                     Action = "invitation.issue.self"
 	ActionInvitationReadSelf                      Action = "invitation.read.self"
 	ActionInvitationRevokeSelf                    Action = "invitation.revoke.self"
@@ -443,6 +445,16 @@ var permissionCatalog = []PermissionDefinition{
 	},
 	{
 		Action: ActionHNRReadSelf, Description: "查看自己的 H&R 义务与达标进度", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionIntegrationMoviePilotManageSelf, Description: "创建、轮换或撤销自己的 MoviePilot API Key", Risk: RiskHigh,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionIntegrationMoviePilotReadSelf, Description: "查看自己的 MoviePilot API Key 状态", Risk: RiskLow,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},

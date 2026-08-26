@@ -29,6 +29,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/hnradmin"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/imaging"
+	"github.com/peergo/peergo/services/core/internal/modules/moviepilot"
 	"github.com/peergo/peergo/services/core/internal/modules/newcomer"
 	"github.com/peergo/peergo/services/core/internal/modules/notifications"
 	"github.com/peergo/peergo/services/core/internal/modules/operations"
@@ -552,6 +553,25 @@ func main() {
 		logger.Error("compose torrent download service", "error", err)
 		os.Exit(1)
 	}
+	moviePilotRepository, err := moviepilot.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose MoviePilot repository", "error", err)
+		os.Exit(1)
+	}
+	moviePilotService, err := moviepilot.NewService(
+		moviePilotRepository,
+		identityService,
+		authorizationService,
+		catalogService,
+		torrentReadService,
+		torrentDownloadService,
+		attendanceService,
+		moviepilot.ServiceConfig{PublicOrigin: settings.PublicOrigin, SigningKey: settings.SessionCSRFKey},
+	)
+	if err != nil {
+		logger.Error("compose MoviePilot service", "error", err)
+		os.Exit(1)
+	}
 	rssRepository, err := rss.NewPostgresRepository(pool)
 	if err != nil {
 		logger.Error("compose RSS repository", "error", err)
@@ -1022,6 +1042,7 @@ func main() {
 		TorrentResubmission:         torrentResubmissionService,
 		TorrentMaintenance:          torrentMaintenanceService,
 		PromotionAdministration:     promotionApplication,
+		MoviePilot:                  moviePilotService,
 		RSS:                         rssService,
 		TorrentUploadMaxBytes:       settings.TorrentUploadMaxBytes,
 		SessionCookie: httpapi.SessionCookieConfig{

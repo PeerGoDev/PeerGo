@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import {
   BadgeCheckIcon,
+  KeyRoundIcon,
   MailCheckIcon,
   ShieldIcon,
   UserIcon,
@@ -12,7 +13,12 @@ import { buttonVariants } from "~/components/ui/button"
 import { cn } from "~/lib/utils"
 import { PageLayout } from "~/shared/components/page-layout"
 
-type AccountSettingsSection = "profile" | "security" | "email" | "permissions"
+type AccountSettingsSection =
+  | "profile"
+  | "api-key"
+  | "security"
+  | "email"
+  | "permissions"
 
 const accountSettingsItems: Array<{
   section: AccountSettingsSection
@@ -25,6 +31,12 @@ const accountSettingsItems: Array<{
     label: "个人资料",
     to: "/account",
     icon: UserIcon,
+  },
+  {
+    section: "api-key",
+    label: "API Key",
+    to: "/account/api-key",
+    icon: KeyRoundIcon,
   },
   {
     section: "security",

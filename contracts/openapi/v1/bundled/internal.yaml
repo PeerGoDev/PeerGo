@@ -3403,6 +3403,101 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/moviepilot-credential:
+    get:
+      operationId: getMyMoviePilotCredential
+      summary: 查看自己的 MoviePilot API Key 状态
+      tags:
+        - integrations
+      x-audience:
+        - web
+      x-owner: core-integrations
+      x-permission: integration.moviepilot.read.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 仅返回不可用于认证的密钥前缀和按六小时合并的最近使用时间。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoviePilotCredentialStatus'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    delete:
+      operationId: revokeMyMoviePilotCredential
+      summary: 撤销自己的 MoviePilot API Key
+      tags:
+        - integrations
+      x-audience:
+        - web
+      x-owner: core-integrations
+      x-permission: integration.moviepilot.manage.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+        - name: expected_version
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 9007199254740991
+      responses:
+        '204':
+          description: API Key 与尚未过期的下载能力均已失效。
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/moviepilot-credential/rotations:
+    post:
+      operationId: rotateMyMoviePilotCredential
+      summary: 创建或轮换自己的 MoviePilot API Key
+      tags:
+        - integrations
+      x-audience:
+        - web
+      x-owner: core-integrations
+      x-permission: integration.moviepilot.manage.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RotateMoviePilotCredentialRequest'
+      responses:
+        '201':
+          description: 原始 API Key 仅在本响应返回一次；旧密钥立即失效。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedMoviePilotCredential'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/torrents/{torrent_id}/reports:
     post:
       operationId: createTorrentReport
@@ -11731,6 +11826,8 @@ components:
         - hnr.policy.issue
         - hnr.policy.read
         - hnr.read.self
+        - integration.moviepilot.manage.self
+        - integration.moviepilot.read.self
         - invitation.issue.self
         - invitation.read.self
         - invitation.revoke.self
@@ -13672,6 +13769,65 @@ components:
           type: string
           minLength: 10
           maxLength: 500
+    MoviePilotCredentialStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - active
+        - scopes
+      properties:
+        active:
+          type: boolean
+        key_prefix:
+          type: string
+          minLength: 12
+          maxLength: 12
+          pattern: ^pgk_[A-Za-z0-9_-]{8}$
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        scopes:
+          type: array
+          minItems: 5
+          maxItems: 5
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/MoviePilotCredentialScope'
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          description: 最多每六小时合并更新一次，不构成逐请求活动记录。
+    RotateMoviePilotCredentialRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: 首次创建时省略；轮换现有密钥时必须与当前版本一致。
+    IssuedMoviePilotCredential:
+      type: object
+      additionalProperties: false
+      required:
+        - credential
+        - api_key
+      properties:
+        credential:
+          $ref: '#/components/schemas/MoviePilotCredentialStatus'
+        api_key:
+          type: string
+          minLength: 47
+          maxLength: 47
+          pattern: ^pgk_[A-Za-z0-9_-]{43}$
+          writeOnly: true
+          description: 仅在创建或轮换成功响应中出现一次的 256 位随机 API Key。
     RegistrationPolicySettings:
       type: object
       additionalProperties: false
@@ -22259,6 +22415,14 @@ components:
         - all
         - free
         - paid
+    MoviePilotCredentialScope:
+      type: string
+      enum:
+        - profile:read
+        - torrent:read
+        - torrent:download
+        - attendance:read
+        - attendance:claim
     TorrentPurchaseHistoryItem:
       type: object
       additionalProperties: false

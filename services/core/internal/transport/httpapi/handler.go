@@ -25,6 +25,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/economy/seedingreward"
 	"github.com/peergo/peergo/services/core/internal/modules/hnradmin"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
+	"github.com/peergo/peergo/services/core/internal/modules/moviepilot"
 	"github.com/peergo/peergo/services/core/internal/modules/newcomer"
 	"github.com/peergo/peergo/services/core/internal/modules/notifications"
 	"github.com/peergo/peergo/services/core/internal/modules/operations"
@@ -196,6 +197,23 @@ type RSSService interface {
 	Download(context.Context, string, int64) (torrents.TorrentDownloadResult, error)
 	Settings(context.Context, authz.StaffActor) (rss.Settings, error)
 	UpdateSettings(context.Context, authz.StaffActor, rss.UpdateSettingsInput) (rss.Settings, error)
+}
+
+// MoviePilotService owns both ordinary-session credential lifecycle and the
+// separately authenticated compatibility projection consumed by MoviePilot.
+// Keeping one typed interface prevents the transport from learning hashes,
+// signing keys or persistence details.
+type MoviePilotService interface {
+	CredentialStatus(context.Context, string) (moviepilot.CredentialStatus, error)
+	RotateCredential(context.Context, string, string, *int64) (moviepilot.IssuedCredential, error)
+	RevokeCredential(context.Context, string, string, int64) error
+	Authenticate(context.Context, string) (moviepilot.AuthenticatedCredential, error)
+	Profile(context.Context, moviepilot.AuthenticatedCredential) (moviepilot.Profile, error)
+	ListTorrents(context.Context, moviepilot.AuthenticatedCredential, int, int, string, string) (moviepilot.TorrentPage, error)
+	Torrent(context.Context, moviepilot.AuthenticatedCredential, int64) (moviepilot.TorrentDownloadDescriptor, error)
+	Download(context.Context, int64, string) (torrents.TorrentDownloadResult, error)
+	AttendanceOverview(context.Context, moviepilot.AuthenticatedCredential) (attendance.Overview, error)
+	ClaimAttendance(context.Context, moviepilot.AuthenticatedCredential, attendance.Mode) (attendance.Record, error)
 }
 
 // UserAdministrationService exposes the authorized operational projection and
@@ -487,13 +505,14 @@ type Handler struct {
 	torrentResubmission         TorrentResubmissionService
 	torrentMaintenance          TorrentMaintenanceService
 	promotionAdministration     PromotionAdministrationService
+	moviePilot                  MoviePilotService
 	rss                         RSSService
 	sessionCookie               SessionCookieConfig
 	staffSessionCookie          SessionCookieConfig
 }
 
 // NewHandler creates the Core HTTP adapter.
-func NewHandler(catalogService *catalog.Service, identityService IdentityService, registrationService RegistrationService, humanVerificationService identity.HumanVerificationVerifier, invitationService InvitationService, emailVerificationService EmailVerificationService, passwordRecoveryService PasswordRecoveryService, sessionSecurityService SessionSecurityService, twoFactorService TwoFactorService, staffIdentityService StaffIdentityService, staffEnrollmentService StaffEnrollmentService, authorizationService AuthorizationService, grantAdministrationService GrantAdministrationService, categoryAdministrationService CategoryAdministrationService, announcementAdministrationService AnnouncementAdministrationService, wikiService WikiService, siteDisplaySettingsService SiteDisplaySettingsService, userAdministrationService UserAdministrationService, notificationService NotificationService, trafficOverviewService TrafficOverviewService, economyOverviewService EconomyOverviewService, attendanceService AttendanceService, memberGiftService MemberGiftService, contentTipService ContentTipService, workgroupService WorkgroupService, seedingRewardAdministrationService SeedingRewardAdministrationService, levelPolicyAdministrationService LevelPolicyAdministrationService, contributionExperiencePolicyService ContributionExperiencePolicyService, medalAdministrationService MedalAdministrationService, memberMedalService MemberMedalService, hnrPolicyAdministrationService HNRPolicyAdministrationService, ratioWatchAdministrationService RatioWatchAdministrationService, newcomerAdministrationService NewcomerAdministrationService, operationsService OperationsService, torrentBookmarkService TorrentBookmarkService, commentService CommentService, socialPostService SocialPostService, commentModerationService CommentModerationService, torrentReadService TorrentReadService, torrentUploadService TorrentUploadService, torrentDownloadService TorrentDownloadService, torrentReviewService TorrentReviewService, torrentResubmissionService TorrentResubmissionService, torrentMaintenanceService TorrentMaintenanceService, promotionAdministrationService PromotionAdministrationService, rssService RSSService, sessionCookie, staffSessionCookie SessionCookieConfig) *Handler {
+func NewHandler(catalogService *catalog.Service, identityService IdentityService, registrationService RegistrationService, humanVerificationService identity.HumanVerificationVerifier, invitationService InvitationService, emailVerificationService EmailVerificationService, passwordRecoveryService PasswordRecoveryService, sessionSecurityService SessionSecurityService, twoFactorService TwoFactorService, staffIdentityService StaffIdentityService, staffEnrollmentService StaffEnrollmentService, authorizationService AuthorizationService, grantAdministrationService GrantAdministrationService, categoryAdministrationService CategoryAdministrationService, announcementAdministrationService AnnouncementAdministrationService, wikiService WikiService, siteDisplaySettingsService SiteDisplaySettingsService, userAdministrationService UserAdministrationService, notificationService NotificationService, trafficOverviewService TrafficOverviewService, economyOverviewService EconomyOverviewService, attendanceService AttendanceService, memberGiftService MemberGiftService, contentTipService ContentTipService, workgroupService WorkgroupService, seedingRewardAdministrationService SeedingRewardAdministrationService, levelPolicyAdministrationService LevelPolicyAdministrationService, contributionExperiencePolicyService ContributionExperiencePolicyService, medalAdministrationService MedalAdministrationService, memberMedalService MemberMedalService, hnrPolicyAdministrationService HNRPolicyAdministrationService, ratioWatchAdministrationService RatioWatchAdministrationService, newcomerAdministrationService NewcomerAdministrationService, operationsService OperationsService, torrentBookmarkService TorrentBookmarkService, commentService CommentService, socialPostService SocialPostService, commentModerationService CommentModerationService, torrentReadService TorrentReadService, torrentUploadService TorrentUploadService, torrentDownloadService TorrentDownloadService, torrentReviewService TorrentReviewService, torrentResubmissionService TorrentResubmissionService, torrentMaintenanceService TorrentMaintenanceService, promotionAdministrationService PromotionAdministrationService, moviePilotService MoviePilotService, rssService RSSService, sessionCookie, staffSessionCookie SessionCookieConfig) *Handler {
 	return &Handler{
 		catalog:                     catalogService,
 		identity:                    identityService,
@@ -540,6 +559,7 @@ func NewHandler(catalogService *catalog.Service, identityService IdentityService
 		torrentResubmission:         torrentResubmissionService,
 		torrentMaintenance:          torrentMaintenanceService,
 		promotionAdministration:     promotionAdministrationService,
+		moviePilot:                  moviePilotService,
 		rss:                         rssService,
 		sessionCookie:               sessionCookie,
 		staffSessionCookie:          staffSessionCookie,
