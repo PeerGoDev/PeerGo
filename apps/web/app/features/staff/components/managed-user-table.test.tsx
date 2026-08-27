@@ -64,4 +64,41 @@ describe("ManagedUserTable", () => {
     render(<ManagedUserTable users={[]} hasFilters onSelect={vi.fn()} />)
     expect(screen.getByText("没有匹配账户")).toBeInTheDocument()
   })
+
+  it("keeps a roleless pending registration visible for recovery", () => {
+    render(
+      <ManagedUserTable
+        users={[
+          {
+            id: "0198f20a-6da8-7e51-9c64-777777777777",
+            numeric_id: 12_328,
+            username: "pending-member",
+            display_name: "待恢复成员",
+            email: "pending@example.com",
+            email_verified: false,
+            banned: false,
+            download_restricted: false,
+            vip_enabled: false,
+            vip_active: false,
+            status: "pending",
+            version: 1,
+            active_restriction_count: 0,
+            uploaded_bytes: "0",
+            downloaded_bytes: "0",
+            magic_balance: "0",
+            level: 1,
+            role_names: [],
+            created_at: "2026-08-27T15:32:22Z",
+            updated_at: "2026-08-27T15:32:22Z",
+          },
+        ]}
+        hasFilters={false}
+        onSelect={vi.fn()}
+      />
+    )
+
+    expect(screen.getAllByText("pending-member").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("未分配").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("待激活").length).toBeGreaterThan(0)
+  })
 })

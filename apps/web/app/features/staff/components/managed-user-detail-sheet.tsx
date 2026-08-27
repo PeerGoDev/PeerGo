@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
+import { Link } from "react-router"
 import {
   CircleAlertIcon,
   Clock3Icon,
+  ExternalLinkIcon,
   RefreshCwIcon,
   ShieldAlertIcon,
 } from "lucide-react"
@@ -29,6 +31,8 @@ import { formatDateTime } from "~/shared/formatters/date-time"
 import { formatBytes } from "~/shared/formatters/bytes"
 import { formatInteger } from "~/shared/formatters/integer"
 import { UserAvatar } from "~/shared/components/user-avatar"
+import { managedTrackerActivityQueryOptions } from "~/features/user/api/tracker-activity.queries"
+import { UserTrackerActivityCard } from "~/features/user/components/user-tracker-activity-card"
 
 export function ManagedUserDetailSheet({
   userId,
@@ -54,10 +58,14 @@ export function ManagedUserDetailSheet({
   onOpenChange: (open: boolean) => void
 }) {
   const detail = useQuery(managedUserDetailQueryOptions(userId ?? ""))
+  const trackerActivity = useQuery({
+    ...managedTrackerActivityQueryOptions(userId ?? ""),
+    enabled: Boolean(userId && detail.data),
+  })
 
   return (
     <Sheet open={Boolean(userId)} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader className="border-b pr-12">
           <SheetTitle>账户详情</SheetTitle>
           <SheetDescription>
@@ -105,6 +113,17 @@ export function ManagedUserDetailSheet({
               <ManagedUserStateBadges user={detail.data} />
             </div>
 
+            <Button
+              render={<Link to={`/user/${detail.data.username}`} />}
+              nativeButton={false}
+              variant="outline"
+              size="sm"
+              className="self-start"
+            >
+              <ExternalLinkIcon data-icon="inline-start" />
+              查看用户公开主页
+            </Button>
+
             <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 text-sm">
               <DetailTerm>用户 ID</DetailTerm>
               <DetailValue className="font-mono tabular-nums">
@@ -115,7 +134,11 @@ export function ManagedUserDetailSheet({
                 {detail.data.id}
               </DetailValue>
               <DetailTerm>角色</DetailTerm>
-              <DetailValue>{detail.data.role_names.join("、")}</DetailValue>
+              <DetailValue>
+                {detail.data.role_names.length
+                  ? detail.data.role_names.join("、")
+                  : "未分配（注册待恢复）"}
+              </DetailValue>
               <DetailTerm>邮箱验证</DetailTerm>
               <DetailValue>
                 {detail.data.email_verified ? "已验证" : "未验证"}
@@ -134,12 +157,59 @@ export function ManagedUserDetailSheet({
               <DetailValue className="font-medium text-info tabular-nums">
                 {formatBytes(detail.data.downloaded_bytes)}
               </DetailValue>
+              <DetailTerm>分享率</DetailTerm>
+              <DetailValue className="tabular-nums">
+                {formatShareRatio(
+                  detail.data.uploaded_bytes,
+                  detail.data.downloaded_bytes
+                )}
+              </DetailValue>
               <DetailTerm>魔力值</DetailTerm>
               <DetailValue>
                 {formatInteger(detail.data.magic_balance)}
               </DetailValue>
               <DetailTerm>等级</DetailTerm>
               <DetailValue>Lv.{detail.data.level}</DetailValue>
+              <DetailTerm>经验值</DetailTerm>
+              <DetailValue className="tabular-nums">
+                {formatExperience(detail.data.experience)}
+              </DetailValue>
+              <DetailTerm>可用邀请</DetailTerm>
+              <DetailValue className="tabular-nums">
+                {formatInteger(detail.data.remaining_invites)} 个
+              </DetailValue>
+              <DetailTerm>直属邀请</DetailTerm>
+              <DetailValue className="tabular-nums">
+                {formatInteger(detail.data.direct_invite_count)} 人
+              </DetailValue>
+              <DetailTerm>邀请人</DetailTerm>
+              <DetailValue>
+                {detail.data.inviter_username &&
+                detail.data.inviter_numeric_id ? (
+                  <Link
+                    to={`/user/${detail.data.inviter_username}`}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    @{detail.data.inviter_username} · ID{" "}
+                    {detail.data.inviter_numeric_id}
+                  </Link>
+                ) : (
+                  "无（开放注册或邀请根节点）"
+                )}
+              </DetailValue>
+              <DetailTerm>发布种子</DetailTerm>
+              <DetailValue className="tabular-nums">
+                已发布 {formatInteger(detail.data.published_torrent_count)} ·
+                待审核 {formatInteger(detail.data.pending_review_torrent_count)}{" "}
+                · 累计提交 {formatInteger(detail.data.submitted_torrent_count)}
+              </DetailValue>
+              <DetailTerm>注册事务</DetailTerm>
+              <DetailValue>
+                {registrationStateLabel(
+                  detail.data.registration_mode,
+                  detail.data.registration_state
+                )}
+              </DetailValue>
               <DetailTerm>最后活跃</DetailTerm>
               <DetailValue>
                 {detail.data.last_active_at
@@ -155,6 +225,15 @@ export function ManagedUserDetailSheet({
                 {formatDateTime(detail.data.updated_at)}
               </DetailValue>
             </dl>
+
+            <Separator />
+
+            <UserTrackerActivityCard
+              activity={trackerActivity.data}
+              loading={trackerActivity.isPending}
+              error={trackerActivity.isError}
+              visibility="admin"
+            />
 
             <Separator />
 
@@ -260,6 +339,36 @@ function vipStatusLabel(user: {
   return user.vip_until
     ? `有效至 ${formatDateTime(user.vip_until)}`
     : "永久 VIP"
+}
+
+function formatExperience(value: string) {
+  const [integer, fraction = ""] = value.split(".")
+  const visibleFraction = fraction.slice(0, 2).replace(/0+$/, "")
+  return visibleFraction
+    ? `${formatInteger(integer)}.${visibleFraction}`
+    : formatInteger(integer)
+}
+
+function formatShareRatio(uploaded: string, downloaded: string) {
+  const uploadedBytes = BigInt(uploaded)
+  const downloadedBytes = BigInt(downloaded)
+  if (downloadedBytes === 0n) return uploadedBytes > 0n ? "∞" : "—"
+  const hundredths = (uploadedBytes * 100n) / downloadedBytes
+  return `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, "0")}`
+}
+
+function registrationStateLabel(
+  mode: "open" | "invite" | null | undefined,
+  state: "reserved" | "credential_provisioned" | "completed" | null | undefined
+) {
+  if (!mode || !state) return "Rousi 迁移账户"
+  const modeLabel = mode === "invite" ? "邀请注册" : "开放注册"
+  const stateLabel = {
+    reserved: "已预留",
+    credential_provisioned: "待自动恢复",
+    completed: "已完成",
+  }[state]
+  return `${modeLabel} · ${stateLabel}`
 }
 
 function restrictionReasonLabel(reasonCode: string) {

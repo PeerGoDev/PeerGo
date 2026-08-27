@@ -11638,9 +11638,9 @@ components:
           maximum: 99
         role_names:
           type: array
-          minItems: 1
           maxItems: 32
           uniqueItems: true
+          description: 当前有效角色；待恢复或尚未完成初始化的账户可为空。
           items:
             type: string
             minLength: 1
@@ -11725,12 +11725,71 @@ components:
         - type: object
           additionalProperties: false
           required:
+            - experience
+            - remaining_invites
+            - submitted_torrent_count
+            - published_torrent_count
+            - pending_review_torrent_count
+            - direct_invite_count
+            - inviter_numeric_id
+            - inviter_username
+            - registration_mode
+            - registration_state
             - active_restrictions
             - manual_download_restriction
             - manual_download_restriction_history
             - vip_state
             - vip_history
           properties:
+            experience:
+              type: string
+              pattern: ^[0-9]+(?:\.[0-9]{1,20})?$
+              description: 当前精确经验值；使用十进制字符串避免精度损失。
+            remaining_invites:
+              type: integer
+              minimum: 0
+              maximum: 1000000
+            submitted_torrent_count:
+              type: integer
+              format: int64
+              minimum: 0
+            published_torrent_count:
+              type: integer
+              format: int64
+              minimum: 0
+            pending_review_torrent_count:
+              type: integer
+              format: int64
+              minimum: 0
+            direct_invite_count:
+              type: integer
+              format: int64
+              minimum: 0
+            inviter_numeric_id:
+              type: integer
+              format: int64
+              minimum: 1
+              nullable: true
+            inviter_username:
+              type: string
+              minLength: 1
+              maxLength: 64
+              nullable: true
+            registration_mode:
+              type: string
+              enum:
+                - open
+                - invite
+              nullable: true
+              description: PeerGo 原生注册方式；迁移用户为空。
+            registration_state:
+              type: string
+              enum:
+                - reserved
+                - credential_provisioned
+                - completed
+              nullable: true
+              description: PeerGo 原生注册事务状态；迁移用户为空。
             active_restrictions:
               type: array
               maxItems: 50

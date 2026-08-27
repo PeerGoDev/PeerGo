@@ -3588,6 +3588,16 @@ func managedUserDetailDTO(user identity.ManagedUserDetail) generated.ManagedUser
 		origin := generated.ManualDownloadRestrictionOrigin(*user.ManualDownloadRestriction.Origin)
 		manualState.Origin = &origin
 	}
+	var registrationMode *generated.ManagedUserDetailRegistrationMode
+	if user.RegistrationMode != nil {
+		value := generated.ManagedUserDetailRegistrationMode(*user.RegistrationMode)
+		registrationMode = &value
+	}
+	var registrationState *generated.ManagedUserDetailRegistrationState
+	if user.RegistrationState != nil {
+		value := generated.ManagedUserDetailRegistrationState(*user.RegistrationState)
+		registrationState = &value
+	}
 	vipHistory := make([]generated.VIPTransition, 0, len(user.VIPHistory))
 	for _, transition := range user.VIPHistory {
 		vipHistory = append(vipHistory, generated.VIPTransition{
@@ -3613,6 +3623,13 @@ func managedUserDetailDTO(user identity.ManagedUserDetail) generated.ManagedUser
 		RoleNames:              append([]string(nil), user.RoleNames...),
 		LastActiveAt:           user.LastActiveAt,
 		CreatedAt:              user.CreatedAt, UpdatedAt: user.UpdatedAt,
+		Experience: user.Experience, RemainingInvites: int(user.RemainingInvites),
+		SubmittedTorrentCount:     user.SubmittedTorrentCount,
+		PublishedTorrentCount:     user.PublishedTorrentCount,
+		PendingReviewTorrentCount: user.PendingReviewTorrentCount,
+		DirectInviteCount:         user.DirectInviteCount,
+		InviterNumericId:          user.InviterNumericID, InviterUsername: user.InviterUsername,
+		RegistrationMode: registrationMode, RegistrationState: registrationState,
 		ActiveRestrictions:               restrictions,
 		ManualDownloadRestriction:        manualState,
 		ManualDownloadRestrictionHistory: manualHistory,

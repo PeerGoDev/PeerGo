@@ -281,6 +281,16 @@ export function ManagedUserStateBadges({ user }: { user: ManagedUserSummary }) {
 }
 
 function RoleBadges({ roles }: { roles: string[] }) {
+  if (!roles.length) {
+    return (
+      <Badge
+        variant="outline"
+        className="border-warning/40 bg-warning/10 text-warning-foreground"
+      >
+        未分配
+      </Badge>
+    )
+  }
   return (
     <div className="flex flex-wrap gap-1">
       {roles.slice(0, 2).map((role) => (

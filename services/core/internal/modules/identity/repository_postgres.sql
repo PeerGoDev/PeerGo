@@ -665,6 +665,56 @@ FROM identity.registrations
 WHERE id = sqlc.arg(registration_id)
 FOR UPDATE;
 
+-- name: GetRecoverableInvitationRegistrationForUpdate :one
+SELECT
+    id, user_id, username, display_name, admission_mode, invitation_id,
+    credential_ref, state, created_at, updated_at, completed_at
+FROM identity.registrations
+WHERE lower(username) = lower(sqlc.arg(username)::text)
+  AND admission_mode = 'invite'
+  AND invitation_id IS NOT NULL
+  AND state IN ('credential_provisioned', 'completed')
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+FOR UPDATE;
+
+-- name: ListIncompleteRegistrations :many
+SELECT
+    id, user_id, username, display_name, admission_mode, invitation_id,
+    credential_ref, state, created_at, updated_at, completed_at
+FROM identity.registrations
+WHERE state = 'credential_provisioned'
+  AND credential_ref IS NOT NULL
+ORDER BY created_at, id
+LIMIT sqlc.arg(result_limit)::integer;
+
+-- name: ReleaseStaleRegistrationReservations :one
+WITH deleted AS (
+    DELETE FROM identity.registrations AS registration
+    WHERE registration.id IN (
+        SELECT candidate.id
+        FROM identity.registrations AS candidate
+        WHERE candidate.state = 'reserved'
+          AND candidate.credential_ref IS NULL
+          AND candidate.created_at < sqlc.arg(created_before)::timestamptz
+        ORDER BY candidate.created_at, candidate.id
+        LIMIT sqlc.arg(result_limit)::integer
+        FOR UPDATE SKIP LOCKED
+    )
+      AND registration.state = 'reserved'
+      AND registration.credential_ref IS NULL
+    RETURNING registration.id, registration.invitation_id
+), released AS (
+    UPDATE identity.registration_invitations AS invitation
+    SET claimed_by = NULL,
+        claimed_at = NULL
+    FROM deleted
+    WHERE invitation.id = deleted.invitation_id
+      AND invitation.claimed_by = deleted.id
+    RETURNING invitation.id
+)
+SELECT count(*)::bigint FROM deleted;
+
 -- name: RegistrationUsernameUnavailable :one
 SELECT EXISTS (
     SELECT 1
@@ -1438,6 +1488,39 @@ LEFT JOIN LATERAL (
 WHERE users.id = sqlc.arg(user_id)
 GROUP BY users.id, traffic.user_id, magic.user_id, magic.balance, progress.user_id,
     activity.user_id, access.user_id, role_projection.role_names;
+
+-- name: GetManagedUserOperations :one
+SELECT
+    COALESCE(progress.experience, 0)::text AS experience,
+    COALESCE(invitation_account.remaining_invites, 0)::integer AS remaining_invites,
+    COALESCE(torrent_counts.submitted_count, 0)::bigint AS submitted_torrent_count,
+    COALESCE(torrent_counts.published_count, 0)::bigint AS published_torrent_count,
+    COALESCE(torrent_counts.pending_review_count, 0)::bigint AS pending_review_torrent_count,
+    COALESCE(invitation_counts.direct_count, 0)::bigint AS direct_invite_count,
+    inviter.numeric_id AS inviter_numeric_id,
+    inviter.username AS inviter_username,
+    registration.admission_mode AS registration_mode,
+    registration.state AS registration_state
+FROM identity.users AS users
+LEFT JOIN progression.user_progress AS progress ON progress.user_id = users.id
+LEFT JOIN identity.invitation_accounts AS invitation_account ON invitation_account.user_id = users.id
+LEFT JOIN identity.invitation_relationships AS invitation_relationship ON invitation_relationship.invitee_user_id = users.id
+LEFT JOIN identity.users AS inviter ON inviter.id = invitation_relationship.inviter_user_id
+LEFT JOIN identity.registrations AS registration ON registration.user_id = users.id
+LEFT JOIN LATERAL (
+    SELECT
+        count(*)::bigint AS submitted_count,
+        count(*) FILTER (WHERE torrent.state = 'published')::bigint AS published_count,
+        count(*) FILTER (WHERE torrent.state = 'pending_review')::bigint AS pending_review_count
+    FROM torrents.torrents AS torrent
+    WHERE torrent.uploader_id = users.id
+) AS torrent_counts ON true
+LEFT JOIN LATERAL (
+    SELECT count(*)::bigint AS direct_count
+    FROM identity.invitation_relationships AS direct_relationship
+    WHERE direct_relationship.inviter_user_id = users.id
+) AS invitation_counts ON true
+WHERE users.id = sqlc.arg(user_id);
 
 -- name: ListCurrentAccountRestrictions :many
 SELECT id, kind, reason_code, reason_summary, starts_at, expires_at, version

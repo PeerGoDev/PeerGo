@@ -116,6 +116,16 @@ type CurrentAccountRestriction struct {
 
 type ManagedUserDetail struct {
 	ManagedUserSummary
+	Experience                       string
+	RemainingInvites                 int32
+	SubmittedTorrentCount            int64
+	PublishedTorrentCount            int64
+	PendingReviewTorrentCount        int64
+	DirectInviteCount                int64
+	InviterNumericID                 *int64
+	InviterUsername                  *string
+	RegistrationMode                 *RegistrationMode
+	RegistrationState                *RegistrationState
 	ActiveRestrictions               []CurrentAccountRestriction
 	ManualDownloadRestriction        ManualDownloadRestrictionState
 	ManualDownloadRestrictionHistory []ManualDownloadRestrictionTransition

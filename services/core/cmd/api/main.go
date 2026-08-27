@@ -787,6 +787,24 @@ func main() {
 		logger.Error("registration policy requires Turnstile but PEERGO_TURNSTILE_SECRET_KEY is not configured")
 		os.Exit(1)
 	}
+	registrationRecoveryCtx, cancelRegistrationRecovery := context.WithTimeout(context.Background(), 15*time.Second)
+	registrationRecovery, registrationRecoveryErr := registrationService.RecoverIncompleteRegistrations(registrationRecoveryCtx)
+	cancelRegistrationRecovery()
+	if registrationRecoveryErr != nil {
+		// Recovery is best-effort at startup: the public API must still become
+		// available when Vault is temporarily unavailable, and the next restart
+		// or an unchanged registration retry will resume the same durable saga.
+		logger.Warn("registration recovery incomplete",
+			"released_reservations", registrationRecovery.ReleasedReservations,
+			"completed_registrations", registrationRecovery.CompletedRegistrations,
+			"error", registrationRecoveryErr,
+		)
+	} else if registrationRecovery.ReleasedReservations > 0 || registrationRecovery.CompletedRegistrations > 0 {
+		logger.Info("registration recovery completed",
+			"released_reservations", registrationRecovery.ReleasedReservations,
+			"completed_registrations", registrationRecovery.CompletedRegistrations,
+		)
+	}
 	invitationRepository, err := identity.NewPostgresInvitationRepository(pool)
 	if err != nil {
 		logger.Error("compose invitation repository", "error", err)

@@ -590,6 +590,43 @@ func managedUserDetailWithQueries(ctx context.Context, queries *identitydb.Queri
 	if err != nil {
 		return ManagedUserDetail{}, err
 	}
+	operations, err := queries.GetManagedUserOperations(ctx, userID)
+	if err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("get managed user operations: %w", err)
+	}
+	if operations.Experience == "" || operations.RemainingInvites < 0 ||
+		operations.SubmittedTorrentCount < 0 || operations.PublishedTorrentCount < 0 ||
+		operations.PendingReviewTorrentCount < 0 || operations.DirectInviteCount < 0 {
+		return ManagedUserDetail{}, errors.New("managed user operations contain invalid required fields")
+	}
+	var inviterNumericID *int64
+	if operations.InviterNumericID.Valid {
+		value := operations.InviterNumericID.Int64
+		inviterNumericID = &value
+	}
+	var inviterUsername *string
+	if operations.InviterUsername.Valid {
+		value := operations.InviterUsername.String
+		inviterUsername = &value
+	}
+	if (inviterNumericID == nil) != (inviterUsername == nil) {
+		return ManagedUserDetail{}, errors.New("managed user inviter projection is inconsistent")
+	}
+	var registrationMode *RegistrationMode
+	var registrationState *RegistrationState
+	if operations.RegistrationMode.Valid || operations.RegistrationState.Valid {
+		if !operations.RegistrationMode.Valid || !operations.RegistrationState.Valid {
+			return ManagedUserDetail{}, errors.New("managed user registration projection is inconsistent")
+		}
+		mode := RegistrationMode(operations.RegistrationMode.String)
+		state := RegistrationState(operations.RegistrationState.String)
+		if (mode != RegistrationModeOpen && mode != RegistrationModeInvite) ||
+			(state != RegistrationStateReserved && state != RegistrationStateCredentialProvisioned && state != RegistrationStateCompleted) {
+			return ManagedUserDetail{}, errors.New("managed user registration projection contains invalid state")
+		}
+		registrationMode = &mode
+		registrationState = &state
+	}
 	rows, err := queries.ListCurrentAccountRestrictions(ctx, identitydb.ListCurrentAccountRestrictionsParams{
 		UserID: userID,
 		AsOf:   timestamp(asOf),
@@ -629,7 +666,15 @@ func managedUserDetailWithQueries(ctx context.Context, queries *identitydb.Queri
 		return ManagedUserDetail{}, errors.New("managed user VIP projection is inconsistent")
 	}
 	return ManagedUserDetail{
-		ManagedUserSummary: summary, ActiveRestrictions: restrictions,
+		ManagedUserSummary: summary,
+		Experience:         operations.Experience, RemainingInvites: operations.RemainingInvites,
+		SubmittedTorrentCount:     operations.SubmittedTorrentCount,
+		PublishedTorrentCount:     operations.PublishedTorrentCount,
+		PendingReviewTorrentCount: operations.PendingReviewTorrentCount,
+		DirectInviteCount:         operations.DirectInviteCount,
+		InviterNumericID:          inviterNumericID, InviterUsername: inviterUsername,
+		RegistrationMode: registrationMode, RegistrationState: registrationState,
+		ActiveRestrictions:               restrictions,
 		ManualDownloadRestriction:        manualRestriction,
 		ManualDownloadRestrictionHistory: manualHistory,
 		VIPState:                         vipState,
@@ -673,7 +718,7 @@ func managedUserSummaryFromValues(
 		(accountStatus != AccountStatusActive && accountStatus != AccountStatusDisabled && accountStatus != AccountStatusPending) ||
 		banned != (accountStatus == AccountStatusDisabled) || (vipActive && !vipEnabled) ||
 		version < 1 || activeRestrictionCount < 0 || uploadedBytes < 0 || downloadedBytes < 0 ||
-		level < 1 || len(roleNames) == 0 || !createdAt.Valid || !updatedAt.Valid {
+		level < 1 || !createdAt.Valid || !updatedAt.Valid {
 		return ManagedUserSummary{}, errors.New("managed user contains invalid required fields")
 	}
 	var lastActive *time.Time

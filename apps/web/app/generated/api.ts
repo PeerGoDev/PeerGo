@@ -4264,6 +4264,7 @@ export interface components {
             /** @description 唯一站内资产魔力值，始终为整数。 */
             magic_balance: string;
             level: number;
+            /** @description 当前有效角色；待恢复或尚未完成初始化的账户可为空。 */
             role_names: string[];
             /** Format: date-time */
             last_active_at?: string;
@@ -4295,6 +4296,30 @@ export interface components {
             version: number;
         };
         ManagedUserDetail: components["schemas"]["ManagedUserSummary"] & {
+            /** @description 当前精确经验值；使用十进制字符串避免精度损失。 */
+            experience: string;
+            remaining_invites: number;
+            /** Format: int64 */
+            submitted_torrent_count: number;
+            /** Format: int64 */
+            published_torrent_count: number;
+            /** Format: int64 */
+            pending_review_torrent_count: number;
+            /** Format: int64 */
+            direct_invite_count: number;
+            /** Format: int64 */
+            inviter_numeric_id: number | null;
+            inviter_username: string | null;
+            /**
+             * @description PeerGo 原生注册方式；迁移用户为空。
+             * @enum {string|null}
+             */
+            registration_mode: "open" | "invite" | null;
+            /**
+             * @description PeerGo 原生注册事务状态；迁移用户为空。
+             * @enum {string|null}
+             */
+            registration_state: "reserved" | "credential_provisioned" | "completed" | null;
             active_restrictions: components["schemas"]["CurrentAccountRestriction"][];
             manual_download_restriction: components["schemas"]["ManualDownloadRestrictionState"];
             manual_download_restriction_history: components["schemas"]["ManualDownloadRestrictionTransition"][];
