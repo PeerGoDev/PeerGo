@@ -264,12 +264,15 @@ function FacetOptionChip({
   onEdit: () => void
 }) {
   const details = `稳定值 ${option.key} · 顺序 ${option.display_order.toLocaleString("zh-CN")} · 引用 ${option.torrent_count.toLocaleString("zh-CN")} 个种子`
+  const showStableKey = option.key !== option.label
   const content = (
     <>
       <span className="max-w-48 truncate">{option.label}</span>
-      <code className="max-w-36 truncate font-normal text-muted-foreground">
-        {option.key}
-      </code>
+      {showStableKey ? (
+        <code className="max-w-36 truncate font-normal text-muted-foreground">
+          {option.key}
+        </code>
+      ) : null}
       {!option.enabled && canUpdate ? (
         <Badge variant="destructive">停用</Badge>
       ) : null}

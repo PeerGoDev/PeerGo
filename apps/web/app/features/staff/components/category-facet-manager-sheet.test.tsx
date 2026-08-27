@@ -50,12 +50,25 @@ describe("CategoryFacetManager", () => {
             created_at: "2026-08-01T00:00:00Z",
             updated_at: "2026-08-27T00:00:00Z",
           },
+          {
+            key: "剧情",
+            label: "剧情",
+            canonical_label: "剧情",
+            display_order: 20,
+            enabled: true,
+            version: 1,
+            torrent_count: 0,
+            created_at: "2026-08-01T00:00:00Z",
+            updated_at: "2026-08-27T00:00:00Z",
+          },
         ],
       },
     ])
 
     expect(screen.getByText("分辨率")).toBeVisible()
     expect(screen.getByText("4K / 2160p")).toBeVisible()
+    expect(screen.getByText("2160p")).toBeVisible()
+    expect(screen.getAllByText("剧情")).toHaveLength(1)
     expect(
       screen.getByRole("button", { name: "编辑类型选项 4K / 2160p" })
     ).toHaveAttribute("title", "稳定值 2160p · 顺序 10 · 引用 8 个种子")
