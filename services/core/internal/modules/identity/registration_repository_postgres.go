@@ -552,7 +552,7 @@ ON CONFLICT (user_id) DO NOTHING`, record.UserID, occurredAt); err != nil {
 	if _, err := tx.Exec(ctx, `
 INSERT INTO economy.magic_accounts (
     id, user_id, account_kind, account_code, balance, version, updated_at
-) VALUES ($1,$1,'member','member:' || $1::text,0,1,$2)
+) VALUES ($1::uuid,$1::uuid,'member','member:' || ($1::uuid)::text,0,1,$2)
 ON CONFLICT (user_id) DO NOTHING`, record.UserID, occurredAt); err != nil {
 		return fmt.Errorf("ensure registration magic account: %w", err)
 	}

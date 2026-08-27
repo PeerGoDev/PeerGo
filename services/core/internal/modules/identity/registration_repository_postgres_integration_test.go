@@ -13,7 +13,7 @@ import (
 	platformpostgres "github.com/peergo/peergo/services/core/internal/platform/postgres"
 )
 
-func TestRecordRegistrationInvitationRelationshipAcceptsFreshInsert(t *testing.T) {
+func TestNativeRegistrationCompletionInitializesStateAndInvitationRelationship(t *testing.T) {
 	databaseURL := os.Getenv("PEERGO_TEST_CORE_DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("PEERGO_TEST_CORE_DATABASE_URL is not set")
@@ -74,6 +74,13 @@ INSERT INTO identity.registrations (
 	}
 
 	queries := identitydb.New(tx)
+	if err := ensureRegisteredMemberState(ctx, tx, RegistrationRecord{
+		ID:        registrationID,
+		UserID:    inviteeID,
+		CreatedAt: now,
+	}, now); err != nil {
+		t.Fatalf("ensureRegisteredMemberState() error = %v", err)
+	}
 	valid, err := queries.RecordRegistrationInvitationRelationship(ctx, registrationID)
 	if err != nil || !valid {
 		t.Fatalf("fresh RecordRegistrationInvitationRelationship() = %v, error=%v", valid, err)
