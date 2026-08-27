@@ -851,6 +851,10 @@ SELECT (CASE
     WHEN candidate.source_kind NOT IN ('member', 'legacy') THEN true
     ELSE EXISTS (
         SELECT 1
+        FROM inserted
+        WHERE inserted.invitee_user_id = candidate.invitee_user_id
+    ) OR EXISTS (
+        SELECT 1
         FROM identity.invitation_relationships AS relationship
         WHERE relationship.invitee_user_id = candidate.invitee_user_id
           AND relationship.inviter_user_id = candidate.inviter_user_id
