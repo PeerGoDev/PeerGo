@@ -13,18 +13,20 @@ import (
 )
 
 type registrationRepositoryFixture struct {
-	mode           RegistrationMode
-	prepareCommand PrepareRegistrationCommand
-	record         RegistrationRecord
-	prepareErr     error
-	cancelErr      error
-	cancelCalls    int
-	attachCalls    int
-	completeCalls  int
+	mode             RegistrationMode
+	prepareCommand   PrepareRegistrationCommand
+	record           RegistrationRecord
+	prepareErr       error
+	cancelErr        error
+	cancelCalls      int
+	cancelContextErr error
+	attachCalls      int
+	completeCalls    int
 }
 
-func (fixture *registrationRepositoryFixture) CancelRegistration(_ context.Context, registrationID uuid.UUID) error {
+func (fixture *registrationRepositoryFixture) CancelRegistration(ctx context.Context, registrationID uuid.UUID) error {
 	fixture.cancelCalls++
+	fixture.cancelContextErr = ctx.Err()
 	if registrationID != fixture.prepareCommand.ID {
 		return ErrRegistrationStateConflict
 	}
@@ -79,11 +81,15 @@ type registrationVaultFixture struct {
 	credentialRef uuid.UUID
 	provisioned   RegistrationInput
 	provisionErr  error
+	provisionHook func()
 	activateCalls int
 }
 
 func (fixture *registrationVaultFixture) ProvisionRegistration(_ context.Context, input RegistrationInput) (uuid.UUID, error) {
 	fixture.provisioned = input
+	if fixture.provisionHook != nil {
+		fixture.provisionHook()
+	}
 	return fixture.credentialRef, fixture.provisionErr
 }
 
@@ -171,16 +177,21 @@ func TestRegistrationServiceStopsBeforeVaultWhenAdmissionRejects(t *testing.T) {
 	}
 }
 
-func TestRegistrationServiceLeavesReservationRecoverableWhenVaultFails(t *testing.T) {
+func TestRegistrationServiceReleasesPreparedReservationWhenVaultFails(t *testing.T) {
 	repository := &registrationRepositoryFixture{record: RegistrationRecord{
 		Mode: RegistrationModeOpen, State: RegistrationStateReserved,
 	}}
-	vault := &registrationVaultFixture{provisionErr: ErrRegistrationServiceUnavailable}
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	defer cancelRequest()
+	vault := &registrationVaultFixture{
+		provisionErr:  ErrRegistrationServiceUnavailable,
+		provisionHook: cancelRequest,
+	}
 	service, err := NewRegistrationService(repository, vault, time.Now)
 	if err != nil {
 		t.Fatalf("NewRegistrationService() error = %v", err)
 	}
-	_, err = service.Register(context.Background(), RegistrationInput{
+	_, err = service.Register(requestCtx, RegistrationInput{
 		ID: uuid.New(), Username: "new_member", DisplayName: "新成员",
 		Email: "member@example.com", Password: "PeerGo-member-2026!",
 	})
@@ -190,8 +201,32 @@ func TestRegistrationServiceLeavesReservationRecoverableWhenVaultFails(t *testin
 	if repository.attachCalls != 0 || repository.completeCalls != 0 || vault.activateCalls != 0 {
 		t.Fatal("later saga steps ran after Vault provisioning failed")
 	}
+	if repository.cancelCalls != 1 || repository.cancelContextErr != nil {
+		t.Fatalf("cancel calls=%d context error=%v", repository.cancelCalls, repository.cancelContextErr)
+	}
+}
+
+func TestRegistrationServicePreservesAdvancedRegistrationWhenVaultRetryFails(t *testing.T) {
+	credentialRef := uuid.New()
+	repository := &registrationRepositoryFixture{record: RegistrationRecord{
+		Mode: RegistrationModeInvite, State: RegistrationStateCredentialProvisioned,
+		CredentialRef: &credentialRef,
+	}}
+	vault := &registrationVaultFixture{provisionErr: ErrRegistrationServiceUnavailable}
+	service, err := NewRegistrationService(repository, vault, time.Now)
+	if err != nil {
+		t.Fatalf("NewRegistrationService() error = %v", err)
+	}
+	_, err = service.Register(context.Background(), RegistrationInput{
+		ID: uuid.New(), Username: "new_member", DisplayName: "新成员",
+		Email: "member@example.com", Password: "PeerGo-member-2026!",
+		InvitationToken: "i" + strings.Repeat("a", 42),
+	})
+	if !errors.Is(err, ErrRegistrationServiceUnavailable) {
+		t.Fatalf("Register() error = %v", err)
+	}
 	if repository.cancelCalls != 0 {
-		t.Fatal("transient Vault failure released a recoverable reservation")
+		t.Fatalf("advanced registration cancellation calls = %d", repository.cancelCalls)
 	}
 }
 

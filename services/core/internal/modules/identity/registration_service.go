@@ -20,6 +20,8 @@ var (
 	legacyRegistrationInvitationToken = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
+const registrationCompensationTimeout = 5 * time.Second
+
 type RegistrationRepository interface {
 	PublicRegistrationPolicy(context.Context) (RegistrationPublicPolicy, error)
 	PrepareRegistration(context.Context, PrepareRegistrationCommand) (RegistrationRecord, error)
@@ -110,8 +112,12 @@ func (service *RegistrationService) Register(ctx context.Context, input Registra
 	// replayed with a different email or password after a network timeout.
 	credentialRef, err := service.vault.ProvisionRegistration(ctx, normalized)
 	if err != nil {
-		if errors.Is(err, ErrRegistrationUnavailable) {
-			if cancelErr := service.repository.CancelRegistration(ctx, record.ID); cancelErr != nil {
+		// No Core identity exists yet while the record is still reserved. Release
+		// that reservation for every failed Vault provision, including timeouts
+		// and internal failures, so a browser refresh cannot strand the username
+		// or invitation. Advanced rows remain recoverable through the same key.
+		if record.State == RegistrationStateReserved && record.CredentialRef == nil {
+			if cancelErr := service.cancelPreparedRegistration(ctx, record.ID); cancelErr != nil {
 				return RegistrationResult{}, ErrRegistrationStateConflict
 			}
 		}
@@ -140,6 +146,15 @@ func (service *RegistrationService) Register(ctx context.Context, input Registra
 		RegistrationMode: record.Mode, EmailVerificationRequired: true,
 		CompletedAt: *record.CompletedAt,
 	}, nil
+}
+
+func (service *RegistrationService) cancelPreparedRegistration(ctx context.Context, registrationID uuid.UUID) error {
+	// Request cancellation is a common reason for an ambiguous Vault result.
+	// Preserve request values for tracing but detach cancellation so the bounded
+	// Core compensation can still release an uncommitted invitation claim.
+	compensationCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), registrationCompensationTimeout)
+	defer cancel()
+	return service.repository.CancelRegistration(compensationCtx, registrationID)
 }
 
 func registrationEmailDomain(email string) string {
