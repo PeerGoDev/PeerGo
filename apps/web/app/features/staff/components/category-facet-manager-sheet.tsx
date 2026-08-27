@@ -14,6 +14,7 @@ import {
   Card,
   CardAction,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "~/components/ui/card"
@@ -46,13 +47,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "~/components/ui/sheet"
 import { Spinner } from "~/components/ui/spinner"
 import { Switch } from "~/components/ui/switch"
 import { Textarea } from "~/components/ui/textarea"
@@ -74,108 +68,114 @@ type FacetEditor = {
   facet?: ManagedCategoryFacet
 }
 
-export function CategoryFacetManagerSheet({
+export function CategoryFacetManager({
   category,
   csrfToken,
   canUpdate,
-  onOpenChange,
   onSaved,
 }: {
   category: ManagedCategory
   csrfToken: string
   canUpdate: boolean
-  onOpenChange: (open: boolean) => void
   onSaved: (message: string) => void
 }) {
   const [facetEditor, setFacetEditor] = React.useState<FacetEditor>()
   const [optionEditor, setOptionEditor] = React.useState<OptionEditor>()
 
   return (
-    <Sheet open onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-3xl">
-        <SheetHeader className="border-b pr-12">
-          <SheetTitle>{category.name} · 类型与属性</SheetTitle>
-          <SheetDescription>
+    <section
+      className="flex flex-col gap-4"
+      aria-labelledby={`category-facets-${category.id}`}
+    >
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3
+            id={`category-facets-${category.id}`}
+            className="font-heading font-semibold"
+          >
+            {category.name} · 类型与属性
+          </h3>
+          <p className="text-sm text-muted-foreground">
             与发种页共用同一套分类属性。停用只影响新发种，历史种子引用仍会保留。
-          </SheetDescription>
-          {canUpdate ? (
-            <div className="pt-2">
-              <Button
-                size="sm"
-                onClick={() => setFacetEditor({})}
-                disabled={category.facets.length >= 20}
-              >
-                <PlusIcon data-icon="inline-start" />
-                添加属性
-              </Button>
-              <span className="ml-3 text-xs text-muted-foreground">
-                已配置 {category.facets.length}/20
-              </span>
-            </div>
-          ) : null}
-        </SheetHeader>
-
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-6">
-          {category.facets.length === 0 ? (
-            <Empty className="min-h-64 border">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <ListTreeIcon />
-                </EmptyMedia>
-                <EmptyTitle>这个分类还没有属性</EmptyTitle>
-                <EmptyDescription>
-                  还没有发种属性。可新增分辨率、来源、类型等单选或多选参数。
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            category.facets.map((facet) => (
-              <FacetCard
-                key={facet.id}
-                facet={facet}
-                canUpdate={canUpdate}
-                onEditFacet={() => setFacetEditor({ facet })}
-                onAdd={() => setOptionEditor({ facet })}
-                onEdit={(option) => setOptionEditor({ facet, option })}
-              />
-            ))
-          )}
+          </p>
         </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-xs text-muted-foreground">
+            已配置 {category.facets.length}/20
+          </span>
+          {canUpdate ? (
+            <Button
+              size="sm"
+              onClick={() => setFacetEditor({})}
+              disabled={category.facets.length >= 20}
+            >
+              <PlusIcon data-icon="inline-start" />
+              添加属性
+            </Button>
+          ) : null}
+        </div>
+      </header>
 
-        {facetEditor ? (
-          <CategoryFacetDialog
-            key={`${facetEditor.facet?.id ?? "new"}:${facetEditor.facet?.version ?? 0}`}
-            category={category}
-            facet={facetEditor.facet}
-            csrfToken={csrfToken}
-            onOpenChange={(open) => {
-              if (!open) setFacetEditor(undefined)
-            }}
-            onSaved={(message) => {
-              setFacetEditor(undefined)
-              onSaved(message)
-            }}
-          />
-        ) : null}
+      {category.facets.length === 0 ? (
+        <Empty className="min-h-48 border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ListTreeIcon />
+            </EmptyMedia>
+            <EmptyTitle>这个分类还没有属性</EmptyTitle>
+            <EmptyDescription>
+              还没有发种属性。可新增分辨率、来源、类型等单选或多选参数。
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {category.facets.map((facet) => (
+            <FacetCard
+              key={facet.id}
+              facet={facet}
+              canUpdate={canUpdate}
+              onEditFacet={() => setFacetEditor({ facet })}
+              onAdd={() => setOptionEditor({ facet })}
+              onEdit={(option) => setOptionEditor({ facet, option })}
+            />
+          ))}
+        </div>
+      )}
 
-        {optionEditor ? (
-          <CategoryFacetOptionDialog
-            key={`${optionEditor.facet.id}:${optionEditor.option?.key ?? "new"}:${optionEditor.option?.version ?? 0}`}
-            category={category}
-            facet={optionEditor.facet}
-            option={optionEditor.option}
-            csrfToken={csrfToken}
-            onOpenChange={(open) => {
-              if (!open) setOptionEditor(undefined)
-            }}
-            onSaved={(message) => {
-              setOptionEditor(undefined)
-              onSaved(message)
-            }}
-          />
-        ) : null}
-      </SheetContent>
-    </Sheet>
+      {facetEditor ? (
+        <CategoryFacetDialog
+          key={`${facetEditor.facet?.id ?? "new"}:${facetEditor.facet?.version ?? 0}`}
+          category={category}
+          facet={facetEditor.facet}
+          csrfToken={csrfToken}
+          onOpenChange={(open) => {
+            if (!open) setFacetEditor(undefined)
+          }}
+          onSaved={(message) => {
+            setFacetEditor(undefined)
+            onSaved(message)
+          }}
+        />
+      ) : null}
+
+      {optionEditor ? (
+        <CategoryFacetOptionDialog
+          key={`${optionEditor.facet.id}:${optionEditor.option?.key ?? "new"}:${optionEditor.option?.version ?? 0}`}
+          category={category}
+          facet={optionEditor.facet}
+          option={optionEditor.option}
+          csrfToken={csrfToken}
+          onOpenChange={(open) => {
+            if (!open) setOptionEditor(undefined)
+          }}
+          onSaved={(message) => {
+            setOptionEditor(undefined)
+            onSaved(message)
+          }}
+        />
+      ) : null}
+    </section>
   )
 }
 
@@ -211,13 +211,13 @@ function FacetCard({
             </Badge>
           ) : null}
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
+        <CardDescription className="text-xs">
           {facet.selection_mode === "multi_option" ? "可多选" : "单选"} · 已启用{" "}
           {enabledCount}/{facet.options.length} · 上限 200
-        </p>
+        </CardDescription>
         {canUpdate ? (
-          <CardAction>
-            <div className="flex items-center gap-2">
+          <CardAction className="col-start-1 row-start-3 mt-2 justify-self-stretch sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:mt-0 sm:justify-self-end">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <Button variant="ghost" size="sm" onClick={onEditFacet}>
                 <PencilIcon data-icon="inline-start" />
                 编辑属性
@@ -235,46 +235,63 @@ function FacetCard({
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="grid gap-1.5 pt-3">
+      <CardContent className="flex flex-wrap gap-2 pt-3">
         {facet.options.length === 0 ? (
-          <p className="rounded-md border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
+          <p className="w-full rounded-md border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
             尚无选项；添加后发种页会自动显示这个属性。
           </p>
         ) : null}
         {facet.options.map((option) => (
-          <div
+          <FacetOptionChip
             key={option.key}
-            className="flex min-h-11 items-center gap-3 rounded-md border px-3 py-2"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="truncate font-medium">{option.label}</span>
-                <code className="truncate text-xs text-muted-foreground">
-                  {option.key}
-                </code>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                顺序 {option.display_order.toLocaleString("zh-CN")} · 引用{" "}
-                {option.torrent_count.toLocaleString("zh-CN")} 个种子
-              </p>
-            </div>
-            <Badge variant={option.enabled ? "outline" : "destructive"}>
-              {option.enabled ? "启用" : "停用"}
-            </Badge>
-            {canUpdate ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => onEdit(option)}
-                aria-label={`编辑类型选项 ${option.label}`}
-              >
-                <PencilIcon />
-              </Button>
-            ) : null}
-          </div>
+            option={option}
+            canUpdate={canUpdate}
+            onEdit={() => onEdit(option)}
+          />
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function FacetOptionChip({
+  option,
+  canUpdate,
+  onEdit,
+}: {
+  option: ManagedCategoryFacetOption
+  canUpdate: boolean
+  onEdit: () => void
+}) {
+  const details = `稳定值 ${option.key} · 顺序 ${option.display_order.toLocaleString("zh-CN")} · 引用 ${option.torrent_count.toLocaleString("zh-CN")} 个种子`
+  const content = (
+    <>
+      <span className="max-w-48 truncate">{option.label}</span>
+      <code className="max-w-36 truncate font-normal text-muted-foreground">
+        {option.key}
+      </code>
+      {!option.enabled && canUpdate ? (
+        <Badge variant="destructive">停用</Badge>
+      ) : null}
+    </>
+  )
+
+  return canUpdate ? (
+    <Button
+      variant="outline"
+      size="xs"
+      className="h-auto max-w-full py-1"
+      onClick={onEdit}
+      aria-label={`编辑类型选项 ${option.label}`}
+      title={details}
+    >
+      {content}
+      <PencilIcon data-icon="inline-end" />
+    </Button>
+  ) : (
+    <Badge variant={option.enabled ? "outline" : "destructive"} title={details}>
+      {content}
+    </Badge>
   )
 }
 

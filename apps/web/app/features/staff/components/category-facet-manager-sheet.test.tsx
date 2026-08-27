@@ -2,10 +2,10 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
-import { CategoryFacetManagerSheet } from "~/features/staff/components/category-facet-manager-sheet"
+import { CategoryFacetManager } from "~/features/staff/components/category-facet-manager-sheet"
 import { AppProviders } from "~/shared/providers/app-providers"
 
-describe("CategoryFacetManagerSheet", () => {
+describe("CategoryFacetManager", () => {
   it("allows a category without attributes to create its first upload attribute", async () => {
     const user = userEvent.setup()
     renderManager([])
@@ -56,18 +56,20 @@ describe("CategoryFacetManagerSheet", () => {
 
     expect(screen.getByText("分辨率")).toBeVisible()
     expect(screen.getByText("4K / 2160p")).toBeVisible()
-    expect(screen.getByText("顺序 10 · 引用 8 个种子")).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: "编辑类型选项 4K / 2160p" })
+    ).toHaveAttribute("title", "稳定值 2160p · 顺序 10 · 引用 8 个种子")
     expect(screen.getAllByText("停用")).toHaveLength(1)
     expect(screen.getByRole("button", { name: "编辑属性" })).toBeEnabled()
   })
 })
 
 function renderManager(
-  facets: Parameters<typeof CategoryFacetManagerSheet>[0]["category"]["facets"]
+  facets: Parameters<typeof CategoryFacetManager>[0]["category"]["facets"]
 ) {
   return render(
     <AppProviders>
-      <CategoryFacetManagerSheet
+      <CategoryFacetManager
         category={{
           id: "movies",
           name: "电影",
@@ -81,7 +83,6 @@ function renderManager(
         }}
         csrfToken="test-csrf"
         canUpdate
-        onOpenChange={vi.fn()}
         onSaved={vi.fn()}
       />
     </AppProviders>

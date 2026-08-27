@@ -24,7 +24,7 @@ import {
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
 import { CategoryEditorSheet } from "~/features/staff/components/category-editor-sheet"
-import { CategoryFacetManagerSheet } from "~/features/staff/components/category-facet-manager-sheet"
+import { CategoryFacetManager } from "~/features/staff/components/category-facet-manager-sheet"
 import { CategoryTable } from "~/features/staff/components/category-table"
 import { hasCapability } from "~/features/staff/model/capability"
 import type { components } from "~/generated/api"
@@ -42,7 +42,7 @@ export function StaffCategoriesPage() {
       pageHeader={{
         title: "分类管理",
         description:
-          "每个分类拥有独立名称和排序；停用后仍保留已有种子的历史归属。",
+          "每个分类拥有独立的类型与属性；停用后仍保留已有种子的历史归属。",
         descriptionClassName: "mt-3",
       }}
     >
@@ -65,13 +65,10 @@ function CategoriesContent({
 }) {
   const categories = useQuery(managedCategoryListQueryOptions)
   const [editor, setEditor] = React.useState<EditorState>()
-  const [facetCategoryId, setFacetCategoryId] = React.useState("")
+  const [expandedCategoryId, setExpandedCategoryId] = React.useState("")
   const [successMessage, setSuccessMessage] = React.useState("")
   const canCreate = hasCapability(capabilities, "category.create")
   const canUpdate = hasCapability(capabilities, "category.update")
-  const facetCategory = categories.data?.find(
-    (category) => category.id === facetCategoryId
-  )
 
   if (categories.isPending) {
     return <CategoriesSkeleton />
@@ -131,7 +128,7 @@ function CategoriesContent({
       </CategoriesHeader>
 
       <p className="text-sm text-muted-foreground">
-        每个分类拥有独立名称和排序；停用后仍保留已有种子的历史归属。使用编辑操作调整顺序与状态。
+        点击分类可直接展开类型、地区、分辨率、来源等发种属性；使用编辑操作调整分类名称、顺序与状态。
       </p>
 
       {successMessage ? (
@@ -155,14 +152,26 @@ function CategoriesContent({
       <CategoryTable
         categories={categories.data}
         canUpdate={canUpdate}
+        expandedCategoryId={expandedCategoryId}
         onEdit={(category) => {
           setSuccessMessage("")
           setEditor({ mode: "edit", category })
         }}
-        onManageFacets={(category) => {
+        onToggleFacets={(category) => {
           setSuccessMessage("")
-          setFacetCategoryId(category.id)
+          setExpandedCategoryId((current) =>
+            current === category.id ? "" : category.id
+          )
         }}
+        renderFacetManager={(category) => (
+          <CategoryFacetManager
+            key={`${category.id}:${category.version}`}
+            category={category}
+            csrfToken={csrfToken}
+            canUpdate={canUpdate}
+            onSaved={setSuccessMessage}
+          />
+        )}
       />
 
       {editor ? (
@@ -187,18 +196,6 @@ function CategoriesContent({
             )
             setEditor(undefined)
           }}
-        />
-      ) : null}
-
-      {facetCategory ? (
-        <CategoryFacetManagerSheet
-          category={facetCategory}
-          csrfToken={csrfToken}
-          canUpdate={canUpdate}
-          onOpenChange={(open) => {
-            if (!open) setFacetCategoryId("")
-          }}
-          onSaved={setSuccessMessage}
         />
       ) : null}
     </CategoriesFrame>
