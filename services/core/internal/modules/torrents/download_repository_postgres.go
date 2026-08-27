@@ -46,13 +46,60 @@ func (repository *PostgresTorrentDownloadRepository) PublishedDownloadSource(ctx
 	if err != nil {
 		return TorrentDownloadSource{}, fmt.Errorf("get published torrent download object: %w", err)
 	}
-	if object.TorrentID != int64(torrentID) || object.ObjectID == uuid.Nil || len(object.ContentSha256) != 32 ||
+	return repository.downloadSourceFromObject(ctx, torrentID, torrentDownloadObject{
+		TorrentID: object.TorrentID, Title: object.Title, FilenamePrefix: object.TorrentFilenamePrefix,
+		ObjectID: object.ObjectID, ContentSHA256: object.ContentSha256, ByteLength: object.ByteLength,
+		InfoOffset: object.InfoOffset, InfoLength: object.InfoLength,
+	})
+}
+
+func (repository *PostgresTorrentDownloadRepository) PendingReviewUploaderDownloadSource(
+	ctx context.Context,
+	torrentID TorrentID,
+	uploaderID uuid.UUID,
+) (TorrentDownloadSource, error) {
+	if torrentID < 1 || uploaderID == uuid.Nil {
+		return TorrentDownloadSource{}, ErrTorrentInputInvalid
+	}
+	object, err := repository.queries.GetPendingReviewUploaderDownloadObject(ctx, torrentdb.GetPendingReviewUploaderDownloadObjectParams{
+		TorrentID: int64(torrentID), UploaderID: uploaderID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return TorrentDownloadSource{}, ErrTorrentDownloadNotFound
+	}
+	if err != nil {
+		return TorrentDownloadSource{}, fmt.Errorf("get pending-review uploader download object: %w", err)
+	}
+	return repository.downloadSourceFromObject(ctx, torrentID, torrentDownloadObject{
+		TorrentID: object.TorrentID, Title: object.Title, FilenamePrefix: object.TorrentFilenamePrefix,
+		ObjectID: object.ObjectID, ContentSHA256: object.ContentSha256, ByteLength: object.ByteLength,
+		InfoOffset: object.InfoOffset, InfoLength: object.InfoLength,
+	})
+}
+
+type torrentDownloadObject struct {
+	TorrentID      int64
+	Title          string
+	FilenamePrefix string
+	ObjectID       uuid.UUID
+	ContentSHA256  []byte
+	ByteLength     int64
+	InfoOffset     int64
+	InfoLength     int64
+}
+
+func (repository *PostgresTorrentDownloadRepository) downloadSourceFromObject(
+	ctx context.Context,
+	torrentID TorrentID,
+	object torrentDownloadObject,
+) (TorrentDownloadSource, error) {
+	if object.TorrentID != int64(torrentID) || object.ObjectID == uuid.Nil || len(object.ContentSHA256) != 32 ||
 		object.ByteLength <= 0 || object.InfoOffset < 0 || object.InfoLength <= 0 ||
 		object.InfoOffset > object.ByteLength-object.InfoLength {
 		return TorrentDownloadSource{}, ErrTorrentDownloadObjectConflict
 	}
 	var contentDigest ObjectSHA256
-	copy(contentDigest[:], object.ContentSha256)
+	copy(contentDigest[:], object.ContentSHA256)
 	rows, err := repository.queries.ListReadableTorrentObjectLocations(ctx, object.ObjectID)
 	if err != nil {
 		return TorrentDownloadSource{}, fmt.Errorf("list readable torrent object locations: %w", err)
@@ -86,7 +133,7 @@ func (repository *PostgresTorrentDownloadRepository) PublishedDownloadSource(ctx
 		})
 	}
 	return TorrentDownloadSource{
-		TorrentID: torrentID, Title: object.Title, FilenamePrefix: object.TorrentFilenamePrefix, ObjectID: object.ObjectID,
+		TorrentID: torrentID, Title: object.Title, FilenamePrefix: object.FilenamePrefix, ObjectID: object.ObjectID,
 		Descriptor: StoredObjectDescriptor{SHA256: contentDigest, ByteLength: object.ByteLength},
 		InfoOffset: object.InfoOffset, InfoLength: object.InfoLength,
 		Locations: locations,
@@ -94,3 +141,4 @@ func (repository *PostgresTorrentDownloadRepository) PublishedDownloadSource(ctx
 }
 
 var _ TorrentDownloadRepository = (*PostgresTorrentDownloadRepository)(nil)
+var _ PendingTorrentDownloadRepository = (*PostgresTorrentDownloadRepository)(nil)

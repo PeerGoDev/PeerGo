@@ -63,8 +63,9 @@ type TorrentUploadInput struct {
 }
 
 // TorrentUploadResult is deliberately a submission projection rather than a
-// public listing row. New uploads remain pending review and cannot enter the
-// Tracker allowlist until a separate reviewed transition succeeds.
+// public listing row. New uploads remain pending review and are admitted to
+// Tracker only for private pre-seeding; approval is still the sole transition
+// that creates a public catalog row.
 type TorrentUploadResult struct {
 	ID             TorrentID
 	InfoHashV1     InfoHashV1
@@ -138,8 +139,8 @@ type TorrentUploadRepository interface {
 }
 
 // TrustedTorrentPublisher is implemented by the review context. Upload owns
-// parsing and durable object creation; only review may transition a verified
-// pending aggregate into Tracker-visible published state.
+// parsing, durable object creation and pending pre-seeding admission; only
+// review may transition the verified aggregate into public published state.
 type TrustedTorrentPublisher interface {
 	PublishTrusted(context.Context, TrustedPublishCommand) (TrustedPublishResult, error)
 }

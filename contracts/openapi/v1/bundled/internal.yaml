@@ -15051,6 +15051,7 @@ components:
           type: string
           format: date-time
     TorrentPublicDetail:
+      description: 已发布种子的公开详情；待审核时，同一规范 URL 仅向经过会话鉴权的 原发布者返回私密预做种详情，其他访问者仍得到 404。
       type: object
       additionalProperties: false
       required:
@@ -15167,6 +15168,7 @@ components:
         state:
           type: string
           enum:
+            - pending_review
             - published
         submitted_at:
           type: string
@@ -15174,6 +15176,8 @@ components:
         published_at:
           type: string
           format: date-time
+          nullable: true
+          description: 待审核的发布者私密详情中为 null。
     TorrentSwarmOverview:
       type: object
       additionalProperties: false

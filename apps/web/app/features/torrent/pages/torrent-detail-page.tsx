@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Link, useParams } from "react-router"
+import { Link, useLocation, useParams } from "react-router"
 import {
   CircleAlertIcon,
   CircleCheckIcon,
@@ -83,13 +83,17 @@ const filePageSize = 50
 
 export function TorrentDetailPage() {
   const { torrentId: routeTorrentId } = useParams()
+  const location = useLocation()
   const torrentId = parseTorrentId(routeTorrentId)
   const validTorrentId = torrentId !== undefined
   const detail = useTorrentDetail(torrentId ?? 0, validTorrentId)
   const session = useWebSession()
   const bookmarkTorrentIds = React.useMemo(
-    () => (torrentId === undefined ? [] : [torrentId]),
-    [torrentId, validTorrentId]
+    () =>
+      torrentId === undefined || detail.data?.state !== "published"
+        ? []
+        : [torrentId],
+    [detail.data?.state, torrentId]
   )
   const bookmarkControls = useTorrentBookmarkControls(bookmarkTorrentIds)
 
@@ -126,6 +130,14 @@ export function TorrentDetailPage() {
 
   return (
     <PageLayout className="gap-6">
+      {detail.data.state === "pending_review" ? (
+        <PendingUploaderNotice
+          automaticDownload={pendingUploadDownloadState(
+            location.state,
+            detail.data.id
+          )}
+        />
+      ) : null}
       <TorrentDetailContent
         detail={detail.data}
         bookmarkControls={bookmarkControls}
@@ -144,11 +156,54 @@ export function TorrentDetailPage() {
         torrentId={detail.data.id}
         infoHash={detail.data.info_hash_v1}
       />
-      <TorrentRelatedVersions torrentId={detail.data.id} />
-      <TorrentPeerListCard torrentId={detail.data.id} />
-      <TorrentCommentsCard torrentId={detail.data.id} />
+      {detail.data.state === "published" ? (
+        <>
+          <TorrentRelatedVersions torrentId={detail.data.id} />
+          <TorrentPeerListCard torrentId={detail.data.id} />
+          <TorrentCommentsCard torrentId={detail.data.id} />
+        </>
+      ) : null}
     </PageLayout>
   )
+}
+
+function PendingUploaderNotice({
+  automaticDownload,
+}: {
+  automaticDownload?: "completed" | "failed"
+}) {
+  const failed = automaticDownload === "failed"
+  const completed = automaticDownload === "completed"
+  return (
+    <Alert variant={failed ? "destructive" : "default"}>
+      {failed ? <CircleAlertIcon /> : <CircleCheckIcon />}
+      <AlertTitle>
+        {failed ? "种子已提交，自动下载未完成" : "种子已提交并进入审核"}
+      </AlertTitle>
+      <AlertDescription>
+        {failed
+          ? "当前页面仍可由你私密查看，请点击右侧“下载种子”后立即加入 BT 客户端做种。"
+          : completed
+            ? "专属种子文件已自动下载。待审核期间仅你和审核人员可查看，你现在就可以加入 BT 客户端开始做种。"
+            : "待审核期间仅你和审核人员可查看；你可以使用右侧下载按钮取得专属种子并立即开始做种。"}
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+function pendingUploadDownloadState(
+  value: unknown,
+  torrentId: number
+): "completed" | "failed" | undefined {
+  if (!value || typeof value !== "object") return undefined
+  const submission = (value as Record<string, unknown>).torrentSubmission
+  if (!submission || typeof submission !== "object") return undefined
+  const candidate = submission as Record<string, unknown>
+  if (candidate.id !== torrentId) return undefined
+  return candidate.automaticDownload === "completed" ||
+    candidate.automaticDownload === "failed"
+    ? candidate.automaticDownload
+    : undefined
 }
 
 function TorrentDetailContent({
@@ -168,6 +223,8 @@ function TorrentDetailContent({
   )
   const tagFacets = groupedFacets.filter((facet) => facet.values.length > 1)
   const promotionLabel = torrentPromotionLabel(detail.promotion)
+  const published = detail.state === "published"
+  const displayedAt = detail.published_at ?? detail.submitted_at
 
   return (
     <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
@@ -179,32 +236,36 @@ function TorrentDetailContent({
             </h1>
           </div>
           <div className="flex shrink-0 items-center justify-end gap-1.5 max-sm:justify-start">
-            <TorrentBookmarkButton
-              torrentId={detail.id}
-              torrentName={detail.title}
-              controls={bookmarkControls}
-              iconVariant="outline"
-              iconSize="icon"
-              className="size-9"
-            />
-            <TorrentReportDialog
-              torrentId={detail.id}
-              torrentTitle={detail.title}
-              compact
-            />
-            <ContentTipDialog
-              target={{
-                kind: "torrent",
-                torrentId: detail.id,
-                title: detail.title,
-              }}
-              userId={userId}
-              csrfToken={csrfToken}
-              buttonVariant="outline"
-              buttonSize="icon"
-              className="size-9"
-              iconOnly
-            />
+            {published ? (
+              <>
+                <TorrentBookmarkButton
+                  torrentId={detail.id}
+                  torrentName={detail.title}
+                  controls={bookmarkControls}
+                  iconVariant="outline"
+                  iconSize="icon"
+                  className="size-9"
+                />
+                <TorrentReportDialog
+                  torrentId={detail.id}
+                  torrentTitle={detail.title}
+                  compact
+                />
+                <ContentTipDialog
+                  target={{
+                    kind: "torrent",
+                    torrentId: detail.id,
+                    title: detail.title,
+                  }}
+                  userId={userId}
+                  csrfToken={csrfToken}
+                  buttonVariant="outline"
+                  buttonSize="icon"
+                  className="size-9"
+                  iconOnly
+                />
+              </>
+            ) : null}
             <TorrentManageShortcut
               torrentId={detail.id}
               torrentTitle={detail.title}
@@ -329,22 +390,28 @@ function TorrentDetailContent({
             <TorrentDownloadButton
               torrentId={detail.id}
               torrentName={detail.title}
-              purchaseAware
+              purchaseAware={published}
               showLabel
               showCopyAction
               className="h-10 w-full"
             />
-            <TorrentPromotionProductDialog
-              torrentId={detail.id}
-              torrentTitle={detail.title}
-            />
+            {published ? (
+              <TorrentPromotionProductDialog
+                torrentId={detail.id}
+                torrentTitle={detail.title}
+              />
+            ) : null}
           </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-x-4 gap-y-2 max-md:flex-wrap">
           <div className="flex items-center gap-2">
-            <TorrentSticky stickyUntil={detail.sticky_until} />
-            {promotionLabel ? (
+            {published ? (
+              <TorrentSticky stickyUntil={detail.sticky_until} />
+            ) : (
+              <Badge>待审核</Badge>
+            )}
+            {published && promotionLabel ? (
               <div className="inline-flex h-[30px] items-center gap-1.5 rounded-sm border border-destructive/20 bg-destructive/10 px-3 text-sm font-semibold text-destructive">
                 <ZapIcon className="size-3.5" />
                 <span>{promotionLabel}</span>
@@ -360,12 +427,14 @@ function TorrentDetailContent({
             ) : null}
           </div>
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 max-md:w-full max-md:flex-col max-md:items-start md:min-w-[678px]">
-            <TorrentSwarmOverview
-              torrentId={detail.id}
-              compact
-              showFreshness={false}
-              className="w-auto"
-            />
+            {published ? (
+              <TorrentSwarmOverview
+                torrentId={detail.id}
+                compact
+                showFreshness={false}
+                className="w-auto"
+              />
+            ) : null}
             <dl className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1 text-sm">
               <InlineDetailFact
                 label="上传者"
@@ -381,8 +450,8 @@ function TorrentDetailContent({
                 }
               />
               <InlineDetailFact
-                label="上传时间"
-                value={`${formatCompactDateTime(detail.published_at)} (${formatTimeAgo(detail.published_at)})`}
+                label={published ? "发布时间" : "提交时间"}
+                value={`${formatCompactDateTime(displayedAt)} (${formatTimeAgo(displayedAt)})`}
               />
             </dl>
           </div>

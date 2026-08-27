@@ -22,6 +22,8 @@ SELECT
     torrent.category_id,
     torrent.title,
     torrent.subtitle,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
     torrent.state,
     torrent.version,
     torrent.submitted_at,

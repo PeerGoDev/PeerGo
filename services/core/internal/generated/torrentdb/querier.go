@@ -37,6 +37,10 @@ type Querier interface {
 	GetPendingReviewEvidence(ctx context.Context, torrentID int64) (GetPendingReviewEvidenceRow, error)
 	GetPendingReviewFileTarget(ctx context.Context, torrentID int64) (GetPendingReviewFileTargetRow, error)
 	GetPendingReviewScreenshotObject(ctx context.Context, arg GetPendingReviewScreenshotObjectParams) (GetPendingReviewScreenshotObjectRow, error)
+	// A pending object is private to its uploader. Reviewers inspect immutable
+	// evidence through the review surface; ordinary members must not be able to
+	// probe or download another uploader's pre-release swarm.
+	GetPendingReviewUploaderDownloadObject(ctx context.Context, arg GetPendingReviewUploaderDownloadObjectParams) (GetPendingReviewUploaderDownloadObjectRow, error)
 	GetPublishedTorrentContent(ctx context.Context, torrentID int64) (GetPublishedTorrentContentRow, error)
 	GetPublishedTorrentCoverObject(ctx context.Context, torrentID int64) (GetPublishedTorrentCoverObjectRow, error)
 	GetPublishedTorrentDetail(ctx context.Context, torrentID int64) (GetPublishedTorrentDetailRow, error)
@@ -75,6 +79,7 @@ type Querier interface {
 	MarkStorageMigrationRetaining(ctx context.Context, arg MarkStorageMigrationRetainingParams) (int64, error)
 	MarkTorrentObjectLocationDeleted(ctx context.Context, arg MarkTorrentObjectLocationDeletedParams) (int64, error)
 	MarkTorrentUploadAbandoned(ctx context.Context, arg MarkTorrentUploadAbandonedParams) (int64, error)
+	PendingReviewTorrentOwnedBy(ctx context.Context, arg PendingReviewTorrentOwnedByParams) (bool, error)
 	PreferStorageMigrationDestinations(ctx context.Context, arg PreferStorageMigrationDestinationsParams) (int64, error)
 	PromotePendingTorrentObjectLocation(ctx context.Context, arg PromotePendingTorrentObjectLocationParams) (uuid.UUID, error)
 	RecordTorrentUploadObjectVerified(ctx context.Context, arg RecordTorrentUploadObjectVerifiedParams) (int64, error)

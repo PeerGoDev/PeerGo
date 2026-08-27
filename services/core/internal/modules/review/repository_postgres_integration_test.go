@@ -192,7 +192,7 @@ WHERE torrent.id = $1`, approved.torrentID, audit.TorrentReviewEventType).Scan(
 	if err != nil || rejectResult.State != torrents.StateRejected || rejectResult.Version != 2 {
 		t.Fatalf("Decide(reject) = %+v, %v", rejectResult, err)
 	}
-	assertReviewGraph(t, ctx, pool, rejected, string(torrents.StateRejected), 2, 1, 1, 0, 0)
+	assertReviewGraph(t, ctx, pool, rejected, string(torrents.StateRejected), 2, 1, 1, 1, 0)
 
 	notificationRepository, err := notifications.NewPostgresRepository(pool)
 	if err != nil {
@@ -257,7 +257,10 @@ WHERE torrent.id = $1`, approved.torrentID, audit.TorrentReviewEventType).Scan(
 		t.Fatalf("persisted feedback count=%d error=%v", persistedFeedbacks, err)
 	}
 
-	resubmissionRepository, err := review.NewPostgresResubmissionRepository(pool)
+	resubmissionRepository, err := review.NewPostgresResubmissionRepository(
+		pool,
+		func(tx pgx.Tx) trackerevent.Appender { return trackercontrol.NewPostgresOutbox(tx) },
+	)
 	if err != nil {
 		t.Fatalf("NewPostgresResubmissionRepository() error = %v", err)
 	}
@@ -299,7 +302,7 @@ WHERE torrent.id = $1`, approved.torrentID, audit.TorrentReviewEventType).Scan(
 	if _, err := pool.Exec(ctx, `UPDATE review.torrent_resubmissions SET correction_note = correction_note || 'x' WHERE id = $1`, resubmissionID); err == nil {
 		t.Fatal("immutable torrent resubmission unexpectedly accepted an update")
 	}
-	assertReviewGraph(t, ctx, pool, rejected, string(torrents.StatePendingReview), 3, 1, 1, 0, 0)
+	assertReviewGraph(t, ctx, pool, rejected, string(torrents.StatePendingReview), 3, 1, 1, 2, 0)
 	resubmittedPage, err := repository.ListPending(ctx, 50)
 	if err != nil {
 		t.Fatalf("ListPending(after resubmission) error=%v", err)

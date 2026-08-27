@@ -5355,6 +5355,7 @@ export interface components {
             /** Format: date-time */
             submitted_at: string;
         };
+        /** @description 已发布种子的公开详情；待审核时，同一规范 URL 仅向经过会话鉴权的 原发布者返回私密预做种详情，其他访问者仍得到 404。 */
         TorrentPublicDetail: {
             /** Format: int64 */
             id: number;
@@ -5395,11 +5396,14 @@ export interface components {
             piece_length_bytes: number;
             piece_count: number;
             /** @enum {string} */
-            state: "published";
+            state: "pending_review" | "published";
             /** Format: date-time */
             submitted_at: string;
-            /** Format: date-time */
-            published_at: string;
+            /**
+             * Format: date-time
+             * @description 待审核的发布者私密详情中为 null。
+             */
+            published_at: string | null;
         };
         TorrentSwarmOverview: {
             /** Format: int64 */

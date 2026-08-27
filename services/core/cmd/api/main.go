@@ -441,7 +441,14 @@ func main() {
 	}
 	torrentStore := contentStore
 	torrentStores := contentStores
-	torrentUploadRepository, err := torrents.NewPostgresTorrentUploadRepository(pool)
+	torrentUploadRepository, err := torrents.NewPostgresTorrentUploadRepository(
+		pool,
+		torrents.PostgresTorrentUploadRepositoryConfig{
+			NewTrackerAppender: func(tx pgx.Tx) trackerevent.Appender {
+				return trackercontrol.NewPostgresOutbox(tx)
+			},
+		},
+	)
 	if err != nil {
 		logger.Error("compose torrent upload repository", "error", err)
 		os.Exit(1)
@@ -641,7 +648,10 @@ func main() {
 		logger.Error("compose torrent review service", "error", err)
 		os.Exit(1)
 	}
-	torrentResubmissionRepository, err := review.NewPostgresResubmissionRepository(pool)
+	torrentResubmissionRepository, err := review.NewPostgresResubmissionRepository(
+		pool,
+		func(tx pgx.Tx) trackerevent.Appender { return trackercontrol.NewPostgresOutbox(tx) },
+	)
 	if err != nil {
 		logger.Error("compose torrent resubmission repository", "error", err)
 		os.Exit(1)

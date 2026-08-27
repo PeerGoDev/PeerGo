@@ -62,6 +62,7 @@ type PublicDetail struct {
 	State               State
 	SubmittedAt         time.Time
 	PublishedAt         time.Time
+	Private             bool
 }
 
 type PublicFacet struct {
@@ -76,11 +77,12 @@ type PublicContent struct {
 	Description       string
 	DescriptionFormat string
 	MediaInfo         string
+	Private           bool
 }
 
-// PendingReviewEvidence is a private, reviewer-only view of the immutable
-// upload. It intentionally has no promotion, swarm or download fields because
-// a pending torrent is not public and is not yet eligible for Tracker traffic.
+// PendingReviewEvidence is a private view of the immutable upload shared by
+// reviewers and the original uploader. It intentionally has no promotion or
+// public swarm fields; pending Tracker admission exists only for pre-seeding.
 type PendingReviewEvidence struct {
 	ID                  TorrentID
 	Category            catalog.Category
@@ -115,6 +117,10 @@ type PendingReviewEvidenceRepository interface {
 	PendingReviewFiles(context.Context, TorrentID, int, int) (PublicFilePage, error)
 }
 
+type PendingReviewOwnerRepository interface {
+	PendingReviewOwnedBy(context.Context, TorrentID, uuid.UUID) (bool, error)
+}
+
 type PublicCoverSource struct {
 	TorrentID   TorrentID
 	ObjectID    uuid.UUID
@@ -129,6 +135,7 @@ type PublicCover struct {
 	Data        []byte
 	ContentType string
 	ETag        string
+	Private     bool
 }
 
 // PublicScreenshotSource binds a stable display position to immutable object
@@ -149,6 +156,7 @@ type PublicScreenshot struct {
 	Data        []byte
 	ContentType string
 	ETag        string
+	Private     bool
 }
 
 type PublicFile struct {
@@ -164,6 +172,7 @@ type PublicFilePage struct {
 	Total     int
 	Limit     int
 	Offset    int
+	Private   bool
 }
 
 // ReviewFeedback is the uploader-safe result of the latest immutable review
@@ -525,11 +534,60 @@ func (service *TorrentReadService) Detail(ctx context.Context, torrentID Torrent
 	return service.repository.PublishedDetail(ctx, torrentID)
 }
 
+// DetailForViewer keeps the canonical detail URL public for published rows,
+// then falls back to an uploader-private pending projection. Existence is
+// hidden from every other audience so a numeric ID cannot become a review
+// queue oracle.
+func (service *TorrentReadService) DetailForViewer(ctx context.Context, cookieToken string, torrentID TorrentID) (PublicDetail, error) {
+	detail, err := service.Detail(ctx, torrentID)
+	if err == nil || !errors.Is(err, ErrTorrentReadNotFound) {
+		return detail, err
+	}
+	if err := service.authorizePendingReviewOwner(ctx, cookieToken, torrentID); err != nil {
+		return PublicDetail{}, err
+	}
+	evidence, err := service.PendingReviewEvidence(ctx, torrentID)
+	if err != nil {
+		return PublicDetail{}, err
+	}
+	return PublicDetail{
+		ID: evidence.ID, Category: evidence.Category, Title: evidence.Title,
+		Subtitle: evidence.Subtitle, ContentName: evidence.ContentName,
+		UploaderDisplayName: evidence.UploaderDisplayName, Anonymous: evidence.Anonymous,
+		Promotion: catalog.PromotionNone, Facets: evidence.Facets,
+		ExternalIdentifiers: evidence.ExternalIdentifiers, InfoHashV1: evidence.InfoHashV1,
+		TotalSizeBytes: evidence.TotalSizeBytes, PayloadSizeBytes: evidence.PayloadSizeBytes,
+		FileCount: evidence.FileCount, PaddingFileCount: evidence.PaddingFileCount,
+		ScreenshotCount: evidence.ScreenshotCount, PieceLengthBytes: evidence.PieceLengthBytes,
+		PieceCount: evidence.PieceCount, State: StatePendingReview,
+		SubmittedAt: evidence.SubmittedAt, Private: true,
+	}, nil
+}
+
 func (service *TorrentReadService) Content(ctx context.Context, torrentID TorrentID) (PublicContent, error) {
 	if torrentID < 1 {
 		return PublicContent{}, ErrTorrentReadInput
 	}
 	return service.repository.PublishedContent(ctx, torrentID)
+}
+
+func (service *TorrentReadService) ContentForViewer(ctx context.Context, cookieToken string, torrentID TorrentID) (PublicContent, error) {
+	content, err := service.Content(ctx, torrentID)
+	if err == nil || !errors.Is(err, ErrTorrentReadNotFound) {
+		return content, err
+	}
+	if err := service.authorizePendingReviewOwner(ctx, cookieToken, torrentID); err != nil {
+		return PublicContent{}, err
+	}
+	evidence, err := service.PendingReviewEvidence(ctx, torrentID)
+	if err != nil {
+		return PublicContent{}, err
+	}
+	return PublicContent{
+		TorrentID: evidence.ID, Description: evidence.Description,
+		DescriptionFormat: evidence.DescriptionFormat, MediaInfo: evidence.MediaInfo,
+		Private: true,
+	}, nil
 }
 
 func (service *TorrentReadService) RelatedVersions(ctx context.Context, torrentID TorrentID) ([]catalog.TorrentSummary, error) {
@@ -552,6 +610,84 @@ func (service *TorrentReadService) Files(ctx context.Context, torrentID TorrentI
 		return PublicFilePage{}, ErrTorrentReadInput
 	}
 	return service.repository.PublishedFiles(ctx, torrentID, limit, offset)
+}
+
+func (service *TorrentReadService) FilesForViewer(ctx context.Context, cookieToken string, torrentID TorrentID, limit, offset int) (PublicFilePage, error) {
+	page, err := service.Files(ctx, torrentID, limit, offset)
+	if err == nil || !errors.Is(err, ErrTorrentReadNotFound) {
+		return page, err
+	}
+	if err := service.authorizePendingReviewOwner(ctx, cookieToken, torrentID); err != nil {
+		return PublicFilePage{}, err
+	}
+	page, err = service.PendingReviewFiles(ctx, torrentID, limit, offset)
+	if err == nil {
+		page.Private = true
+	}
+	return page, err
+}
+
+func (service *TorrentReadService) CoverForViewer(ctx context.Context, cookieToken string, torrentID TorrentID) (PublicCover, error) {
+	cover, err := service.Cover(ctx, torrentID)
+	if err == nil || (!errors.Is(err, ErrTorrentReadNotFound) && !errors.Is(err, ErrTorrentCoverNotFound)) {
+		return cover, err
+	}
+	if err := service.authorizePendingReviewOwner(ctx, cookieToken, torrentID); err != nil {
+		return PublicCover{}, err
+	}
+	cover, err = service.PendingReviewCover(ctx, torrentID)
+	if err == nil {
+		cover.Private = true
+	}
+	return cover, err
+}
+
+func (service *TorrentReadService) ScreenshotForViewer(ctx context.Context, cookieToken string, torrentID TorrentID, position int) (PublicScreenshot, error) {
+	screenshot, err := service.Screenshot(ctx, torrentID, position)
+	if err == nil || (!errors.Is(err, ErrTorrentReadNotFound) && !errors.Is(err, ErrTorrentScreenshotNotFound)) {
+		return screenshot, err
+	}
+	if err := service.authorizePendingReviewOwner(ctx, cookieToken, torrentID); err != nil {
+		return PublicScreenshot{}, err
+	}
+	screenshot, err = service.PendingReviewScreenshot(ctx, torrentID, position)
+	if err == nil {
+		screenshot.Private = true
+	}
+	return screenshot, err
+}
+
+func (service *TorrentReadService) authorizePendingReviewOwner(ctx context.Context, cookieToken string, torrentID TorrentID) error {
+	if torrentID < 1 || cookieToken == "" {
+		return ErrTorrentReadNotFound
+	}
+	session, err := service.authenticator.CurrentSession(ctx, cookieToken)
+	if errors.Is(err, identity.ErrSessionNotFound) {
+		return ErrTorrentReadNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := authz.AuthorizeWebSelfAction(
+		ctx, service.authorizer, session.User.ID,
+		authz.ActionTorrentSubmissionReadSelf, service.now().UTC(),
+	); errors.Is(err, authz.ErrForbidden) {
+		return ErrTorrentReadNotFound
+	} else if err != nil {
+		return err
+	}
+	repository, ok := service.repository.(PendingReviewOwnerRepository)
+	if !ok {
+		return ErrTorrentReadNotFound
+	}
+	owned, err := repository.PendingReviewOwnedBy(ctx, torrentID, session.User.ID)
+	if err != nil {
+		return err
+	}
+	if !owned {
+		return ErrTorrentReadNotFound
+	}
+	return nil
 }
 
 // MySubmissions authenticates and authorizes before reading by uploader ID.
