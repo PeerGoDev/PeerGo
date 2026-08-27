@@ -150,6 +150,7 @@ type CategoryAdministrationService interface {
 	List(context.Context, authz.StaffActor) ([]catalog.ManagedCategory, error)
 	Create(context.Context, authz.StaffActor, catalog.CreateCategoryInput) (catalog.ManagedCategory, error)
 	Update(context.Context, authz.StaffActor, catalog.UpdateCategoryInput) (catalog.ManagedCategory, error)
+	UpsertFacet(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetInput) (catalog.ManagedCategoryFacet, error)
 	UpsertFacetOption(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetOptionInput) (catalog.ManagedCategoryFacetOption, error)
 }
 
@@ -2257,6 +2258,59 @@ func (h *Handler) UpdateManagedCategory(ctx context.Context, request generated.U
 	return generated.UpdateManagedCategory200JSONResponse(managedCategoryDTO(result)), nil
 }
 
+// UpsertManagedCategoryFacet restores the missing PtYes category-attribute
+// administration surface. Stable IDs and selection modes become immutable
+// after creation; category-local label, requirement, order and availability
+// remain editable with optimistic concurrency.
+func (h *Handler) UpsertManagedCategoryFacet(ctx context.Context, request generated.UpsertManagedCategoryFacetRequestObject) (generated.UpsertManagedCategoryFacetResponseObject, error) {
+	if request.Body == nil {
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_category_facet", "分类属性无效", "请检查名称、选择模式、必填规则、排序、状态和版本。")
+		return generated.UpsertManagedCategoryFacet400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	}
+	session, authenticationProblem, err := h.authenticateStaffWrite(ctx, request.Params.XCSRFToken)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.UpsertManagedCategoryFacet401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.UpsertManagedCategoryFacet403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	requirementGroup := ""
+	if request.Body.RequirementGroup != nil {
+		requirementGroup = *request.Body.RequirementGroup
+	}
+	result, err := h.categoryAdministration.UpsertFacet(ctx, staffActor(session), catalog.UpsertCategoryFacetInput{
+		CategoryID: string(request.CategoryId), FacetID: request.FacetId,
+		Name: request.Body.Name, SelectionMode: catalog.FacetSelectionMode(request.Body.SelectionMode),
+		Required: request.Body.Required, RequirementGroup: requirementGroup,
+		DisplayOrder: request.Body.DisplayOrder, Enabled: request.Body.Enabled,
+		ExpectedVersion: request.Body.ExpectedVersion, Reason: request.Body.Reason,
+	})
+	if err != nil {
+		problem, handled := categoryAdministrationProblem(ctx, err)
+		if !handled {
+			return nil, err
+		}
+		switch problem.Status {
+		case http.StatusBadRequest:
+			return generated.UpsertManagedCategoryFacet400ApplicationProblemPlusJSONResponse{
+				ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+			}, nil
+		case http.StatusForbidden:
+			return generated.UpsertManagedCategoryFacet403ApplicationProblemPlusJSONResponse(problem), nil
+		case http.StatusNotFound:
+			return generated.UpsertManagedCategoryFacet404ApplicationProblemPlusJSONResponse(problem), nil
+		default:
+			return generated.UpsertManagedCategoryFacet409ApplicationProblemPlusJSONResponse(problem), nil
+		}
+	}
+	return generated.UpsertManagedCategoryFacet200JSONResponse(managedCategoryFacetDTO(result)), nil
+}
+
 // UpsertManagedCategoryFacetOption restores PtYes-style category attribute
 // option management without duplicating the public upload vocabulary.
 func (h *Handler) UpsertManagedCategoryFacetOption(ctx context.Context, request generated.UpsertManagedCategoryFacetOptionRequestObject) (generated.UpsertManagedCategoryFacetOptionResponseObject, error) {
@@ -2316,6 +2370,14 @@ func categoryAdministrationProblem(ctx context.Context, err error) (generated.Pr
 		return newProblemFromContext(ctx, http.StatusConflict, "category_version_conflict", "分类版本已经变化", "当前编辑基于旧版本，请重新载入后再提交。"), true
 	case errors.Is(err, catalog.ErrCategoryFacetNotFound):
 		return newProblemFromContext(ctx, http.StatusNotFound, "category_facet_not_found", "分类属性不存在", "目标分类没有这个属性，请刷新列表。"), true
+	case errors.Is(err, catalog.ErrCategoryFacetAlreadyExists):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_facet_exists", "分类属性已经存在", "相同稳定标识已经绑定到这个分类。"), true
+	case errors.Is(err, catalog.ErrCategoryFacetUnavailable):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_facet_unavailable", "分类属性不可用", "同名规范属性已停用，或创建后不能再改变单选/多选模式。"), true
+	case errors.Is(err, catalog.ErrCategoryFacetVersionConflict):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_facet_version_conflict", "分类属性版本已经变化", "当前编辑基于旧版本，请刷新后再提交。"), true
+	case errors.Is(err, catalog.ErrCategoryFacetLimitReached):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_facet_limit_reached", "分类属性数量已达上限", "每个分类最多配置 20 个发种属性，请停用或复用已有属性。"), true
 	case errors.Is(err, catalog.ErrCategoryOptionNotFound):
 		return newProblemFromContext(ctx, http.StatusNotFound, "category_option_not_found", "类型选项不存在", "目标选项已经不存在，请刷新列表。"), true
 	case errors.Is(err, catalog.ErrCategoryOptionAlreadyExists):
@@ -2324,6 +2386,8 @@ func categoryAdministrationProblem(ctx context.Context, err error) (generated.Pr
 		return newProblemFromContext(ctx, http.StatusConflict, "category_option_unavailable", "类型选项不可用", "同名全局选项已停用或属性模式不一致。"), true
 	case errors.Is(err, catalog.ErrCategoryOptionVersionConflict):
 		return newProblemFromContext(ctx, http.StatusConflict, "category_option_version_conflict", "类型选项版本已经变化", "当前编辑基于旧版本，请刷新后再提交。"), true
+	case errors.Is(err, catalog.ErrCategoryOptionLimitReached):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_option_limit_reached", "类型选项数量已达上限", "每个分类属性最多配置 200 个选项，请复用或停用已有选项。"), true
 	default:
 		return generated.Problem{}, false
 	}
@@ -3383,24 +3447,30 @@ func hnrPageDTO(result traffic.HNRPage) (generated.HNRPage, error) {
 func managedCategoryDTO(category catalog.ManagedCategory) generated.ManagedCategory {
 	facets := make([]generated.ManagedCategoryFacet, 0, len(category.Facets))
 	for _, facet := range category.Facets {
-		options := make([]generated.ManagedCategoryFacetOption, 0, len(facet.Options))
-		for _, option := range facet.Options {
-			options = append(options, managedCategoryFacetOptionDTO(option))
-		}
-		item := generated.ManagedCategoryFacet{
-			Id: facet.ID, Name: facet.Name, SelectionMode: generated.CategoryFacetSelectionMode(facet.SelectionMode),
-			Required: facet.Required, DisplayOrder: facet.DisplayOrder, Options: options,
-		}
-		if facet.RequirementGroup != "" {
-			item.RequirementGroup = &facet.RequirementGroup
-		}
-		facets = append(facets, item)
+		facets = append(facets, managedCategoryFacetDTO(facet))
 	}
 	return generated.ManagedCategory{
 		Id: category.ID, Name: category.Name, DisplayOrder: category.DisplayOrder,
 		Enabled: category.Enabled, Version: category.Version, TorrentCount: category.TorrentCount,
 		CreatedAt: category.CreatedAt, UpdatedAt: category.UpdatedAt, Facets: facets,
 	}
+}
+
+func managedCategoryFacetDTO(facet catalog.ManagedCategoryFacet) generated.ManagedCategoryFacet {
+	options := make([]generated.ManagedCategoryFacetOption, 0, len(facet.Options))
+	for _, option := range facet.Options {
+		options = append(options, managedCategoryFacetOptionDTO(option))
+	}
+	result := generated.ManagedCategoryFacet{
+		Id: facet.ID, Name: facet.Name, SelectionMode: generated.CategoryFacetSelectionMode(facet.SelectionMode),
+		Required: facet.Required, DisplayOrder: facet.DisplayOrder, Enabled: facet.Enabled,
+		Version: facet.Version, TorrentCount: facet.TorrentCount,
+		CreatedAt: facet.CreatedAt, UpdatedAt: facet.UpdatedAt, Options: options,
+	}
+	if facet.RequirementGroup != "" {
+		result.RequirementGroup = &facet.RequirementGroup
+	}
+	return result
 }
 
 func managedCategoryFacetOptionDTO(option catalog.ManagedCategoryFacetOption) generated.ManagedCategoryFacetOption {

@@ -215,7 +215,7 @@ func (r *PostgresRepository) CategoryFacets(ctx context.Context, categoryID stri
 			return nil, fmt.Errorf("%w: category %q facet projection is invalid", errCatalogProjectionInvalid, categoryID)
 		}
 		if len(facets) == 0 || facets[len(facets)-1].ID != row.FacetID {
-			if len(facets) >= 20 {
+			if len(facets) >= maxCategoryFacets {
 				return nil, fmt.Errorf("%w: category %q has too many facets", errCatalogProjectionInvalid, categoryID)
 			}
 			facets = append(facets, CategoryFacet{
@@ -226,7 +226,7 @@ func (r *PostgresRepository) CategoryFacets(ctx context.Context, categoryID stri
 		}
 		facet := &facets[len(facets)-1]
 		if facet.Name != row.FacetName || facet.SelectionMode != mode || facet.Required != row.Required ||
-			facet.RequirementGroup != row.RequirementGroup || len(facet.Options) >= 200 {
+			facet.RequirementGroup != row.RequirementGroup || len(facet.Options) >= maxCategoryFacetOptions {
 			return nil, fmt.Errorf("%w: category %q facet rows disagree", errCatalogProjectionInvalid, categoryID)
 		}
 		facet.Options = append(facet.Options, CategoryFacetOption{Key: row.OptionKey, Label: row.OptionLabel})

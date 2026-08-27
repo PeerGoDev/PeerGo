@@ -66,7 +66,7 @@ func TestNewPendingTorrentNormalizesUserContentAndExternalIdentifiers(t *testing
 	metainfo := mustParseV1(t, validSingleFixture("release.bin", 1, 16*1024), ValidationProfileStrictUpload)
 	torrent, err := NewPendingTorrent(NewPendingTorrentInput{
 		UploaderID: uuid.New(), CategoryID: "movies", Title: "Release",
-		Description: "# Description\n", MediaInfo: "General\nComplete name: release.mkv", Anonymous: true,
+		Description: "# Description\n", MediaInfo: "General\nComplete name: release.mkv", Anonymous: true, PurchasePrice: 88,
 		ExternalIdentifiers: []ExternalIdentifier{
 			{Provider: " TMDB ", ExternalID: " 12345 "},
 			{Provider: "IMDB", ExternalID: "tt1234567"},
@@ -80,7 +80,7 @@ func TestNewPendingTorrentNormalizesUserContentAndExternalIdentifiers(t *testing
 	if err != nil {
 		t.Fatalf("NewPendingTorrent() error = %v", err)
 	}
-	if torrent.DescriptionFormat != DescriptionFormatMarkdown || !torrent.Anonymous ||
+	if torrent.DescriptionFormat != DescriptionFormatMarkdown || !torrent.Anonymous || torrent.PurchasePrice != 88 ||
 		torrent.Description != "# Description\n" || torrent.MediaInfo == "" {
 		t.Fatalf("user content = %+v", torrent)
 	}
@@ -103,6 +103,13 @@ func TestNewPendingTorrentNormalizesUserContentAndExternalIdentifiers(t *testing
 	})
 	if !errors.Is(err, ErrTorrentInputInvalid) {
 		t.Fatalf("oversized description error = %v, want ErrTorrentInputInvalid", err)
+	}
+	invalidPrice := NewPendingTorrentInput{
+		UploaderID: uuid.New(), CategoryID: "movies", Title: "Release", PurchasePrice: 1_000_001,
+		ObjectID: uuid.New(), Metainfo: metainfo, OccurredAt: time.Now(),
+	}
+	if _, err := NewPendingTorrent(invalidPrice); !errors.Is(err, ErrTorrentInputInvalid) {
+		t.Fatalf("invalid purchase price error = %v, want ErrTorrentInputInvalid", err)
 	}
 }
 

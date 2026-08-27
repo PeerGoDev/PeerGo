@@ -79,6 +79,21 @@ const availableScopes = [
     description: "为当前账户生成受限、短时的种子下载链接。",
   },
   {
+    value: "torrent:upload",
+    label: "发布种子",
+    description: "允许外部工具按站点分类属性提交待审核种子。",
+  },
+  {
+    value: "torrent:purchase:read",
+    label: "读取种子购买",
+    description: "查看付费种子的购买状态和自己的购买记录。",
+  },
+  {
+    value: "torrent:purchase:write",
+    label: "购买种子",
+    description: "允许外部工具使用魔力值代表当前账户购买种子。",
+  },
+  {
     value: "attendance:read",
     label: "读取签到状态",
     description: "查看今日签到状态和连续签到数据。",
@@ -94,7 +109,15 @@ const availableScopes = [
   description: string
 }>
 
-const defaultScopes = availableScopes.map((scope) => scope.value)
+// Keep newly introduced write powers opt-in. Existing users rotating a key do
+// not accidentally grant an external tool upload or purchase authority.
+const defaultScopes: PersonalAPIKeyScope[] = [
+  "profile:read",
+  "torrent:read",
+  "torrent:download",
+  "attendance:read",
+  "attendance:claim",
+]
 const scopeLabels = Object.fromEntries(
   availableScopes.map((scope) => [scope.value, scope.label])
 ) as Record<PersonalAPIKeyScope, string>

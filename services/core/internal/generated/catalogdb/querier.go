@@ -16,6 +16,8 @@ type Querier interface {
 	CountAnnouncementRevisions(ctx context.Context, announcementID string) (int64, error)
 	CountCategoryTorrents(ctx context.Context, categoryID string) (int64, error)
 	CountManagedAnnouncements(ctx context.Context) (int64, error)
+	CountManagedCategoryFacetOptions(ctx context.Context, arg CountManagedCategoryFacetOptionsParams) (int64, error)
+	CountManagedCategoryFacets(ctx context.Context, categoryID string) (int64, error)
 	CountPublishedAnnouncements(ctx context.Context) (int64, error)
 	CountPublishedTorrents(ctx context.Context, arg CountPublishedTorrentsParams) (int64, error)
 	CountTorrentBookmarks(ctx context.Context, userID pgtype.UUID) (int64, error)
@@ -27,8 +29,10 @@ type Querier interface {
 	GetAnnouncementRevisionByID(ctx context.Context, revisionID int64) (GetAnnouncementRevisionByIDRow, error)
 	GetCanonicalFacetOption(ctx context.Context, arg GetCanonicalFacetOptionParams) (GetCanonicalFacetOptionRow, error)
 	GetCategoryFacetForOptionAdministration(ctx context.Context, arg GetCategoryFacetForOptionAdministrationParams) (GetCategoryFacetForOptionAdministrationRow, error)
+	GetFacetDefinitionForCategoryAdministration(ctx context.Context, facetID string) (GetFacetDefinitionForCategoryAdministrationRow, error)
 	GetLatestAnnouncement(ctx context.Context) (GetLatestAnnouncementRow, error)
 	GetManagedAnnouncement(ctx context.Context, announcementID string) (CatalogManagedAnnouncementProjection, error)
+	GetManagedCategoryFacetForUpdate(ctx context.Context, arg GetManagedCategoryFacetForUpdateParams) (GetManagedCategoryFacetForUpdateRow, error)
 	GetManagedCategoryFacetOptionForUpdate(ctx context.Context, arg GetManagedCategoryFacetOptionForUpdateParams) (GetManagedCategoryFacetOptionForUpdateRow, error)
 	GetManagedCategoryForUpdate(ctx context.Context, categoryID string) (GetManagedCategoryForUpdateRow, error)
 	GetPublishedAnnouncement(ctx context.Context, announcementID string) (CatalogPublicAnnouncementProjection, error)
@@ -38,7 +42,10 @@ type Querier interface {
 	GetSiteInfo(ctx context.Context, asOf pgtype.Timestamptz) (GetSiteInfoRow, error)
 	InsertAnnouncementRevision(ctx context.Context, arg InsertAnnouncementRevisionParams) (int64, error)
 	InsertCanonicalFacetOption(ctx context.Context, arg InsertCanonicalFacetOptionParams) (int64, error)
+	InsertCategoryFacetChange(ctx context.Context, arg InsertCategoryFacetChangeParams) error
 	InsertCategoryFacetOptionChange(ctx context.Context, arg InsertCategoryFacetOptionChangeParams) error
+	InsertFacetDefinitionForCategoryAdministration(ctx context.Context, arg InsertFacetDefinitionForCategoryAdministrationParams) (InsertFacetDefinitionForCategoryAdministrationRow, error)
+	InsertManagedCategoryFacet(ctx context.Context, arg InsertManagedCategoryFacetParams) (InsertManagedCategoryFacetRow, error)
 	InsertManagedCategoryFacetOption(ctx context.Context, arg InsertManagedCategoryFacetOptionParams) (InsertManagedCategoryFacetOptionRow, error)
 	ListAnnouncementRevisions(ctx context.Context, arg ListAnnouncementRevisionsParams) ([]ListAnnouncementRevisionsRow, error)
 	// Public counts follow the write-side aggregate, not an orphaned read-model
@@ -52,6 +59,7 @@ type Querier interface {
 	// currently public catalog.
 	ListManagedCategories(ctx context.Context) ([]ListManagedCategoriesRow, error)
 	ListManagedCategoryFacetOptions(ctx context.Context) ([]ListManagedCategoryFacetOptionsRow, error)
+	ListManagedCategoryFacets(ctx context.Context) ([]ListManagedCategoryFacetsRow, error)
 	ListPublishedAnnouncements(ctx context.Context, arg ListPublishedAnnouncementsParams) ([]ListPublishedAnnouncementsRow, error)
 	// catalog.torrents supplies the denormalized public presentation, while the
 	// aggregate join is the publication authority. Never publish projection-only
@@ -64,6 +72,7 @@ type Querier interface {
 	ScheduleAnnouncementDraft(ctx context.Context, arg ScheduleAnnouncementDraftParams) (int64, error)
 	UpdateAnnouncementDraftPointer(ctx context.Context, arg UpdateAnnouncementDraftPointerParams) (int64, error)
 	UpdateManagedCategory(ctx context.Context, arg UpdateManagedCategoryParams) (UpdateManagedCategoryRow, error)
+	UpdateManagedCategoryFacet(ctx context.Context, arg UpdateManagedCategoryFacetParams) (UpdateManagedCategoryFacetRow, error)
 	UpdateManagedCategoryFacetOption(ctx context.Context, arg UpdateManagedCategoryFacetOptionParams) (UpdateManagedCategoryFacetOptionRow, error)
 	UpdateSiteDisplaySettings(ctx context.Context, arg UpdateSiteDisplaySettingsParams) (UpdateSiteDisplaySettingsRow, error)
 	WithdrawAnnouncement(ctx context.Context, arg WithdrawAnnouncementParams) (int64, error)

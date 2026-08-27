@@ -26,6 +26,9 @@ const (
 	ScopeProfileRead     Scope = "profile:read"
 	ScopeTorrentRead     Scope = "torrent:read"
 	ScopeTorrentDownload Scope = "torrent:download"
+	ScopeTorrentUpload   Scope = "torrent:upload"
+	ScopePurchaseRead    Scope = "torrent:purchase:read"
+	ScopePurchaseWrite   Scope = "torrent:purchase:write"
 	ScopeAttendanceRead  Scope = "attendance:read"
 	ScopeAttendanceClaim Scope = "attendance:claim"
 )
@@ -34,6 +37,9 @@ var supportedScopes = []Scope{
 	ScopeProfileRead,
 	ScopeTorrentRead,
 	ScopeTorrentDownload,
+	ScopeTorrentUpload,
+	ScopePurchaseRead,
+	ScopePurchaseWrite,
 	ScopeAttendanceRead,
 	ScopeAttendanceClaim,
 }

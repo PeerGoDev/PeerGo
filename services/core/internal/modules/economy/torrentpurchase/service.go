@@ -50,6 +50,20 @@ func (service *Service) MyStatus(ctx context.Context, cookieToken string, torren
 	return service.repository.Status(ctx, session.User.ID, torrentID, now)
 }
 
+// StatusForIntegration applies the same self-only policy after a personal API
+// key has established the caller. Transport scopes supplement, but never
+// replace, the canonical authorization decision made here.
+func (service *Service) StatusForIntegration(ctx context.Context, user identity.User, torrentID int64) (Status, error) {
+	if user.ID == uuid.Nil || torrentID < 1 {
+		return Status{}, ErrInput
+	}
+	now := canonicalTime(service.now())
+	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, user.ID, authz.ActionTorrentPurchaseReadSelf, now); err != nil {
+		return Status{}, err
+	}
+	return service.repository.Status(ctx, user.ID, torrentID, now)
+}
+
 func (service *Service) Purchase(ctx context.Context, cookieToken, csrfToken string, requestID uuid.UUID, torrentID int64) (Receipt, error) {
 	if requestID == uuid.Nil || torrentID < 1 {
 		return Receipt{}, ErrInput
@@ -67,6 +81,22 @@ func (service *Service) Purchase(ctx context.Context, cookieToken, csrfToken str
 		UserID:    session.User.ID,
 		TorrentID: torrentID,
 		Now:       now,
+	})
+}
+
+// PurchaseForIntegration accepts an optional observed price so tools cannot
+// silently spend more magic after a concurrent operator price change.
+func (service *Service) PurchaseForIntegration(ctx context.Context, user identity.User, requestID uuid.UUID, torrentID int64, expectedPrice *int64) (Receipt, error) {
+	if user.ID == uuid.Nil || requestID == uuid.Nil || torrentID < 1 || (expectedPrice != nil && (*expectedPrice < 0 || *expectedPrice > 1_000_000)) {
+		return Receipt{}, ErrInput
+	}
+	now := canonicalTime(service.now())
+	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, user.ID, authz.ActionTorrentPurchaseCreateSelf, now); err != nil {
+		return Receipt{}, err
+	}
+	return service.repository.Purchase(ctx, PurchaseCommand{
+		RequestID: requestID, UserID: user.ID, TorrentID: torrentID,
+		ExpectedPrice: expectedPrice, Now: now,
 	})
 }
 
@@ -90,6 +120,21 @@ func (service *Service) MyHistory(ctx context.Context, cookieToken string, limit
 		return HistoryPage{}, err
 	}
 	return repository.ListHistory(ctx, HistoryQuery{UserID: session.User.ID, Limit: limit, Offset: offset})
+}
+
+func (service *Service) HistoryForIntegration(ctx context.Context, user identity.User, limit, offset int) (HistoryPage, error) {
+	if user.ID == uuid.Nil || limit < 1 || limit > MaxHistoryLimit || offset < 0 || offset > MaxHistoryOffset {
+		return HistoryPage{}, ErrInput
+	}
+	repository, ok := service.repository.(HistoryRepository)
+	if !ok {
+		return HistoryPage{}, ErrInvariant
+	}
+	now := canonicalTime(service.now())
+	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, user.ID, authz.ActionTorrentPurchaseReadSelf, now); err != nil {
+		return HistoryPage{}, err
+	}
+	return repository.ListHistory(ctx, HistoryQuery{UserID: user.ID, Limit: limit, Offset: offset})
 }
 
 func (service *Service) PurchasePolicy(ctx context.Context, actor authz.StaffActor) (PolicySettings, error) {

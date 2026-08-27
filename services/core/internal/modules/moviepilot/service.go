@@ -72,6 +72,7 @@ type Service struct {
 	torrentRead  TorrentReadService
 	downloader   TorrentDownloadService
 	attendance   AttendanceService
+	legacy       LegacyServices
 	publicOrigin url.URL
 	signingKey   []byte
 	now          func() time.Time
@@ -87,6 +88,7 @@ func NewService(
 	downloader TorrentDownloadService,
 	attendanceService AttendanceService,
 	config ServiceConfig,
+	legacy ...LegacyServices,
 ) (*Service, error) {
 	if repository == nil || apiKeys == nil || catalogService == nil || torrentRead == nil || downloader == nil || attendanceService == nil {
 		return nil, errors.New("MoviePilot service dependencies are required")
@@ -103,10 +105,17 @@ func NewService(
 	if config.Now == nil {
 		config.Now = time.Now
 	}
+	legacyServices := LegacyServices{}
+	if len(legacy) > 1 {
+		return nil, errors.New("only one legacy API dependency set may be configured")
+	}
+	if len(legacy) == 1 {
+		legacyServices = legacy[0]
+	}
 	return &Service{
 		repository: repository, apiKeys: apiKeys,
 		catalog: catalogService, torrentRead: torrentRead, downloader: downloader,
-		attendance: attendanceService, publicOrigin: *origin,
+		attendance: attendanceService, legacy: legacyServices, publicOrigin: *origin,
 		signingKey: append([]byte(nil), config.SigningKey...), now: config.Now,
 		rateWindows: make(map[string]rateWindow),
 	}, nil
@@ -165,7 +174,23 @@ func (service *Service) ListTorrents(ctx context.Context, credential personalapi
 	if page < 1 || pageSize < 1 || pageSize > 100 || page > 1_000_001 || (page-1) > 1_000_000/pageSize {
 		return TorrentPage{}, ErrInput
 	}
-	categoryID, valid := peerGoCategory(categoryID)
+	rawCategoryID := categoryID
+	categoryID, valid := peerGoCategory(rawCategoryID)
+	if !valid && service.legacy.Catalog != nil {
+		candidate := strings.ToLower(strings.TrimSpace(rawCategoryID))
+		if legacyCategoryPattern.MatchString(candidate) {
+			categories, err := service.legacy.Catalog.ListCategories(ctx)
+			if err != nil {
+				return TorrentPage{}, err
+			}
+			for _, category := range categories {
+				if candidate == category.ID {
+					categoryID, valid = category.ID, true
+					break
+				}
+			}
+		}
+	}
 	if !valid {
 		return TorrentPage{}, ErrInput
 	}
@@ -176,15 +201,20 @@ func (service *Service) ListTorrents(ctx context.Context, credential personalapi
 	if err != nil {
 		return TorrentPage{}, err
 	}
+	metadata := make(map[int64]TorrentMetadata)
+	if repository, ok := service.repository.(LegacyRepository); ok {
+		ids := make([]int64, 0, len(result.Items))
+		for _, item := range result.Items {
+			ids = append(ids, item.ID)
+		}
+		metadata, err = repository.TorrentMetadataBatch(ctx, ids)
+		if err != nil {
+			return TorrentPage{}, err
+		}
+	}
 	items := make([]TorrentSummary, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, TorrentSummary{
-			ID: item.ID, LegacyRouteID: strconv.FormatInt(item.ID, 10), Title: item.Name,
-			Subtitle: item.Subtitle, Category: moviePilotCategory(item.Category.ID), CategoryName: item.Category.Name,
-			Size: item.SizeBytes, Seeders: item.Swarm.Seeders, Leechers: item.Swarm.Leechers,
-			Downloads: item.Swarm.Completed, CreatedAt: item.UploadedAt.UTC(),
-			Promotion: promotion(item.Promotion, nil),
-		})
+		items = append(items, legacyTorrentSummary(item, metadata[item.ID]))
 	}
 	totalPages := 0
 	if result.Total > 0 {

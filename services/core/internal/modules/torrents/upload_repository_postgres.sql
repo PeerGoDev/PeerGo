@@ -185,6 +185,7 @@ INSERT INTO torrents.torrents (
     description_format,
     media_info,
     anonymous,
+    purchase_price,
     total_size_bytes,
     payload_size_bytes,
     file_count,
@@ -209,6 +210,7 @@ INSERT INTO torrents.torrents (
     sqlc.arg(description_format)::text,
     sqlc.arg(media_info)::text,
     sqlc.arg(anonymous)::boolean,
+    sqlc.arg(purchase_price)::bigint,
     sqlc.arg(total_size_bytes)::bigint,
     sqlc.arg(payload_size_bytes)::bigint,
     sqlc.arg(file_count)::integer,
@@ -260,6 +262,11 @@ SELECT
     sqlc.arg(position)::integer,
     sqlc.arg(created_at)::timestamptz
 FROM catalog.category_facet_options AS allowed
+JOIN catalog.category_facets AS binding
+  ON binding.category_id = allowed.category_id
+ AND binding.facet_id = allowed.facet_id
+ AND binding.selection_mode = allowed.selection_mode
+ AND binding.enabled = true
 JOIN catalog.facet_definitions AS facet
   ON facet.id = allowed.facet_id
  AND facet.selection_mode = allowed.selection_mode
@@ -362,7 +369,21 @@ SELECT NOT EXISTS (
      AND facet.selection_mode = required_facet.selection_mode
      AND facet.enabled = true
     WHERE required_facet.category_id = sqlc.arg(category_id)::text
+      AND required_facet.enabled = true
       AND required_facet.required = true
+      AND EXISTS (
+          SELECT 1
+          FROM catalog.category_facet_options AS allowed
+          JOIN catalog.facet_options AS option
+            ON option.facet_id = allowed.facet_id
+           AND option.option_key = allowed.option_key
+           AND option.selection_mode = allowed.selection_mode
+           AND option.enabled = true
+          WHERE allowed.category_id = required_facet.category_id
+            AND allowed.facet_id = required_facet.facet_id
+            AND allowed.selection_mode = required_facet.selection_mode
+            AND allowed.enabled = true
+      )
       AND NOT EXISTS (
           SELECT 1
           FROM torrents.torrent_facet_values AS value
@@ -380,7 +401,21 @@ SELECT NOT EXISTS (
          AND facet.selection_mode = grouped_facet.selection_mode
          AND facet.enabled = true
         WHERE grouped_facet.category_id = sqlc.arg(category_id)::text
+          AND grouped_facet.enabled = true
           AND grouped_facet.requirement_group IS NOT NULL
+          AND EXISTS (
+              SELECT 1
+              FROM catalog.category_facet_options AS allowed
+              JOIN catalog.facet_options AS option
+                ON option.facet_id = allowed.facet_id
+               AND option.option_key = allowed.option_key
+               AND option.selection_mode = allowed.selection_mode
+               AND option.enabled = true
+              WHERE allowed.category_id = grouped_facet.category_id
+                AND allowed.facet_id = grouped_facet.facet_id
+                AND allowed.selection_mode = grouped_facet.selection_mode
+                AND allowed.enabled = true
+          )
         GROUP BY grouped_facet.requirement_group
     ) AS required_group
     WHERE NOT EXISTS (
@@ -390,6 +425,7 @@ SELECT NOT EXISTS (
           ON member.category_id = value.category_id
          AND member.facet_id = value.facet_id
          AND member.selection_mode = value.selection_mode
+         AND member.enabled = true
         WHERE value.torrent_id = sqlc.arg(torrent_id)::bigint
           AND value.category_id = sqlc.arg(category_id)::text
           AND member.requirement_group = required_group.requirement_group

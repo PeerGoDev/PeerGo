@@ -139,8 +139,10 @@ type CategorySummary struct {
 type FacetSelectionMode string
 
 const (
-	FacetSelectionSingle FacetSelectionMode = "single_option"
-	FacetSelectionMulti  FacetSelectionMode = "multi_option"
+	FacetSelectionSingle    FacetSelectionMode = "single_option"
+	FacetSelectionMulti     FacetSelectionMode = "multi_option"
+	maxCategoryFacets                          = 20
+	maxCategoryFacetOptions                    = 200
 )
 
 type CategoryFacetOption struct {

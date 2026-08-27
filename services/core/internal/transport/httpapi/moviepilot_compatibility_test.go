@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/peergo/peergo/services/core/internal/modules/catalog"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/attendance"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/torrentpurchase"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/moviepilot"
 	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
@@ -224,6 +227,108 @@ func TestPrivateResponseHeadersProtectIssuedPersonalAPIKey(t *testing.T) {
 	}
 }
 
+func TestLegacyCategoriesExposeManagedCategoryFacets(t *testing.T) {
+	stub := &legacyCompatibilityStub{
+		moviePilotCompatibilityStub: &moviePilotCompatibilityStub{},
+		categories: []moviepilot.LegacyCategory{{
+			ID: 1, Name: "movie", Label: "电影", Icon: "film",
+			Attributes: []moviepilot.LegacyCategoryAttribute{{
+				Name: "source", Label: "来源", Type: "select", Required: true,
+				Options: []moviepilot.LegacyCategoryOption{{Value: "bluray", Label: "Blu-ray"}},
+			}},
+		}},
+	}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/categories", nil)
+	request.Header.Set("Authorization", "Bearer pgk_categories")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"name":"source"`) ||
+		!strings.Contains(response.Body.String(), `"value":"bluray"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLegacyUploadDecodesPtYesJSONWithoutPersistingTags(t *testing.T) {
+	stub := &legacyCompatibilityStub{
+		moviePilotCompatibilityStub: &moviePilotCompatibilityStub{},
+		uploadResult: moviepilot.LegacyUploadResult{
+			ID: 42, RouteID: "42", InfoHash: strings.Repeat("a", 40), Status: "pending",
+		},
+	}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
+	body := `{"torrent":"` + base64.StdEncoding.EncodeToString([]byte("d4:infode")) + `","title":"Example","description":"Description","category":"movie","attributes":{"source":"Blu-ray","genre":["动作","科幻"]},"tags":"国语,中字","price":12}`
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/torrents", strings.NewReader(body))
+	request.Header.Set("Authorization", "Bearer pgk_upload")
+	request.Header.Set("Idempotency-Key", "550e8400-e29b-41d4-a716-446655440000")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if stub.uploadInput.RequestID.String() != "550e8400-e29b-41d4-a716-446655440000" || stub.uploadInput.PurchasePrice != 12 ||
+		string(stub.uploadInput.RawMetainfo) != "d4:infode" || stub.uploadInput.Attributes["source"][0] != "Blu-ray" ||
+		len(stub.uploadInput.Attributes["genre"]) != 2 {
+		t.Fatalf("upload input = %+v", stub.uploadInput)
+	}
+}
+
+func TestLegacyPaidTorrentDetailFailsClosedForProtectedFields(t *testing.T) {
+	var infoHash torrents.InfoHashV1
+	copy(infoHash[:], strings.Repeat("a", 20))
+	stub := &legacyCompatibilityStub{
+		moviePilotCompatibilityStub: &moviePilotCompatibilityStub{},
+		torrentDetail: moviepilot.LegacyTorrentDetail{
+			RouteID: "42",
+			Detail: torrents.PublicDetail{
+				ID: 42, Category: catalog.Category{ID: "movies", Name: "电影"},
+				Title: "Paid", InfoHashV1: infoHash, TotalSizeBytes: 1024,
+			},
+			Metadata:    moviepilot.TorrentMetadata{TorrentID: 42, PurchasePrice: 9},
+			Files:       []torrents.PublicFile{{Index: 0, DisplayPath: "secret.mkv", SizeBytes: 1024}},
+			DownloadURL: "https://should-not-leak.test/torrent", CanReadObject: false,
+			Purchase: torrentpurchase.Status{TorrentID: 42, Price: 9, State: torrentpurchase.AccessPurchaseRequired},
+		},
+	}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/torrents/42", nil)
+	request.Header.Set("Authorization", "Bearer pgk_read")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK || strings.Contains(response.Body.String(), "secret.mkv") ||
+		strings.Contains(response.Body.String(), "should-not-leak") || !strings.Contains(response.Body.String(), `"info_hash":""`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestLegacyPurchaseRequiresIdempotencyAndForwardsExpectedPrice(t *testing.T) {
+	stub := &legacyCompatibilityStub{moviePilotCompatibilityStub: &moviePilotCompatibilityStub{}}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
+	missing := httptest.NewRequest(http.MethodPost, "/api/v1/torrents/42/purchase", strings.NewReader(`{"expected_price":9}`))
+	missing.Header.Set("Authorization", "Bearer pgk_purchase")
+	missingResponse := httptest.NewRecorder()
+	handler.ServeHTTP(missingResponse, missing)
+	if missingResponse.Code != http.StatusBadRequest {
+		t.Fatalf("missing idempotency status=%d body=%s", missingResponse.Code, missingResponse.Body.String())
+	}
+
+	requestID := uuid.New()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/torrents/42/purchase", strings.NewReader(`{"expected_price":9}`))
+	request.Header.Set("Authorization", "Bearer pgk_purchase")
+	request.Header.Set("Idempotency-Key", requestID.String())
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || stub.purchaseRequestID != requestID || stub.expectedPrice == nil || *stub.expectedPrice != 9 {
+		t.Fatalf("status=%d request=%s expected=%v body=%s", response.Code, stub.purchaseRequestID, stub.expectedPrice, response.Body.String())
+	}
+}
+
 type moviePilotCompatibilityStub struct {
 	authenticatedToken string
 	authenticateErr    error
@@ -235,6 +340,55 @@ type moviePilotCompatibilityStub struct {
 	listKeyword        string
 	listCategory       string
 	downloadTorrentID  int64
+}
+
+type legacyCompatibilityStub struct {
+	*moviePilotCompatibilityStub
+	categories        []moviepilot.LegacyCategory
+	uploadInput       moviepilot.LegacyUploadInput
+	uploadResult      moviepilot.LegacyUploadResult
+	torrentDetail     moviepilot.LegacyTorrentDetail
+	purchaseRequestID uuid.UUID
+	expectedPrice     *int64
+}
+
+func (stub *legacyCompatibilityStub) PublicProfile(context.Context, personalapikey.AuthenticatedCredential, string) (moviepilot.Profile, error) {
+	return moviepilot.Profile{}, nil
+}
+
+func (stub *legacyCompatibilityStub) Categories(context.Context, personalapikey.AuthenticatedCredential) ([]moviepilot.LegacyCategory, error) {
+	return stub.categories, nil
+}
+
+func (stub *legacyCompatibilityStub) Upload(_ context.Context, _ personalapikey.AuthenticatedCredential, input moviepilot.LegacyUploadInput) (moviepilot.LegacyUploadResult, error) {
+	stub.uploadInput = input
+	return stub.uploadResult, nil
+}
+
+func (stub *legacyCompatibilityStub) LegacyTorrent(context.Context, personalapikey.AuthenticatedCredential, string) (moviepilot.LegacyTorrentDetail, error) {
+	return stub.torrentDetail, nil
+}
+
+func (stub *legacyCompatibilityStub) Comments(context.Context, personalapikey.AuthenticatedCredential, string, int, int) (moviepilot.LegacyCommentPage, error) {
+	return moviepilot.LegacyCommentPage{}, nil
+}
+
+func (stub *legacyCompatibilityStub) Bookmarks(context.Context, personalapikey.AuthenticatedCredential, int, int) (moviepilot.LegacyBookmarkPage, error) {
+	return moviepilot.LegacyBookmarkPage{}, nil
+}
+
+func (stub *legacyCompatibilityStub) PurchaseStatus(context.Context, personalapikey.AuthenticatedCredential, string) (torrentpurchase.Status, error) {
+	return torrentpurchase.Status{}, nil
+}
+
+func (stub *legacyCompatibilityStub) Purchase(_ context.Context, _ personalapikey.AuthenticatedCredential, _ string, requestID uuid.UUID, expectedPrice *int64) (torrentpurchase.Receipt, error) {
+	stub.purchaseRequestID = requestID
+	stub.expectedPrice = expectedPrice
+	return torrentpurchase.Receipt{RequestID: requestID, TorrentID: 42, Price: 9}, nil
+}
+
+func (stub *legacyCompatibilityStub) Purchases(context.Context, personalapikey.AuthenticatedCredential, int, int) (torrentpurchase.HistoryPage, error) {
+	return torrentpurchase.HistoryPage{}, nil
 }
 
 func (stub moviePilotCompatibilityStub) Status(context.Context, string) (personalapikey.Status, error) {

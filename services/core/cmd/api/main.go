@@ -574,19 +574,6 @@ func main() {
 		logger.Error("compose MoviePilot repository", "error", err)
 		os.Exit(1)
 	}
-	moviePilotService, err := moviepilot.NewService(
-		moviePilotRepository,
-		personalAPIKeyService,
-		catalogService,
-		torrentReadService,
-		torrentDownloadService,
-		attendanceService,
-		moviepilot.ServiceConfig{PublicOrigin: settings.PublicOrigin, SigningKey: settings.SessionCSRFKey},
-	)
-	if err != nil {
-		logger.Error("compose MoviePilot service", "error", err)
-		os.Exit(1)
-	}
 	rssRepository, err := rss.NewPostgresRepository(pool)
 	if err != nil {
 		logger.Error("compose RSS repository", "error", err)
@@ -627,6 +614,24 @@ func main() {
 	)
 	if err != nil {
 		logger.Error("compose torrent upload service", "error", err)
+		os.Exit(1)
+	}
+	moviePilotService, err := moviepilot.NewService(
+		moviePilotRepository,
+		personalAPIKeyService,
+		catalogService,
+		torrentReadService,
+		torrentDownloadService,
+		attendanceService,
+		moviepilot.ServiceConfig{PublicOrigin: settings.PublicOrigin, SigningKey: settings.SessionCSRFKey},
+		moviepilot.LegacyServices{
+			Catalog: catalogService, Torrents: torrentReadService,
+			Bookmarks: torrentBookmarkService, Comments: commentService,
+			Uploads: torrentUploadService, Purchases: torrentPurchaseService,
+		},
+	)
+	if err != nil {
+		logger.Error("compose MoviePilot service", "error", err)
 		os.Exit(1)
 	}
 	torrentReviewService, err := review.NewService(

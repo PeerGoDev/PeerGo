@@ -18,6 +18,7 @@ var (
 	ErrPurchaseDisabled    = errors.New("torrent purchasing is disabled")
 	ErrPurchaseNotRequired = errors.New("torrent purchase is not required")
 	ErrIdempotencyConflict = errors.New("torrent purchase idempotency key was reused")
+	ErrPriceChanged        = errors.New("torrent purchase price changed")
 	ErrVersionConflict     = errors.New("torrent purchase settings version changed")
 	ErrNoChange            = errors.New("torrent purchase settings did not change")
 	ErrAlreadyRefunded     = errors.New("torrent purchase was already refunded")
@@ -74,10 +75,11 @@ type Receipt struct {
 }
 
 type PurchaseCommand struct {
-	RequestID uuid.UUID
-	UserID    uuid.UUID
-	TorrentID int64
-	Now       time.Time
+	RequestID     uuid.UUID
+	UserID        uuid.UUID
+	TorrentID     int64
+	ExpectedPrice *int64
+	Now           time.Time
 }
 
 // HistoryItem is the durable purchase right shown to its owner.  Paid values

@@ -5,6 +5,9 @@ PersonalAPIKeyScope:
     - profile:read
     - torrent:read
     - torrent:download
+    - torrent:upload
+    - torrent:purchase:read
+    - torrent:purchase:write
     - attendance:read
     - attendance:claim
 
@@ -23,7 +26,7 @@ PersonalAPIKeyStatus:
     scopes:
       type: array
       minItems: 0
-      maxItems: 5
+      maxItems: 8
       uniqueItems: true
       items: { $ref: "#/PersonalAPIKeyScope" }
       description: 当前密钥实际拥有的权限；未创建密钥时为空数组。
@@ -47,7 +50,7 @@ RotatePersonalAPIKeyRequest:
     scopes:
       type: array
       minItems: 1
-      maxItems: 5
+      maxItems: 8
       uniqueItems: true
       items: { $ref: "#/PersonalAPIKeyScope" }
       description: 新密钥可以调用的最小权限集合。

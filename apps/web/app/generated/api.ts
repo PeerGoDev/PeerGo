@@ -2321,6 +2321,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 创建或以乐观并发更新分类下的发种属性 */
+        put: operations["upsertManagedCategoryFacet"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}/options/{option_key}": {
         parameters: {
             query?: never;
@@ -5207,6 +5224,7 @@ export interface components {
             name: string;
             display_order: number;
             enabled: boolean;
+            /** @description 可留空；服务端会生成明确的审计理由。 */
             reason: string;
         };
         UpdateManagedCategoryRequest: {
@@ -5215,6 +5233,7 @@ export interface components {
             enabled: boolean;
             /** Format: int64 */
             expected_version: number;
+            /** @description 可留空；服务端会生成明确的审计理由。 */
             reason: string;
         };
         ManagedCategoryFacet: {
@@ -5224,6 +5243,16 @@ export interface components {
             required: boolean;
             requirement_group?: string;
             display_order: number;
+            /** @description 停用后不再出现在新发种表单中，历史取值仍然保留。 */
+            enabled: boolean;
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            torrent_count: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
             options: components["schemas"]["ManagedCategoryFacetOption"][];
         };
         ManagedCategoryFacetOption: {
@@ -5250,6 +5279,7 @@ export interface components {
              * @description 传 0 表示新增；更新时必须传当前版本。
              */
             expected_version: number;
+            /** @description 可留空；服务端会生成明确的审计理由。 */
             reason: string;
         };
         TorrentSummary: {
@@ -7948,7 +7978,7 @@ export interface components {
          * @description 可授予个人 API Key 的最小权限范围；所有适配器共享同一套范围。
          * @enum {string}
          */
-        PersonalAPIKeyScope: "profile:read" | "torrent:read" | "torrent:download" | "attendance:read" | "attendance:claim";
+        PersonalAPIKeyScope: "profile:read" | "torrent:read" | "torrent:download" | "torrent:upload" | "torrent:purchase:read" | "torrent:purchase:write" | "attendance:read" | "attendance:claim";
         TorrentPurchaseHistoryItem: {
             /** Format: int64 */
             torrent_id: number;
@@ -8234,6 +8264,22 @@ export interface components {
             options: components["schemas"]["CategoryFacetOption"][];
         };
         CategoryFacetList: components["schemas"]["CategoryFacet"][];
+        UpsertManagedCategoryFacetRequest: {
+            name: string;
+            selection_mode: components["schemas"]["CategoryFacetSelectionMode"];
+            required: boolean;
+            /** @description 非必填属性可加入同一组，表示组内至少选择一个；直接必填时省略。 */
+            requirement_group?: string;
+            display_order: number;
+            enabled: boolean;
+            /**
+             * Format: int64
+             * @description 传 0 表示创建分类属性；更新时必须传当前版本。
+             */
+            expected_version: number;
+            /** @description 可留空；服务端会生成明确的审计理由。 */
+            reason: string;
+        };
         TorrentFacetSelectionInput: {
             facet_id: string;
             option_keys: string[];
@@ -14465,6 +14511,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManagedCategory"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    upsertManagedCategoryFacet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                /** @description 创建后不可变的分类稳定标识。 */
+                category_id: components["parameters"]["CategoryIDPathParameter"];
+                facet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertManagedCategoryFacetRequest"];
+            };
+        };
+        responses: {
+            /** @description 分类属性和不可变审计记录已经原子提交。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedCategoryFacet"];
                 };
             };
             400: components["responses"]["ProblemResponse"];

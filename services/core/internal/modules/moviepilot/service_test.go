@@ -30,6 +30,46 @@ func TestMoviePilotAdapterEnforcesSharedPersonalAPIKeyScopes(t *testing.T) {
 	if _, err := service.DownloadWithCredential(context.Background(), credential, 9830); !errors.Is(err, personalapikey.ErrScopeDenied) {
 		t.Fatalf("DownloadWithCredential() scope error = %v", err)
 	}
+	if _, err := service.Upload(context.Background(), credential, LegacyUploadInput{}); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("Upload() scope error = %v", err)
+	}
+	if _, err := service.PurchaseStatus(context.Background(), credential, "9830"); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("PurchaseStatus() scope error = %v", err)
+	}
+	if _, err := service.Purchase(context.Background(), credential, "9830", uuid.New(), nil); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("Purchase() scope error = %v", err)
+	}
+}
+
+func TestLegacyFacetSelectionsAcceptKeysLabelsAndPtYesSourceAlias(t *testing.T) {
+	facets := []catalog.CategoryFacet{
+		{
+			ID: "source-medium", Name: "来源", SelectionMode: catalog.FacetSelectionSingle,
+			Options: []catalog.CategoryFacetOption{{Key: "bluray", Label: "Blu-ray"}},
+		},
+		{
+			ID: "genre", Name: "类型", SelectionMode: catalog.FacetSelectionMulti,
+			Options: []catalog.CategoryFacetOption{{Key: "action", Label: "动作"}, {Key: "comedy", Label: "喜剧"}},
+		},
+	}
+	result, err := legacyFacetSelections(facets, map[string][]string{
+		"source": {"Blu-ray"},
+		"类型":     {"喜剧", "action"},
+	})
+	if err != nil {
+		t.Fatalf("legacyFacetSelections() error = %v", err)
+	}
+	if len(result) != 2 || result[0].FacetID != "genre" || result[1].FacetID != "source-medium" ||
+		len(result[0].OptionKeys) != 2 || result[0].OptionKeys[0] != "comedy" || result[0].OptionKeys[1] != "action" ||
+		result[1].OptionKeys[0] != "bluray" {
+		t.Fatalf("legacyFacetSelections() = %+v", result)
+	}
+	if _, err := legacyFacetSelections(facets, map[string][]string{"disabled-facet": {"value"}}); !errors.Is(err, ErrInput) {
+		t.Fatalf("disabled facet error = %v", err)
+	}
+	if !markdownImagePattern.MatchString("![cover](https://example.test/a.jpg)") || !markdownImagePattern.MatchString("<IMG src=x>") {
+		t.Fatal("legacy upload description image guard did not detect an image")
+	}
 }
 
 func TestDownloadCapabilityIsShortLivedAndBoundToTorrent(t *testing.T) {

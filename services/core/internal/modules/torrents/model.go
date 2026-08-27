@@ -118,6 +118,7 @@ type Torrent struct {
 	DescriptionFormat   string
 	MediaInfo           string
 	Anonymous           bool
+	PurchasePrice       int64
 	ExternalIdentifiers []ExternalIdentifier
 	FacetSelections     []FacetSelection
 	Screenshots         []TorrentScreenshot
@@ -188,6 +189,7 @@ type NewPendingTorrentInput struct {
 	Description         string
 	MediaInfo           string
 	Anonymous           bool
+	PurchasePrice       int64
 	ExternalIdentifiers []ExternalIdentifier
 	FacetSelections     []FacetSelection
 	Screenshots         []TorrentScreenshot
@@ -214,7 +216,7 @@ func NewPendingTorrent(input NewPendingTorrentInput) (Torrent, error) {
 	}
 	now := input.OccurredAt.UTC()
 
-	if input.UploaderID == uuid.Nil || input.ObjectID == uuid.Nil ||
+	if input.UploaderID == uuid.Nil || input.ObjectID == uuid.Nil || input.PurchasePrice < 0 || input.PurchasePrice > 1_000_000 ||
 		now.IsZero() || !validParsedMetainfo(input.Metainfo) {
 		return Torrent{}, ErrTorrentInputInvalid
 	}
@@ -239,6 +241,7 @@ func NewPendingTorrent(input NewPendingTorrentInput) (Torrent, error) {
 		DescriptionFormat:   DescriptionFormatMarkdown,
 		MediaInfo:           input.MediaInfo,
 		Anonymous:           input.Anonymous,
+		PurchasePrice:       input.PurchasePrice,
 		ExternalIdentifiers: externalIdentifiers,
 		FacetSelections:     facetSelections,
 		Screenshots:         append([]TorrentScreenshot(nil), input.Screenshots...),

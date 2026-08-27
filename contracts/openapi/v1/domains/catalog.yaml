@@ -151,6 +151,52 @@ ManagedCategoryPath:
       default:
         $ref: "../responses.yaml#/ProblemResponse"
 
+ManagedCategoryFacetPath:
+  put:
+    operationId: upsertManagedCategoryFacet
+    summary: 创建或以乐观并发更新分类下的发种属性
+    tags: [catalog]
+    x-audience: [staff]
+    x-owner: core-catalog
+    x-permission: category.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/CategoryIDPathParameter"
+      - name: facet_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/catalog.yaml#/UpsertManagedCategoryFacetRequest"
+    responses:
+      "200":
+        description: 分类属性和不可变审计记录已经原子提交。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/catalog.yaml#/ManagedCategoryFacet"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "429":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
 ManagedCategoryFacetOptionPath:
   put:
     operationId: upsertManagedCategoryFacetOption

@@ -1728,6 +1728,10 @@ func (unavailableCategoryAdministrationService) Update(context.Context, authz.St
 	return catalog.ManagedCategory{}, authz.ErrForbidden
 }
 
+func (unavailableCategoryAdministrationService) UpsertFacet(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetInput) (catalog.ManagedCategoryFacet, error) {
+	return catalog.ManagedCategoryFacet{}, authz.ErrForbidden
+}
+
 func (unavailableCategoryAdministrationService) UpsertFacetOption(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetOptionInput) (catalog.ManagedCategoryFacetOption, error) {
 	return catalog.ManagedCategoryFacetOption{}, authz.ErrForbidden
 }
@@ -2002,6 +2006,11 @@ func (service *recordingCategoryAdministrationService) Update(_ context.Context,
 	service.updateActor = actor
 	service.updateInput = input
 	return service.updateResult, service.err
+}
+
+func (service *recordingCategoryAdministrationService) UpsertFacet(_ context.Context, actor authz.StaffActor, input catalog.UpsertCategoryFacetInput) (catalog.ManagedCategoryFacet, error) {
+	service.updateActor = actor
+	return catalog.ManagedCategoryFacet{}, service.err
 }
 
 func (service *recordingCategoryAdministrationService) UpsertFacetOption(_ context.Context, actor authz.StaffActor, input catalog.UpsertCategoryFacetOptionInput) (catalog.ManagedCategoryFacetOption, error) {
