@@ -775,8 +775,8 @@ func (unavailableCommentService) ListAnnouncementComments(context.Context, strin
 	return social.CommentPage{}, social.ErrCommentTargetNotFound
 }
 
-func (unavailableCommentService) ListPostComments(context.Context, uuid.UUID, int, int) (social.CommentPage, error) {
-	return social.CommentPage{}, social.ErrCommentTargetNotFound
+func (unavailableCommentService) ListPostComments(context.Context, uuid.UUID, social.CommentThreadSort, int, int) (social.CommentThreadPage, error) {
+	return social.CommentThreadPage{}, social.ErrCommentTargetNotFound
 }
 
 func (unavailableCommentService) CreateTorrentComment(context.Context, string, string, social.CreateTorrentCommentInput) (social.Comment, error) {
@@ -889,6 +889,7 @@ func (unavailableCommentModerationService) Decide(context.Context, authz.StaffAc
 
 type recordingCommentService struct {
 	page                    social.CommentPage
+	threadPage              social.CommentThreadPage
 	created                 social.Comment
 	updated                 social.Comment
 	listTorrentID           int64
@@ -896,6 +897,7 @@ type recordingCommentService struct {
 	listAnnouncementID      string
 	listLimit               int
 	listOffset              int
+	listThreadSort          social.CommentThreadSort
 	createCookie            string
 	createCSRF              string
 	createInput             social.CreateTorrentCommentInput
@@ -947,9 +949,9 @@ func (service *recordingCommentService) ListAnnouncementComments(_ context.Conte
 	return service.page, nil
 }
 
-func (service *recordingCommentService) ListPostComments(_ context.Context, postID uuid.UUID, limit, offset int) (social.CommentPage, error) {
-	service.listPostID, service.listLimit, service.listOffset = postID, limit, offset
-	return service.page, nil
+func (service *recordingCommentService) ListPostComments(_ context.Context, postID uuid.UUID, sort social.CommentThreadSort, limit, offset int) (social.CommentThreadPage, error) {
+	service.listPostID, service.listThreadSort, service.listLimit, service.listOffset = postID, sort, limit, offset
+	return service.threadPage, nil
 }
 
 func (service *recordingCommentService) CreateTorrentComment(_ context.Context, cookie, csrf string, input social.CreateTorrentCommentInput) (social.Comment, error) {

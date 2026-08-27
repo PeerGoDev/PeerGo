@@ -7505,9 +7505,17 @@ paths:
             minimum: 0
             maximum: 99999
             default: 0
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            allOf:
+              - $ref: '#/components/schemas/SocialCommentSort'
+            default: newest
       responses:
         '200':
-          description: 动态评论与回复；删除项保留墓碑。
+          description: 按一级评论分页的动态评论与楼中楼回复；删除项保留墓碑。
           content:
             application/json:
               schema:
@@ -15746,6 +15754,18 @@ components:
           type: string
           format: uuid
           nullable: true
+          description: 直接回复的评论，用于保留“回复谁”的精确上下文。
+        root_comment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: 所属一级评论；一级评论自身为空，楼中楼回复均指向同一根楼。
+        reply_to:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/CommentAuthor'
+          description: 直接回复对象的作者；仅回复评论返回。
         author:
           $ref: '#/components/schemas/CommentAuthor'
         body:
@@ -16577,6 +16597,7 @@ components:
         - post_id
         - items
         - total
+        - thread_total
         - limit
         - offset
       properties:
@@ -16591,6 +16612,12 @@ components:
           type: integer
           format: int64
           minimum: 0
+          description: 一级评论与楼中楼回复的总数。
+        thread_total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: 用于分页的一级评论总数。
         limit:
           type: integer
           minimum: 1
@@ -16599,6 +16626,12 @@ components:
           type: integer
           minimum: 0
           maximum: 99999
+    SocialCommentSort:
+      type: string
+      enum:
+        - hot
+        - newest
+        - oldest
     SocialMediaUploadRequest:
       type: object
       additionalProperties: false

@@ -1,11 +1,13 @@
 import * as React from "react"
 import { Link } from "react-router"
 import {
-  ArrowUpDownIcon,
   ArrowDownIcon,
   ArrowUpIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   CircleAlertIcon,
   FlagIcon,
+  FlameIcon,
   LogInIcon,
   MessageCircleIcon,
   MessageSquareIcon,
@@ -66,6 +68,7 @@ import { useWebSession } from "~/features/auth/api/session.mutations"
 import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import {
   type Comment,
+  type CommentSort,
   type CommentTarget,
   useComments,
   useCreateComment,
@@ -87,8 +90,9 @@ import { cn } from "~/lib/utils"
 const commentPageSize = 20
 const maxCommentCharacters = 2_000
 const collapsedCommentLength = 180
+const collapsedReplyPreviewCount = 3
 
-type ReplyTarget = Pick<Comment, "id" | "author">
+type ReplyTarget = Pick<Comment, "id" | "author"> & { rootId: string }
 
 export function CommentThreadCard({
   target,
@@ -107,9 +111,8 @@ export function CommentThreadCard({
   const titleId = React.useId()
   const composerFieldId = React.useId()
   const [offset, setOffset] = React.useState(0)
-  const [socialCommentSort, setSocialCommentSort] = React.useState<
-    "newest" | "oldest"
-  >("newest")
+  const [socialCommentSort, setSocialCommentSort] =
+    React.useState<CommentSort>("newest")
   const [announcementCommentSort, setAnnouncementCommentSort] = React.useState<
     "newest" | "oldest"
   >("newest")
@@ -119,11 +122,26 @@ export function CommentThreadCard({
   const [editingCommentId, setEditingCommentId] = React.useState<string>()
   const [deleteTarget, setDeleteTarget] = React.useState<Comment>()
   const [reportTarget, setReportTarget] = React.useState<Comment>()
+  const [expandedSocialThreads, setExpandedSocialThreads] = React.useState(
+    () => new Set<string>()
+  )
+  const [anchorCommentId] = React.useState(() =>
+    typeof window === "undefined"
+      ? undefined
+      : window.location.hash.match(/^#comment-(.+)$/)?.[1]
+  )
+  const [searchingAnchor, setSearchingAnchor] = React.useState(
+    Boolean(anchorCommentId)
+  )
   const createRequestId = React.useRef<string>(undefined)
   const replyRequestId = React.useRef<string>(undefined)
-  const socialSortInitialized = React.useRef(false)
 
-  const comments = useComments(target, commentPageSize, offset)
+  const comments = useComments(
+    target,
+    commentPageSize,
+    offset,
+    socialAppearance ? socialCommentSort : undefined
+  )
   const session = useWebSession()
   const capabilities = useCapabilities(session.data?.user.id)
   const createComment = useCreateComment(target)
@@ -147,24 +165,56 @@ export function CommentThreadCard({
   const canReport = capabilityActions.has("comment.report.create.self")
 
   React.useEffect(() => {
-    const total = comments.data?.total
+    const total = socialAppearance
+      ? comments.data?.thread_total
+      : comments.data?.total
     if (total === undefined || offset === 0 || offset < total) {
       return
     }
     setOffset(lastPageOffset(total, commentPageSize))
-  }, [comments.data?.total, offset])
+  }, [
+    comments.data?.thread_total,
+    comments.data?.total,
+    offset,
+    socialAppearance,
+  ])
 
   React.useEffect(() => {
     if (
       !socialAppearance ||
-      socialSortInitialized.current ||
-      comments.data?.total === undefined
+      !searchingAnchor ||
+      !anchorCommentId ||
+      !comments.data
     ) {
       return
     }
-    socialSortInitialized.current = true
-    setOffset(lastPageOffset(comments.data.total, commentPageSize))
-  }, [comments.data?.total, socialAppearance])
+    const anchoredComment = comments.data.items.find(
+      (comment) => comment.id === anchorCommentId
+    )
+    if (anchoredComment) {
+      const rootId = anchoredComment.root_comment_id ?? anchoredComment.id
+      setExpandedSocialThreads((current) => addSetValue(current, rootId))
+      setSearchingAnchor(false)
+      globalThis.requestAnimationFrame(() => {
+        document
+          .getElementById(`comment-${anchorCommentId}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" })
+      })
+      return
+    }
+    const threadTotal = comments.data.thread_total ?? 0
+    if (offset + commentPageSize < threadTotal) {
+      setOffset(offset + commentPageSize)
+    } else {
+      setSearchingAnchor(false)
+    }
+  }, [
+    anchorCommentId,
+    comments.data,
+    offset,
+    searchingAnchor,
+    socialAppearance,
+  ])
 
   function resetCreateAttempt() {
     createRequestId.current = undefined
@@ -177,7 +227,11 @@ export function CommentThreadCard({
   }
 
   function beginReply(comment: Comment) {
-    setReplyTarget({ id: comment.id, author: comment.author })
+    const rootId = comment.root_comment_id ?? comment.id
+    setReplyTarget({ id: comment.id, author: comment.author, rootId })
+    if (socialAppearance) {
+      setExpandedSocialThreads((current) => addSetValue(current, rootId))
+    }
     setEditingCommentId(undefined)
     updateComment.reset()
     if (socialAppearance) {
@@ -225,8 +279,10 @@ export function CommentThreadCard({
       createRequestId.current = undefined
       if (socialAppearance) {
         setSocialCommentSort("newest")
+        setOffset(0)
+      } else {
+        setOffset(lastPageOffset(totalBeforeCreate + 1, commentPageSize))
       }
-      setOffset(lastPageOffset(totalBeforeCreate + 1, commentPageSize))
     } catch {
       // Keep the request UUID while the unchanged draft remains retryable.
     }
@@ -243,7 +299,6 @@ export function CommentThreadCard({
       return
     }
     replyRequestId.current ??= globalThis.crypto.randomUUID()
-    const totalBeforeCreate = comments.data?.total ?? 0
     try {
       await createReply.mutateAsync({
         csrfToken: session.data.csrf_token,
@@ -252,9 +307,11 @@ export function CommentThreadCard({
         parentCommentId: replyTarget.id,
       })
       setReplyDraft("")
+      setExpandedSocialThreads((current) =>
+        addSetValue(current, replyTarget.rootId)
+      )
       setReplyTarget(undefined)
       replyRequestId.current = undefined
-      setOffset(lastPageOffset(totalBeforeCreate + 1, commentPageSize))
     } catch {
       // Keep the request UUID while the unchanged reply remains retryable.
     }
@@ -274,6 +331,75 @@ export function CommentThreadCard({
     } catch {
       // Keep the dialog open so the stable problem can be shown and retried.
     }
+  }
+
+  function renderComment(comment: Comment) {
+    const owned = session.data?.user.id === comment.author.id
+    const replyTo =
+      comment.reply_to ??
+      comments.data?.items.find(
+        (candidate) => candidate.id === comment.parent_comment_id
+      )?.author
+    return (
+      <CommentRow
+        key={comment.id}
+        comment={comment}
+        replyTo={replyTo ?? undefined}
+        owned={owned}
+        canReply={canCreate}
+        canUpdate={owned && canUpdateOwn}
+        canDelete={owned && canDeleteOwn}
+        canReport={!owned && canReport}
+        cardAppearance={announcementAppearance}
+        absoluteTime={torrentAppearance || announcementAppearance}
+        torrentAppearance={torrentAppearance}
+        socialAppearance={socialAppearance}
+        editing={editingCommentId === comment.id}
+        replying={socialAppearance && replyTarget?.id === comment.id}
+        replyDraft={replyDraft}
+        replyPending={createReply.isPending}
+        replyError={createReply.error}
+        updatePending={updateComment.isPending}
+        updateError={updateComment.error}
+        csrfToken={session.data?.csrf_token}
+        currentUserId={session.data?.user.id}
+        onReply={() => beginReply(comment)}
+        onReplyDraftChange={changeReplyDraft}
+        onCancelReply={cancelReply}
+        onSubmitReply={submitSocialReply}
+        onBeginEdit={() => {
+          setEditingCommentId(comment.id)
+          setReplyTarget(undefined)
+          setReplyDraft("")
+          replyRequestId.current = undefined
+          createReply.reset()
+          updateComment.reset()
+        }}
+        onCancelEdit={() => {
+          setEditingCommentId(undefined)
+          updateComment.reset()
+        }}
+        onUpdate={async (body) => {
+          if (!session.data) return
+          try {
+            await updateComment.mutateAsync({
+              commentId: comment.id,
+              csrfToken: session.data.csrf_token,
+              expectedVersion: comment.version,
+              body,
+            })
+            setEditingCommentId(undefined)
+          } catch {
+            // Keep the inline editor open for a safe correction.
+          }
+        }}
+        onDelete={() => {
+          deleteComment.reset()
+          setDeleteTarget(comment)
+        }}
+        onReport={() => setReportTarget(comment)}
+      />
+    )
   }
 
   return (
@@ -468,30 +594,42 @@ export function CommentThreadCard({
             </Empty>
           ) : null}
           {comments.data && socialAppearance ? (
-            <div className="mb-1 flex items-center justify-between">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-muted-foreground">
                 共 {comments.data.total.toLocaleString("zh-CN")} 条评论
               </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1 px-2 text-xs"
-                disabled={comments.isFetching}
-                onClick={() => {
-                  const nextSort =
-                    socialCommentSort === "newest" ? "oldest" : "newest"
-                  setSocialCommentSort(nextSort)
-                  setOffset(
-                    nextSort === "oldest"
-                      ? 0
-                      : lastPageOffset(comments.data.total, commentPageSize)
-                  )
-                }}
+              <div
+                role="group"
+                aria-label="评论排序"
+                className="flex items-center rounded-md border bg-background p-0.5"
               >
-                <ArrowUpDownIcon className="size-3" />
-                {socialCommentSort === "newest" ? "最新" : "最早"}
-              </Button>
+                {(
+                  [
+                    ["hot", "热门", FlameIcon],
+                    ["newest", "最新", ArrowDownIcon],
+                    ["oldest", "最早", ArrowUpIcon],
+                  ] as const
+                ).map(([value, label, Icon]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={
+                      socialCommentSort === value ? "secondary" : "ghost"
+                    }
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs shadow-none"
+                    disabled={comments.isFetching}
+                    aria-pressed={socialCommentSort === value}
+                    onClick={() => {
+                      setSocialCommentSort(value)
+                      setOffset(0)
+                    }}
+                  >
+                    <Icon className="size-3" />
+                    {label}
+                  </Button>
+                ))}
+              </div>
             </div>
           ) : null}
           {comments.data?.items.length === 0 && socialAppearance ? (
@@ -516,85 +654,55 @@ export function CommentThreadCard({
                 socialAppearance && "border-t-0"
               )}
             >
-              {orderedComments(
-                comments.data.items,
-                socialAppearance
-                  ? socialCommentSort
-                  : announcementAppearance
-                    ? announcementCommentSort
-                    : "oldest"
-              ).map((comment) => {
-                const owned = session.data?.user.id === comment.author.id
-                return (
-                  <CommentRow
-                    key={comment.id}
-                    comment={comment}
-                    parent={comments.data.items.find(
-                      (candidate) => candidate.id === comment.parent_comment_id
-                    )}
-                    owned={owned}
-                    canReply={canCreate}
-                    canUpdate={owned && canUpdateOwn}
-                    canDelete={owned && canDeleteOwn}
-                    canReport={!owned && canReport}
-                    cardAppearance={announcementAppearance}
-                    absoluteTime={torrentAppearance || announcementAppearance}
-                    torrentAppearance={torrentAppearance}
-                    socialAppearance={socialAppearance}
-                    editing={editingCommentId === comment.id}
-                    replying={
-                      socialAppearance && replyTarget?.id === comment.id
-                    }
-                    replyDraft={replyDraft}
-                    replyPending={createReply.isPending}
-                    replyError={createReply.error}
-                    updatePending={updateComment.isPending}
-                    updateError={updateComment.error}
-                    csrfToken={session.data?.csrf_token}
-                    currentUserId={session.data?.user.id}
-                    onReply={() => beginReply(comment)}
-                    onReplyDraftChange={changeReplyDraft}
-                    onCancelReply={cancelReply}
-                    onSubmitReply={submitSocialReply}
-                    onBeginEdit={() => {
-                      setEditingCommentId(comment.id)
-                      setReplyTarget(undefined)
-                      setReplyDraft("")
-                      replyRequestId.current = undefined
-                      createReply.reset()
-                      updateComment.reset()
-                    }}
-                    onCancelEdit={() => {
-                      setEditingCommentId(undefined)
-                      updateComment.reset()
-                    }}
-                    onUpdate={async (body) => {
-                      if (!session.data) return
-                      try {
-                        await updateComment.mutateAsync({
-                          commentId: comment.id,
-                          csrfToken: session.data.csrf_token,
-                          expectedVersion: comment.version,
-                          body,
-                        })
-                        setEditingCommentId(undefined)
-                      } catch {
-                        // Keep the inline editor open for a safe correction.
-                      }
-                    }}
-                    onDelete={() => {
-                      deleteComment.reset()
-                      setDeleteTarget(comment)
-                    }}
-                    onReport={() => setReportTarget(comment)}
-                  />
-                )
-              })}
+              {socialAppearance
+                ? socialCommentThreads(comments.data.items).map((thread) => {
+                    const expanded = expandedSocialThreads.has(thread.root.id)
+                    const visibleReplies = expanded
+                      ? thread.replies
+                      : thread.replies.slice(0, collapsedReplyPreviewCount)
+                    return (
+                      <div key={thread.root.id}>
+                        {renderComment(thread.root)}
+                        {visibleReplies.map((reply) => renderComment(reply))}
+                        {thread.replies.length > collapsedReplyPreviewCount ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="mb-2 ml-11 h-7 gap-1 px-2 text-xs text-muted-foreground"
+                            aria-expanded={expanded}
+                            onClick={() =>
+                              setExpandedSocialThreads((current) =>
+                                toggleSetValue(current, thread.root.id)
+                              )
+                            }
+                          >
+                            {expanded ? (
+                              <ChevronUpIcon className="size-3.5" />
+                            ) : (
+                              <ChevronDownIcon className="size-3.5" />
+                            )}
+                            {expanded
+                              ? "收起回复"
+                              : `查看全部 ${thread.replies.length.toLocaleString("zh-CN")} 条回复`}
+                          </Button>
+                        ) : null}
+                      </div>
+                    )
+                  })
+                : orderedComments(
+                    comments.data.items,
+                    announcementAppearance ? announcementCommentSort : "oldest"
+                  ).map((comment) => renderComment(comment))}
             </div>
           ) : null}
           {comments.data ? (
             <OffsetPagination
-              total={comments.data.total}
+              total={
+                socialAppearance
+                  ? (comments.data.thread_total ?? 0)
+                  : comments.data.total
+              }
               limit={comments.data.limit}
               offset={comments.data.offset}
               onOffsetChange={(nextOffset) => {
@@ -886,7 +994,7 @@ function CommentComposer({
 
 function CommentRow({
   comment,
-  parent,
+  replyTo,
   owned,
   canReply,
   canUpdate,
@@ -916,7 +1024,7 @@ function CommentRow({
   onReport,
 }: {
   comment: Comment
-  parent?: Comment
+  replyTo?: Comment["author"]
   owned: boolean
   canReply: boolean
   canUpdate: boolean
@@ -1116,7 +1224,7 @@ function CommentRow({
           </span>
           {isReply ? (
             <span className="text-xs text-muted-foreground">
-              回复 {parent ? `@${parent.author.display_name}` : "一条早先评论"}
+              {replyTo ? `回复 @${replyTo.display_name}` : "回复"}
             </span>
           ) : null}
           <time
@@ -1429,6 +1537,75 @@ function CommentListSkeleton() {
 function validCommentBody(value: string) {
   const count = characterCount(value.trim())
   return count > 0 && count <= maxCommentCharacters
+}
+
+function socialCommentThreads(comments: Comment[]) {
+  const byID = new Map(comments.map((comment) => [comment.id, comment]))
+  const threads: Array<{ root: Comment; replies: Comment[] }> = []
+  const byRootID = new Map<string, (typeof threads)[number]>()
+
+  for (const comment of comments) {
+    if (comment.parent_comment_id) continue
+    const thread = { root: comment, replies: [] as Comment[] }
+    threads.push(thread)
+    byRootID.set(comment.id, thread)
+  }
+
+  for (const comment of comments) {
+    if (!comment.parent_comment_id) continue
+    const rootID =
+      comment.root_comment_id ?? resolveVisibleRootID(comment, byID)
+    const thread = rootID ? byRootID.get(rootID) : undefined
+    if (thread) {
+      thread.replies.push(comment)
+      continue
+    }
+    // Keep a malformed rolling-deploy response visible. The current API
+    // always includes the owning root, so this is only a compatibility guard.
+    const fallback = { root: comment, replies: [] as Comment[] }
+    threads.push(fallback)
+    byRootID.set(comment.id, fallback)
+  }
+
+  for (const thread of threads) {
+    thread.replies.sort((left, right) =>
+      left.created_at.localeCompare(right.created_at)
+    )
+  }
+  return threads
+}
+
+function resolveVisibleRootID(
+  comment: Comment,
+  byID: Map<string, Comment>
+): string | undefined {
+  const visited = new Set<string>([comment.id])
+  let current = comment
+  while (current.parent_comment_id) {
+    if (visited.has(current.parent_comment_id)) return undefined
+    visited.add(current.parent_comment_id)
+    const parent = byID.get(current.parent_comment_id)
+    if (!parent) return undefined
+    current = parent
+  }
+  return current.id
+}
+
+function addSetValue(current: Set<string>, value: string) {
+  if (current.has(value)) return current
+  const next = new Set(current)
+  next.add(value)
+  return next
+}
+
+function toggleSetValue(current: Set<string>, value: string) {
+  const next = new Set(current)
+  if (next.has(value)) {
+    next.delete(value)
+  } else {
+    next.add(value)
+  }
+  return next
 }
 
 // The API returns comments in chronological order and keeps replies adjacent

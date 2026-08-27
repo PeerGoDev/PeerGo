@@ -10,10 +10,11 @@ import { apiClient } from "~/shared/api/client"
 import { ApiProblemError } from "~/shared/api/problem"
 
 export type Comment = components["schemas"]["Comment"]
+export type CommentSort = components["schemas"]["SocialCommentSort"]
 export type CommentPage = Pick<
   components["schemas"]["TorrentCommentPage"],
   "items" | "total" | "limit" | "offset"
->
+> & { thread_total?: number }
 export type CommentReportReasonCode =
   components["schemas"]["CommentReportReasonCode"]
 export type CommentReportReceipt = components["schemas"]["CommentReportReceipt"]
@@ -38,17 +39,22 @@ export function postCommentTarget(id: string): CommentTarget {
 export const commentKeys = {
   all: (target: CommentTarget) =>
     ["social", "comments", target.kind, target.id] as const,
-  page: (target: CommentTarget, limit: number, offset: number) =>
-    [...commentKeys.all(target), { limit, offset }] as const,
+  page: (
+    target: CommentTarget,
+    limit: number,
+    offset: number,
+    sort?: CommentSort
+  ) => [...commentKeys.all(target), { limit, offset, sort }] as const,
 }
 
 export function commentsQueryOptions(
   target: CommentTarget,
   limit: number,
-  offset: number
+  offset: number,
+  sort?: CommentSort
 ) {
   return queryOptions({
-    queryKey: commentKeys.page(target, limit, offset),
+    queryKey: commentKeys.page(target, limit, offset, sort),
     queryFn: async (): Promise<CommentPage> => {
       if (target.kind === "torrent") {
         const { data, error, response } = await apiClient.GET(
@@ -72,7 +78,7 @@ export function commentsQueryOptions(
           {
             params: {
               path: { post_id: target.id },
-              query: { limit, offset },
+              query: { limit, offset, sort: sort ?? "newest" },
             },
           }
         )
@@ -104,9 +110,10 @@ export function commentsQueryOptions(
 export function useComments(
   target: CommentTarget,
   limit: number,
-  offset: number
+  offset: number,
+  sort?: CommentSort
 ) {
-  return useQuery(commentsQueryOptions(target, limit, offset))
+  return useQuery(commentsQueryOptions(target, limit, offset, sort))
 }
 
 export function useCreateComment(target: CommentTarget) {

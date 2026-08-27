@@ -100,7 +100,9 @@ type Comment struct {
 	ID              uuid.UUID
 	Target          CommentTarget
 	ParentCommentID *uuid.UUID
+	RootCommentID   *uuid.UUID
 	Author          CommentAuthor
+	ReplyTo         *CommentAuthor
 	Body            string
 	BodyFormat      CommentBodyFormat
 	State           CommentState
@@ -116,6 +118,23 @@ type CommentPage struct {
 	Total  int64
 	Limit  int
 	Offset int
+}
+
+type CommentThreadSort string
+
+const (
+	CommentThreadHot    CommentThreadSort = "hot"
+	CommentThreadNewest CommentThreadSort = "newest"
+	CommentThreadOldest CommentThreadSort = "oldest"
+)
+
+type CommentThreadPage struct {
+	Target      CommentTarget
+	Items       []Comment
+	Total       int64
+	ThreadTotal int64
+	Limit       int
+	Offset      int
 }
 
 type CreateTorrentCommentInput struct {
@@ -178,6 +197,7 @@ type deleteCommentCommand struct {
 
 type CommentRepository interface {
 	List(context.Context, CommentTarget, int, int) ([]Comment, int64, error)
+	ListThreads(context.Context, CommentTarget, CommentThreadSort, int, int) ([]Comment, int64, int64, error)
 	Create(context.Context, createCommentCommand) (Comment, error)
 	Update(context.Context, updateCommentCommand) (Comment, error)
 	Delete(context.Context, deleteCommentCommand) error
@@ -224,8 +244,46 @@ func (service *CommentService) ListAnnouncementComments(ctx context.Context, ann
 	return service.listComments(ctx, AnnouncementCommentTarget(announcementID), limit, offset)
 }
 
-func (service *CommentService) ListPostComments(ctx context.Context, postPublicID uuid.UUID, limit, offset int) (CommentPage, error) {
-	return service.listComments(ctx, PostCommentTarget(postPublicID), limit, offset)
+func (service *CommentService) ListPostComments(ctx context.Context, postPublicID uuid.UUID, sort CommentThreadSort, limit, offset int) (CommentThreadPage, error) {
+	target := PostCommentTarget(postPublicID)
+	if validateCommentTarget(target) != nil || !validCommentThreadSort(sort) || limit < 1 || limit > MaxCommentLimit || offset < 0 || offset > MaxCommentOffset {
+		return CommentThreadPage{}, ErrCommentInput
+	}
+	items, total, threadTotal, err := service.repository.ListThreads(ctx, target, sort, limit, offset)
+	if err != nil {
+		return CommentThreadPage{}, err
+	}
+	rootIDs := make(map[uuid.UUID]struct{}, limit)
+	for _, item := range items {
+		if item.Target != target || validatePersistedComment(item) != nil {
+			return CommentThreadPage{}, ErrCommentInvariant
+		}
+		if item.ParentCommentID == nil {
+			if item.RootCommentID != nil || item.ReplyTo != nil {
+				return CommentThreadPage{}, ErrCommentInvariant
+			}
+			rootIDs[item.ID] = struct{}{}
+			continue
+		}
+		if item.RootCommentID == nil || item.ReplyTo == nil {
+			return CommentThreadPage{}, ErrCommentInvariant
+		}
+	}
+	for _, item := range items {
+		if item.RootCommentID != nil {
+			if _, ok := rootIDs[*item.RootCommentID]; !ok {
+				return CommentThreadPage{}, ErrCommentInvariant
+			}
+		}
+	}
+	if total < 0 || threadTotal < 0 || total < threadTotal || len(rootIDs) > limit ||
+		(len(rootIDs) > 0 && int64(offset+len(rootIDs)) > threadTotal) {
+		return CommentThreadPage{}, ErrCommentInvariant
+	}
+	return CommentThreadPage{
+		Target: target, Items: items, Total: total, ThreadTotal: threadTotal,
+		Limit: limit, Offset: offset,
+	}, nil
 }
 
 func (service *CommentService) listComments(ctx context.Context, target CommentTarget, limit, offset int) (CommentPage, error) {
@@ -383,7 +441,9 @@ func normalizeCommentBody(value string) (string, error) {
 
 func validatePersistedComment(comment Comment) error {
 	if comment.ID == uuid.Nil || validateCommentTarget(comment.Target) != nil || comment.Author.ID == uuid.Nil ||
-		invalidOptionalUUID(comment.ParentCommentID) || strings.TrimSpace(comment.Author.DisplayName) == "" ||
+		invalidOptionalUUID(comment.ParentCommentID) || invalidOptionalUUID(comment.RootCommentID) ||
+		(comment.ParentCommentID == nil && (comment.RootCommentID != nil || comment.ReplyTo != nil)) ||
+		strings.TrimSpace(comment.Author.DisplayName) == "" ||
 		utf8.RuneCountInString(comment.Author.DisplayName) > 80 || comment.Version < 1 ||
 		comment.CreatedAt.IsZero() || comment.UpdatedAt.Before(comment.CreatedAt) {
 		return ErrCommentInvariant
@@ -407,6 +467,10 @@ func validatePersistedComment(comment Comment) error {
 		return ErrCommentInvariant
 	}
 	return nil
+}
+
+func validCommentThreadSort(sort CommentThreadSort) bool {
+	return sort == CommentThreadHot || sort == CommentThreadNewest || sort == CommentThreadOldest
 }
 
 func validateCommentTarget(target CommentTarget) error {

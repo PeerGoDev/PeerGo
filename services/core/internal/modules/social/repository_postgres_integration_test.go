@@ -116,6 +116,17 @@ func TestPostgresCommentRepositoryPreservesThreadHistoryAndOwnedWrites(t *testin
 	if err != nil || total != 3 || len(items) != 3 || items[0].ID != rootPublicID || items[1].ID != replyPublicID || items[2].ID != nestedReplyPublicID {
 		t.Fatalf("List() items=%+v total=%d error=%v", items, total, err)
 	}
+	threadItems, commentTotal, threadTotal, err := repository.ListThreads(ctx, torrentTarget, CommentThreadNewest, 1, 0)
+	if err != nil || commentTotal != 3 || threadTotal != 1 || len(threadItems) != 3 ||
+		threadItems[0].ID != rootPublicID || threadItems[1].ID != replyPublicID || threadItems[2].ID != nestedReplyPublicID {
+		t.Fatalf("ListThreads() items=%+v comments=%d threads=%d error=%v", threadItems, commentTotal, threadTotal, err)
+	}
+	if threadItems[1].RootCommentID == nil || *threadItems[1].RootCommentID != rootPublicID ||
+		threadItems[2].RootCommentID == nil || *threadItems[2].RootCommentID != rootPublicID ||
+		threadItems[1].ReplyTo == nil || threadItems[1].ReplyTo.ID != authorID ||
+		threadItems[2].ReplyTo == nil || threadItems[2].ReplyTo.ID != otherID {
+		t.Fatalf("ListThreads() reply context = %+v", threadItems)
+	}
 
 	updated, err := repository.Update(ctx, updateCommentCommand{
 		CommentID: rootPublicID, AuthorID: authorID, ExpectedVersion: 1,

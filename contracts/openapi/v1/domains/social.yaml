@@ -239,9 +239,17 @@ SocialPostCommentsPath:
           minimum: 0
           maximum: 99999
           default: 0
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          allOf:
+            - $ref: "../schemas/social.yaml#/SocialCommentSort"
+          default: newest
     responses:
       "200":
-        description: 动态评论与回复；删除项保留墓碑。
+        description: 按一级评论分页的动态评论与楼中楼回复；删除项保留墓碑。
         content:
           application/json:
             schema:

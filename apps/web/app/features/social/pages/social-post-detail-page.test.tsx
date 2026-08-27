@@ -29,7 +29,7 @@ function commentAuthor() {
 }
 
 describe("SocialPostDetailPage", () => {
-  it("renders the PtYes-compatible detail and flat comment frame", () => {
+  it("keeps replies inside their top-level thread with precise reply context", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     })
@@ -79,47 +79,58 @@ describe("SocialPostDetailPage", () => {
       created_at: "2026-08-13T06:00:00Z",
       updated_at: "2026-08-13T06:00:00Z",
     })
+    const rootId = "0198f20a-6da8-7e51-9c64-333333333333"
+    const secondRoot = {
+      id: "0198f20a-6da8-7e51-9c64-555555555555",
+      author: commentAuthor(),
+      body: "第二条一级评论。",
+      body_format: "plain_text" as const,
+      state: "visible" as const,
+      version: 1,
+      created_at: "2026-08-13T06:10:00Z",
+      updated_at: "2026-08-13T06:10:00Z",
+    }
+    const root = {
+      id: rootId,
+      author: commentAuthor(),
+      body: "欢迎来到新的动态讨论。",
+      body_format: "plain_text" as const,
+      state: "visible" as const,
+      version: 1,
+      created_at: "2026-08-13T06:05:00Z",
+      updated_at: "2026-08-13T06:05:00Z",
+    }
+    const replies = Array.from({ length: 4 }, (_, index) => ({
+      id: `0198f20a-6da8-7e51-9c64-44444444444${index}`,
+      parent_comment_id: rootId,
+      root_comment_id: rootId,
+      reply_to: commentAuthor(),
+      author: commentAuthor(),
+      body: index === 0 ? "这是楼中楼回复。" : `楼中楼回复 ${index + 1}。`,
+      body_format: "plain_text" as const,
+      state: "visible" as const,
+      version: 1,
+      created_at: `2026-08-13T06:0${index + 6}:00Z`,
+      updated_at: `2026-08-13T06:0${index + 6}:00Z`,
+    }))
+    const newestPage = {
+      items: [secondRoot, root, ...replies],
+      total: 6,
+      thread_total: 2,
+      limit: 20,
+      offset: 0,
+    } satisfies CommentPage
+    const oldestPage = {
+      ...newestPage,
+      items: [root, ...replies, secondRoot],
+    } satisfies CommentPage
     queryClient.setQueryData(
-      commentKeys.page(postCommentTarget(postId), 20, 0),
-      {
-        items: [
-          {
-            id: "0198f20a-6da8-7e51-9c64-333333333333",
-            author: commentAuthor(),
-            body: "欢迎来到新的动态讨论。",
-            body_format: "plain_text",
-            state: "visible",
-            version: 1,
-            created_at: "2026-08-13T06:05:00Z",
-            updated_at: "2026-08-13T06:05:00Z",
-          },
-          {
-            id: "0198f20a-6da8-7e51-9c64-444444444444",
-            parent_comment_id: "0198f20a-6da8-7e51-9c64-333333333333",
-            author: commentAuthor(),
-            body: "这是楼中楼回复。",
-            body_format: "plain_text",
-            state: "visible",
-            version: 1,
-            created_at: "2026-08-13T06:06:00Z",
-            updated_at: "2026-08-13T06:06:00Z",
-          },
-          {
-            id: "0198f20a-6da8-7e51-9c64-555555555555",
-            parent_comment_id: "0198f20a-6da8-7e51-9c64-000000000000",
-            author: commentAuthor(),
-            body: "父评论不在当前页的回复。",
-            body_format: "plain_text",
-            state: "visible",
-            version: 1,
-            created_at: "2026-08-13T06:07:00Z",
-            updated_at: "2026-08-13T06:07:00Z",
-          },
-        ],
-        total: 3,
-        limit: 20,
-        offset: 0,
-      } satisfies CommentPage
+      commentKeys.page(postCommentTarget(postId), 20, 0, "newest"),
+      newestPage
+    )
+    queryClient.setQueryData(
+      commentKeys.page(postCommentTarget(postId), 20, 0, "oldest"),
+      oldestPage
     )
 
     render(
@@ -156,35 +167,45 @@ describe("SocialPostDetailPage", () => {
       "shrink-0",
       "whitespace-nowrap"
     )
-    expect(screen.getByText("共 3 条评论")).toBeVisible()
+    expect(screen.getByText("共 6 条评论")).toBeVisible()
+    expect(screen.getByRole("button", { name: "热门" })).toBeVisible()
     expect(screen.getByRole("button", { name: "最新" })).toHaveClass(
       "h-7",
       "text-xs"
     )
     const comments = screen.getByRole("region", { name: "评论列表" })
-    const newestComment = within(comments).getByText("这是楼中楼回复。")
+    const newestComment = within(comments).getByText("第二条一级评论。")
     const oldestComment = within(comments).getByText("欢迎来到新的动态讨论。")
     expect(
-      oldestComment.compareDocumentPosition(newestComment) &
+      newestComment.compareDocumentPosition(oldestComment) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
-    fireEvent.click(screen.getByRole("button", { name: "最新" }))
-    expect(screen.getByRole("button", { name: "最早" })).toBeVisible()
+    expect(
+      within(comments).queryByText("楼中楼回复 4。")
+    ).not.toBeInTheDocument()
+    fireEvent.click(
+      within(comments).getByRole("button", { name: "查看全部 4 条回复" })
+    )
+    expect(within(comments).getByText("楼中楼回复 4。")).toBeVisible()
+    expect(within(comments).getAllByText("回复 @演示用户")).toHaveLength(4)
+    expect(
+      within(comments).queryByText("回复 一条早先评论")
+    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "最早" }))
     expect(
       oldestComment.compareDocumentPosition(newestComment) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
     expect(within(comments).getByText("欢迎来到新的动态讨论。")).toBeVisible()
-    expect(within(comments).getByText("父评论不在当前页的回复。")).toBeVisible()
     expect(
       within(comments).getByText("这是楼中楼回复。").closest("article")
     ).toHaveClass("ml-8", "py-3", "border-l-2", "sm:ml-11")
     expect(
       within(comments).getByText("这是楼中楼回复。").closest("article")
-    ).toHaveAttribute("id", "comment-0198f20a-6da8-7e51-9c64-444444444444")
+    ).toHaveAttribute("id", "comment-0198f20a-6da8-7e51-9c64-444444444440")
     expect(
       within(comments).getAllByRole("button", { name: "回复" })
-    ).toHaveLength(3)
+    ).toHaveLength(6)
     const rootArticle = within(comments)
       .getByText("欢迎来到新的动态讨论。")
       .closest("article")!
@@ -227,10 +248,11 @@ describe("SocialPostDetailPage", () => {
       updated_at: "2026-08-13T06:00:00Z",
     })
     queryClient.setQueryData(
-      commentKeys.page(postCommentTarget(postId), 20, 0),
+      commentKeys.page(postCommentTarget(postId), 20, 0, "newest"),
       {
         items: [],
         total: 0,
+        thread_total: 0,
         limit: 20,
         offset: 0,
       } satisfies CommentPage

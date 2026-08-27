@@ -95,6 +95,70 @@ func (repository *PostgresCommentRepository) List(ctx context.Context, target Co
 	return items, total, nil
 }
 
+// ListThreads pages top-level comments and returns each selected conversation
+// with all of its replies. Direct parent links remain intact while the stored
+// root identity guarantees that a reply can never be split onto another page.
+func (repository *PostgresCommentRepository) ListThreads(ctx context.Context, target CommentTarget, sort CommentThreadSort, limit, offset int) ([]Comment, int64, int64, error) {
+	targetKind, targetKey, targetErr := commentTargetParts(target)
+	if targetErr != nil || !validCommentThreadSort(sort) || limit < 1 || limit > MaxCommentLimit || offset < 0 || offset > MaxCommentOffset {
+		return nil, 0, 0, ErrCommentInput
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("begin comment thread list: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := socialdb.New(tx)
+	counts, err := queries.CountCommentThreads(ctx, socialdb.CountCommentThreadsParams{
+		TargetKind: targetKind, TargetKey: targetKey,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, 0, 0, ErrCommentTargetNotFound
+	}
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("count comment threads: %w", err)
+	}
+	if counts.CommentTotal < 0 || counts.ThreadTotal < 0 || counts.CommentTotal < counts.ThreadTotal {
+		return nil, 0, 0, ErrCommentInvariant
+	}
+	rows, err := queries.ListCommentThreads(ctx, socialdb.ListCommentThreadsParams{
+		TargetKind: targetKind, TargetKey: targetKey, SortOrder: string(sort),
+		ResultLimit: int32(limit), ResultOffset: int32(offset),
+	})
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("list comment threads: %w", err)
+	}
+	items := make([]Comment, 0, len(rows))
+	for _, row := range rows {
+		comment, conversionErr := commentFromThreadRow(row)
+		if conversionErr != nil {
+			return nil, 0, 0, conversionErr
+		}
+		items = append(items, comment)
+	}
+	if err := repository.enrichCommentAuthors(ctx, tx, items, time.Now().UTC()); err != nil {
+		return nil, 0, 0, err
+	}
+	byID := make(map[uuid.UUID]CommentAuthor, len(items))
+	for _, item := range items {
+		byID[item.ID] = item.Author
+	}
+	for index := range items {
+		if items[index].ParentCommentID == nil {
+			continue
+		}
+		parentAuthor, ok := byID[*items[index].ParentCommentID]
+		if !ok {
+			return nil, 0, 0, ErrCommentInvariant
+		}
+		items[index].ReplyTo = &parentAuthor
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, 0, 0, fmt.Errorf("commit comment thread list: %w", err)
+	}
+	return items, counts.CommentTotal, counts.ThreadTotal, nil
+}
+
 // Create performs lazy thread creation and comment insertion in one
 // transaction. The torrent row is locked only when the typed binding is still
 // absent, preventing concurrent first comments from creating orphan threads.
@@ -514,6 +578,22 @@ func commentFromLockedRow(row socialdb.LockCommentForAuthorRow) (Comment, error)
 		row.AuthorID, row.AuthorDisplayName, row.Body, row.BodyFormat, row.State,
 		row.Version, row.CreatedAt, row.UpdatedAt, row.EditedAt,
 	)
+}
+
+func commentFromThreadRow(row socialdb.ListCommentThreadsRow) (Comment, error) {
+	comment, err := commentFromFields(
+		row.CommentInternalID, row.PublicID, row.TargetKind, row.TargetKey, row.ParentPublicID,
+		row.AuthorID, row.AuthorDisplayName, row.Body, row.BodyFormat, row.State,
+		row.Version, row.CreatedAt, row.UpdatedAt, row.EditedAt,
+	)
+	if err != nil {
+		return Comment{}, err
+	}
+	if row.RootPublicID.Valid {
+		root := uuid.UUID(row.RootPublicID.Bytes)
+		comment.RootCommentID = &root
+	}
+	return comment, nil
 }
 
 func commentFromFields(

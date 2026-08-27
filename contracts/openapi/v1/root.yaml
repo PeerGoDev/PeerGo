@@ -836,6 +836,8 @@ components:
       $ref: "./schemas/social.yaml#/UpdateSocialPostRequest"
     SocialPostCommentPage:
       $ref: "./schemas/social.yaml#/SocialPostCommentPage"
+    SocialCommentSort:
+      $ref: "./schemas/social.yaml#/SocialCommentSort"
     SocialMediaUploadRequest:
       $ref: "./schemas/social.yaml#/SocialMediaUploadRequest"
     SocialInteractionState:

@@ -403,7 +403,7 @@ type TorrentBookmarkService interface {
 type CommentService interface {
 	ListTorrentComments(context.Context, int64, int, int) (social.CommentPage, error)
 	ListAnnouncementComments(context.Context, string, int, int) (social.CommentPage, error)
-	ListPostComments(context.Context, uuid.UUID, int, int) (social.CommentPage, error)
+	ListPostComments(context.Context, uuid.UUID, social.CommentThreadSort, int, int) (social.CommentThreadPage, error)
 	CreateTorrentComment(context.Context, string, string, social.CreateTorrentCommentInput) (social.Comment, error)
 	CreateAnnouncementComment(context.Context, string, string, social.CreateAnnouncementCommentInput) (social.Comment, error)
 	CreatePostComment(context.Context, string, string, social.CreatePostCommentInput) (social.Comment, error)

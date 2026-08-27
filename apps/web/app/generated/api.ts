@@ -5595,8 +5595,18 @@ export interface components {
         Comment: {
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 直接回复的评论，用于保留“回复谁”的精确上下文。
+             */
             parent_comment_id?: string | null;
+            /**
+             * Format: uuid
+             * @description 所属一级评论；一级评论自身为空，楼中楼回复均指向同一根楼。
+             */
+            root_comment_id?: string | null;
+            /** @description 直接回复对象的作者；仅回复评论返回。 */
+            reply_to?: components["schemas"]["CommentAuthor"] | null;
             author: components["schemas"]["CommentAuthor"];
             /** @description 可见评论正文；墓碑状态返回空字符串。 */
             body: string;
@@ -5882,11 +5892,21 @@ export interface components {
             /** Format: uuid */
             post_id: string;
             items: components["schemas"]["Comment"][];
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description 一级评论与楼中楼回复的总数。
+             */
             total: number;
+            /**
+             * Format: int64
+             * @description 用于分页的一级评论总数。
+             */
+            thread_total: number;
             limit: number;
             offset: number;
         };
+        /** @enum {string} */
+        SocialCommentSort: "hot" | "newest" | "oldest";
         SocialMediaUploadRequest: {
             /** Format: binary */
             image: string;
@@ -15506,6 +15526,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                sort?: string & components["schemas"]["SocialCommentSort"];
             };
             header?: never;
             path: {
@@ -15516,7 +15537,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 动态评论与回复；删除项保留墓碑。 */
+            /** @description 按一级评论分页的动态评论与楼中楼回复；删除项保留墓碑。 */
             200: {
                 headers: {
                     [name: string]: unknown;

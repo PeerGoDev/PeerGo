@@ -20,6 +20,10 @@ func (h *Handler) ListSocialPostComments(ctx context.Context, request generated.
 	if request.Params.Offset != nil {
 		offset = *request.Params.Offset
 	}
+	sort := social.CommentThreadNewest
+	if request.Params.Sort != nil {
+		sort = social.CommentThreadSort(*request.Params.Sort)
+	}
 	// CommentService keeps torrent/announcement public reads reusable. Posts
 	// are member-only, so re-authorize the target read before touching the
 	// shared comment projection instead of widening all comment reads.
@@ -38,7 +42,7 @@ func (h *Handler) ListSocialPostComments(ctx context.Context, request generated.
 			return nil, err
 		}
 	}
-	page, err := h.comments.ListPostComments(ctx, request.PostId, limit, offset)
+	page, err := h.comments.ListPostComments(ctx, request.PostId, sort, limit, offset)
 	switch {
 	case errors.Is(err, social.ErrCommentInput):
 		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_comment_query", "评论查询无效", "每页数量或偏移量无效。")
@@ -89,10 +93,13 @@ func (h *Handler) CreateSocialPostComment(ctx context.Context, request generated
 	return generated.CreateSocialPostComment201JSONResponse(commentDTO(comment)), nil
 }
 
-func socialPostCommentPageDTO(page social.CommentPage) generated.SocialPostCommentPage {
+func socialPostCommentPageDTO(page social.CommentThreadPage) generated.SocialPostCommentPage {
 	items := make([]generated.Comment, 0, len(page.Items))
 	for _, item := range page.Items {
 		items = append(items, commentDTO(item))
 	}
-	return generated.SocialPostCommentPage{PostId: page.Target.PostPublicID, Items: items, Total: page.Total, Limit: page.Limit, Offset: page.Offset}
+	return generated.SocialPostCommentPage{
+		PostId: page.Target.PostPublicID, Items: items, Total: page.Total,
+		ThreadTotal: page.ThreadTotal, Limit: page.Limit, Offset: page.Offset,
+	}
 }

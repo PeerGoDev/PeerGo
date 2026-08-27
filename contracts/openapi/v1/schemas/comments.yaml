@@ -71,6 +71,18 @@ Comment:
       type: string
       format: uuid
       nullable: true
+      description: 直接回复的评论，用于保留“回复谁”的精确上下文。
+    root_comment_id:
+      type: string
+      format: uuid
+      nullable: true
+      description: 所属一级评论；一级评论自身为空，楼中楼回复均指向同一根楼。
+    reply_to:
+      type: object
+      nullable: true
+      allOf:
+        - $ref: "#/CommentAuthor"
+      description: 直接回复对象的作者；仅回复评论返回。
     author:
       $ref: "#/CommentAuthor"
     body:
