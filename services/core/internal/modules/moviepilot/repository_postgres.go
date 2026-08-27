@@ -15,10 +15,12 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 )
 
-// Repository contains only MoviePilot's canonical profile projection. Shared
-// personal-key persistence belongs to the personalapikey module.
+// Repository contains only canonical profile and settled reward projections
+// shared by external clients. Personal-key persistence belongs to the
+// personalapikey module.
 type Repository interface {
 	Profile(context.Context, uuid.UUID, time.Time) (Profile, error)
+	LatestSeedingReward(context.Context, uuid.UUID) (int64, error)
 }
 
 type PostgresRepository struct{ pool *pgxpool.Pool }
@@ -86,6 +88,26 @@ WHERE users.id = $1
 	result.LastActiveAt = optionalTime(lastActive)
 	result.VIPUntil = optionalTime(vipUntil)
 	return result, nil
+}
+
+// LatestSeedingReward reads the most recent completed hourly settlement. It
+// deliberately does not calculate or persist a second real-time reward model
+// for integrations, so polling clients cannot grow PostgreSQL history.
+func (repository *PostgresRepository) LatestSeedingReward(ctx context.Context, userID uuid.UUID) (int64, error) {
+	var reward int64
+	err := repository.pool.QueryRow(ctx, `
+SELECT reward
+FROM economy.seeding_reward_calculations
+WHERE user_id = $1
+ORDER BY window_start DESC
+LIMIT 1`, userID).Scan(&reward)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("read integration seeding reward: %w", err)
+	}
+	return reward, nil
 }
 
 func optionalTime(value pgtype.Timestamptz) *time.Time {

@@ -209,13 +209,16 @@ type PersonalAPIKeyService interface {
 	Authenticate(context.Context, string) (personalapikey.AuthenticatedCredential, error)
 }
 
-// MoviePilotService is only the MoviePilot compatibility projection. It
-// consumes an already authenticated shared personal key and owns no key rows.
+// MoviePilotService is the canonical compatibility projection shared by
+// MoviePilot and PT-depiler. It consumes an already authenticated personal key
+// and owns no key rows.
 type MoviePilotService interface {
 	Profile(context.Context, personalapikey.AuthenticatedCredential) (moviepilot.Profile, error)
+	SeedingReward(context.Context, personalapikey.AuthenticatedCredential) (int64, error)
 	ListTorrents(context.Context, personalapikey.AuthenticatedCredential, int, int, string, string) (moviepilot.TorrentPage, error)
 	Torrent(context.Context, personalapikey.AuthenticatedCredential, int64) (moviepilot.TorrentDownloadDescriptor, error)
 	Download(context.Context, int64, string) (torrents.TorrentDownloadResult, error)
+	DownloadWithCredential(context.Context, personalapikey.AuthenticatedCredential, int64) (torrents.TorrentDownloadResult, error)
 	AttendanceOverview(context.Context, personalapikey.AuthenticatedCredential) (attendance.Overview, error)
 	ClaimAttendance(context.Context, personalapikey.AuthenticatedCredential, attendance.Mode) (attendance.Record, error)
 }

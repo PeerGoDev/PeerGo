@@ -60,10 +60,11 @@ type rateWindow struct {
 	count  int
 }
 
-// Service is a deliberately narrow compatibility adapter for MoviePilot. It
-// projects canonical PeerGo reads directly; shared API-key lifecycle and
-// authentication are owned by personalapikey. Searches, downloads and
-// attendance calls create no API log or copied record in PostgreSQL.
+// Service is a deliberately narrow compatibility adapter for external Rousi
+// clients. It projects canonical PeerGo reads directly; shared API-key
+// lifecycle and authentication are owned by personalapikey. Searches,
+// downloads and attendance calls create no API log or copied record in
+// PostgreSQL.
 type Service struct {
 	repository   Repository
 	apiKeys      APIKeyService
@@ -139,6 +140,19 @@ func (service *Service) Profile(ctx context.Context, credential personalapikey.A
 		}
 	}
 	return profile, nil
+}
+
+// SeedingReward returns the latest completed hourly settlement used by
+// PT-depiler's bonusPerHour field. It never recomputes or stores a polling-time
+// estimate, keeping the integration read-only and storage-bounded.
+func (service *Service) SeedingReward(ctx context.Context, credential personalapikey.AuthenticatedCredential) (int64, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeProfileRead); err != nil {
+		return 0, err
+	}
+	if !service.allow(credential.User.ID, "seeding-reward", 30) {
+		return 0, ErrRateLimited
+	}
+	return service.repository.LatestSeedingReward(ctx, credential.User.ID)
 }
 
 func (service *Service) ListTorrents(ctx context.Context, credential personalapikey.AuthenticatedCredential, page, pageSize int, keyword, categoryID string) (TorrentPage, error) {
@@ -229,6 +243,23 @@ func (service *Service) Download(ctx context.Context, torrentID int64, capabilit
 		return torrents.TorrentDownloadResult{}, err
 	}
 	return service.downloader.DownloadForRSS(ctx, user, torrents.TorrentID(torrentID))
+}
+
+// DownloadWithCredential supports PT-depiler's fixed legacy download route.
+// Authentication has already resolved the shared personal API key; this method
+// applies the same scope, rate, purchase, restriction and metainfo pipeline as
+// every other external download.
+func (service *Service) DownloadWithCredential(ctx context.Context, credential personalapikey.AuthenticatedCredential, torrentID int64) (torrents.TorrentDownloadResult, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeTorrentDownload); err != nil {
+		return torrents.TorrentDownloadResult{}, err
+	}
+	if credential.User.ID == uuid.Nil || torrentID < 1 {
+		return torrents.TorrentDownloadResult{}, ErrInput
+	}
+	if !service.allow(credential.User.ID, "torrent-download", 20) {
+		return torrents.TorrentDownloadResult{}, ErrRateLimited
+	}
+	return service.downloader.DownloadForRSS(ctx, credential.User, torrents.TorrentID(torrentID))
 }
 
 func (service *Service) AttendanceOverview(ctx context.Context, credential personalapikey.AuthenticatedCredential) (attendance.Overview, error) {

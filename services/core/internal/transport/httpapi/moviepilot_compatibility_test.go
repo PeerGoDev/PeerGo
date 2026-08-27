@@ -83,6 +83,61 @@ func TestMoviePilotCompatibilityReturnsOfficialTorrentShape(t *testing.T) {
 	}
 }
 
+func TestPTDepilerCompatibilityUsesOfficialSearchAlias(t *testing.T) {
+	createdAt := time.Date(2026, 8, 27, 8, 0, 0, 0, time.UTC)
+	stub := &moviePilotCompatibilityStub{
+		torrentPage: moviepilot.TorrentPage{
+			Items: []moviepilot.TorrentSummary{{
+				ID: 9830, LegacyRouteID: "9830", Title: "Example", Subtitle: "Subtitle",
+				Category: "movie", CategoryName: "电影", Size: 1024, Seeders: 7,
+				Leechers: 2, Downloads: 9, CreatedAt: createdAt,
+			}},
+			Total: 1, Page: 1, PageSize: 100, TotalPages: 1,
+		},
+	}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/search?page_size=100&keyword=Example&category=movie", nil)
+	request.Header.Set("Authorization", "Bearer pgk_pt-depiler")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Code int `json:"code"`
+		Data struct {
+			Torrents []struct {
+				UUID string `json:"uuid"`
+			} `json:"torrents"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != 0 || len(body.Data.Torrents) != 1 || body.Data.Torrents[0].UUID != "9830" {
+		t.Fatalf("unexpected PT-depiler search response: %+v", body)
+	}
+	if stub.listPage != 1 || stub.listPageSize != 100 || stub.listKeyword != "Example" || stub.listCategory != "movie" {
+		t.Fatalf("search input = page %d size %d keyword %q category %q", stub.listPage, stub.listPageSize, stub.listKeyword, stub.listCategory)
+	}
+}
+
+func TestPTDepilerCompatibilityReturnsLatestSettledSeedingReward(t *testing.T) {
+	stub := &moviePilotCompatibilityStub{seedingReward: 42}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/seeding-reward", nil)
+	request.Header.Set("Authorization", "Bearer pgk_pt-depiler")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"total_reward":42`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestMoviePilotCompatibilityFailsClosedForInvalidCredential(t *testing.T) {
 	stub := &moviePilotCompatibilityStub{authenticateErr: personalapikey.ErrInvalid}
 	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
@@ -116,6 +171,43 @@ func TestMoviePilotCompatibilityStreamsCapabilityDownloadWithoutAPIKeyInURL(t *t
 	}
 }
 
+func TestPTDepilerCompatibilityStreamsFixedLegacyDownloadRoute(t *testing.T) {
+	const rawCredential = "pgk_pt-depiler"
+	stub := &moviePilotCompatibilityStub{download: torrents.TorrentDownloadResult{Data: []byte("torrent-bytes"), Filename: "[Rousi] Example.torrent"}}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
+	request := httptest.NewRequest(http.MethodGet, "/api/torrent/9830/download/"+rawCredential, nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK || response.Body.String() != "torrent-bytes" {
+		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+	if stub.authenticatedToken != rawCredential || stub.downloadTorrentID != 9830 {
+		t.Fatalf("credential=%q torrent=%d", stub.authenticatedToken, stub.downloadTorrentID)
+	}
+	if strings.Contains(response.Body.String(), rawCredential) {
+		t.Fatal("PT-depiler credential leaked in response")
+	}
+	if response.Header().Get("Cache-Control") != "private, no-store" || response.Header().Get("Referrer-Policy") != "no-referrer" {
+		t.Fatalf("unexpected private headers: %v", response.Header())
+	}
+}
+
+func TestPTDepilerCompatibilityRejectsConflictingHeaderCredential(t *testing.T) {
+	stub := &moviePilotCompatibilityStub{}
+	handler := MoviePilotCompatibility(stub, stub)(http.NotFoundHandler())
+	request := httptest.NewRequest(http.MethodGet, "/api/torrent/9830/download/pgk_path-key", nil)
+	request.Header.Set("Authorization", "Bearer pgk_other-key")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized || stub.authenticatedToken != "" || strings.Contains(response.Body.String(), "pgk_") {
+		t.Fatalf("status=%d authenticated=%q body=%s", response.Code, stub.authenticatedToken, response.Body.String())
+	}
+}
+
 func TestPrivateResponseHeadersProtectIssuedPersonalAPIKey(t *testing.T) {
 	next := http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
 		response.WriteHeader(http.StatusCreated)
@@ -137,6 +229,12 @@ type moviePilotCompatibilityStub struct {
 	authenticateErr    error
 	torrentPage        moviepilot.TorrentPage
 	download           torrents.TorrentDownloadResult
+	seedingReward      int64
+	listPage           int
+	listPageSize       int
+	listKeyword        string
+	listCategory       string
+	downloadTorrentID  int64
 }
 
 func (stub moviePilotCompatibilityStub) Status(context.Context, string) (personalapikey.Status, error) {
@@ -163,7 +261,13 @@ func (stub moviePilotCompatibilityStub) Profile(context.Context, personalapikey.
 	return moviepilot.Profile{}, nil
 }
 
-func (stub moviePilotCompatibilityStub) ListTorrents(context.Context, personalapikey.AuthenticatedCredential, int, int, string, string) (moviepilot.TorrentPage, error) {
+func (stub moviePilotCompatibilityStub) SeedingReward(context.Context, personalapikey.AuthenticatedCredential) (int64, error) {
+	return stub.seedingReward, nil
+}
+
+func (stub *moviePilotCompatibilityStub) ListTorrents(_ context.Context, _ personalapikey.AuthenticatedCredential, page, pageSize int, keyword, category string) (moviepilot.TorrentPage, error) {
+	stub.listPage, stub.listPageSize = page, pageSize
+	stub.listKeyword, stub.listCategory = keyword, category
 	return stub.torrentPage, nil
 }
 
@@ -172,6 +276,11 @@ func (stub moviePilotCompatibilityStub) Torrent(context.Context, personalapikey.
 }
 
 func (stub moviePilotCompatibilityStub) Download(context.Context, int64, string) (torrents.TorrentDownloadResult, error) {
+	return stub.download, nil
+}
+
+func (stub *moviePilotCompatibilityStub) DownloadWithCredential(_ context.Context, _ personalapikey.AuthenticatedCredential, torrentID int64) (torrents.TorrentDownloadResult, error) {
+	stub.downloadTorrentID = torrentID
 	return stub.download, nil
 }
 

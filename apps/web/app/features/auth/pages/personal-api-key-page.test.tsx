@@ -50,6 +50,11 @@ describe("PersonalAPIKeyPage", () => {
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
     expect(screen.getByText(/一把通用的个人 API Key/)).toBeVisible()
+    expect(screen.getByText("PT-depiler · 已支持")).toBeVisible()
+    expect(screen.getByText(/Passkey 字段请粘贴本页 API Key/)).toBeVisible()
+    expect(
+      screen.getByText(/“读取账户资料”“读取与搜索种子”“下载种子”/)
+    ).toBeVisible()
     expect(screen.getByText(/不保存可还原的原文或逐请求日志/)).toBeVisible()
 
     await user.click(screen.getByRole("button", { name: "创建 API Key" }))

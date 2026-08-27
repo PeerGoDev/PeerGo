@@ -13,6 +13,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/attendance"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/torrentpurchase"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/moviepilot"
 	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
@@ -27,11 +28,12 @@ type moviePilotResponse struct {
 	Data    any    `json:"data,omitempty"`
 }
 
-// MoviePilotCompatibility intercepts only the legacy endpoints and only
-// claims the colliding torrent routes when an external Authorization header is
-// present. Ordinary PeerGo browser calls continue through OpenAPI validation.
-// It must be mounted after private response headers and before same-origin
-// enforcement because API-key clients are not browser-cookie audiences.
+// MoviePilotCompatibility intercepts the legacy Rousi API used by MoviePilot
+// and PT-depiler, and only claims colliding torrent routes when an external
+// Authorization header is present. Ordinary PeerGo browser calls continue
+// through OpenAPI validation. It must be mounted after private response headers
+// and before same-origin enforcement because API-key clients are not
+// browser-cookie audiences.
 func MoviePilotCompatibility(apiKeys PersonalAPIKeyService, service MoviePilotService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +44,12 @@ func MoviePilotCompatibility(apiKeys PersonalAPIKeyService, service MoviePilotSe
 			switch {
 			case r.Method == http.MethodGet && r.URL.Path == "/api/v1/profile":
 				handleMoviePilotProfile(apiKeys, service, w, r)
+				return
+			case r.Method == http.MethodGet && r.URL.Path == "/api/v1/search":
+				handleMoviePilotTorrentList(apiKeys, service, w, r)
+				return
+			case r.Method == http.MethodGet && r.URL.Path == "/api/v1/seeding-reward":
+				handlePTDepilerSeedingReward(apiKeys, service, w, r)
 				return
 			case r.Method == http.MethodGet && r.URL.Path == "/api/v1/torrents" && hasMoviePilotCredentialHeader(r):
 				handleMoviePilotTorrentList(apiKeys, service, w, r)
@@ -59,6 +67,10 @@ func MoviePilotCompatibility(apiKeys PersonalAPIKeyService, service MoviePilotSe
 				handleMoviePilotDownload(service, w, r)
 				return
 			default:
+				if torrentID, rawCredential, ok := ptDepilerDownloadCredential(r); ok {
+					handlePTDepilerDownload(apiKeys, service, torrentID, rawCredential, w, r)
+					return
+				}
 				next.ServeHTTP(w, r)
 			}
 		})
@@ -82,7 +94,7 @@ func handleMoviePilotProfile(apiKeys PersonalAPIKeyService, service MoviePilotSe
 	}
 	writeMoviePilotJSON(w, http.StatusOK, moviePilotResponse{Code: 0, Message: "success", Data: map[string]any{
 		"id": profile.NumericID, "username": profile.Username, "display_name": profile.DisplayName,
-		"level_text": fmt.Sprintf("Lv.%d", profile.Level), "registered_at": profile.RegisteredAt,
+		"level": profile.Level, "level_text": fmt.Sprintf("Lv.%d", profile.Level), "registered_at": profile.RegisteredAt,
 		"last_active_at": profile.LastActiveAt, "uploaded": profile.Uploaded, "downloaded": profile.Downloaded,
 		"ratio": ratio, "karma": profile.Magic, "experience": profile.Experience,
 		"email_verified": profile.EmailVerified, "vip": profile.VIP, "vip_until": profile.VIPUntil,
@@ -90,6 +102,20 @@ func handleMoviePilotProfile(apiKeys PersonalAPIKeyService, service MoviePilotSe
 			"seeding_count": profile.SeedingCount, "seeding_size": profile.SeedingSize,
 			"leeching_count": profile.LeechingCount, "leeching_size": profile.LeechingSize,
 		},
+	}})
+}
+
+func handlePTDepilerSeedingReward(apiKeys PersonalAPIKeyService, service MoviePilotService, w http.ResponseWriter, r *http.Request) {
+	credential, ok := authenticateMoviePilot(apiKeys, w, r)
+	if !ok {
+		return
+	}
+	reward, err := service.SeedingReward(r.Context(), credential)
+	if writeMoviePilotServiceError(w, err) {
+		return
+	}
+	writeMoviePilotJSON(w, http.StatusOK, moviePilotResponse{Code: 0, Message: "success", Data: map[string]any{
+		"total_reward": reward,
 	}})
 }
 
@@ -200,25 +226,29 @@ func handleMoviePilotAttendanceStats(apiKeys PersonalAPIKeyService, service Movi
 func handleMoviePilotDownload(service MoviePilotService, w http.ResponseWriter, r *http.Request) {
 	torrentID := moviePilotDownloadTorrentID(r.URL.Path)
 	result, err := service.Download(r.Context(), torrentID, r.URL.Query().Get("capability"))
-	if err != nil {
-		status := http.StatusInternalServerError
-		switch {
-		case errors.Is(err, moviepilot.ErrCapabilityInvalid), errors.Is(err, personalapikey.ErrInvalid):
-			status = http.StatusUnauthorized
-		case errors.Is(err, moviepilot.ErrRateLimited):
-			status = http.StatusTooManyRequests
-		case errors.Is(err, torrents.ErrTorrentDownloadNotFound), errors.Is(err, torrents.ErrTorrentReadNotFound), errors.Is(err, catalog.ErrTorrentNotFound):
-			status = http.StatusNotFound
-		case errors.Is(err, torrents.ErrTorrentDownloadEmailUnverified), errors.Is(err, torrents.ErrTorrentDownloadRestricted), errors.Is(err, authz.ErrForbidden):
-			status = http.StatusForbidden
-		case errors.Is(err, torrents.ErrTorrentDownloadStorageUnavailable):
-			status = http.StatusServiceUnavailable
-		case errors.Is(err, torrents.ErrTorrentDownloadObjectConflict):
-			status = http.StatusConflict
-		}
-		writeMoviePilotJSON(w, status, moviePilotResponse{Code: status, Message: "种子下载失败"})
+	if writeIntegrationDownloadError(w, err) {
 		return
 	}
+	writeIntegrationTorrent(w, result)
+}
+
+func handlePTDepilerDownload(apiKeys PersonalAPIKeyService, service MoviePilotService, torrentID int64, rawCredential string, w http.ResponseWriter, r *http.Request) {
+	if headerCredential, present, valid := optionalMoviePilotCredentialFromRequest(r); present && (!valid || headerCredential != rawCredential) {
+		writeInvalidIntegrationCredential(w)
+		return
+	}
+	credential, ok := authenticateIntegrationCredential(apiKeys, rawCredential, w, r)
+	if !ok {
+		return
+	}
+	result, err := service.DownloadWithCredential(r.Context(), credential, torrentID)
+	if writeIntegrationDownloadError(w, err) {
+		return
+	}
+	writeIntegrationTorrent(w, result)
+}
+
+func writeIntegrationTorrent(w http.ResponseWriter, result torrents.TorrentDownloadResult) {
 	w.Header().Set("Content-Type", "application/x-bittorrent")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": result.Filename}))
 	w.Header().Set("Cache-Control", "private, no-store")
@@ -227,17 +257,44 @@ func handleMoviePilotDownload(service MoviePilotService, w http.ResponseWriter, 
 	_, _ = w.Write(result.Data)
 }
 
+func writeIntegrationDownloadError(w http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	status := http.StatusInternalServerError
+	switch {
+	case errors.Is(err, moviepilot.ErrCapabilityInvalid), errors.Is(err, personalapikey.ErrInvalid):
+		status = http.StatusUnauthorized
+	case errors.Is(err, moviepilot.ErrRateLimited):
+		status = http.StatusTooManyRequests
+	case errors.Is(err, torrents.ErrTorrentDownloadNotFound), errors.Is(err, torrents.ErrTorrentReadNotFound), errors.Is(err, catalog.ErrTorrentNotFound):
+		status = http.StatusNotFound
+	case errors.Is(err, torrentpurchase.ErrPurchaseRequired):
+		status = http.StatusPaymentRequired
+	case errors.Is(err, torrents.ErrTorrentDownloadEmailUnverified), errors.Is(err, torrents.ErrTorrentDownloadRestricted), errors.Is(err, torrentpurchase.ErrPurchaseDisabled), errors.Is(err, authz.ErrForbidden), errors.Is(err, personalapikey.ErrScopeDenied):
+		status = http.StatusForbidden
+	case errors.Is(err, identity.ErrTrackerCredentialUnavailable), errors.Is(err, identity.ErrTrackerCredentialStateConflict), errors.Is(err, torrents.ErrTorrentDownloadStorageUnavailable):
+		status = http.StatusServiceUnavailable
+	case errors.Is(err, torrents.ErrTorrentDownloadObjectConflict):
+		status = http.StatusConflict
+	}
+	writeMoviePilotJSON(w, status, moviePilotResponse{Code: status, Message: "种子下载失败"})
+	return true
+}
+
 func authenticateMoviePilot(service PersonalAPIKeyService, w http.ResponseWriter, r *http.Request) (personalapikey.AuthenticatedCredential, bool) {
 	raw, valid := moviePilotCredentialFromRequest(r)
 	if !valid {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="PeerGo MoviePilot"`)
-		writeMoviePilotJSON(w, http.StatusUnauthorized, moviePilotResponse{Code: 401, Message: "API Key 无效或已撤销"})
+		writeInvalidIntegrationCredential(w)
 		return personalapikey.AuthenticatedCredential{}, false
 	}
+	return authenticateIntegrationCredential(service, raw, w, r)
+}
+
+func authenticateIntegrationCredential(service PersonalAPIKeyService, raw string, w http.ResponseWriter, r *http.Request) (personalapikey.AuthenticatedCredential, bool) {
 	credential, err := service.Authenticate(r.Context(), raw)
 	if errors.Is(err, personalapikey.ErrInvalid) {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="PeerGo MoviePilot"`)
-		writeMoviePilotJSON(w, http.StatusUnauthorized, moviePilotResponse{Code: 401, Message: "API Key 无效或已撤销"})
+		writeInvalidIntegrationCredential(w)
 		return personalapikey.AuthenticatedCredential{}, false
 	}
 	if err != nil {
@@ -245,6 +302,11 @@ func authenticateMoviePilot(service PersonalAPIKeyService, w http.ResponseWriter
 		return personalapikey.AuthenticatedCredential{}, false
 	}
 	return credential, true
+}
+
+func writeInvalidIntegrationCredential(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", `Bearer realm="PeerGo integrations"`)
+	writeMoviePilotJSON(w, http.StatusUnauthorized, moviePilotResponse{Code: 401, Message: "API Key 无效或已撤销"})
 }
 
 func moviePilotCredentialFromRequest(r *http.Request) (string, bool) {
@@ -269,6 +331,35 @@ func moviePilotCredentialFromRequest(r *http.Request) (string, bool) {
 
 func hasMoviePilotCredentialHeader(r *http.Request) bool {
 	return strings.TrimSpace(r.Header.Get("Authorization")) != "" || strings.TrimSpace(r.Header.Get("api-token")) != ""
+}
+
+func optionalMoviePilotCredentialFromRequest(r *http.Request) (string, bool, bool) {
+	if !hasMoviePilotCredentialHeader(r) {
+		return "", false, true
+	}
+	raw, valid := moviePilotCredentialFromRequest(r)
+	return raw, true, valid
+}
+
+func ptDepilerDownloadCredential(r *http.Request) (int64, string, bool) {
+	if r.Method != http.MethodGet {
+		return 0, "", false
+	}
+	const prefix = "/api/torrent/"
+	const marker = "/download/"
+	if !strings.HasPrefix(r.URL.Path, prefix) {
+		return 0, "", false
+	}
+	remainder := strings.TrimPrefix(r.URL.Path, prefix)
+	rawTorrentID, rawCredential, found := strings.Cut(remainder, marker)
+	if !found || rawTorrentID == "" || rawCredential == "" || strings.Contains(rawCredential, "/") {
+		return 0, "", false
+	}
+	torrentID, err := strconv.ParseInt(rawTorrentID, 10, 64)
+	if err != nil || torrentID < 1 {
+		return 0, "", false
+	}
+	return torrentID, rawCredential, true
 }
 
 func moviePilotTorrentID(path string) int64 {
@@ -356,7 +447,7 @@ func writeMoviePilotServiceError(w http.ResponseWriter, err error) bool {
 		status, code, message = http.StatusConflict, 409, "签到暂未开放"
 	}
 	if status == http.StatusUnauthorized {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="PeerGo MoviePilot"`)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="PeerGo integrations"`)
 	}
 	writeMoviePilotJSON(w, status, moviePilotResponse{Code: code, Message: message})
 	return true

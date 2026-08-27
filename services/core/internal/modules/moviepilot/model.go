@@ -1,7 +1,7 @@
-// Package moviepilot owns the deliberately narrow compatibility boundary for
-// the official MoviePilot Rousi adapter. Personal API-key lifecycle and
-// authentication live in personalapikey so future adapters share one secure
-// credential instead of introducing tool-specific secrets.
+// Package moviepilot owns the deliberately narrow compatibility projection for
+// external Rousi clients. Personal API-key lifecycle and authentication live
+// in personalapikey so MoviePilot, PT-depiler and future adapters share one
+// secure credential instead of introducing tool-specific secrets.
 package moviepilot
 
 import (

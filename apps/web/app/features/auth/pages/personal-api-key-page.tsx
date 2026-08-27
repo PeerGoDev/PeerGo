@@ -179,13 +179,20 @@ export function PersonalAPIKeyPage() {
       <Alert>
         <ShieldCheckIcon />
         <AlertTitle>一把通用的个人 API Key</AlertTitle>
-        <AlertDescription className="space-y-2">
+        <AlertDescription className="flex flex-col gap-2">
           <p>
-            同一把 Key 可用于 MoviePilot
-            及后续接入的工具；每个工具只能调用你授予的权限。它不会替代浏览器登录，也不会出现在种子下载地址中。
+            同一把 Key 可用于 MoviePilot、PT-depiler
+            及后续接入的工具；每个工具只能调用你授予的权限。它不会替代浏览器登录。
+          </p>
+          <p>
+            PT-depiler 设置里的 Passkey 字段请粘贴本页 API Key，不要填写 Tracker
+            Passkey，并授予“读取账户资料”“读取与搜索种子”“下载种子”三项权限。其上游下载协议会在请求路径中携带
+            Key；PeerGo 已关闭该专用路径的访问与错误日志并禁止
+            Referrer，但仍不要分享下载地址。
           </p>
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">MoviePilot · 已支持</Badge>
+            <Badge variant="outline">PT-depiler · 已支持</Badge>
           </div>
         </AlertDescription>
       </Alert>
@@ -352,7 +359,7 @@ export function PersonalAPIKeyPage() {
                           }
                           disabled={rotate.isPending || revoke.isPending}
                         />
-                        <div className="space-y-0.5">
+                        <div className="flex flex-col gap-0.5">
                           <FieldLabel htmlFor={id} className="font-normal">
                             {scope.label}
                           </FieldLabel>

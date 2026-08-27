@@ -76,7 +76,8 @@ func PrivateResponseHeaders(next http.Handler) http.Handler {
 			w.Header().Set("Pragma", "no-cache")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 		}
-		if r.URL.Path == "/api/v1/profile" || strings.HasPrefix(r.URL.Path, "/api/points/attendance") ||
+		if r.URL.Path == "/api/v1/profile" || r.URL.Path == "/api/v1/search" || r.URL.Path == "/api/v1/seeding-reward" ||
+			strings.HasPrefix(r.URL.Path, "/api/torrent/") || strings.HasPrefix(r.URL.Path, "/api/points/attendance") ||
 			strings.HasPrefix(r.URL.Path, "/api/compat/moviepilot/") {
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
