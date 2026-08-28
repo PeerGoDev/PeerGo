@@ -53,7 +53,7 @@ describe("ManagedUserTable", () => {
     expect(screen.getAllByText("下载受限").length).toBeGreaterThan(0)
     expect(screen.getAllByText("未验证").length).toBeGreaterThan(0)
     await user.click(
-      screen.getByRole("button", { name: "查看账户 demo-target" })
+      screen.getByRole("button", { name: "管理账户 demo-target" })
     )
     expect(onSelect).toHaveBeenCalledWith(
       "0198f20a-6da8-7e51-9c64-666666666666"

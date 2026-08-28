@@ -1,4 +1,4 @@
-import { EyeIcon, ShieldAlertIcon, UsersRoundIcon } from "lucide-react"
+import { Settings2Icon, ShieldAlertIcon, UsersRoundIcon } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
 import { Button } from "~/components/ui/button"
@@ -133,10 +133,10 @@ export function ManagedUserTable({
                     size="icon-sm"
                     className="size-7"
                     onClick={() => onSelect(user.id)}
-                    aria-label={`查看账户 ${user.username}`}
-                    title="查看"
+                    aria-label={`管理账户 ${user.username}`}
+                    title="设置"
                   >
-                    <EyeIcon />
+                    <Settings2Icon />
                   </Button>
                 </TableCell>
               </TableRow>
@@ -187,8 +187,8 @@ export function ManagedUserTable({
                 size="sm"
                 onClick={() => onSelect(user.id)}
               >
-                <EyeIcon data-icon="inline-start" />
-                查看账户详情
+                <Settings2Icon data-icon="inline-start" />
+                管理账户
               </Button>
             </CardContent>
           </Card>

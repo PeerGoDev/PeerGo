@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { useNavigate, useSearchParams } from "react-router"
+import { useSearchParams } from "react-router"
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -50,6 +50,7 @@ import {
   type ManagedUserPage,
 } from "~/features/staff/api/user-administration.queries"
 import { ManagedUserTable } from "~/features/staff/components/managed-user-table"
+import { ManagedUserDialog } from "~/features/staff/components/managed-user-detail-sheet"
 import { AccountAccessAppealQueue } from "~/features/staff/components/account-access-appeal-queue"
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
@@ -61,7 +62,13 @@ import {
   parseManagedUserFilters,
 } from "~/features/staff/model/user-administration"
 
-export function StaffUsersPage() {
+export function StaffUsersPage({
+  initialSelectedUserId,
+  onDialogClose,
+}: {
+  initialSelectedUserId?: string
+  onDialogClose?: () => void
+} = {}) {
   return (
     <StaffAccessGate
       requiredAction="user.account.read"
@@ -73,6 +80,9 @@ export function StaffUsersPage() {
       {({ session, capabilities }) => (
         <UsersContent
           csrfToken={session.csrf_token}
+          currentStaffUserId={session.user.id}
+          initialSelectedUserId={initialSelectedUserId}
+          onDialogClose={onDialogClose}
           canRestrict={hasCapability(capabilities, "user.account.restrict")}
           canRevoke={hasCapability(
             capabilities,
@@ -87,6 +97,15 @@ export function StaffUsersPage() {
             "user.downloadrestriction.revoke"
           )}
           canManageVIP={hasCapability(capabilities, "user.vip.manage")}
+          canAssignAssessment={hasCapability(
+            capabilities,
+            "newcomer.assessment.assign"
+          )}
+          canAdjustData={hasCapability(capabilities, "user.account.adjust")}
+          canReadNetworkHistory={hasCapability(
+            capabilities,
+            "user.network.read"
+          )}
           canReadAppeals={hasCapability(
             capabilities,
             "user.account.appeal.read"
@@ -103,25 +122,39 @@ export function StaffUsersPage() {
 
 function UsersContent({
   csrfToken,
+  currentStaffUserId,
+  initialSelectedUserId,
+  onDialogClose,
   canRestrict,
   canRevoke,
   canDownloadRestrict,
   canDownloadRevoke,
   canManageVIP,
+  canAssignAssessment,
+  canAdjustData,
+  canReadNetworkHistory,
   canReadAppeals,
   canDecideAppeals,
 }: {
   csrfToken: string
+  currentStaffUserId: string
+  initialSelectedUserId?: string
+  onDialogClose?: () => void
   canRestrict: boolean
   canRevoke: boolean
   canDownloadRestrict: boolean
   canDownloadRevoke: boolean
   canManageVIP: boolean
+  canAssignAssessment: boolean
+  canAdjustData: boolean
+  canReadNetworkHistory: boolean
   canReadAppeals: boolean
   canDecideAppeals: boolean
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
+  const [selectedUserId, setSelectedUserId] = React.useState(
+    initialSelectedUserId
+  )
   const filters = React.useMemo(
     () => parseManagedUserFilters(searchParams),
     [searchParams]
@@ -132,6 +165,10 @@ function UsersContent({
   React.useEffect(() => {
     setQueryDraft(filters.query)
   }, [filters.query])
+
+  React.useEffect(() => {
+    setSelectedUserId(initialSelectedUserId)
+  }, [initialSelectedUserId])
 
   React.useEffect(() => {
     if (!users.data) {
@@ -288,7 +325,7 @@ function UsersContent({
           <ManagedUserTable
             users={users.data.items}
             hasFilters={Boolean(filters.query) || filters.status !== "all"}
-            onSelect={(userId) => navigate(`/staff/users/${userId}`)}
+            onSelect={setSelectedUserId}
           />
 
           {totalPages > 1 ? (
@@ -301,6 +338,26 @@ function UsersContent({
           ) : null}
         </CardContent>
       </Card>
+
+      <ManagedUserDialog
+        open={Boolean(selectedUserId)}
+        onOpenChange={(open) => {
+          if (open) return
+          setSelectedUserId(undefined)
+          onDialogClose?.()
+        }}
+        userId={selectedUserId}
+        csrfToken={csrfToken}
+        currentStaffUserId={currentStaffUserId}
+        canRestrict={canRestrict}
+        canRevoke={canRevoke}
+        canDownloadRestrict={canDownloadRestrict}
+        canDownloadRevoke={canDownloadRevoke}
+        canManageVIP={canManageVIP}
+        canAssignAssessment={canAssignAssessment}
+        canAdjustData={canAdjustData}
+        canReadNetworkHistory={canReadNetworkHistory}
+      />
     </UsersFrame>
   )
 }
