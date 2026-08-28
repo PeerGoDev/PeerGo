@@ -42,7 +42,7 @@ var (
 	feeSinkAccountID                 = uuid.MustParse("00000000-0000-7000-8000-000000000005")
 	promotionProductSinkID           = uuid.MustParse("00000000-0000-7000-8000-000000000006")
 	medalPurchaseSinkID              = uuid.MustParse("00000000-0000-7000-8000-000000000007")
-	administratorAdjustmentAccountID = uuid.MustParse("00000000-0000-7000-8000-000000000008")
+	administratorAdjustmentAccountID = uuid.MustParse("00000000-0000-7000-8000-000000000009")
 )
 
 // RousiMigrationAccountID returns the immutable opening-balance counterparty.

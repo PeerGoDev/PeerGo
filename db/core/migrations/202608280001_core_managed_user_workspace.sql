@@ -21,7 +21,7 @@ INSERT INTO authz.role_permissions (role_id, action) VALUES
 INSERT INTO economy.magic_accounts (
     id, user_id, account_kind, account_code, balance, version, updated_at
 ) VALUES (
-    '00000000-0000-7000-8000-000000000008',
+    '00000000-0000-7000-8000-000000000009',
     NULL,
     'system',
     'system:adjustment:administrator',
@@ -257,7 +257,7 @@ WHERE revision = 'administrator-adjustment-v1';
 ALTER TABLE progression.experience_policy_revisions
     ENABLE TRIGGER progression_experience_policy_revisions_immutable;
 DELETE FROM economy.magic_accounts
-WHERE id = '00000000-0000-7000-8000-000000000008';
+WHERE id = '00000000-0000-7000-8000-000000000009';
 
 DELETE FROM authz.role_permissions
 WHERE action IN ('user.account.adjust', 'user.network.read');
