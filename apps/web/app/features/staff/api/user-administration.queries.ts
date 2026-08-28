@@ -23,6 +23,10 @@ export type RevokeManualDownloadRestrictionRequest =
 export type ChangeVIPRequest = components["schemas"]["ChangeVIPRequest"]
 export type ReactivateManagedUserRequest =
   components["schemas"]["ReactivateManagedUserRequest"]
+export type ManagedUserAdjustmentRequest =
+  components["schemas"]["ManagedUserAdjustmentRequest"]
+export type ManagedUserNetworkHistory =
+  components["schemas"]["ManagedUserNetworkHistory"]
 
 export const userAdministrationKeys = {
   all: ["staff", "identity", "users"] as const,
@@ -30,6 +34,66 @@ export const userAdministrationKeys = {
     [...userAdministrationKeys.all, "list", filters] as const,
   detail: (userId: string) =>
     [...userAdministrationKeys.all, "detail", userId] as const,
+  networkHistory: (userId: string) =>
+    [...userAdministrationKeys.all, "network-history", userId] as const,
+}
+
+export function managedUserNetworkHistoryQueryOptions(
+  userId: string,
+  enabled = true
+) {
+  return queryOptions({
+    queryKey: userAdministrationKeys.networkHistory(userId),
+    queryFn: async (): Promise<ManagedUserNetworkHistory> => {
+      const { data, error, response } = await apiClient.GET(
+        "/api/v1/admin/users/{user_id}/network-history",
+        { params: { path: { user_id: userId } } }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    enabled: Boolean(userId) && enabled,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useAdjustManagedUserData() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      userId: string
+      csrfToken: string
+      idempotencyKey: string
+      body: ManagedUserAdjustmentRequest
+    }): Promise<ManagedUserDetail> => {
+      const { data, error, response } = await apiClient.POST(
+        "/api/v1/admin/users/{user_id}/adjustments",
+        {
+          params: {
+            path: { user_id: input.userId },
+            header: {
+              "X-CSRF-Token": input.csrfToken,
+              "Idempotency-Key": input.idempotencyKey,
+            },
+          },
+          body: input.body,
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    onSuccess: async (detail) => {
+      queryClient.setQueryData(userAdministrationKeys.detail(detail.id), detail)
+      await queryClient.invalidateQueries({
+        queryKey: userAdministrationKeys.all,
+      })
+    },
+  })
 }
 
 export function managedUserListQueryOptions(filters: ManagedUserFilters) {

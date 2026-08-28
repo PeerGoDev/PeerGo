@@ -156,6 +156,7 @@ const (
 	ActionTrackerSeedboxReportCreateSelf          Action = "tracker.seedbox.report.create.self"
 	ActionTrackerSeedboxReportDecide              Action = "tracker.seedbox.report.decide"
 	ActionTrafficReadSelf                         Action = "traffic.read.self"
+	ActionUserAccountAdjust                       Action = "user.account.adjust"
 	ActionUserAccountAppealCreateRestricted       Action = "user.account.appeal.create.restricted"
 	ActionUserAccountAppealDecide                 Action = "user.account.appeal.decide"
 	ActionUserAccountAppealRead                   Action = "user.account.appeal.read"
@@ -166,6 +167,7 @@ const (
 	ActionUserDownloadRestrictionReadSelf         Action = "user.downloadrestriction.read.self"
 	ActionUserDownloadRestrictionRestrict         Action = "user.downloadrestriction.restrict"
 	ActionUserDownloadRestrictionRevoke           Action = "user.downloadrestriction.revoke"
+	ActionUserNetworkRead                         Action = "user.network.read"
 	ActionUserProfileReadMember                   Action = "user.profile.read.member"
 	ActionUserVIPManage                           Action = "user.vip.manage"
 	ActionWikiPageCreate                          Action = "wiki.page.create"
@@ -944,6 +946,11 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
+		Action: ActionUserAccountAdjust, Description: "增减用户流量、魔力值、经验、邀请和捐赠数据", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
 		Action: ActionUserAccountAppealCreateRestricted, Description: "使用受限账户凭据查询本人限制并提交一次复核申请", Risk: RiskMedium,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceAnonymous,
 		Discoverable: true,
@@ -990,6 +997,11 @@ var permissionCatalog = []PermissionDefinition{
 	},
 	{
 		Action: ActionUserDownloadRestrictionRevoke, Description: "解除一个账户的人工下载限制", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionUserNetworkRead, Description: "读取用户有限保留的登录 IP 聚合历史", Risk: RiskHigh,
 		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
 		Grantable: true, Discoverable: true,
 	},

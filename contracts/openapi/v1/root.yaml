@@ -64,6 +64,10 @@ paths:
     $ref: "./domains/identity.yaml#/ManagedUsersPath"
   /api/v1/admin/users/{user_id}:
     $ref: "./domains/identity.yaml#/ManagedUserPath"
+  /api/v1/admin/users/{user_id}/adjustments:
+    $ref: "./domains/identity.yaml#/ManagedUserAdjustmentsPath"
+  /api/v1/admin/users/{user_id}/network-history:
+    $ref: "./domains/identity.yaml#/ManagedUserNetworkHistoryPath"
   /api/v1/admin/users/{user_id}/tracker-activity:
     $ref: "./domains/profile-activity.yaml#/ManagedUserTrackerActivityPath"
   /api/v1/admin/users/{user_id}/account-restrictions:
@@ -522,6 +526,10 @@ components:
       $ref: "./schemas/identity.yaml#/CurrentAccountRestriction"
     ManagedUserDetail:
       $ref: "./schemas/identity.yaml#/ManagedUserDetail"
+    ManagedUserAdjustmentRequest:
+      $ref: "./schemas/identity.yaml#/ManagedUserAdjustmentRequest"
+    ManagedUserNetworkHistory:
+      $ref: "./schemas/identity.yaml#/ManagedUserNetworkHistory"
     AccountRestrictionReasonCode:
       $ref: "./schemas/identity.yaml#/AccountRestrictionReasonCode"
     AccountRestrictionRevocationReasonCode:

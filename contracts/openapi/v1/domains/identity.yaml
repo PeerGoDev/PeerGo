@@ -1167,6 +1167,77 @@ ManagedUserPath:
       default:
         $ref: "../responses.yaml#/ProblemResponse"
 
+ManagedUserAdjustmentsPath:
+  post:
+    operationId: adjustManagedUserData
+    summary: 增减一个账户的运营数据
+    description: >-
+      调整上传、下载、魔力值、经验、可用邀请或捐赠金额。每次变更都使用
+      账户版本、幂等键和不可变事件记录；空理由由服务端生成，不会绕过审计。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.account.adjust
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/identity.yaml#/ManagedUserAdjustmentRequest"
+    responses:
+      "200":
+        description: 变更已提交，并返回最新账户详情。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserDetail"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedUserNetworkHistoryPath:
+  get:
+    operationId: getManagedUserNetworkHistory
+    summary: 读取用户有限保留的登录 IP 聚合历史
+    description: >-
+      最多返回最近 180 天的 20 个用户/IP 聚合，不返回逐请求记录、User-Agent、
+      Tracker peer 端点或其他可持续膨胀的数据。
+    tags: [identity]
+    x-audience: [staff]
+    x-owner: core-identity
+    x-permission: user.network.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    responses:
+      "200":
+        description: 已授权的有限 IP 聚合历史。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/identity.yaml#/ManagedUserNetworkHistory"
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "429": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
 ManagedUserAccountRestrictionsPath:
   post:
     operationId: createManagedUserAccountRestriction

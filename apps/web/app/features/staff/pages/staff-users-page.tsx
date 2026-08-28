@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { useSearchParams } from "react-router"
+import { useNavigate, useSearchParams } from "react-router"
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -49,7 +49,6 @@ import {
   managedUserListQueryOptions,
   type ManagedUserPage,
 } from "~/features/staff/api/user-administration.queries"
-import { ManagedUserDetailSheet } from "~/features/staff/components/managed-user-detail-sheet"
 import { ManagedUserTable } from "~/features/staff/components/managed-user-table"
 import { AccountAccessAppealQueue } from "~/features/staff/components/account-access-appeal-queue"
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
@@ -74,7 +73,6 @@ export function StaffUsersPage() {
       {({ session, capabilities }) => (
         <UsersContent
           csrfToken={session.csrf_token}
-          currentStaffUserId={session.user.id}
           canRestrict={hasCapability(capabilities, "user.account.restrict")}
           canRevoke={hasCapability(
             capabilities,
@@ -89,10 +87,6 @@ export function StaffUsersPage() {
             "user.downloadrestriction.revoke"
           )}
           canManageVIP={hasCapability(capabilities, "user.vip.manage")}
-          canAssignAssessment={hasCapability(
-            capabilities,
-            "newcomer.assessment.assign"
-          )}
           canReadAppeals={hasCapability(
             capabilities,
             "user.account.appeal.read"
@@ -109,35 +103,31 @@ export function StaffUsersPage() {
 
 function UsersContent({
   csrfToken,
-  currentStaffUserId,
   canRestrict,
   canRevoke,
   canDownloadRestrict,
   canDownloadRevoke,
   canManageVIP,
-  canAssignAssessment,
   canReadAppeals,
   canDecideAppeals,
 }: {
   csrfToken: string
-  currentStaffUserId: string
   canRestrict: boolean
   canRevoke: boolean
   canDownloadRestrict: boolean
   canDownloadRevoke: boolean
   canManageVIP: boolean
-  canAssignAssessment: boolean
   canReadAppeals: boolean
   canDecideAppeals: boolean
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const filters = React.useMemo(
     () => parseManagedUserFilters(searchParams),
     [searchParams]
   )
   const users = useQuery(managedUserListQueryOptions(filters))
   const [queryDraft, setQueryDraft] = React.useState(filters.query)
-  const [selectedUserId, setSelectedUserId] = React.useState<string>()
 
   React.useEffect(() => {
     setQueryDraft(filters.query)
@@ -298,7 +288,7 @@ function UsersContent({
           <ManagedUserTable
             users={users.data.items}
             hasFilters={Boolean(filters.query) || filters.status !== "all"}
-            onSelect={setSelectedUserId}
+            onSelect={(userId) => navigate(`/staff/users/${userId}`)}
           />
 
           {totalPages > 1 ? (
@@ -311,23 +301,6 @@ function UsersContent({
           ) : null}
         </CardContent>
       </Card>
-
-      <ManagedUserDetailSheet
-        userId={selectedUserId}
-        csrfToken={csrfToken}
-        currentStaffUserId={currentStaffUserId}
-        canRestrict={canRestrict}
-        canRevoke={canRevoke}
-        canDownloadRestrict={canDownloadRestrict}
-        canDownloadRevoke={canDownloadRevoke}
-        canManageVIP={canManageVIP}
-        canAssignAssessment={canAssignAssessment}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedUserId(undefined)
-          }
-        }}
-      />
     </UsersFrame>
   )
 }

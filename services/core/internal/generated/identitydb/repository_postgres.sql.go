@@ -1168,6 +1168,7 @@ func (q *Queries) GetManagedUserDirectorySummary(ctx context.Context, asOf pgtyp
 const getManagedUserOperations = `-- name: GetManagedUserOperations :one
 SELECT
     COALESCE(progress.experience, 0)::text AS experience,
+    COALESCE(donation.amount, 0)::text AS donation_amount,
     COALESCE(invitation_account.remaining_invites, 0)::integer AS remaining_invites,
     COALESCE(torrent_counts.submitted_count, 0)::bigint AS submitted_torrent_count,
     COALESCE(torrent_counts.published_count, 0)::bigint AS published_torrent_count,
@@ -1179,6 +1180,7 @@ SELECT
     registration.state AS registration_state
 FROM identity.users AS users
 LEFT JOIN progression.user_progress AS progress ON progress.user_id = users.id
+LEFT JOIN identity.user_donation_totals AS donation ON donation.user_id = users.id
 LEFT JOIN identity.invitation_accounts AS invitation_account ON invitation_account.user_id = users.id
 LEFT JOIN identity.invitation_relationships AS invitation_relationship ON invitation_relationship.invitee_user_id = users.id
 LEFT JOIN identity.users AS inviter ON inviter.id = invitation_relationship.inviter_user_id
@@ -1201,6 +1203,7 @@ WHERE users.id = $1
 
 type GetManagedUserOperationsRow struct {
 	Experience                string
+	DonationAmount            string
 	RemainingInvites          int32
 	SubmittedTorrentCount     int64
 	PublishedTorrentCount     int64
@@ -1217,6 +1220,7 @@ func (q *Queries) GetManagedUserOperations(ctx context.Context, userID uuid.UUID
 	var i GetManagedUserOperationsRow
 	err := row.Scan(
 		&i.Experience,
+		&i.DonationAmount,
 		&i.RemainingInvites,
 		&i.SubmittedTorrentCount,
 		&i.PublishedTorrentCount,

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"slices"
@@ -25,6 +26,7 @@ type Config struct {
 	StaffCookieName             string
 	CookieSecure                bool
 	AllowedOrigins              []string
+	TrustedProxyCIDRs           []netip.Prefix
 	PublicOrigin                string
 	WebAuthnRPID                string
 	WebAuthnOrigins             []string
@@ -279,6 +281,10 @@ func Load() (Config, error) {
 	if len(turnstileSecretKey) > 256 || strings.ContainsAny(turnstileSecretKey, "\r\n") {
 		return Config{}, errors.New("PEERGO_TURNSTILE_SECRET_KEY must contain at most 256 characters without line breaks")
 	}
+	trustedProxyCIDRs, err := parseCoreTrustedProxyCIDRs()
+	if err != nil {
+		return Config{}, err
+	}
 
 	address := strings.TrimSpace(os.Getenv("PEERGO_CORE_ADDR"))
 	if address == "" {
@@ -308,6 +314,7 @@ func Load() (Config, error) {
 		StaffCookieName:             staffCookieName,
 		CookieSecure:                cookieSecure,
 		AllowedOrigins:              allowedOrigins,
+		TrustedProxyCIDRs:           trustedProxyCIDRs,
 		PublicOrigin:                publicOrigin,
 		WebAuthnRPID:                webAuthnRPID,
 		WebAuthnOrigins:             webAuthnOrigins,
@@ -324,6 +331,37 @@ func Load() (Config, error) {
 		SeedingEvidenceClosureDelay: seedingEvidenceClosureDelay,
 		TurnstileSecretKey:          turnstileSecretKey,
 	}, nil
+}
+
+func parseCoreTrustedProxyCIDRs() ([]netip.Prefix, error) {
+	const maximumTrustedProxyCIDRs = 16
+	value := strings.TrimSpace(os.Getenv("PEERGO_CORE_TRUSTED_PROXY_CIDRS"))
+	if value == "" {
+		// Existing single-server installs already have the exact Docker gateway
+		// value for Tracker.  Reusing it is a safe rolling-upgrade fallback.
+		value = strings.TrimSpace(os.Getenv("PEERGO_TRACKER_TRUSTED_PROXY_CIDRS"))
+	}
+	if value == "" {
+		return nil, nil
+	}
+	rawPrefixes := strings.Split(value, ",")
+	if len(rawPrefixes) > maximumTrustedProxyCIDRs {
+		return nil, fmt.Errorf("PEERGO_CORE_TRUSTED_PROXY_CIDRS must contain at most %d CIDRs", maximumTrustedProxyCIDRs)
+	}
+	prefixes := make([]netip.Prefix, 0, len(rawPrefixes))
+	for _, raw := range rawPrefixes {
+		prefix, err := netip.ParsePrefix(strings.TrimSpace(raw))
+		if err != nil || prefix.Addr().Is4In6() || prefix != prefix.Masked() {
+			return nil, errors.New("PEERGO_CORE_TRUSTED_PROXY_CIDRS must contain canonical IPv4 or IPv6 CIDRs")
+		}
+		for _, existing := range prefixes {
+			if existing.Contains(prefix.Addr()) || prefix.Contains(existing.Addr()) {
+				return nil, errors.New("PEERGO_CORE_TRUSTED_PROXY_CIDRS must not contain duplicate or overlapping CIDRs")
+			}
+		}
+		prefixes = append(prefixes, prefix)
+	}
+	return prefixes, nil
 }
 
 func parseOrigins(name, raw, environment string) ([]string, error) {

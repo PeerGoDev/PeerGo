@@ -502,6 +502,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 增减一个账户的运营数据
+         * @description 调整上传、下载、魔力值、经验、可用邀请或捐赠金额。每次变更都使用 账户版本、幂等键和不可变事件记录；空理由由服务端生成，不会绕过审计。
+         */
+        post: operations["adjustManagedUserData"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/network-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取用户有限保留的登录 IP 聚合历史
+         * @description 最多返回最近 180 天的 20 个用户/IP 聚合，不返回逐请求记录、User-Agent、 Tracker peer 端点或其他可持续膨胀的数据。
+         */
+        get: operations["getManagedUserNetworkHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/tracker-activity": {
         parameters: {
             query?: never;
@@ -4298,6 +4338,8 @@ export interface components {
         ManagedUserDetail: components["schemas"]["ManagedUserSummary"] & {
             /** @description 当前精确经验值；使用十进制字符串避免精度损失。 */
             experience: string;
+            /** @description 当前累计捐赠金额；由 PtYes 开账值和后续不可变调整记录组成。 */
+            donation_amount: string;
             remaining_invites: number;
             /** Format: int64 */
             submitted_torrent_count: number;
@@ -4325,6 +4367,23 @@ export interface components {
             manual_download_restriction_history: components["schemas"]["ManualDownloadRestrictionTransition"][];
             vip_state: components["schemas"]["VIPState"];
             vip_history: components["schemas"]["VIPTransition"][];
+        };
+        ManagedUserAdjustmentRequest: {
+            /** @enum {string} */
+            field: "uploaded_bytes" | "downloaded_bytes" | "magic_balance" | "experience" | "remaining_invites" | "donation_amount";
+            /** @enum {string} */
+            operation: "increase" | "decrease";
+            /** @description 正数；字段决定整数、两位金额或二十位经验精度。 */
+            amount: string;
+            /** @description 可留空；服务端会生成字段对应的审计理由。 */
+            reason?: string;
+            /** Format: int64 */
+            expected_user_version: number;
+        };
+        ManagedUserNetworkHistory: {
+            items: components["schemas"]["ManagedUserNetworkObservation"][];
+            retention_days: number;
+            maximum_items: number;
         };
         /** @enum {string} */
         AccountRestrictionReasonCode: "manual_review" | "security_incident";
@@ -4386,7 +4445,7 @@ export interface components {
             expected_state_version: number;
         };
         /** @enum {string} */
-        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
+        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.adjust" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.network.read" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
         CapabilityScope: {
             /** @enum {string} */
             type: "site" | "category";
@@ -7333,6 +7392,21 @@ export interface components {
             /** Format: int64 */
             actor_numeric_id?: number;
             actor_username?: string;
+        };
+        ManagedUserNetworkObservation: {
+            /** @description 规范 IPv4 或 IPv6 地址。 */
+            address: string;
+            /** Format: date-time */
+            first_seen_at: string;
+            /** Format: date-time */
+            last_seen_at: string;
+            /** Format: int64 */
+            seen_count: number;
+            /**
+             * Format: int64
+             * @description 在同一保留窗口内出现此地址的用户数量。
+             */
+            related_user_count: number;
         };
         UserTrackerTask: {
             /** Format: int64 */
@@ -10595,6 +10669,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManagedUserDetail"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    adjustManagedUserData: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagedUserAdjustmentRequest"];
+            };
+        };
+        responses: {
+            /** @description 变更已提交，并返回最新账户详情。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedUserDetail"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getManagedUserNetworkHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已授权的有限 IP 聚合历史。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedUserNetworkHistory"];
                 };
             };
             400: components["responses"]["ProblemResponse"];

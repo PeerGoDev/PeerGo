@@ -59,6 +59,7 @@ export default [
   route("staff", "routes/staff.tsx"),
   route("staff/setup", "routes/staff.setup.tsx"),
   route("staff/users", "routes/staff.users.tsx"),
+  route("staff/users/:userId", "routes/staff.users.$userId.tsx"),
   route("staff/assessments", "routes/staff.assessments.tsx"),
   route("staff/workgroups", "routes/staff.workgroups.tsx"),
   route(

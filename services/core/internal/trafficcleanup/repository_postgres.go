@@ -24,6 +24,7 @@ func NewPostgresRepository(pool *pgxpool.Pool) (*PostgresRepository, error) {
 
 func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutoffs, batchSize int) (Result, error) {
 	if cutoffs.DetailBefore.IsZero() || cutoffs.HistoryBefore.IsZero() ||
+		cutoffs.NetworkBefore.IsZero() ||
 		!cutoffs.HistoryBefore.Before(cutoffs.DetailBefore) || batchSize < 100 || batchSize > 10_000 {
 		return Result{}, ErrInput
 	}
@@ -63,6 +64,33 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	})
 	if err != nil {
 		return result, cleanupError("delete Core traffic history rollups", err)
+	}
+	if err := tx.QueryRow(ctx, `
+WITH ranked AS (
+    SELECT
+        observation.user_id,
+        observation.ip_address,
+        observation.last_seen_at,
+        row_number() OVER (
+            PARTITION BY observation.user_id
+            ORDER BY observation.last_seen_at DESC, observation.ip_address
+        ) AS recent_rank
+    FROM identity.user_network_observations AS observation
+), candidates AS (
+    SELECT ranked.user_id, ranked.ip_address
+    FROM ranked
+    WHERE ranked.last_seen_at < $1 OR ranked.recent_rank > 20
+    ORDER BY ranked.last_seen_at, ranked.user_id, ranked.ip_address
+    LIMIT $2
+), deleted AS (
+    DELETE FROM identity.user_network_observations AS observation
+    USING candidates
+    WHERE observation.user_id = candidates.user_id
+      AND observation.ip_address = candidates.ip_address
+    RETURNING 1
+)
+SELECT count(*)::bigint FROM deleted`, cutoffs.NetworkBefore, batchSize).Scan(&result.NetworkObservations); err != nil {
+		return result, cleanupError("delete expired network observations", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return result, cleanupError("commit Core traffic cleanup", err)

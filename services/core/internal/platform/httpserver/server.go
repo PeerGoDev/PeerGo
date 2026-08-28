@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -80,6 +81,7 @@ type Dependencies struct {
 	SessionCookie               httpapi.SessionCookieConfig
 	StaffSessionCookie          httpapi.SessionCookieConfig
 	AllowedOrigins              []string
+	TrustedProxyCIDRs           []netip.Prefix
 }
 
 // New creates a contract-validating Core HTTP handler.
@@ -129,6 +131,7 @@ func New(dependencies Dependencies, logger *slog.Logger) (http.Handler, error) {
 	router.Use(middleware.Timeout(15 * time.Second))
 	router.Use(httpapi.PrivateResponseHeaders)
 	router.Use(httpapi.CaptureSessionCookies(dependencies.SessionCookie.Name, dependencies.StaffSessionCookie.Name))
+	router.Use(httpapi.CaptureClientAddress(dependencies.TrustedProxyCIDRs))
 	if dependencies.PersonalAPIKeys != nil && dependencies.MoviePilot != nil {
 		router.Use(httpapi.MoviePilotCompatibility(dependencies.PersonalAPIKeys, dependencies.MoviePilot))
 	}

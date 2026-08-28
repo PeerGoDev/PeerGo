@@ -27,6 +27,7 @@ const detail: ManagedUserDetail = {
   level: 2,
   role_names: ["普通成员"],
   experience: "1200",
+  donation_amount: "0.00",
   remaining_invites: 3,
   submitted_torrent_count: 4,
   published_torrent_count: 3,

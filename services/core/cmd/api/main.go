@@ -16,6 +16,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/contracts/auditevent"
 	"github.com/peergo/peergo/services/core/internal/contracts/objectstorage"
 	"github.com/peergo/peergo/services/core/internal/contracts/trackerevent"
+	"github.com/peergo/peergo/services/core/internal/modules/accountadmin"
 	"github.com/peergo/peergo/services/core/internal/modules/audit"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
@@ -918,9 +919,15 @@ func main() {
 		logger.Error("compose account restriction repository", "error", err)
 		os.Exit(1)
 	}
-	userAdministrationService, err := identity.NewUserAdministrationService(
+	userDataAdministrationRepository, err := accountadmin.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose user data administration repository", "error", err)
+		os.Exit(1)
+	}
+	userAdministrationService, err := identity.NewUserAdministrationServiceWithData(
 		identityRepository,
 		accountRestrictionRepository,
+		userDataAdministrationRepository,
 		authorizationService,
 		time.Now,
 		vaultClient,
@@ -1105,7 +1112,8 @@ func main() {
 			Path:   "/api/v1/admin",
 			Secure: settings.CookieSecure,
 		},
-		AllowedOrigins: settings.AllowedOrigins,
+		AllowedOrigins:    settings.AllowedOrigins,
+		TrustedProxyCIDRs: settings.TrustedProxyCIDRs,
 	}, logger)
 	if err != nil {
 		logger.Error("failed to compose core http server", "error", err)

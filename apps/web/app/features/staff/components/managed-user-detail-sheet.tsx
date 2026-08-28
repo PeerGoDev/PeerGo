@@ -11,18 +11,20 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
 import { Badge } from "~/components/ui/badge"
 import { Button } from "~/components/ui/button"
-import { Separator } from "~/components/ui/separator"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "~/components/ui/sheet"
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card"
+import { Separator } from "~/components/ui/separator"
 import { Skeleton } from "~/components/ui/skeleton"
 import { managedUserDetailQueryOptions } from "~/features/staff/api/user-administration.queries"
 import { AccountRestrictionControls } from "~/features/staff/components/account-restriction-controls"
 import { ManagedUserAccountActions } from "~/features/staff/components/managed-user-account-actions"
+import { ManagedUserDataAdjustment } from "~/features/staff/components/managed-user-data-adjustment"
+import { ManagedUserNetworkHistoryCard } from "~/features/staff/components/managed-user-network-history-card"
 import { ManualDownloadRestrictionControls } from "~/features/staff/components/manual-download-restriction-controls"
 import { VIPControls } from "~/features/staff/components/vip-controls"
 import { ManagedUserStateBadges } from "~/features/staff/components/managed-user-table"
@@ -34,7 +36,7 @@ import { UserAvatar } from "~/shared/components/user-avatar"
 import { managedTrackerActivityQueryOptions } from "~/features/user/api/tracker-activity.queries"
 import { UserTrackerActivityCard } from "~/features/user/components/user-tracker-activity-card"
 
-export function ManagedUserDetailSheet({
+export function ManagedUserDetailPanel({
   userId,
   csrfToken,
   currentStaffUserId,
@@ -44,9 +46,10 @@ export function ManagedUserDetailSheet({
   canDownloadRevoke,
   canManageVIP,
   canAssignAssessment,
-  onOpenChange,
+  canAdjustData,
+  canReadNetworkHistory,
 }: {
-  userId?: string
+  userId: string
   csrfToken: string
   currentStaffUserId: string
   canRestrict: boolean
@@ -55,28 +58,28 @@ export function ManagedUserDetailSheet({
   canDownloadRevoke: boolean
   canManageVIP: boolean
   canAssignAssessment: boolean
-  onOpenChange: (open: boolean) => void
+  canAdjustData: boolean
+  canReadNetworkHistory: boolean
 }) {
-  const detail = useQuery(managedUserDetailQueryOptions(userId ?? ""))
+  const detail = useQuery(managedUserDetailQueryOptions(userId))
   const trackerActivity = useQuery({
-    ...managedTrackerActivityQueryOptions(userId ?? ""),
-    enabled: Boolean(userId && detail.data),
+    ...managedTrackerActivityQueryOptions(userId),
+    enabled: Boolean(detail.data),
   })
 
   return (
-    <Sheet open={Boolean(userId)} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
-        <SheetHeader className="border-b pr-12">
-          <SheetTitle>账户详情</SheetTitle>
-          <SheetDescription>
-            显示账户标识、运营数据和联系邮箱；密码与凭据不会显示。
-          </SheetDescription>
-        </SheetHeader>
-
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>账户详情</CardTitle>
+        <CardDescription>
+          显示账户标识、运营数据和联系邮箱；密码与凭据不会显示。
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
         {detail.isPending ? (
           <DetailSkeleton />
         ) : detail.isError || !detail.data ? (
-          <div className="p-4">
+          <div>
             <Alert variant="destructive">
               <CircleAlertIcon />
               <AlertTitle>账户详情暂时无法读取</AlertTitle>
@@ -95,7 +98,7 @@ export function ManagedUserDetailSheet({
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-5 p-4 pt-0">
+          <div className="flex flex-col gap-5">
             <div className="flex items-center gap-3">
               <UserAvatar
                 username={detail.data.username}
@@ -178,6 +181,10 @@ export function ManagedUserDetailSheet({
               <DetailValue className="tabular-nums">
                 {formatInteger(detail.data.remaining_invites)} 个
               </DetailValue>
+              <DetailTerm>捐赠金额</DetailTerm>
+              <DetailValue className="font-medium tabular-nums">
+                ¥{formatDonation(detail.data.donation_amount)}
+              </DetailValue>
               <DetailTerm>直属邀请</DetailTerm>
               <DetailValue className="tabular-nums">
                 {formatInteger(detail.data.direct_invite_count)} 人
@@ -226,7 +233,22 @@ export function ManagedUserDetailSheet({
               </DetailValue>
             </dl>
 
+            {canAdjustData ? (
+              <ManagedUserDataAdjustment
+                detail={detail.data}
+                csrfToken={csrfToken}
+                disabled={detail.data.id === currentStaffUserId}
+              />
+            ) : null}
+
             <Separator />
+
+            {canReadNetworkHistory ? (
+              <>
+                <ManagedUserNetworkHistoryCard userId={detail.data.id} />
+                <Separator />
+              </>
+            ) : null}
 
             <UserTrackerActivityCard
               activity={trackerActivity.data}
@@ -318,8 +340,8 @@ export function ManagedUserDetailSheet({
             />
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -347,6 +369,16 @@ function formatExperience(value: string) {
   return visibleFraction
     ? `${formatInteger(integer)}.${visibleFraction}`
     : formatInteger(integer)
+}
+
+function formatDonation(value: string) {
+  const amount = Number(value)
+  return Number.isFinite(amount)
+    ? amount.toLocaleString("zh-CN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : value
 }
 
 function formatShareRatio(uploaded: string, downloaded: string) {
@@ -394,7 +426,7 @@ function DetailValue({
 function DetailSkeleton() {
   return (
     <div
-      className="flex flex-col gap-5 p-4 pt-0"
+      className="flex flex-col gap-5"
       aria-label="正在加载账户详情"
       aria-busy="true"
     >

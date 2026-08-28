@@ -15,6 +15,7 @@ import (
 const (
 	MinimumDetailRetention      = 12 * time.Hour
 	MinimumHistoryRetention     = 30 * 24 * time.Hour
+	NetworkObservationRetention = 180 * 24 * time.Hour
 	minimumBacklogRetryInterval = 30 * time.Second
 )
 
@@ -24,24 +25,26 @@ var (
 )
 
 type Result struct {
-	Inbox        int64
-	Entries      int64
-	Explanations int64
-	Segments     int64
-	Rollups      int64
+	Inbox               int64
+	Entries             int64
+	Explanations        int64
+	Segments            int64
+	Rollups             int64
+	NetworkObservations int64
 }
 
 func (result Result) Total() int64 {
-	return result.Inbox + result.Entries + result.Explanations + result.Segments + result.Rollups
+	return result.Inbox + result.Entries + result.Explanations + result.Segments + result.Rollups + result.NetworkObservations
 }
 
 func (result Result) Saturated(batchSize int64) bool {
-	return batchSize > 0 && (result.Entries >= batchSize || result.Rollups >= batchSize)
+	return batchSize > 0 && (result.Entries >= batchSize || result.Rollups >= batchSize || result.NetworkObservations >= batchSize)
 }
 
 type Cutoffs struct {
 	DetailBefore  time.Time
 	HistoryBefore time.Time
+	NetworkBefore time.Time
 }
 
 type Repository interface {
@@ -86,6 +89,7 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 	cutoffs := Cutoffs{
 		DetailBefore:  now.Add(-worker.config.DetailRetention),
 		HistoryBefore: now.Add(-worker.config.HistoryRetention),
+		NetworkBefore: now.Add(-NetworkObservationRetention),
 	}
 	result, err := worker.repository.Cleanup(ctx, cutoffs, worker.config.BatchSize)
 	if err != nil {
@@ -100,7 +104,8 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 		}
 		worker.logger.Log(ctx, level, message,
 			"rows", result.Total(), "batch_size", worker.config.BatchSize,
-			"entries", result.Entries, "segments", result.Segments, "rollups", result.Rollups)
+			"entries", result.Entries, "segments", result.Segments, "rollups", result.Rollups,
+			"network_observations", result.NetworkObservations)
 	}
 	return result, nil
 }

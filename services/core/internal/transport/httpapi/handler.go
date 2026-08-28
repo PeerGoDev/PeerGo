@@ -231,6 +231,8 @@ type MoviePilotService interface {
 type UserAdministrationService interface {
 	List(context.Context, authz.StaffActor, identity.ListManagedUsersInput) (identity.ManagedUserPage, error)
 	Get(context.Context, authz.StaffActor, uuid.UUID) (identity.ManagedUserDetail, error)
+	Adjust(context.Context, authz.StaffActor, identity.ManagedUserAdjustmentInput) (identity.ManagedUserDetail, error)
+	NetworkHistory(context.Context, authz.StaffActor, uuid.UUID) (identity.ManagedUserNetworkHistory, error)
 	CreateRestriction(context.Context, authz.StaffActor, identity.CreateAccountRestrictionInput) (identity.ManagedUserDetail, error)
 	RevokeRestriction(context.Context, authz.StaffActor, identity.RevokeAccountRestrictionInput) (identity.ManagedUserDetail, error)
 	Reactivate(context.Context, authz.StaffActor, identity.ReactivateManagedUserInput) (identity.ManagedUserDetail, error)
@@ -1092,6 +1094,107 @@ func (h *Handler) GetManagedUser(ctx context.Context, request generated.GetManag
 		return nil, err
 	}
 	return generated.GetManagedUser200JSONResponse(managedUserDetailDTO(result)), nil
+}
+
+func (h *Handler) AdjustManagedUserData(ctx context.Context, request generated.AdjustManagedUserDataRequestObject) (generated.AdjustManagedUserDataResponseObject, error) {
+	if request.Body == nil {
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_adjustment", "用户数据变更无效", "请检查字段、方向、数值和账户版本。")
+		return generated.AdjustManagedUserData400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	}
+	session, authenticationProblem, err := h.authenticateStaffWrite(ctx, request.Params.XCSRFToken)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.AdjustManagedUserData401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.AdjustManagedUserData403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	reason := ""
+	if request.Body.Reason != nil {
+		reason = *request.Body.Reason
+	}
+	result, err := h.userAdministration.Adjust(ctx, staffActor(session), identity.ManagedUserAdjustmentInput{
+		AdjustmentID:        request.Params.IdempotencyKey,
+		UserID:              request.UserId,
+		Field:               identity.ManagedUserAdjustmentField(request.Body.Field),
+		Operation:           identity.ManagedUserAdjustmentOperation(request.Body.Operation),
+		Amount:              request.Body.Amount,
+		Reason:              reason,
+		ExpectedUserVersion: request.Body.ExpectedUserVersion,
+	})
+	switch {
+	case errors.Is(err, identity.ErrUserAdministrationInput):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_adjustment", "用户数据变更无效", "流量、魔力值和邀请必须是整数；捐赠最多两位小数，经验最多二十位小数。")
+		return generated.AdjustManagedUserData400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, authz.ErrForbidden), errors.Is(err, identity.ErrAccountRestrictionSelfTarget):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "user_adjustment_denied", "无法变更用户数据", "当前后台身份没有 user.account.adjust，或不能调整自己的数据。")
+		return generated.AdjustManagedUserData403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "managed_user_not_found", "账户不存在", "目标账户不存在或已被移除。")
+		return generated.AdjustManagedUserData404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserVersionConflict),
+		errors.Is(err, identity.ErrManagedUserAdjustmentConflict),
+		errors.Is(err, identity.ErrManagedUserAdjustmentInsufficient):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "user_adjustment_conflict", "用户数据已经变化", "余额不足、数值超出范围或账户版本已更新；请刷新详情后重试。")
+		return generated.AdjustManagedUserData409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserDataUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "user_adjustment_unavailable", "用户数据管理暂时不可用", "请稍后重试；本次变更没有提交。")
+		return generated.AdjustManagedUserDatadefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.AdjustManagedUserData200JSONResponse(managedUserDetailDTO(result)), nil
+}
+
+func (h *Handler) GetManagedUserNetworkHistory(ctx context.Context, request generated.GetManagedUserNetworkHistoryRequestObject) (generated.GetManagedUserNetworkHistoryResponseObject, error) {
+	session, authenticationProblem, err := h.authenticateStaffRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.GetManagedUserNetworkHistory401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.GetManagedUserNetworkHistory403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	result, err := h.userAdministration.NetworkHistory(ctx, staffActor(session), request.UserId)
+	switch {
+	case errors.Is(err, identity.ErrUserAdministrationInput):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_id", "账户标识无效", "请使用有效的账户 UUID。")
+		return generated.GetManagedUserNetworkHistory400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, authz.ErrForbidden):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "user_network_read_denied", "无法查看 IP 历史", "当前后台身份没有 user.network.read。")
+		return generated.GetManagedUserNetworkHistory403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "managed_user_not_found", "账户不存在", "目标账户不存在或已被移除。")
+		return generated.GetManagedUserNetworkHistory404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserDataUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "user_network_history_unavailable", "IP 历史暂时不可用", "请稍后重试；账户登录与其他管理功能不受影响。")
+		return generated.GetManagedUserNetworkHistorydefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	items := make([]generated.ManagedUserNetworkObservation, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, generated.ManagedUserNetworkObservation{
+			Address:          item.Address,
+			FirstSeenAt:      item.FirstSeenAt,
+			LastSeenAt:       item.LastSeenAt,
+			SeenCount:        item.SeenCount,
+			RelatedUserCount: item.RelatedUserCount,
+		})
+	}
+	return generated.GetManagedUserNetworkHistory200JSONResponse{
+		Items: items, RetentionDays: result.RetentionDays, MaximumItems: result.MaximumItems,
+	}, nil
 }
 
 // CreateManagedUserAccountRestriction requires the staff CSRF token before the
@@ -2501,6 +2604,7 @@ func (h *Handler) CreateWebSession(ctx context.Context, request generated.Create
 		Password:         *request.Body.Password,
 		SecondFactorCode: secondFactorCode,
 		RememberMe:       request.Body.RememberMe,
+		ClientAddress:    clientAddressFromContext(ctx),
 	})
 	if errors.Is(err, identity.ErrInvalidInput) {
 		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_login", "登录信息无效", "请检查输入长度和验证码格式。")
@@ -3624,6 +3728,7 @@ func managedUserDetailDTO(user identity.ManagedUserDetail) generated.ManagedUser
 		LastActiveAt:           user.LastActiveAt,
 		CreatedAt:              user.CreatedAt, UpdatedAt: user.UpdatedAt,
 		Experience: user.Experience, RemainingInvites: int(user.RemainingInvites),
+		DonationAmount:            user.DonationAmount,
 		SubmittedTorrentCount:     user.SubmittedTorrentCount,
 		PublishedTorrentCount:     user.PublishedTorrentCount,
 		PendingReviewTorrentCount: user.PendingReviewTorrentCount,

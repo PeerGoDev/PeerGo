@@ -231,12 +231,55 @@ func nullableTimestamp(value pgtype.Timestamptz) *time.Time {
 
 // CreateSession implements Repository.
 func (r *PostgresRepository) CreateSession(ctx context.Context, session SessionRecord) error {
-	return r.queries.CreateWebSession(ctx, identitydb.CreateWebSessionParams{
+	parameters := identitydb.CreateWebSessionParams{
 		TokenHash: session.TokenHash,
 		UserID:    session.User.ID,
 		CreatedAt: timestamp(session.CreatedAt),
 		ExpiresAt: timestamp(session.ExpiresAt),
-	})
+	}
+	address := session.ClientAddress.Unmap()
+	if !address.IsValid() || address.Zone() != "" || (!address.Is4() && !address.Is6()) {
+		return r.queries.CreateWebSession(ctx, parameters)
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin web session with network observation: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := r.queries.WithTx(tx).CreateWebSession(ctx, parameters); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO identity.user_network_observations (
+    user_id, ip_address, first_seen_at, last_seen_at,
+    legacy_seen_count, web_login_seen_count, updated_at
+) VALUES ($1, $2::inet, $3, $3, 0, 1, $3)
+ON CONFLICT (user_id, ip_address) DO UPDATE
+SET first_seen_at = LEAST(identity.user_network_observations.first_seen_at, EXCLUDED.first_seen_at),
+    last_seen_at = GREATEST(identity.user_network_observations.last_seen_at, EXCLUDED.last_seen_at),
+    web_login_seen_count = identity.user_network_observations.web_login_seen_count + 1,
+    updated_at = EXCLUDED.updated_at`, session.User.ID, address.String(), session.CreatedAt); err != nil {
+		return fmt.Errorf("record login network observation: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+DELETE FROM identity.user_network_observations AS observation
+WHERE observation.user_id = $1
+  AND (
+      observation.last_seen_at < $2 - interval '180 days'
+      OR observation.ip_address NOT IN (
+          SELECT recent.ip_address
+          FROM identity.user_network_observations AS recent
+          WHERE recent.user_id = $1
+          ORDER BY recent.last_seen_at DESC, recent.ip_address
+          LIMIT 20
+      )
+  )`, session.User.ID, session.CreatedAt); err != nil {
+		return fmt.Errorf("prune login network observations: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit web session with network observation: %w", err)
+	}
+	return nil
 }
 
 // ActiveSession implements Repository.
@@ -594,7 +637,7 @@ func managedUserDetailWithQueries(ctx context.Context, queries *identitydb.Queri
 	if err != nil {
 		return ManagedUserDetail{}, fmt.Errorf("get managed user operations: %w", err)
 	}
-	if operations.Experience == "" || operations.RemainingInvites < 0 ||
+	if operations.Experience == "" || operations.DonationAmount == "" || operations.RemainingInvites < 0 ||
 		operations.SubmittedTorrentCount < 0 || operations.PublishedTorrentCount < 0 ||
 		operations.PendingReviewTorrentCount < 0 || operations.DirectInviteCount < 0 {
 		return ManagedUserDetail{}, errors.New("managed user operations contain invalid required fields")
@@ -667,7 +710,8 @@ func managedUserDetailWithQueries(ctx context.Context, queries *identitydb.Queri
 	}
 	return ManagedUserDetail{
 		ManagedUserSummary: summary,
-		Experience:         operations.Experience, RemainingInvites: operations.RemainingInvites,
+		Experience:         operations.Experience, DonationAmount: operations.DonationAmount,
+		RemainingInvites:          operations.RemainingInvites,
 		SubmittedTorrentCount:     operations.SubmittedTorrentCount,
 		PublishedTorrentCount:     operations.PublishedTorrentCount,
 		PendingReviewTorrentCount: operations.PendingReviewTorrentCount,

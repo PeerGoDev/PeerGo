@@ -139,6 +139,7 @@ CapabilityAction:
     - tracker.seedbox.report.create.self
     - tracker.seedbox.report.decide
     - traffic.read.self
+    - user.account.adjust
     - user.account.appeal.create.restricted
     - user.account.appeal.decide
     - user.account.appeal.read
@@ -149,6 +150,7 @@ CapabilityAction:
     - user.downloadrestriction.read.self
     - user.downloadrestriction.restrict
     - user.downloadrestriction.revoke
+    - user.network.read
     - user.vip.manage
     - wiki.page.create
     - wiki.page.manage.read

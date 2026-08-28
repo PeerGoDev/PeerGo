@@ -593,6 +593,7 @@ done < <(docker network inspect --format '{{range .IPAM.Config}}{{println .Gatew
     fail "Docker network ${network_name} has no gateway for the host HTTPS proxy"
 trusted_proxy_value="$(IFS=,; printf '%s' "${trusted_proxy_cidrs[*]}")"
 set_env PEERGO_TRACKER_TRUSTED_PROXY_CIDRS "${trusted_proxy_value}"
+set_env PEERGO_CORE_TRUSTED_PROXY_CIDRS "${trusted_proxy_value}"
 
 attached_names="$(docker network inspect --format '{{range .Containers}}{{println .Name}}{{end}}' "${network_name}")"
 if ! grep -Fqx "${postgres_container}" <<<"${attached_names}"; then
