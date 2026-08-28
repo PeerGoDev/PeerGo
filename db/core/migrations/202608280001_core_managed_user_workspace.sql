@@ -117,9 +117,11 @@ CREATE TABLE traffic.user_traffic_adjustments (
 -- adjustment has no invitation token, but still gets a domain ledger row.
 ALTER TABLE identity.invitation_balance_events
     DROP CONSTRAINT invitation_balance_events_event_kind_check,
-    -- The original delta constraint was unnamed in 202608240005, so
-    -- PostgreSQL assigned the stable table-level name below.
-    DROP CONSTRAINT invitation_balance_events_check,
+    -- The baseline migration left this check unnamed, while this migration's
+    -- Down path restores it with an explicit name. Accept both states so a
+    -- verified Down -> Up cycle remains possible.
+    DROP CONSTRAINT IF EXISTS invitation_balance_events_check,
+    DROP CONSTRAINT IF EXISTS invitation_balance_events_delta_check,
     DROP CONSTRAINT invitation_balance_events_source_reference_check,
     ALTER COLUMN invitation_id DROP NOT NULL,
     ALTER COLUMN delta TYPE integer,
