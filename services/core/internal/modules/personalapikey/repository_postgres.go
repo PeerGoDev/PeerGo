@@ -216,7 +216,7 @@ WHERE credential.token_hash = $1
 
 func touchCredentialUsage(executor commandExecutor, ctx context.Context, userID uuid.UUID, now time.Time, version int64) {
 	// Pass the cutoff as a timestamp and cast both time parameters explicitly.
-	// Otherwise PostgreSQL can infer `$2 - interval` as an interval expression
+	// Otherwise PostgreSQL can infer an untyped subtraction as an interval expression
 	// and reject the timestamptz comparison at execution time.
 	_, _ = executor.Exec(
 		ctx,

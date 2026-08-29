@@ -265,7 +265,7 @@ SET first_seen_at = LEAST(identity.user_network_observations.first_seen_at, EXCL
 DELETE FROM identity.user_network_observations AS observation
 WHERE observation.user_id = $1
   AND (
-      observation.last_seen_at < $2 - interval '180 days'
+      observation.last_seen_at < $2::timestamptz - interval '180 days'
       OR observation.ip_address NOT IN (
           SELECT recent.ip_address
           FROM identity.user_network_observations AS recent

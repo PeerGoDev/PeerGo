@@ -660,7 +660,7 @@ SELECT users.username, users.display_name,
              AND session.audience = 'web'
              AND session.revoked_at IS NULL
              AND session.expires_at > $2
-             AND session.last_seen_at >= $2 - interval '15 minutes'
+             AND session.last_seen_at >= $2::timestamptz - interval '15 minutes'
              AND users.status = 'active'
              AND NOT EXISTS (
                  SELECT 1

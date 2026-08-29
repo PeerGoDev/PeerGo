@@ -73,7 +73,7 @@ UPDATE economy.seeding_reward_work_items AS work
 SET status = 'processing',
     attempts = work.attempts + 1,
     lease_token = $3,
-    lease_until = $1 + ($4 * interval '1 microsecond'),
+    lease_until = $1::timestamptz + ($4::bigint * interval '1 microsecond'),
     updated_at = $1
 FROM candidate
 WHERE work.window_start = candidate.window_start
