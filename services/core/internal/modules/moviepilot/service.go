@@ -276,15 +276,23 @@ func (service *Service) Download(ctx context.Context, torrentID int64, capabilit
 }
 
 // DownloadWithCredential supports PT-depiler's fixed legacy download route.
-// Authentication has already resolved the shared personal API key; this method
-// applies the same scope, rate, purchase, restriction and metainfo pipeline as
-// every other external download.
-func (service *Service) DownloadWithCredential(ctx context.Context, credential personalapikey.AuthenticatedCredential, torrentID int64) (torrents.TorrentDownloadResult, error) {
+// Numeric IDs remain canonical. A saved PtYes UUID may resolve through the
+// bounded one-way alias table without reintroducing UUID identity into torrent
+// aggregates or API projections.
+func (service *Service) DownloadWithCredential(ctx context.Context, credential personalapikey.AuthenticatedCredential, routeID string) (torrents.TorrentDownloadResult, error) {
 	if err := personalapikey.RequireScope(credential, personalapikey.ScopeTorrentDownload); err != nil {
 		return torrents.TorrentDownloadResult{}, err
 	}
-	if credential.User.ID == uuid.Nil || torrentID < 1 {
+	if credential.User.ID == uuid.Nil || strings.TrimSpace(routeID) == "" {
 		return torrents.TorrentDownloadResult{}, ErrInput
+	}
+	repository, ok := service.repository.(LegacyRepository)
+	if !ok {
+		return torrents.TorrentDownloadResult{}, ErrUnavailable
+	}
+	torrentID, err := repository.ResolveTorrentID(ctx, routeID)
+	if err != nil {
+		return torrents.TorrentDownloadResult{}, err
 	}
 	if !service.allow(credential.User.ID, "torrent-download", 20) {
 		return torrents.TorrentDownloadResult{}, ErrRateLimited

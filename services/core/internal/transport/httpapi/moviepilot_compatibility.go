@@ -122,8 +122,8 @@ func MoviePilotCompatibility(apiKeys PersonalAPIKeyService, service MoviePilotSe
 				handleMoviePilotDownload(service, w, r)
 				return
 			default:
-				if torrentID, rawCredential, ok := ptDepilerDownloadCredential(r); ok {
-					handlePTDepilerDownload(apiKeys, service, torrentID, rawCredential, w, r)
+				if routeID, rawCredential, ok := ptDepilerDownloadCredential(r); ok {
+					handlePTDepilerDownload(apiKeys, service, routeID, rawCredential, w, r)
 					return
 				}
 				next.ServeHTTP(w, r)
@@ -604,7 +604,7 @@ func handleMoviePilotDownload(service MoviePilotService, w http.ResponseWriter, 
 	writeIntegrationTorrent(w, result)
 }
 
-func handlePTDepilerDownload(apiKeys PersonalAPIKeyService, service MoviePilotService, torrentID int64, rawCredential string, w http.ResponseWriter, r *http.Request) {
+func handlePTDepilerDownload(apiKeys PersonalAPIKeyService, service MoviePilotService, routeID, rawCredential string, w http.ResponseWriter, r *http.Request) {
 	if headerCredential, present, valid := optionalMoviePilotCredentialFromRequest(r); present && (!valid || headerCredential != rawCredential) {
 		writeInvalidIntegrationCredential(w)
 		return
@@ -613,7 +613,7 @@ func handlePTDepilerDownload(apiKeys PersonalAPIKeyService, service MoviePilotSe
 	if !ok {
 		return
 	}
-	result, err := service.DownloadWithCredential(r.Context(), credential, torrentID)
+	result, err := service.DownloadWithCredential(r.Context(), credential, routeID)
 	if writeIntegrationDownloadError(w, err) {
 		return
 	}
@@ -639,7 +639,7 @@ func writeIntegrationDownloadError(w http.ResponseWriter, err error) bool {
 		status = http.StatusUnauthorized
 	case errors.Is(err, moviepilot.ErrRateLimited):
 		status = http.StatusTooManyRequests
-	case errors.Is(err, torrents.ErrTorrentDownloadNotFound), errors.Is(err, torrents.ErrTorrentReadNotFound), errors.Is(err, catalog.ErrTorrentNotFound):
+	case errors.Is(err, moviepilot.ErrNotFound), errors.Is(err, torrents.ErrTorrentDownloadNotFound), errors.Is(err, torrents.ErrTorrentReadNotFound), errors.Is(err, catalog.ErrTorrentNotFound):
 		status = http.StatusNotFound
 	case errors.Is(err, torrentpurchase.ErrPurchaseRequired):
 		status = http.StatusPaymentRequired
@@ -713,25 +713,28 @@ func optionalMoviePilotCredentialFromRequest(r *http.Request) (string, bool, boo
 	return raw, true, valid
 }
 
-func ptDepilerDownloadCredential(r *http.Request) (int64, string, bool) {
+func ptDepilerDownloadCredential(r *http.Request) (string, string, bool) {
 	if r.Method != http.MethodGet {
-		return 0, "", false
+		return "", "", false
 	}
 	const prefix = "/api/torrent/"
 	const marker = "/download/"
 	if !strings.HasPrefix(r.URL.Path, prefix) {
-		return 0, "", false
+		return "", "", false
 	}
 	remainder := strings.TrimPrefix(r.URL.Path, prefix)
-	rawTorrentID, rawCredential, found := strings.Cut(remainder, marker)
-	if !found || rawTorrentID == "" || rawCredential == "" || strings.Contains(rawCredential, "/") {
-		return 0, "", false
+	routeID, rawCredential, found := strings.Cut(remainder, marker)
+	if !found || routeID == "" || rawCredential == "" || strings.Contains(rawCredential, "/") {
+		return "", "", false
 	}
-	torrentID, err := strconv.ParseInt(rawTorrentID, 10, 64)
-	if err != nil || torrentID < 1 {
-		return 0, "", false
+	if torrentID, err := strconv.ParseInt(routeID, 10, 64); err == nil && torrentID > 0 {
+		return routeID, rawCredential, true
 	}
-	return torrentID, rawCredential, true
+	legacyID, err := uuid.Parse(routeID)
+	if err != nil || legacyID == uuid.Nil || legacyID.String() != strings.ToLower(routeID) {
+		return "", "", false
+	}
+	return routeID, rawCredential, true
 }
 
 func moviePilotTorrentID(path string) int64 {

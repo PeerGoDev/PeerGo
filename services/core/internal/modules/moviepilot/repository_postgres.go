@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/peergo/peergo/services/core/internal/legacyroutealiases"
 	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 )
 
@@ -164,7 +165,22 @@ func (repository *PostgresRepository) ResolveTorrentID(ctx context.Context, raw 
 	if numericID, err := strconv.ParseInt(raw, 10, 64); err == nil && numericID > 0 {
 		return numericID, nil
 	}
-	return 0, ErrInput
+	digest, err := legacyroutealiases.Digest(raw)
+	if err != nil {
+		return 0, ErrInput
+	}
+	var torrentID int64
+	err = repository.pool.QueryRow(ctx, `
+SELECT torrent_id
+FROM migration.legacy_torrent_route_aliases
+WHERE alias_sha256 = $1`, digest[:]).Scan(&torrentID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("resolve legacy torrent route alias: %w", err)
+	}
+	return torrentID, nil
 }
 
 func (repository *PostgresRepository) TorrentMetadata(ctx context.Context, torrentID int64) (TorrentMetadata, error) {

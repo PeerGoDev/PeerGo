@@ -599,7 +599,7 @@ Content-Type: application/json
 - API Key 被轮换或撤销后立即失效；
 - 下载时仍执行 PeerGo 购买、限制、邮箱和 Tracker 凭据规则。
 
-PT-depiler 的旧固定路由 `/api/torrent/{numeric_id}/download/{api_key}` 暂时保留用于迁移，但新工具必须使用请求头认证及详情返回的短时 URL，避免密钥进入代理日志和浏览器历史。
+PT-depiler 的旧固定路由 `/api/torrent/{torrent_id}/download/{api_key}` 暂时保留用于迁移。`torrent_id` 优先使用 PeerGo 数字 ID；PTD 已保存的旧 PtYes UUID 也可作为兼容别名使用。PeerGo 不会重新采用 UUID 作为种子身份，Core 只保存旧路由值的不可逆 SHA-256 摘要到数字 ID 的固定映射，且不会按下载请求增加记录。该专用路径关闭代理访问日志；新工具仍应使用请求头认证及详情返回的短时 URL，避免密钥进入代理日志和浏览器历史。
 
 ## HTTP 错误
 

@@ -219,7 +219,7 @@ type MoviePilotService interface {
 	ListTorrents(context.Context, personalapikey.AuthenticatedCredential, int, int, string, string) (moviepilot.TorrentPage, error)
 	Torrent(context.Context, personalapikey.AuthenticatedCredential, int64) (moviepilot.TorrentDownloadDescriptor, error)
 	Download(context.Context, int64, string) (torrents.TorrentDownloadResult, error)
-	DownloadWithCredential(context.Context, personalapikey.AuthenticatedCredential, int64) (torrents.TorrentDownloadResult, error)
+	DownloadWithCredential(context.Context, personalapikey.AuthenticatedCredential, string) (torrents.TorrentDownloadResult, error)
 	AttendanceOverview(context.Context, personalapikey.AuthenticatedCredential) (attendance.Overview, error)
 	ClaimAttendance(context.Context, personalapikey.AuthenticatedCredential, attendance.Mode) (attendance.Record, error)
 }

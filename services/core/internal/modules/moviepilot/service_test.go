@@ -27,7 +27,7 @@ func TestMoviePilotAdapterEnforcesSharedPersonalAPIKeyScopes(t *testing.T) {
 	if _, err := service.Torrent(context.Background(), credential, 9830); !errors.Is(err, personalapikey.ErrScopeDenied) {
 		t.Fatalf("Torrent() download scope error = %v", err)
 	}
-	if _, err := service.DownloadWithCredential(context.Background(), credential, 9830); !errors.Is(err, personalapikey.ErrScopeDenied) {
+	if _, err := service.DownloadWithCredential(context.Background(), credential, "9830"); !errors.Is(err, personalapikey.ErrScopeDenied) {
 		t.Fatalf("DownloadWithCredential() scope error = %v", err)
 	}
 	if _, err := service.Upload(context.Background(), credential, LegacyUploadInput{}); !errors.Is(err, personalapikey.ErrScopeDenied) {
