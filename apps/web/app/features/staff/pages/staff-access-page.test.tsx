@@ -8,6 +8,7 @@ import { sessionKeys } from "~/features/auth/api/session.mutations"
 import { capabilityKeys } from "~/features/authz/api/capabilities.queries"
 import { siteKeys } from "~/features/site/api/site.queries"
 import { staffSessionKeys } from "~/features/staff/api/staff-session.mutations"
+import { pendingTorrentReviewsQueryOptions } from "~/features/staff/api/torrent-review.queries"
 import { managedUserListQueryOptions } from "~/features/staff/api/user-administration.queries"
 import { StaffAccessPage } from "~/features/staff/pages/staff-access-page"
 import { torrentListQueryOptions } from "~/features/torrent/api/torrent.queries"
@@ -121,6 +122,10 @@ function createStaffQueryClient(actions: CapabilityAction[]) {
     total: 8_999,
     limit: 1,
     offset: 0,
+  })
+  queryClient.setQueryData(pendingTorrentReviewsQueryOptions(1).queryKey, {
+    items: [],
+    total: 0,
   })
   queryClient.setQueryData(sessionKeys.current(), {
     user: {

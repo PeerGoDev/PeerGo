@@ -8,8 +8,11 @@ import { TooltipProvider } from "~/components/ui/tooltip"
 import { sessionKeys } from "~/features/auth/api/session.mutations"
 import { capabilityKeys } from "~/features/authz/api/capabilities.queries"
 import { siteKeys } from "~/features/site/api/site.queries"
+import { commentModerationCasesQueryOptions } from "~/features/staff/api/comment-moderation.queries"
+import { workerOperationsQueryOptions } from "~/features/staff/api/operations.queries"
 import { StaffShell } from "~/features/staff/components/staff-shell"
 import { staffSessionKeys } from "~/features/staff/api/staff-session.mutations"
+import { pendingTorrentReviewsQueryOptions } from "~/features/staff/api/torrent-review.queries"
 import type { components } from "~/generated/api"
 
 vi.mock("~/hooks/use-mobile", () => ({
@@ -19,6 +22,36 @@ vi.mock("~/hooks/use-mobile", () => ({
 type CapabilityAction = components["schemas"]["CapabilityAction"]
 
 describe("StaffShell navigation", () => {
+  it("surfaces pending work in both the header and sidebar", async () => {
+    const user = userEvent.setup()
+    const queryClient = createStaffQueryClient(["torrent.review"], {
+      pendingReviews: 7,
+    })
+
+    render(
+      <MemoryRouter initialEntries={["/staff"]}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <StaffShell>
+              <main>后台内容</main>
+            </StaffShell>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    )
+
+    expect(
+      screen.getByRole("button", { name: "后台待办，共 7 项" })
+    ).toBeVisible()
+
+    await user.click(screen.getByRole("button", { name: "切换后台侧栏" }))
+    const navigation = await screen.findByRole("dialog")
+    const reviewLink = within(navigation).getByRole("link", {
+      name: "种子审核",
+    })
+    expect(reviewLink.parentElement).toHaveTextContent("7")
+  })
+
   it("keeps implemented staff areas discoverable before security verification", async () => {
     const user = userEvent.setup()
     const queryClient = createStaffQueryClient([], {
@@ -81,6 +114,8 @@ describe("StaffShell navigation", () => {
       "site.registration.manage.read",
       "promotion.manage.read",
       "economy.seedingreward.policy.read",
+      "economy.attendance.policy.read",
+      "progression.level.policy.read",
       "hnr.policy.read",
       "operations.monitor.read",
       "tracker.policy.read",
@@ -146,8 +181,11 @@ describe("StaffShell navigation", () => {
     expect(
       within(navigation).getByRole("link", { name: "权限与任期" })
     ).toHaveAttribute("href", "/staff/governance")
+    expect(
+      within(navigation).getByRole("link", { name: "设置中心" })
+    ).toHaveAttribute("href", "/staff/settings")
     await user.click(
-      within(navigation).getByRole("button", { name: "站点设置" })
+      within(navigation).getByRole("button", { name: "站点与用户" })
     )
     expect(
       within(navigation).getByRole("link", { name: "基础设置" })
@@ -183,7 +221,7 @@ describe("StaffShell navigation", () => {
       within(navigation).getByRole("link", { name: "分享率与 H&R" })
     ).toHaveAttribute("href", "/staff/settings/ratio-hnr")
     await user.click(
-      within(navigation).getByRole("button", { name: "等级与魔力" })
+      within(navigation).getByRole("button", { name: "等级与经济" })
     )
     expect(
       within(navigation).getByRole("link", { name: "做种奖励" })
@@ -227,7 +265,7 @@ describe("StaffShell navigation", () => {
     await user.click(screen.getByRole("button", { name: "切换后台侧栏" }))
     const navigation = await screen.findByRole("dialog")
     const parent = within(navigation).getByRole("button", {
-      name: "站点设置",
+      name: "站点与用户",
     })
     const child = within(navigation).getByRole("link", { name: "基础设置" })
 
@@ -242,6 +280,7 @@ function createStaffQueryClient(
   options: {
     staffSession?: boolean
     webActions?: CapabilityAction[]
+    pendingReviews?: number
   } = {}
 ) {
   const userId = "0198f20a-6da8-7e51-9c64-333333333333"
@@ -259,6 +298,20 @@ function createStaffQueryClient(
     online_users: 222,
     default_torrent_view: "list",
     show_latest_announcement: true,
+  })
+  queryClient.setQueryData(pendingTorrentReviewsQueryOptions(1).queryKey, {
+    items: [],
+    total: options.pendingReviews ?? 0,
+  })
+  queryClient.setQueryData(commentModerationCasesQueryOptions(1, 0).queryKey, {
+    items: [],
+    total: 0,
+    limit: 1,
+    offset: 0,
+  })
+  queryClient.setQueryData(workerOperationsQueryOptions().queryKey, {
+    generated_at: "2026-08-29T08:00:00Z",
+    queues: [],
   })
   queryClient.setQueryData(sessionKeys.current(), {
     user: {

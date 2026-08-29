@@ -44,15 +44,21 @@ describe("StaffSiteSettingsPage", () => {
     expect(save).toBeDisabled()
     expect(screen.getByLabelText("站点说明").tagName).toBe("INPUT")
     expect(screen.getByLabelText("种子文件名前缀")).toHaveValue("[ROUSI]")
+    expect(screen.getByRole("tablist", { name: "站点设置分区" })).toBeVisible()
+    await user.click(screen.getByRole("tab", { name: "首页展示" }))
     expect(screen.getByRole("heading", { name: "首页展示" })).toBeVisible()
+    await user.click(screen.getByRole("tab", { name: "侧栏菜单" }))
     expect(
       screen.getByRole("heading", { name: "自定义左侧菜单" })
     ).toBeVisible()
+    await user.click(screen.getByRole("tab", { name: "变更与审计" }))
     expect(screen.getByRole("heading", { name: "变更与审计" })).toBeVisible()
     expect(screen.getByText(/最近生效于/)).toBeVisible()
 
+    await user.click(screen.getByRole("tab", { name: "基本信息" }))
     await user.clear(screen.getByLabelText("站点名称"))
     await user.type(screen.getByLabelText("站点名称"), "PeerGo Next")
+    await user.click(screen.getByRole("tab", { name: "变更与审计" }))
     await user.type(
       screen.getByLabelText("变更理由"),
       "统一站点名称并完成公开页面复核。"
@@ -85,7 +91,8 @@ describe("StaffSiteSettingsPage", () => {
       </QueryClientProvider>
     )
 
-    await user.click(await screen.findByRole("button", { name: "新增链接" }))
+    await user.click(await screen.findByRole("tab", { name: "侧栏菜单" }))
+    await user.click(screen.getByRole("button", { name: "新增链接" }))
     await user.type(screen.getByLabelText("菜单名称"), "Wiki")
     await user.type(
       screen.getByLabelText("链接地址"),
