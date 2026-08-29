@@ -12,6 +12,7 @@ CREATE TABLE migration.legacy_torrent_route_aliases (
     created_at timestamptz NOT NULL
 );
 
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION migration.protect_legacy_torrent_route_alias()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -20,6 +21,7 @@ BEGIN
     RAISE EXCEPTION 'legacy torrent route aliases are immutable';
 END;
 $$;
+-- +goose StatementEnd
 
 CREATE TRIGGER migration_legacy_torrent_route_alias_immutable
 BEFORE UPDATE OR DELETE ON migration.legacy_torrent_route_aliases
