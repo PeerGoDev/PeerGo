@@ -44,6 +44,20 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 	windowStart := createdAt.Truncate(time.Hour).Add(2 * time.Hour)
 	fixtureAt := windowStart.Add(-2 * time.Hour)
 	userID, torrentIDs := insertEvidenceFixture(t, ctx, pool, fixtureAt)
+	pendingTorrentID := insertSettlementTorrent(
+		t, ctx, pool, userID, torrentIDs[0], "pending_review",
+		windowStart.Add(-30*time.Minute), nil,
+	)
+	duringWindowPublishedAt := windowStart.Add(30 * time.Minute)
+	duringWindowTorrentID := insertSettlementTorrent(
+		t, ctx, pool, userID, torrentIDs[0], "published",
+		windowStart.Add(-30*time.Minute), &duringWindowPublishedAt,
+	)
+	afterWindowPublishedAt := windowStart.Add(90 * time.Minute)
+	afterWindowTorrentID := insertSettlementTorrent(
+		t, ctx, pool, userID, torrentIDs[0], "published",
+		windowStart.Add(-30*time.Minute), &afterWindowPublishedAt,
+	)
 
 	policyRepository, err := seedingreward.NewPostgresTimelineRepository(pool)
 	if err != nil {
@@ -58,10 +72,27 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	item := settlementseedingv1.Item{
-		UserID: userID.String(), TorrentID: torrentIDs[0], ActiveSeconds: 3600,
-		RawUploadedBytes: 4096, SnapshotSeeders: 1, SnapshotLeechers: 0,
-		EvidenceSHA256: digestText("settlement-reward-item"),
+	items := []settlementseedingv1.Item{
+		{
+			UserID: userID.String(), TorrentID: torrentIDs[0], ActiveSeconds: 3600,
+			RawUploadedBytes: 4096, SnapshotSeeders: 1, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-published-before-window"),
+		},
+		{
+			UserID: userID.String(), TorrentID: pendingTorrentID, ActiveSeconds: 3600,
+			RawUploadedBytes: 4096, SnapshotSeeders: 1, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-pending-review"),
+		},
+		{
+			UserID: userID.String(), TorrentID: duringWindowTorrentID, ActiveSeconds: 1800,
+			RawUploadedBytes: 2048, SnapshotSeeders: 1, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-published-during-window"),
+		},
+		{
+			UserID: userID.String(), TorrentID: afterWindowTorrentID, ActiveSeconds: 3600,
+			RawUploadedBytes: 4096, SnapshotSeeders: 1, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-published-after-window"),
+		},
 	}
 	header := settlementseedingv1.Event{
 		SchemaVersion: settlementseedingv1.SchemaVersion,
@@ -70,7 +101,7 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 		WindowEvidenceSHA256: digestText("settlement-reward-window"),
 		SnapshotID:           mustV7(t).String(), SnapshotSequence: 10,
 		SnapshotObservedAt: windowStart.Add(55 * time.Minute),
-		ItemCount:          1, ChunkIndex: 0, ChunkCount: 1, Items: []settlementseedingv1.Item{item},
+		ItemCount:          int32(len(items)), ChunkIndex: 0, ChunkCount: 1, Items: items,
 	}
 	projectionDigest, err := settlementseedingv1.ProjectionDigest(header, header.Items)
 	if err != nil {
@@ -92,7 +123,7 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 		t.Fatal(err)
 	}
 	worker, err := seedingreward.NewWorker(settlementRepository, seedingreward.WorkerConfig{
-		Now: func() time.Time { return evidenceNow.Add(time.Minute) },
+		Now: func() time.Time { return afterWindowPublishedAt.Add(time.Minute) },
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -108,20 +139,22 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 
 	var status string
 	var reward int64
+	var eligibleTorrentCount int
 	var experience string
 	var transactionID, experienceID uuid.UUID
 	err = pool.QueryRow(ctx, `
 SELECT work.status, calculation.reward, calculation.experience_amount::text,
+       calculation.eligible_torrent_count,
        calculation.magic_transaction_id, calculation.experience_entry_id
 FROM economy.seeding_reward_work_items AS work
 JOIN economy.seeding_reward_calculations AS calculation
   ON calculation.window_start = work.window_start AND calculation.user_id = work.user_id
 WHERE work.window_start = $1 AND work.user_id = $2`, windowStart, userID).
-		Scan(&status, &reward, &experience, &transactionID, &experienceID)
-	if err != nil || status != "completed" || reward <= 0 || experience == "0" ||
+		Scan(&status, &reward, &experience, &eligibleTorrentCount, &transactionID, &experienceID)
+	if err != nil || status != "completed" || reward <= 0 || experience == "0" || eligibleTorrentCount != 2 ||
 		transactionID == uuid.Nil || experienceID == uuid.Nil {
-		t.Fatalf("settlement status=%s reward=%d experience=%s transaction=%s entry=%s error=%v",
-			status, reward, experience, transactionID, experienceID, err)
+		t.Fatalf("settlement status=%s reward=%d experience=%s eligible=%d transaction=%s entry=%s error=%v",
+			status, reward, experience, eligibleTorrentCount, transactionID, experienceID, err)
 	}
 
 	var postingCount int
@@ -144,12 +177,22 @@ WHERE transaction_id = $3`, userID, economy.SeedingMintAccountID(), transactionI
 	}
 
 	var metadataCount, benefitCount int
+	var beforeCount, pendingCount, duringCount, afterCount int
 	if err := pool.QueryRow(ctx, `
 SELECT
     (SELECT count(*) FROM economy.seeding_reward_metadata_snapshots WHERE window_start = $1),
-    (SELECT count(*) FROM economy.seeding_reward_benefit_snapshots WHERE window_start = $1 AND user_id = $2)`,
-		windowStart, userID).Scan(&metadataCount, &benefitCount); err != nil || metadataCount != 1 || benefitCount != 1 {
-		t.Fatalf("metadata=%d benefits=%d error=%v", metadataCount, benefitCount, err)
+    (SELECT count(*) FROM economy.seeding_reward_benefit_snapshots WHERE window_start = $1 AND user_id = $2),
+    count(*) FILTER (WHERE torrent_id = $3),
+    count(*) FILTER (WHERE torrent_id = $4),
+    count(*) FILTER (WHERE torrent_id = $5),
+    count(*) FILTER (WHERE torrent_id = $6)
+FROM economy.seeding_reward_metadata_snapshots
+WHERE window_start = $1`, windowStart, userID, torrentIDs[0], pendingTorrentID,
+		duringWindowTorrentID, afterWindowTorrentID).
+		Scan(&metadataCount, &benefitCount, &beforeCount, &pendingCount, &duringCount, &afterCount); err != nil ||
+		metadataCount != 2 || benefitCount != 1 || beforeCount != 1 || pendingCount != 0 || duringCount != 1 || afterCount != 0 {
+		t.Fatalf("metadata=%d benefits=%d before=%d pending=%d during=%d after=%d error=%v",
+			metadataCount, benefitCount, beforeCount, pendingCount, duringCount, afterCount, err)
 	}
 	if _, err := pool.Exec(ctx, `
 UPDATE economy.seeding_reward_benefit_snapshots
@@ -237,6 +280,63 @@ SET magic_delta = magic_delta + 1
 WHERE source_reference = $1`, correctionSource); err == nil {
 		t.Fatal("immutable compensation receipt unexpectedly accepted update")
 	}
+}
+
+func insertSettlementTorrent(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	uploaderID uuid.UUID,
+	referenceTorrentID int64,
+	state string,
+	submittedAt time.Time,
+	publishedAt *time.Time,
+) int64 {
+	t.Helper()
+	if (state == "published") != (publishedAt != nil) {
+		t.Fatalf("state=%q published_at=%v is inconsistent", state, publishedAt)
+	}
+	var categoryID string
+	if err := pool.QueryRow(ctx, `
+SELECT category_id
+FROM torrents.torrents
+WHERE id = $1`, referenceTorrentID).Scan(&categoryID); err != nil {
+		t.Fatal(err)
+	}
+	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
+	objectID := uuid.New()
+	objectDigest := sha256.Sum256([]byte("settlement-object-" + suffix))
+	infoDigest := sha256.Sum256([]byte("settlement-info-" + suffix))
+	if _, err := pool.Exec(ctx, `
+INSERT INTO torrents.torrent_objects (
+    id, content_sha256, byte_length, parser_version, validation_profile,
+    compatibility_flags, info_offset, info_length, created_at
+) VALUES ($1, $2, 256, 'integration-v1', 'strict_upload', ARRAY[]::text[], 0, 128, $3)`,
+		objectID, objectDigest[:], submittedAt); err != nil {
+		t.Fatal(err)
+	}
+	version := int64(1)
+	stateChangedAt := submittedAt
+	if publishedAt != nil {
+		version = 2
+		stateChangedAt = *publishedAt
+	}
+	var torrentID int64
+	if err := pool.QueryRow(ctx, `
+INSERT INTO torrents.torrents (
+    uploader_id, category_id, object_id, info_hash_v1,
+    content_name, title, subtitle, total_size_bytes, payload_size_bytes,
+    file_count, padding_file_count, piece_length_bytes, piece_count,
+    state, version, submitted_at, published_at, state_changed_at, updated_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, '', 4096, 4096,
+    1, 0, 16384, 1, $7, $8, $9, $10, $11, $11
+) RETURNING id`, uploaderID, categoryID, objectID, infoDigest[:20],
+		"settlement-"+suffix+".bin", "Settlement "+suffix, state, version,
+		submittedAt, publishedAt, stateChangedAt).Scan(&torrentID); err != nil {
+		t.Fatal(err)
+	}
+	return torrentID
 }
 
 func integrationRewardPolicy(effectiveAt time.Time, revision string) seedingreward.PolicyRevision {

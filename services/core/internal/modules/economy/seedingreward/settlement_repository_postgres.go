@@ -317,7 +317,9 @@ SELECT evidence.torrent_id, torrent.total_size_bytes, torrent.published_at,
 FROM economy.seeding_reward_evidence_items AS evidence
 JOIN torrents.torrents AS torrent ON torrent.id = evidence.torrent_id
 WHERE evidence.window_start = $1 AND evidence.user_id = $2
-ORDER BY evidence.torrent_id`, window.Start, userID)
+  AND torrent.published_at IS NOT NULL
+  AND torrent.published_at <= $3
+ORDER BY evidence.torrent_id`, window.Start, userID, window.End)
 	if err != nil {
 		return nil, fmt.Errorf("read seeding reward item enrichment: %w", err)
 	}
