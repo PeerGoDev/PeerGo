@@ -33,8 +33,8 @@ describe("StaffUsersPage", () => {
       screen.getByRole("combobox", { name: "按账户状态筛选" })
     ).toBeVisible()
     expect(screen.getAllByText(/12,327 条记录/)).toHaveLength(2)
-    expect(screen.getAllByText("demo-user")).toHaveLength(2)
-    expect(screen.getAllByText("demo@example.com")).toHaveLength(2)
+    expect(screen.getAllByText("demo-user")).toHaveLength(1)
+    expect(screen.getAllByText("demo@example.com")).toHaveLength(1)
     expect(screen.getAllByText("12327").length).toBeGreaterThan(0)
     expect(
       screen.getAllByText("0198f20a-6da8-7e51-9c64-222222222222").length

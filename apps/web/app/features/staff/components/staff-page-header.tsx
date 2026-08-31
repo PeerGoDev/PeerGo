@@ -50,7 +50,9 @@ export function StaffPageHeader({
           <h1
             className={cn(
               "font-heading",
-              hero ? "text-3xl font-bold md:text-4xl" : "text-xl font-semibold"
+              hero
+                ? "text-2xl font-bold sm:text-3xl md:text-4xl"
+                : "text-xl font-semibold"
             )}
           >
             {title}
@@ -71,7 +73,7 @@ export function StaffPageHeader({
         ) : null}
       </div>
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {actions}
         </div>
       ) : null}

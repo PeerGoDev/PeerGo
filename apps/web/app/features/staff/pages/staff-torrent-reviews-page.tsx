@@ -47,7 +47,7 @@ const reviewQueueLimit = 20
 
 export function StaffTorrentReviewsPage() {
   return (
-    <PageLayout className="max-w-[1172px] gap-6 px-10 py-6 pt-10! sm:px-6 sm:pt-12!">
+    <PageLayout className="max-w-[1172px] gap-5 p-4! sm:gap-6 sm:p-6! sm:pt-10!">
       <header>
         <h1 className="font-heading text-2xl font-bold tracking-tight">
           种子审核终审
@@ -156,7 +156,7 @@ function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
               {reviews.data.items.map((torrent) => (
                 <Card
                   key={torrent.id}
-                  className="h-[130px] gap-0 rounded-lg py-0 shadow-sm"
+                  className="min-h-[130px] gap-0 rounded-lg py-0 shadow-sm"
                 >
                   <CardContent className="h-full p-4">
                     <article className="flex h-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

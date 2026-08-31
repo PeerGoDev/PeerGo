@@ -49,10 +49,12 @@ describe("AlertDialog", () => {
     expect(
       document.querySelector('[data-slot="alert-dialog-content"]')
     ).toHaveClass(
-      "max-w-[calc(100%-2rem)]",
+      "max-h-[calc(100dvh-1rem)]",
+      "max-w-[calc(100%-1rem)]",
       "data-[size=default]:sm:max-w-[425px]",
       "rounded-lg",
-      "p-6"
+      "p-4",
+      "sm:p-6"
     )
     expect(screen.getByRole("button", { name: "关闭" })).toBeVisible()
   })

@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test"
 
 const port = Number(process.env.PEERGO_E2E_PORT ?? 4173)
 const baseURL = `http://127.0.0.1:${port}`
+const chromeExecutable = process.env.PEERGO_E2E_CHROME
+const video =
+  process.env.PEERGO_E2E_VIDEO === "off" ? "off" : "retain-on-failure"
 
 export default defineConfig({
   testDir: "./e2e",
@@ -15,13 +18,16 @@ export default defineConfig({
     : [["list"], ["html", { open: "never" }]],
   use: {
     baseURL,
+    launchOptions: chromeExecutable
+      ? { executablePath: chromeExecutable }
+      : undefined,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video,
   },
   expect: { timeout: 10_000 },
   webServer: {
-    command: `pnpm exec vite preview --host 127.0.0.1 --port ${port}`,
+    command: `node_modules/.bin/vite preview --host 127.0.0.1 --port ${port}`,
     // Probe a Vite-owned static asset so CI never depends on Core being up.
     url: `${baseURL}/favicon.ico`,
     reuseExistingServer: !process.env.CI,

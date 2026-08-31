@@ -123,10 +123,10 @@ describe("StaffTorrentReviewsPage", () => {
 
     expect(screen.getByRole("main")).toHaveClass(
       "max-w-[1172px]",
-      "px-10",
-      "pt-10!",
-      "sm:px-6",
-      "sm:pt-12!"
+      "p-4!",
+      "gap-5",
+      "sm:p-6!",
+      "sm:pt-10!"
     )
     expect(screen.getByRole("button", { name: "刷新队列" })).toBeVisible()
     expect(screen.getByRole("heading", { name: "种子审核终审" })).toBeVisible()
@@ -141,7 +141,7 @@ describe("StaffTorrentReviewsPage", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument()
     expect(
       screen.getByText("Release 2026").closest("[data-slot=card]")
-    ).toHaveClass("h-[130px]")
+    ).toHaveClass("min-h-[130px]")
     expect(
       screen
         .getByText("Release 2026")

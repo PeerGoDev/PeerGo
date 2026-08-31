@@ -37,7 +37,7 @@ describe("StaffAnnouncementsPage", () => {
 
     const heading = await screen.findByRole("heading", { name: "公告管理" })
     expect(heading).toBeVisible()
-    expect(heading).toHaveClass("text-3xl", "md:text-4xl")
+    expect(heading).toHaveClass("text-2xl", "sm:text-3xl", "md:text-4xl")
     expect(screen.getByRole("button", { name: "创建新公告" })).toHaveClass(
       "w-35"
     )

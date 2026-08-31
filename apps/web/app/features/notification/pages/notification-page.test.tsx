@@ -123,11 +123,13 @@ describe("NotificationPage", () => {
       screen.getByRole("heading", { level: 1, name: "站内消息" })
     ).toBeVisible()
     expect(screen.getByRole("main")).toHaveClass(
-      "px-8!",
-      "pt-12!",
-      "gap-6",
+      "p-4!",
+      "gap-5",
+      "md:px-8!",
+      "md:pt-10!",
+      "md:gap-6",
       "lg:px-10!",
-      "lg:pt-14!",
+      "lg:pt-12!",
       "md:max-w-3xl"
     )
     expect(

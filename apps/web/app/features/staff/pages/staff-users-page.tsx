@@ -494,11 +494,14 @@ function ManagedUserPagination({
   onPageChange: (page: number) => void
 }) {
   return (
-    <Pagination className="justify-between pt-1" aria-label="用户列表分页">
+    <Pagination
+      className="flex-col gap-2 pt-1 sm:flex-row sm:justify-between"
+      aria-label="用户列表分页"
+    >
       <span className="text-sm text-muted-foreground">
         共 {total.toLocaleString("zh-CN")} 条记录
       </span>
-      <PaginationContent>
+      <PaginationContent className="max-w-full">
         <PaginationItem>
           <Button
             variant="outline"

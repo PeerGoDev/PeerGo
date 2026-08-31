@@ -52,6 +52,11 @@ describe("ManagedUserTable", () => {
     expect(screen.getAllByText("1 项有效限制").length).toBeGreaterThan(0)
     expect(screen.getAllByText("下载受限").length).toBeGreaterThan(0)
     expect(screen.getAllByText("未验证").length).toBeGreaterThan(0)
+    expect(screen.getByText(/表格可左右滑动/)).toBeVisible()
+    expect(screen.getByRole("table")).toHaveClass(
+      "min-w-[1120px]",
+      "lg:min-w-[1480px]"
+    )
     await user.click(
       screen.getByRole("button", { name: "管理账户 demo-target" })
     )

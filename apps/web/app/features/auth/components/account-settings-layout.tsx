@@ -72,10 +72,10 @@ export function AccountSettingsLayout({
   contentClassName?: string
 }) {
   return (
-    <PageLayout className="flex-row items-start gap-6 max-md:flex-col">
+    <PageLayout className="flex-row items-start gap-6 max-md:flex-col max-md:gap-4">
       <nav
         aria-label="账户设置"
-        className="flex w-48 shrink-0 flex-col gap-1 max-md:w-full"
+        className="flex w-48 shrink-0 flex-col gap-1 max-md:-mx-4 max-md:w-[calc(100%+2rem)] max-md:touch-pan-x max-md:[scrollbar-width:none] max-md:flex-row max-md:overflow-x-auto max-md:px-4 max-md:pb-1 max-md:[&::-webkit-scrollbar]:hidden"
       >
         {accountSettingsItems.map((item) => {
           const current = item.section === active
@@ -88,7 +88,7 @@ export function AccountSettingsLayout({
                   variant: current ? "default" : "ghost",
                   size: "sm",
                 }),
-                "w-full shrink-0 justify-start gap-3 px-3 font-normal",
+                "w-full shrink-0 justify-start gap-3 px-3 font-normal max-md:w-auto",
                 !current && "text-muted-foreground"
               )}
               aria-current={current ? "page" : undefined}

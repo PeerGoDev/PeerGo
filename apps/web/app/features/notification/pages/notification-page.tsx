@@ -218,9 +218,11 @@ export function NotificationPage() {
   }
 
   return (
-    <PageLayout className="gap-6 px-8! pt-12! pb-8! md:max-w-3xl lg:max-w-5xl lg:px-10! lg:pt-14! xl:max-w-7xl">
+    <PageLayout className="gap-5 p-4! md:max-w-3xl md:gap-6 md:px-8! md:pt-10! md:pb-8! lg:max-w-5xl lg:px-10! lg:pt-12! xl:max-w-7xl">
       <header className="flex items-center justify-between gap-4 max-md:flex-col max-md:items-stretch">
-        <h1 className="font-heading text-3xl font-bold">站内消息</h1>
+        <h1 className="font-heading text-2xl font-bold sm:text-3xl">
+          站内消息
+        </h1>
         {session.data && canRead && notifications.data ? (
           <div className="grid min-w-0 grid-cols-2 gap-2 md:flex">
             {canCreateFeedback ? (
