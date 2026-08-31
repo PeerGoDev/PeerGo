@@ -66,6 +66,32 @@ func TestDecisionEventConstantsAndReasonsMatchJSONSchema(t *testing.T) {
 	}
 }
 
+func TestSeedingRewardRetryConstantsMatchJSONSchema(t *testing.T) {
+	t.Parallel()
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller() failed")
+	}
+	path := filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "../../../../../contracts/events/audit/v1/seeding-reward-retry-recorded.schema.json"))
+	encoded, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%s) error = %v", path, err)
+	}
+	var schema struct {
+		Properties map[string]struct {
+			Const string `json:"const"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(encoded, &schema); err != nil {
+		t.Fatal(err)
+	}
+	if schema.Properties["schema_version"].Const != SeedingRewardRetrySchemaVersion ||
+		schema.Properties["event_type"].Const != SeedingRewardRetryEventType {
+		t.Fatalf("schema constants = version %q type %q",
+			schema.Properties["schema_version"].Const, schema.Properties["event_type"].Const)
+	}
+}
+
 func TestRegistrationCompletedConstantsAndModesMatchJSONSchema(t *testing.T) {
 	t.Parallel()
 	_, sourceFile, _, ok := runtime.Caller(0)

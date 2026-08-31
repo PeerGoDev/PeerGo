@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/peergo/peergo/contracts/go/settlementseedingv1"
+	"github.com/peergo/peergo/services/core/internal/contracts/auditevent"
+	"github.com/peergo/peergo/services/core/internal/modules/audit"
 	"github.com/peergo/peergo/services/core/internal/modules/economy"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/seedingreward"
 	platformpostgres "github.com/peergo/peergo/services/core/internal/platform/postgres"
@@ -40,7 +43,7 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 	// Keep every modeled business event in the past. The production apply path
 	// uses the wall clock for immutable receipt timestamps and must never accept
 	// a synthetic approval from the future.
-	createdAt := time.Now().UTC().Add(-4 * time.Hour).Truncate(time.Microsecond)
+	createdAt := time.Now().UTC().Add(-8 * time.Hour).Truncate(time.Microsecond)
 	windowStart := createdAt.Truncate(time.Hour).Add(2 * time.Hour)
 	fixtureAt := windowStart.Add(-2 * time.Hour)
 	userID, torrentIDs := insertEvidenceFixture(t, ctx, pool, fixtureAt)
@@ -199,6 +202,122 @@ UPDATE economy.seeding_reward_benefit_snapshots
 SET vip_active = NOT vip_active
 WHERE window_start = $1 AND user_id = $2`, windowStart, userID); err == nil {
 		t.Fatal("immutable benefit snapshot unexpectedly accepted update")
+	}
+
+	// Uploaders are allowed to seed a torrent while it is under review. If an
+	// entire evidence hour predates publication, settlement must record a zero
+	// result and advance the per-user queue instead of creating a dead letter.
+	deferredWindowStart := windowStart.Add(2 * time.Hour)
+	deferredPublishedAt := deferredWindowStart.Add(90 * time.Minute)
+	deferredTorrentID := insertSettlementTorrent(
+		t, ctx, pool, userID, torrentIDs[0], "published",
+		deferredWindowStart.Add(-30*time.Minute), &deferredPublishedAt,
+	)
+	deferredHeader := settlementseedingv1.Event{
+		SchemaVersion: settlementseedingv1.SchemaVersion,
+		EventID:       mustV7(t).String(), WindowStart: deferredWindowStart, WindowEnd: deferredWindowStart.Add(time.Hour),
+		BuiltAt:              deferredWindowStart.Add(time.Hour + 2*time.Minute),
+		WindowEvidenceSHA256: digestText("settlement-reward-all-prepublication-window"),
+		SnapshotID:           mustV7(t).String(), SnapshotSequence: 11,
+		SnapshotObservedAt: deferredWindowStart.Add(55 * time.Minute),
+		ItemCount:          1, ChunkIndex: 0, ChunkCount: 1,
+		Items: []settlementseedingv1.Item{{
+			UserID: userID.String(), TorrentID: deferredTorrentID, ActiveSeconds: 900,
+			RawUploadedBytes: 0, SnapshotSeeders: 2, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-all-prepublication-item"),
+		}},
+	}
+	deferredDigest, err := settlementseedingv1.ProjectionDigest(deferredHeader, deferredHeader.Items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deferredHeader.ProjectionSHA256 = settlementseedingv1.DigestHex(deferredDigest)
+	deferredEvidenceNow := deferredWindowStart.Add(time.Hour + 3*time.Minute)
+	deferredEvidenceRepository, err := seedingreward.NewPostgresEvidenceRepository(
+		pool, func() time.Time { return deferredEvidenceNow }, 2*time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deferredApplied, err := deferredEvidenceRepository.ApplyEvidence(
+		ctx, encodeEvidence(t, deferredHeader), deferredHeader.BuiltAt,
+	)
+	if err != nil || !deferredApplied.Complete {
+		t.Fatalf("ApplyEvidence(prepublication) = %+v, %v", deferredApplied, err)
+	}
+	if commandTag, err := pool.Exec(ctx, `
+UPDATE economy.seeding_reward_work_items
+SET status = 'dead', attempts = 10, available_at = $3,
+    last_error_code = 'invariant_failed', last_error_at = $3, updated_at = $3
+WHERE window_start = $1 AND user_id = $2 AND status = 'pending'`,
+		deferredWindowStart, userID, deferredEvidenceNow); err != nil || commandTag.RowsAffected() != 1 {
+		t.Fatalf("prepare dead prepublication work rows=%d error=%v", commandTag.RowsAffected(), err)
+	}
+	retryBuilder, err := audit.NewSeedingRewardRetryEventBuilder(audit.RecorderConfig{
+		PseudonymKey: []byte("settlement-retry-test-key-32-bytes"), PseudonymKeyEpoch: "test-retry-v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryRepository, err := seedingreward.NewPostgresDeadWorkRetryRepository(
+		pool, retryBuilder,
+		func(tx pgx.Tx) auditevent.Appender { return audit.NewPostgresRepository(tx) },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryID := uuid.New()
+	retryReason := "修复发布前做种产生零可奖励窗口后的结算误判。"
+	retryResult, err := retryRepository.RequeueDead(ctx, seedingreward.DeadWorkRetryCommand{
+		ID: retryID, WindowStart: deferredWindowStart, UserID: userID,
+		ExpectedAttempts: 10, ExpectedErrorCode: "invariant_failed",
+		OperatorReference: "integration:prepublication-zero-reward", Reason: retryReason,
+		OccurredAt: deferredEvidenceNow.Add(time.Minute),
+	})
+	if err != nil || retryResult.RetryID != retryID || retryResult.PreviousAttempts != 10 {
+		t.Fatalf("RequeueDead() = %+v, %v", retryResult, err)
+	}
+	var retryAuditPayload string
+	if err := pool.QueryRow(ctx, `
+SELECT payload_json
+FROM audit.outbox
+WHERE event_type = $1 AND payload_json::jsonb ->> 'retry_id' = $2`,
+		audit.SeedingRewardRetryEventType, retryID.String()).Scan(&retryAuditPayload); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(retryAuditPayload, userID.String()) || strings.Contains(retryAuditPayload, retryReason) {
+		t.Fatalf("retry audit leaked target or reason: %s", retryAuditPayload)
+	}
+	deferredWorker, err := seedingreward.NewWorker(settlementRepository, seedingreward.WorkerConfig{
+		Now: func() time.Time { return deferredPublishedAt.Add(time.Minute) },
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if processed, err := deferredWorker.RunOnce(ctx); err != nil || processed != 1 {
+		t.Fatalf("RunOnce(prepublication) processed=%d error=%v", processed, err)
+	}
+	var deferredStatus string
+	var deferredReward int64
+	var deferredEligible, deferredMetadata, deferredBenefits int
+	var deferredMagicNull, deferredExperienceNull bool
+	if err := pool.QueryRow(ctx, `
+SELECT work.status, calculation.reward, calculation.eligible_torrent_count,
+       calculation.magic_transaction_id IS NULL,
+       calculation.experience_entry_id IS NULL,
+       (SELECT count(*) FROM economy.seeding_reward_metadata_snapshots WHERE window_start = $1),
+       (SELECT count(*) FROM economy.seeding_reward_benefit_snapshots WHERE window_start = $1 AND user_id = $2)
+FROM economy.seeding_reward_work_items AS work
+JOIN economy.seeding_reward_calculations AS calculation
+  ON calculation.window_start = work.window_start AND calculation.user_id = work.user_id
+WHERE work.window_start = $1 AND work.user_id = $2`, deferredWindowStart, userID).Scan(
+		&deferredStatus, &deferredReward, &deferredEligible,
+		&deferredMagicNull, &deferredExperienceNull, &deferredMetadata, &deferredBenefits,
+	); err != nil || deferredStatus != "completed" || deferredReward != 0 || deferredEligible != 0 ||
+		!deferredMagicNull || !deferredExperienceNull || deferredMetadata != 0 || deferredBenefits != 1 {
+		t.Fatalf("prepublication settlement status=%s reward=%d eligible=%d magic_null=%t experience_null=%t metadata=%d benefits=%d error=%v",
+			deferredStatus, deferredReward, deferredEligible, deferredMagicNull,
+			deferredExperienceNull, deferredMetadata, deferredBenefits, err)
 	}
 
 	var originalCalculation []byte

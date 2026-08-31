@@ -352,9 +352,12 @@ ORDER BY evidence.torrent_id`, window.Start, userID, window.End)
 		return nil, fmt.Errorf("finish seeding reward item enrichment: %w", err)
 	}
 	rows.Close()
-	if len(items) == 0 {
-		return nil, ErrInvariant
-	}
+	// A user can seed an upload while it is still under review. Tracker evidence
+	// for that hour is valid, but it must not earn rewards before published_at.
+	// When every item is filtered for that reason, Calculate persists a
+	// zero-reward receipt so this user's later hourly work is not blocked. The
+	// evidence table's torrent foreign key still makes a missing aggregate an
+	// invariant violation at ingestion time.
 	for _, item := range items {
 		if err := upsertMetadataSnapshot(ctx, tx, window.Start, item, capturedAt); err != nil {
 			return nil, err
