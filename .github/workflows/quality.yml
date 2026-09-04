@@ -40,6 +40,9 @@ jobs:
           cache-dependency-path: |
             **/go.sum
 
+      - name: Install source-check dependencies
+        run: sudo apt-get update && sudo apt-get install --yes ripgrep
+
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
