@@ -78,6 +78,7 @@ export function economySettingsFixture() {
     transactions: {
       legacy_opening: "12327",
       seeding_reward: "42",
+      harem_reward: "0",
       activity_reward: "12",
       torrent_purchase: "0",
       member_gift: "0",

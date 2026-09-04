@@ -262,6 +262,7 @@ type TorrentRulesOverview struct {
 type EconomyTransactionCounts struct {
 	LegacyOpening   int64
 	SeedingReward   int64
+	HaremReward     int64
 	ActivityReward  int64
 	TorrentPurchase int64
 	MemberGift      int64

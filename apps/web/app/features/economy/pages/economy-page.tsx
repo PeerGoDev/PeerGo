@@ -648,6 +648,7 @@ function magicSourceLabel(value: string) {
   const labels: Record<string, string> = {
     legacy_opening: "旧站资产迁移",
     seeding_reward: "做种奖励",
+    harem_reward: "后宫奖励",
     activity_reward: "活动奖励",
     torrent_purchase: "种子购买",
     promotion_product_purchase: "种子促销",

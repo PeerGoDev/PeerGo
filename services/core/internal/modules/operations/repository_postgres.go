@@ -590,6 +590,7 @@ func (repository *PostgresRepository) EconomySettings(ctx context.Context, now t
 SELECT
     count(*) FILTER (WHERE transaction_type = 'legacy_opening'),
     count(*) FILTER (WHERE transaction_type = 'seeding_reward'),
+    count(*) FILTER (WHERE transaction_type = 'harem_reward'),
     count(*) FILTER (WHERE transaction_type = 'activity_reward'),
     count(*) FILTER (WHERE transaction_type = 'torrent_purchase'),
     count(*) FILTER (WHERE transaction_type = 'member_gift'),
@@ -599,6 +600,7 @@ SELECT
 FROM economy.magic_transactions`).Scan(
 		&result.LegacyOpening,
 		&result.SeedingReward,
+		&result.HaremReward,
 		&result.ActivityReward,
 		&result.TorrentPurchase,
 		&result.MemberGift,

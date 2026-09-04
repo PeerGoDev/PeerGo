@@ -27,6 +27,23 @@ func TestLoadPromotionWorkerAllowsProductionIPLoopbackHTTP(t *testing.T) {
 	if settings.WorkgroupEnforcementInterval != time.Hour || settings.WorkgroupEnforcementBatch != 500 {
 		t.Fatalf("unexpected workgroup enforcement defaults: interval=%s batch=%d", settings.WorkgroupEnforcementInterval, settings.WorkgroupEnforcementBatch)
 	}
+	if settings.HaremRewardInterval != 10*time.Minute || settings.HaremRewardBatch != 96 {
+		t.Fatalf("unexpected harem reward defaults: interval=%s batch=%d", settings.HaremRewardInterval, settings.HaremRewardBatch)
+	}
+}
+
+func TestLoadPromotionWorkerValidatesHaremRewardBounds(t *testing.T) {
+	setPromotionWorkerEnvironment(t, "http://127.0.0.1:18085")
+	t.Setenv("PEERGO_HAREM_REWARD_INTERVAL", "30s")
+	if _, err := LoadPromotionWorker(); err == nil || !strings.Contains(err.Error(), "between 1m and 1h") {
+		t.Fatalf("expected harem reward interval rejection, got %v", err)
+	}
+
+	t.Setenv("PEERGO_HAREM_REWARD_INTERVAL", "10m")
+	t.Setenv("PEERGO_HAREM_REWARD_BATCH", "97")
+	if _, err := LoadPromotionWorker(); err == nil || !strings.Contains(err.Error(), "between 1 and 96") {
+		t.Fatalf("expected harem reward batch rejection, got %v", err)
+	}
 }
 
 func TestLoadPromotionWorkerValidatesWorkgroupEnforcementBounds(t *testing.T) {

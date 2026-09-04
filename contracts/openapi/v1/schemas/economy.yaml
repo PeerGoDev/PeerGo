@@ -35,6 +35,7 @@ MagicStatementEntry:
         [
           legacy_opening,
           seeding_reward,
+          harem_reward,
           activity_reward,
           torrent_purchase,
           promotion_product_purchase,

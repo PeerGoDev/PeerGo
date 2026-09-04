@@ -70,7 +70,7 @@ RegistrationPolicySettings:
       uniqueItems: true
       items:
         type: string
-        pattern: '^[a-z0-9][a-z0-9_-]{2,31}$'
+        pattern: "^[a-z0-9][a-z0-9_-]{2,31}$"
     email_domain_mode:
       $ref: "#/EmailDomainMode"
     email_domains:
@@ -173,7 +173,7 @@ UpdateRegistrationPolicySettingsRequest:
       uniqueItems: true
       items:
         type: string
-        pattern: '^[a-z0-9][a-z0-9_-]{2,31}$'
+        pattern: "^[a-z0-9][a-z0-9_-]{2,31}$"
     email_domain_mode:
       $ref: "#/EmailDomainMode"
     email_domains:
@@ -328,7 +328,18 @@ InvitationRelationshipSource:
 InvitedMember:
   type: object
   additionalProperties: false
-  required: [numeric_id, username, display_name, source, established_at]
+  required:
+    [
+      numeric_id,
+      username,
+      display_name,
+      source,
+      established_at,
+      current_seeding_count,
+      current_seeding_reward,
+      current_contribution_milli,
+      harem_eligible,
+    ]
   properties:
     numeric_id:
       type: integer
@@ -347,6 +358,92 @@ InvitedMember:
     established_at:
       type: string
       format: date-time
+    last_active_at:
+      type: string
+      format: date-time
+      nullable: true
+    latest_reward_window:
+      type: string
+      format: date-time
+      nullable: true
+    current_seeding_count:
+      type: integer
+      minimum: 0
+    current_seeding_reward:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+    current_contribution_milli:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+      description: 按当前后宫比例估算的每小时千分之一魔力值；最终按结算窗口合并取整。
+    harem_eligible:
+      type: boolean
+
+HaremRewardPolicySummary:
+  type: object
+  additionalProperties: false
+  required:
+    [
+      revision,
+      enabled,
+      reward_bps,
+      depth,
+      minimum_seed_count,
+      hourly_cap,
+      activity_days,
+      settlement_hours,
+      effective_from,
+    ]
+  properties:
+    revision:
+      type: string
+      maxLength: 64
+    enabled:
+      type: boolean
+    reward_bps:
+      type: integer
+      minimum: 0
+      maximum: 10000
+    depth:
+      type: integer
+      minimum: 1
+      maximum: 10
+    minimum_seed_count:
+      type: integer
+      minimum: 0
+      maximum: 100000
+    hourly_cap:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+    activity_days:
+      type: integer
+      minimum: 0
+      maximum: 3650
+    settlement_hours:
+      type: integer
+      minimum: 1
+      maximum: 24
+    effective_from:
+      type: string
+      format: date-time
+
+LiveHaremReward:
+  type: object
+  additionalProperties: false
+  required:
+    [policy, current_hourly_estimate_milli, awarded_amount, settlement_count]
+  properties:
+    policy:
+      $ref: "#/HaremRewardPolicySummary"
+    current_hourly_estimate_milli:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+    awarded_amount:
+      $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
+    settlement_count:
+      type: integer
+      format: int64
+      minimum: 0
+    last_settled_at:
+      type: string
+      format: date-time
+      nullable: true
 
 HistoricalInvitationReward:
   type: object
@@ -376,6 +473,7 @@ InvitationNetwork:
       total_descendants,
       harem_reward,
       invitation_reward,
+      live_harem_reward,
     ]
   properties:
     direct_members:
@@ -399,6 +497,8 @@ InvitationNetwork:
       $ref: "#/HistoricalInvitationReward"
     invitation_reward:
       $ref: "#/HistoricalInvitationReward"
+    live_harem_reward:
+      $ref: "#/LiveHaremReward"
 
 InvitationOverview:
   type: object
@@ -697,7 +797,15 @@ AccountAccessAppealStatus:
 AccountAccessRestriction:
   type: object
   additionalProperties: false
-  required: [source_kind, reason_code, reason_summary, starts_at, expires_at, source_version]
+  required:
+    [
+      source_kind,
+      reason_code,
+      reason_summary,
+      starts_at,
+      expires_at,
+      source_version,
+    ]
   properties:
     source_kind: { $ref: "#/AccountAccessSourceKind" }
     reason_code: { type: string, minLength: 1, maxLength: 80 }
@@ -713,8 +821,20 @@ AccountAccessAppeal:
   type: object
   additionalProperties: false
   required:
-    [id, user_id, user_numeric_id, username, restriction, statement, status,
-     response, created_at, resolved_at, source_active, replayed]
+    [
+      id,
+      user_id,
+      user_numeric_id,
+      username,
+      restriction,
+      statement,
+      status,
+      response,
+      created_at,
+      resolved_at,
+      source_active,
+      replayed,
+    ]
   properties:
     id: { type: string, format: uuid }
     user_id: { type: string, format: uuid }
@@ -877,7 +997,14 @@ PublicUserProfile:
   type: object
   additionalProperties: false
   required:
-    [numeric_id, username, display_name, joined_at, published_torrent_count, published_torrents]
+    [
+      numeric_id,
+      username,
+      display_name,
+      joined_at,
+      published_torrent_count,
+      published_torrents,
+    ]
   properties:
     numeric_id:
       type: integer
@@ -1247,7 +1374,8 @@ CompleteStaffElevationRequest:
 StaffSession:
   type: object
   additionalProperties: false
-  required: [user, expires_at, authentication_method, authenticated_at, csrf_token]
+  required:
+    [user, expires_at, authentication_method, authenticated_at, csrf_token]
   properties:
     user:
       $ref: "#/SessionUser"
@@ -1688,7 +1816,8 @@ ManagedUserDirectorySummary:
 CurrentAccountRestriction:
   type: object
   additionalProperties: false
-  required: [id, kind, reason_code, reason_summary, starts_at, expires_at, version]
+  required:
+    [id, kind, reason_code, reason_summary, starts_at, expires_at, version]
   properties:
     id:
       type: string
@@ -1840,7 +1969,8 @@ ManagedUserAdjustmentRequest:
 ManagedUserNetworkObservation:
   type: object
   additionalProperties: false
-  required: [address, first_seen_at, last_seen_at, seen_count, related_user_count]
+  required:
+    [address, first_seen_at, last_seen_at, seen_count, related_user_count]
   properties:
     address:
       type: string
@@ -2126,7 +2256,8 @@ CreateAccountRestrictionRequest:
 RevokeAccountRestrictionRequest:
   type: object
   additionalProperties: false
-  required: [reason_code, reason, expected_user_version, expected_restriction_version]
+  required:
+    [reason_code, reason, expected_user_version, expected_restriction_version]
   properties:
     reason_code:
       $ref: "#/AccountRestrictionRevocationReasonCode"

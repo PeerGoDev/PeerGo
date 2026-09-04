@@ -85,7 +85,7 @@ func normalizeRecordCommand(command RecordCommand) (RecordCommand, error) {
 
 func validTransactionType(value TransactionType) bool {
 	switch value {
-	case TransactionSeedingReward, TransactionActivityReward, TransactionTorrentBuy,
+	case TransactionSeedingReward, TransactionHaremReward, TransactionActivityReward, TransactionTorrentBuy,
 		TransactionPromotionBuy, TransactionMedalBuy, TransactionMemberGift, TransactionTip,
 		TransactionSocialRedPacketFund, TransactionSocialRedPacketClaim, TransactionRefund, TransactionAdjustment:
 		return true

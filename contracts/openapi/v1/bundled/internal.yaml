@@ -18695,6 +18695,7 @@ components:
           enum:
             - legacy_opening
             - seeding_reward
+            - harem_reward
             - activity_reward
             - torrent_purchase
             - promotion_product_purchase
@@ -20006,6 +20007,9 @@ components:
       enum:
         - registration
         - legacy_import
+    UnsignedIntegerText:
+      type: string
+      pattern: ^(0|[1-9][0-9]{0,18})$
     InvitedMember:
       type: object
       additionalProperties: false
@@ -20015,6 +20019,10 @@ components:
         - display_name
         - source
         - established_at
+        - current_seeding_count
+        - current_seeding_reward
+        - current_contribution_milli
+        - harem_eligible
       properties:
         numeric_id:
           type: integer
@@ -20033,6 +20041,24 @@ components:
         established_at:
           type: string
           format: date-time
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+        latest_reward_window:
+          type: string
+          format: date-time
+          nullable: true
+        current_seeding_count:
+          type: integer
+          minimum: 0
+        current_seeding_reward:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        current_contribution_milli:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+          description: 按当前后宫比例估算的每小时千分之一魔力值；最终按结算窗口合并取整。
+        harem_eligible:
+          type: boolean
     HistoricalInvitationReward:
       type: object
       additionalProperties: false
@@ -20051,6 +20077,73 @@ components:
         last_rewarded_at:
           type: string
           format: date-time
+    HaremRewardPolicySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - revision
+        - enabled
+        - reward_bps
+        - depth
+        - minimum_seed_count
+        - hourly_cap
+        - activity_days
+        - settlement_hours
+        - effective_from
+      properties:
+        revision:
+          type: string
+          maxLength: 64
+        enabled:
+          type: boolean
+        reward_bps:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        depth:
+          type: integer
+          minimum: 1
+          maximum: 10
+        minimum_seed_count:
+          type: integer
+          minimum: 0
+          maximum: 100000
+        hourly_cap:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        activity_days:
+          type: integer
+          minimum: 0
+          maximum: 3650
+        settlement_hours:
+          type: integer
+          minimum: 1
+          maximum: 24
+        effective_from:
+          type: string
+          format: date-time
+    LiveHaremReward:
+      type: object
+      additionalProperties: false
+      required:
+        - policy
+        - current_hourly_estimate_milli
+        - awarded_amount
+        - settlement_count
+      properties:
+        policy:
+          $ref: '#/components/schemas/HaremRewardPolicySummary'
+        current_hourly_estimate_milli:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        awarded_amount:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        settlement_count:
+          type: integer
+          format: int64
+          minimum: 0
+        last_settled_at:
+          type: string
+          format: date-time
+          nullable: true
     InvitationNetwork:
       type: object
       additionalProperties: false
@@ -20061,6 +20154,7 @@ components:
         - total_descendants
         - harem_reward
         - invitation_reward
+        - live_harem_reward
       properties:
         direct_members:
           type: array
@@ -20083,6 +20177,8 @@ components:
           $ref: '#/components/schemas/HistoricalInvitationReward'
         invitation_reward:
           $ref: '#/components/schemas/HistoricalInvitationReward'
+        live_harem_reward:
+          $ref: '#/components/schemas/LiveHaremReward'
     InvitationOverview:
       type: object
       additionalProperties: false
@@ -21571,9 +21667,6 @@ components:
       type: string
       pattern: ^-?(0|[1-9][0-9]{0,18})$
       description: int64 整数十进制文本，防止 JavaScript Number 丢失精度。
-    UnsignedIntegerText:
-      type: string
-      pattern: ^(0|[1-9][0-9]{0,18})$
     ExactExperienceText:
       type: string
       pattern: ^(0|[1-9][0-9]{0,17})(\.[0-9]{1,20})?$
@@ -27263,6 +27356,7 @@ components:
       required:
         - legacy_opening
         - seeding_reward
+        - harem_reward
         - activity_reward
         - torrent_purchase
         - member_gift
@@ -27273,6 +27367,8 @@ components:
         legacy_opening:
           $ref: '#/components/schemas/OperationsCount'
         seeding_reward:
+          $ref: '#/components/schemas/OperationsCount'
+        harem_reward:
           $ref: '#/components/schemas/OperationsCount'
         activity_reward:
           $ref: '#/components/schemas/OperationsCount'

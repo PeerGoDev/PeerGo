@@ -106,17 +106,43 @@ const (
 )
 
 type InvitedMember struct {
-	NumericID     int64
-	Username      string
-	DisplayName   string
-	Source        InvitationRelationshipSource
-	EstablishedAt time.Time
+	NumericID                int64
+	Username                 string
+	DisplayName              string
+	Source                   InvitationRelationshipSource
+	EstablishedAt            time.Time
+	LastActiveAt             *time.Time
+	LatestRewardWindow       *time.Time
+	CurrentSeedingCount      int32
+	CurrentSeedingReward     int64
+	CurrentContributionMilli int64
+	HaremEligible            bool
 }
 
 type HistoricalInvitationReward struct {
 	Amount         int64
 	SourceRows     int64
 	LastRewardedAt *time.Time
+}
+
+type HaremRewardPolicySummary struct {
+	Revision         string
+	Enabled          bool
+	RewardBPS        int32
+	Depth            int16
+	MinimumSeedCount int32
+	HourlyCap        int64
+	ActivityDays     int32
+	SettlementHours  int16
+	EffectiveFrom    time.Time
+}
+
+type LiveHaremReward struct {
+	Policy                     HaremRewardPolicySummary
+	CurrentHourlyEstimateMilli int64
+	AwardedAmount              int64
+	SettlementCount            int64
+	LastSettledAt              *time.Time
 }
 
 type InvitationNetwork struct {
@@ -126,6 +152,7 @@ type InvitationNetwork struct {
 	TotalDescendants int
 	HaremReward      HistoricalInvitationReward
 	InvitationReward HistoricalInvitationReward
+	LiveHaremReward  LiveHaremReward
 }
 
 type InvitationIssueResult struct {

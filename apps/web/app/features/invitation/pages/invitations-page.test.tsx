@@ -104,6 +104,12 @@ describe("InvitationsPage", () => {
             display_name: "旧站成员",
             source: "legacy_import",
             established_at: "2026-06-01T08:00:00Z",
+            last_active_at: "2026-09-04T05:30:00Z",
+            latest_reward_window: "2026-09-04T05:00:00Z",
+            current_seeding_count: 3,
+            current_seeding_reward: "125",
+            current_contribution_milli: "12500",
+            harem_eligible: true,
           },
         ],
         ancestor_members: [],
@@ -117,13 +123,33 @@ describe("InvitationsPage", () => {
           source_rows: 1,
           last_rewarded_at: "2026-06-01T08:00:00Z",
         },
+        live_harem_reward: {
+          policy: {
+            revision: "harem-rousi-v1",
+            enabled: true,
+            reward_bps: 1000,
+            depth: 1,
+            minimum_seed_count: 1,
+            hourly_cap: "100",
+            activity_days: 30,
+            settlement_hours: 6,
+            effective_from: "2026-08-21T05:00:00Z",
+          },
+          current_hourly_estimate_milli: "12500",
+          awarded_amount: "321",
+          settlement_count: 8,
+          last_settled_at: "2026-09-04T05:00:00Z",
+        },
       },
     })
 
     renderPage(queryClient)
 
     await user.click(await screen.findByRole("tab", { name: "后宫" }))
-    expect(await screen.findByText("后宫与历史奖励")).toBeVisible()
+    expect(await screen.findByText("后宫奖励")).toBeVisible()
+    expect(screen.getByText("后宫加成正在运行")).toBeVisible()
+    expect(screen.getByText("12.5", { exact: true })).toBeVisible()
+    expect(screen.getByText("正在贡献")).toBeVisible()
     expect(screen.getByText("12,345 魔力值")).toBeVisible()
     expect(screen.getByText("旧站成员")).toBeVisible()
     expect(screen.getByText("Rousi 继承")).toBeVisible()
@@ -256,6 +282,22 @@ const disabledOverview: InvitationOverview = {
     total_descendants: 0,
     harem_reward: { amount: "0", source_rows: 0 },
     invitation_reward: { amount: "0", source_rows: 0 },
+    live_harem_reward: {
+      policy: {
+        revision: "harem-rousi-v1",
+        enabled: true,
+        reward_bps: 1000,
+        depth: 1,
+        minimum_seed_count: 1,
+        hourly_cap: "100",
+        activity_days: 30,
+        settlement_hours: 6,
+        effective_from: "2026-08-21T05:00:00Z",
+      },
+      current_hourly_estimate_milli: "0",
+      awarded_amount: "0",
+      settlement_count: 0,
+    },
   },
   total: 0,
   limit: 20,

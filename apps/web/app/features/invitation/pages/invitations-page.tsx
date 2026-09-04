@@ -399,14 +399,21 @@ function InvitationStats({ overview }: { overview: InvitationOverview }) {
       />
       <SummaryCard
         icon={CoinsIcon}
-        label="历史后宫奖励"
-        value={formatInteger(overview.network.harem_reward.amount)}
+        label="预计后宫奖励 / 小时"
+        value={
+          formatMilliMagic(
+            overview.network.live_harem_reward.current_hourly_estimate_milli
+          ) + " 魔力值"
+        }
         tone="text-purple-600"
       />
       <SummaryCard
         icon={GiftIcon}
-        label="历史邀请奖励"
-        value={formatInteger(overview.network.invitation_reward.amount)}
+        label="PeerGo 已结算"
+        value={
+          formatInteger(overview.network.live_harem_reward.awarded_amount) +
+          " 魔力值"
+        }
         tone="text-emerald-600"
       />
     </div>
@@ -553,13 +560,19 @@ function InvitationHarem({
 }: {
   network: import("~/features/invitation/api/invitations.queries").InvitationOverview["network"]
 }) {
+  const live = network.live_harem_reward
+  const policy = live.policy
+  const rewardPercent = new Intl.NumberFormat("zh-CN", {
+    maximumFractionDigits: 2,
+  }).format(policy.reward_bps / 100)
+
   return (
     <Card>
       <CardHeader>
         <div>
-          <CardTitle>后宫与历史奖励</CardTitle>
+          <CardTitle>后宫奖励</CardTitle>
           <CardDescription>
-            展示后宫规模，以及从 Rousi 继承且已经计入期初余额的奖励。
+            直属成员的合格做种奖励会按旧站规则持续为你产生魔力值。
           </CardDescription>
         </div>
       </CardHeader>
@@ -572,20 +585,41 @@ function InvitationHarem({
           />
           <NetworkMetric
             icon={GitForkIcon}
-            label="后宫总人数"
-            value={formatInteger(network.total_descendants)}
+            label="当前预计 / 小时"
+            value={
+              formatMilliMagic(live.current_hourly_estimate_milli) + " 魔力值"
+            }
           />
           <NetworkMetric
             icon={CoinsIcon}
-            label="历史后宫奖励"
-            value={formatInteger(network.harem_reward.amount) + " 魔力值"}
+            label="PeerGo 已结算"
+            value={formatInteger(live.awarded_amount) + " 魔力值"}
           />
           <NetworkMetric
             icon={TicketIcon}
-            label="历史邀请奖励"
-            value={formatInteger(network.invitation_reward.amount) + " 魔力值"}
+            label="旧站已计入余额"
+            value={formatInteger(network.harem_reward.amount) + " 魔力值"}
           />
         </div>
+
+        <Alert>
+          <CoinsIcon />
+          <AlertTitle>
+            {policy.enabled ? "后宫加成正在运行" : "后宫加成当前停用"}
+          </AlertTitle>
+          <AlertDescription>
+            计入直属 {formatInteger(policy.depth)} 层成员做种奖励的{" "}
+            {rewardPercent}%，成员至少做种{" "}
+            {formatInteger(policy.minimum_seed_count)} 个且最近{" "}
+            {formatInteger(policy.activity_days)} 天有活动；每小时最高{" "}
+            {formatInteger(policy.hourly_cap)} 魔力值。权益仍按小时计算，每{" "}
+            {formatInteger(policy.settlement_hours)}{" "}
+            小时合并入账一次，减少数据库流水。
+            {live.last_settled_at
+              ? " 最近一次结算：" + formatDateTime(live.last_settled_at) + "。"
+              : ""}
+          </AlertDescription>
+        </Alert>
 
         {(network.harem_reward.source_rows > 0 ||
           network.invitation_reward.source_rows > 0) && (
@@ -604,7 +638,7 @@ function InvitationHarem({
           </Alert>
         )}
 
-        <InvitationMembersTable members={network.direct_members} />
+        <InvitationMembersTable members={network.direct_members} showRewards />
       </CardContent>
     </Card>
   )
@@ -689,8 +723,10 @@ function InvitationChain({
 
 function InvitationMembersTable({
   members,
+  showRewards = false,
 }: {
   members: InvitationOverview["network"]["direct_members"]
+  showRewards?: boolean
 }) {
   if (!members.length) {
     return (
@@ -708,44 +744,101 @@ function InvitationMembersTable({
     )
   }
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>直属成员</TableHead>
-          <TableHead>用户 ID</TableHead>
-          <TableHead>来源</TableHead>
-          <TableHead className="text-right">建立时间</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {members.map((member) => (
-          <TableRow key={member.numeric_id}>
-            <TableCell>
-              <div className="flex flex-col gap-0.5">
-                <span>{member.display_name}</span>
-                <span className="text-xs text-muted-foreground">
-                  @{member.username}
-                </span>
-              </div>
-            </TableCell>
-            <TableCell className="tabular-nums">
-              {formatInteger(member.numeric_id)}
-            </TableCell>
-            <TableCell>
-              <Badge variant="outline">
-                {member.source === "legacy_import"
-                  ? "Rousi 继承"
-                  : "PeerGo 邀请"}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-right text-muted-foreground">
-              {formatDateTime(member.established_at)}
-            </TableCell>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>直属成员</TableHead>
+            <TableHead>用户 ID</TableHead>
+            {showRewards ? (
+              <>
+                <TableHead>计入状态</TableHead>
+                <TableHead className="text-right">做种数</TableHead>
+                <TableHead className="text-right">做种奖励 / 小时</TableHead>
+                <TableHead className="text-right">预计贡献 / 小时</TableHead>
+                <TableHead className="text-right">最近活动</TableHead>
+              </>
+            ) : (
+              <TableHead>来源</TableHead>
+            )}
+            <TableHead className="text-right">建立时间</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {members.map((member) => (
+            <TableRow key={member.numeric_id}>
+              <TableCell>
+                <div className="flex flex-col gap-0.5">
+                  <span>{member.display_name}</span>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span>@{member.username}</span>
+                    {showRewards ? (
+                      <Badge variant="outline" className="text-[10px]">
+                        {member.source === "legacy_import"
+                          ? "Rousi 继承"
+                          : "PeerGo 邀请"}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="tabular-nums">
+                {formatInteger(member.numeric_id)}
+              </TableCell>
+              {showRewards ? (
+                <>
+                  <TableCell>
+                    <Badge
+                      variant={member.harem_eligible ? "secondary" : "outline"}
+                    >
+                      {member.harem_eligible ? "正在贡献" : "暂未计入"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatInteger(member.current_seeding_count)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatInteger(member.current_seeding_reward)}
+                  </TableCell>
+                  <TableCell className="text-right font-medium text-purple-600 tabular-nums">
+                    {formatMilliMagic(member.current_contribution_milli)}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap text-muted-foreground">
+                    {member.last_active_at
+                      ? formatDateTime(member.last_active_at)
+                      : "暂无记录"}
+                  </TableCell>
+                </>
+              ) : (
+                <TableCell>
+                  <Badge variant="outline">
+                    {member.source === "legacy_import"
+                      ? "Rousi 继承"
+                      : "PeerGo 邀请"}
+                  </Badge>
+                </TableCell>
+              )}
+              <TableCell className="text-right whitespace-nowrap text-muted-foreground">
+                {formatDateTime(member.established_at)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   )
+}
+
+function formatMilliMagic(value: string) {
+  const milli = BigInt(value)
+  const whole = milli / 1_000n
+  const fraction = (milli % 1_000n)
+    .toString()
+    .padStart(3, "0")
+    .replace(/0+$/, "")
+  return fraction
+    ? whole.toLocaleString("zh-CN") + "." + fraction
+    : whole.toLocaleString("zh-CN")
 }
 
 function NetworkMetric({

@@ -326,6 +326,10 @@ function MagicUsageContent({
                   value: formatInteger(transactions.seeding_reward),
                 },
                 {
+                  label: "后宫奖励",
+                  value: formatInteger(transactions.harem_reward),
+                },
+                {
                   label: "活动奖励",
                   value: formatInteger(transactions.activity_reward),
                 },

@@ -19,6 +19,8 @@ type PromotionWorkerConfig struct {
 	RatioWatchBatch              int
 	WorkgroupEnforcementInterval time.Duration
 	WorkgroupEnforcementBatch    int
+	HaremRewardInterval          time.Duration
+	HaremRewardBatch             int
 }
 
 func LoadPromotionWorker() (PromotionWorkerConfig, error) {
@@ -92,11 +94,29 @@ func LoadPromotionWorker() (PromotionWorkerConfig, error) {
 		}
 		workgroupEnforcementBatch = value
 	}
+	haremRewardInterval := 10 * time.Minute
+	if raw := strings.TrimSpace(os.Getenv("PEERGO_HAREM_REWARD_INTERVAL")); raw != "" {
+		value, parseErr := time.ParseDuration(raw)
+		if parseErr != nil || value < time.Minute || value > time.Hour {
+			return PromotionWorkerConfig{}, errors.New("PEERGO_HAREM_REWARD_INTERVAL must be between 1m and 1h")
+		}
+		haremRewardInterval = value
+	}
+	haremRewardBatch := 96
+	if raw := strings.TrimSpace(os.Getenv("PEERGO_HAREM_REWARD_BATCH")); raw != "" {
+		value, parseErr := strconv.Atoi(raw)
+		if parseErr != nil || value < 1 || value > 96 {
+			return PromotionWorkerConfig{}, errors.New("PEERGO_HAREM_REWARD_BATCH must be between 1 and 96")
+		}
+		haremRewardBatch = value
+	}
 	return PromotionWorkerConfig{
 		Environment: environment, DatabaseURL: databaseURL,
 		SettlementURL: strings.TrimRight(settlementURL, "/"), SettlementToken: token,
 		RatioWatchInterval: ratioWatchInterval, RatioWatchBatch: ratioWatchBatch,
 		WorkgroupEnforcementInterval: workgroupEnforcementInterval,
 		WorkgroupEnforcementBatch:    workgroupEnforcementBatch,
+		HaremRewardInterval:          haremRewardInterval,
+		HaremRewardBatch:             haremRewardBatch,
 	}, nil
 }

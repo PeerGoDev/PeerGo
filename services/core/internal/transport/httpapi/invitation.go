@@ -119,21 +119,11 @@ func invitationOverviewDTO(overview identity.InvitationOverview) generated.Invit
 	eligibility := overview.Eligibility
 	directMembers := make([]generated.InvitedMember, 0, len(overview.Network.DirectMembers))
 	for _, member := range overview.Network.DirectMembers {
-		directMembers = append(directMembers, generated.InvitedMember{
-			NumericId: member.NumericID, Username: member.Username,
-			DisplayName:   member.DisplayName,
-			Source:        generated.InvitationRelationshipSource(member.Source),
-			EstablishedAt: member.EstablishedAt,
-		})
+		directMembers = append(directMembers, invitedMemberDTO(member))
 	}
 	ancestorMembers := make([]generated.InvitedMember, 0, len(overview.Network.AncestorMembers))
 	for _, member := range overview.Network.AncestorMembers {
-		ancestorMembers = append(ancestorMembers, generated.InvitedMember{
-			NumericId: member.NumericID, Username: member.Username,
-			DisplayName:   member.DisplayName,
-			Source:        generated.InvitationRelationshipSource(member.Source),
-			EstablishedAt: member.EstablishedAt,
-		})
+		ancestorMembers = append(ancestorMembers, invitedMemberDTO(member))
 	}
 	return generated.InvitationOverview{
 		Eligibility: generated.InvitationEligibility{
@@ -154,9 +144,41 @@ func invitationOverviewDTO(overview identity.InvitationOverview) generated.Invit
 			TotalDescendants: overview.Network.TotalDescendants,
 			HaremReward:      historicalInvitationRewardDTO(overview.Network.HaremReward),
 			InvitationReward: historicalInvitationRewardDTO(overview.Network.InvitationReward),
+			LiveHaremReward: generated.LiveHaremReward{
+				Policy: generated.HaremRewardPolicySummary{
+					Revision:         overview.Network.LiveHaremReward.Policy.Revision,
+					Enabled:          overview.Network.LiveHaremReward.Policy.Enabled,
+					RewardBps:        int(overview.Network.LiveHaremReward.Policy.RewardBPS),
+					Depth:            int(overview.Network.LiveHaremReward.Policy.Depth),
+					MinimumSeedCount: int(overview.Network.LiveHaremReward.Policy.MinimumSeedCount),
+					HourlyCap:        strconv.FormatInt(overview.Network.LiveHaremReward.Policy.HourlyCap, 10),
+					ActivityDays:     int(overview.Network.LiveHaremReward.Policy.ActivityDays),
+					SettlementHours:  int(overview.Network.LiveHaremReward.Policy.SettlementHours),
+					EffectiveFrom:    overview.Network.LiveHaremReward.Policy.EffectiveFrom,
+				},
+				CurrentHourlyEstimateMilli: strconv.FormatInt(overview.Network.LiveHaremReward.CurrentHourlyEstimateMilli, 10),
+				AwardedAmount:              strconv.FormatInt(overview.Network.LiveHaremReward.AwardedAmount, 10),
+				SettlementCount:            overview.Network.LiveHaremReward.SettlementCount,
+				LastSettledAt:              overview.Network.LiveHaremReward.LastSettledAt,
+			},
 		},
 		Total: overview.Total, Limit: overview.Limit,
 		Offset: overview.Offset, ObservedAt: overview.ObservedAt,
+	}
+}
+
+func invitedMemberDTO(member identity.InvitedMember) generated.InvitedMember {
+	return generated.InvitedMember{
+		NumericId: member.NumericID, Username: member.Username,
+		DisplayName:              member.DisplayName,
+		Source:                   generated.InvitationRelationshipSource(member.Source),
+		EstablishedAt:            member.EstablishedAt,
+		LastActiveAt:             member.LastActiveAt,
+		LatestRewardWindow:       member.LatestRewardWindow,
+		CurrentSeedingCount:      int(member.CurrentSeedingCount),
+		CurrentSeedingReward:     strconv.FormatInt(member.CurrentSeedingReward, 10),
+		CurrentContributionMilli: strconv.FormatInt(member.CurrentContributionMilli, 10),
+		HaremEligible:            member.HaremEligible,
 	}
 }
 

@@ -557,6 +557,7 @@ func (h *Handler) GetEconomySettings(ctx context.Context, _ generated.GetEconomy
 		Transactions: generated.EconomyTransactionCounts{
 			LegacyOpening:   strconv.FormatInt(settings.Transactions.LegacyOpening, 10),
 			SeedingReward:   strconv.FormatInt(settings.Transactions.SeedingReward, 10),
+			HaremReward:     strconv.FormatInt(settings.Transactions.HaremReward, 10),
 			ActivityReward:  strconv.FormatInt(settings.Transactions.ActivityReward, 10),
 			TorrentPurchase: strconv.FormatInt(settings.Transactions.TorrentPurchase, 10),
 			MemberGift:      strconv.FormatInt(settings.Transactions.MemberGift, 10),

@@ -22,6 +22,7 @@ type TransactionType string
 
 const (
 	TransactionSeedingReward        TransactionType = "seeding_reward"
+	TransactionHaremReward          TransactionType = "harem_reward"
 	TransactionActivityReward       TransactionType = "activity_reward"
 	TransactionTorrentBuy           TransactionType = "torrent_purchase"
 	TransactionPromotionBuy         TransactionType = "promotion_product_purchase"
@@ -43,6 +44,7 @@ var (
 	promotionProductSinkID           = uuid.MustParse("00000000-0000-7000-8000-000000000006")
 	medalPurchaseSinkID              = uuid.MustParse("00000000-0000-7000-8000-000000000007")
 	administratorAdjustmentAccountID = uuid.MustParse("00000000-0000-7000-8000-000000000009")
+	haremMintAccountID               = uuid.MustParse("00000000-0000-7000-8000-000000000010")
 )
 
 // RousiMigrationAccountID returns the immutable opening-balance counterparty.
@@ -69,6 +71,9 @@ func MedalPurchaseSinkID() uuid.UUID { return medalPurchaseSinkID }
 // AdministratorAdjustmentAccountID returns the explicit counterparty for
 // audited staff-issued magic adjustments.
 func AdministratorAdjustmentAccountID() uuid.UUID { return administratorAdjustmentAccountID }
+
+// HaremMintAccountID returns the explicit issuer for invitation-tree rewards.
+func HaremMintAccountID() uuid.UUID { return haremMintAccountID }
 
 type PostingInput struct {
 	// Member account IDs equal their identity user UUID. System account IDs are

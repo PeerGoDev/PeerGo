@@ -6604,7 +6604,7 @@ export interface components {
         MagicStatementEntry: {
             sequence: components["schemas"]["UnsignedIntegerText"];
             /** @enum {string} */
-            transaction_type: "legacy_opening" | "seeding_reward" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "refund" | "adjustment";
+            transaction_type: "legacy_opening" | "seeding_reward" | "harem_reward" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "refund" | "adjustment";
             /** @enum {string} */
             entry_type: "legacy_opening" | "earn" | "spend" | "adjustment";
             amount: components["schemas"]["SignedIntegerText"];
@@ -7103,6 +7103,7 @@ export interface components {
         };
         /** @enum {string} */
         InvitationRelationshipSource: "registration" | "legacy_import";
+        UnsignedIntegerText: string;
         InvitedMember: {
             /** Format: int64 */
             numeric_id: number;
@@ -7111,6 +7112,15 @@ export interface components {
             source: components["schemas"]["InvitationRelationshipSource"];
             /** Format: date-time */
             established_at: string;
+            /** Format: date-time */
+            last_active_at?: string | null;
+            /** Format: date-time */
+            latest_reward_window?: string | null;
+            current_seeding_count: number;
+            current_seeding_reward: components["schemas"]["UnsignedIntegerText"];
+            /** @description 按当前后宫比例估算的每小时千分之一魔力值；最终按结算窗口合并取整。 */
+            current_contribution_milli: components["schemas"]["UnsignedIntegerText"];
+            harem_eligible: boolean;
         };
         HistoricalInvitationReward: {
             /** @description 已包含在用户期初魔力值中的历史整数合计，不会再次入账。 */
@@ -7120,6 +7130,27 @@ export interface components {
             /** Format: date-time */
             last_rewarded_at?: string;
         };
+        HaremRewardPolicySummary: {
+            revision: string;
+            enabled: boolean;
+            reward_bps: number;
+            depth: number;
+            minimum_seed_count: number;
+            hourly_cap: components["schemas"]["UnsignedIntegerText"];
+            activity_days: number;
+            settlement_hours: number;
+            /** Format: date-time */
+            effective_from: string;
+        };
+        LiveHaremReward: {
+            policy: components["schemas"]["HaremRewardPolicySummary"];
+            current_hourly_estimate_milli: components["schemas"]["UnsignedIntegerText"];
+            awarded_amount: components["schemas"]["UnsignedIntegerText"];
+            /** Format: int64 */
+            settlement_count: number;
+            /** Format: date-time */
+            last_settled_at?: string | null;
+        };
         InvitationNetwork: {
             direct_members: components["schemas"]["InvitedMember"][];
             /** @description 从直属上家开始，按距离由近到远排列的邀请链。 */
@@ -7128,6 +7159,7 @@ export interface components {
             total_descendants: number;
             harem_reward: components["schemas"]["HistoricalInvitationReward"];
             invitation_reward: components["schemas"]["HistoricalInvitationReward"];
+            live_harem_reward: components["schemas"]["LiveHaremReward"];
         };
         InvitationOverview: {
             eligibility: components["schemas"]["InvitationEligibility"];
@@ -7631,7 +7663,6 @@ export interface components {
         };
         /** @description int64 整数十进制文本，防止 JavaScript Number 丢失精度。 */
         SignedIntegerText: string;
-        UnsignedIntegerText: string;
         /** @description PostgreSQL numeric(38,20) 的规范非负十进制文本。 */
         ExactExperienceText: string;
         EconomyRuleOverview: {
@@ -9535,6 +9566,7 @@ export interface components {
         EconomyTransactionCounts: {
             legacy_opening: components["schemas"]["OperationsCount"];
             seeding_reward: components["schemas"]["OperationsCount"];
+            harem_reward: components["schemas"]["OperationsCount"];
             activity_reward: components["schemas"]["OperationsCount"];
             torrent_purchase: components["schemas"]["OperationsCount"];
             member_gift: components["schemas"]["OperationsCount"];

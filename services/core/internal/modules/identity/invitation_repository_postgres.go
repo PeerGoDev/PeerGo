@@ -68,7 +68,7 @@ func (repository *PostgresInvitationRepository) Overview(ctx context.Context, us
 	if err != nil {
 		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, fmt.Errorf("list invitation history: %w", err)
 	}
-	network, err := readInvitationNetwork(ctx, tx, userID)
+	network, err := readInvitationNetwork(ctx, tx, userID, now)
 	if err != nil {
 		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, err
 	}
@@ -259,7 +259,7 @@ func validateInvitationHistoryItem(item MemberInvitation) error {
 	return nil
 }
 
-func readInvitationNetwork(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (InvitationNetwork, error) {
+func readInvitationNetwork(ctx context.Context, tx pgx.Tx, userID uuid.UUID, asOf time.Time) (InvitationNetwork, error) {
 	var result InvitationNetwork
 	var directCount, descendantCount int64
 	var haremLast, invitationLast pgtype.Timestamptz
@@ -317,14 +317,62 @@ GROUP BY rewards.harem_amount, rewards.harem_rows, rewards.harem_last,
 	result.InvitationReward = HistoricalInvitationReward{
 		Amount: invitationAmount, SourceRows: invitationRows, LastRewardedAt: invitationOptionalTime(invitationLast),
 	}
+	if err := readLiveHaremReward(ctx, tx, userID, asOf, &result); err != nil {
+		return InvitationNetwork{}, err
+	}
 	rows, err := tx.Query(ctx, `
 SELECT invited.numeric_id, invited.username, invited.display_name,
-       relationship.source_kind, relationship.established_at
+       relationship.source_kind, relationship.established_at,
+       activity.last_active_at,
+       latest.window_start, COALESCE(latest.eligible_torrent_count, 0)::integer,
+       COALESCE(latest.reward, 0)::bigint,
+       CASE
+           WHEN policy.enabled
+            AND invited.status = 'active'
+            AND relationship.established_at <= latest.window_start + interval '1 hour'
+            AND latest.reward > 0
+            AND latest.eligible_torrent_count >= policy.minimum_seed_count
+            AND (
+                policy.activity_days = 0
+                OR activity.last_active_at >= $2::timestamptz - (policy.activity_days::bigint * interval '1 day')
+            )
+           THEN floor((latest.reward::numeric * policy.reward_bps::numeric + 5) / 10)::bigint
+           ELSE 0::bigint
+       END AS contribution_milli,
+       CASE
+           WHEN policy.enabled
+            AND invited.status = 'active'
+            AND relationship.established_at <= latest.window_start + interval '1 hour'
+            AND latest.reward > 0
+            AND latest.eligible_torrent_count >= policy.minimum_seed_count
+            AND (
+                policy.activity_days = 0
+                OR activity.last_active_at >= $2::timestamptz - (policy.activity_days::bigint * interval '1 day')
+            )
+           THEN true ELSE false
+       END AS harem_eligible
 FROM identity.invitation_relationships AS relationship
 JOIN identity.users AS invited ON invited.id = relationship.invitee_user_id
+LEFT JOIN identity.user_activity AS activity ON activity.user_id = invited.id
+LEFT JOIN LATERAL (
+    SELECT calculation.window_start, calculation.eligible_torrent_count,
+           calculation.reward
+    FROM economy.seeding_reward_calculations AS calculation
+    WHERE calculation.user_id = invited.id
+      AND calculation.window_start < date_trunc('hour', $2::timestamptz)
+    ORDER BY calculation.window_start DESC
+    LIMIT 1
+) AS latest ON true
+JOIN LATERAL (
+    SELECT enabled, reward_bps, minimum_seed_count, activity_days
+    FROM economy.harem_reward_policy_revisions
+    WHERE effective_from <= $2
+    ORDER BY effective_from DESC, revision DESC
+    LIMIT 1
+) AS policy ON true
 WHERE relationship.inviter_user_id = $1
 ORDER BY relationship.established_at DESC, relationship.invitee_user_id
-LIMIT 100`, userID)
+LIMIT 100`, userID, asOf)
 	if err != nil {
 		return InvitationNetwork{}, fmt.Errorf("list directly invited members: %w", err)
 	}
@@ -332,11 +380,21 @@ LIMIT 100`, userID)
 	result.DirectMembers = make([]InvitedMember, 0, result.DirectCount)
 	for rows.Next() {
 		var item InvitedMember
-		if err := rows.Scan(&item.NumericID, &item.Username, &item.DisplayName, &item.Source, &item.EstablishedAt); err != nil {
+		var lastActiveAt, latestRewardWindow pgtype.Timestamptz
+		if err := rows.Scan(
+			&item.NumericID, &item.Username, &item.DisplayName,
+			&item.Source, &item.EstablishedAt, &lastActiveAt,
+			&latestRewardWindow, &item.CurrentSeedingCount,
+			&item.CurrentSeedingReward, &item.CurrentContributionMilli,
+			&item.HaremEligible,
+		); err != nil {
 			return InvitationNetwork{}, fmt.Errorf("scan directly invited member: %w", err)
 		}
 		item.EstablishedAt = item.EstablishedAt.UTC()
+		item.LastActiveAt = invitationOptionalTime(lastActiveAt)
+		item.LatestRewardWindow = invitationOptionalTime(latestRewardWindow)
 		if item.NumericID < 1 || item.Username == "" || item.DisplayName == "" ||
+			item.CurrentSeedingCount < 0 || item.CurrentSeedingReward < 0 || item.CurrentContributionMilli < 0 ||
 			(item.Source != InvitationRelationshipRegistration && item.Source != InvitationRelationshipLegacyImport) {
 			return InvitationNetwork{}, ErrInvitationInvariant
 		}
@@ -389,6 +447,98 @@ ORDER BY ancestors.depth ASC`, userID)
 		return InvitationNetwork{}, fmt.Errorf("finish invitation ancestor query: %w", err)
 	}
 	return result, nil
+}
+
+func readLiveHaremReward(ctx context.Context, tx pgx.Tx, userID uuid.UUID, asOf time.Time, network *InvitationNetwork) error {
+	if network == nil || asOf.IsZero() {
+		return ErrInvitationInvariant
+	}
+	var lastSettledAt pgtype.Timestamptz
+	err := tx.QueryRow(ctx, `
+WITH policy AS (
+    SELECT revision, enabled, reward_bps, depth, minimum_seed_count,
+           hourly_cap, activity_days, settlement_hours, effective_from
+    FROM economy.harem_reward_policy_revisions
+    WHERE effective_from <= $2
+    ORDER BY effective_from DESC, revision DESC
+    LIMIT 1
+), live AS (
+    SELECT COALESCE(sum(reward), 0)::bigint AS awarded_amount,
+           count(*)::bigint AS settlement_count,
+           max(window.window_end) AS last_settled_at
+    FROM economy.harem_reward_payouts AS payout
+    JOIN economy.harem_reward_windows AS window
+      ON window.window_start = payout.window_start
+    WHERE payout.inviter_user_id = $1
+), latest_sources AS (
+    SELECT latest.reward
+    FROM identity.invitation_relationships AS relationship
+    JOIN identity.users AS invitee ON invitee.id = relationship.invitee_user_id
+    LEFT JOIN identity.user_activity AS activity ON activity.user_id = invitee.id
+    JOIN LATERAL (
+        SELECT calculation.window_start, calculation.eligible_torrent_count,
+               calculation.reward
+        FROM economy.seeding_reward_calculations AS calculation
+        WHERE calculation.user_id = relationship.invitee_user_id
+          AND calculation.window_start < date_trunc('hour', $2::timestamptz)
+        ORDER BY calculation.window_start DESC
+        LIMIT 1
+    ) AS latest ON true
+    CROSS JOIN policy
+    WHERE relationship.inviter_user_id = $1
+      AND relationship.established_at <= latest.window_start + interval '1 hour'
+      AND latest.reward > 0
+      AND latest.eligible_torrent_count >= policy.minimum_seed_count
+      AND invitee.status = 'active'
+      AND (
+          policy.activity_days = 0
+          OR activity.last_active_at >= $2::timestamptz - (policy.activity_days::bigint * interval '1 day')
+      )
+)
+SELECT policy.revision, policy.enabled, policy.reward_bps, policy.depth,
+       policy.minimum_seed_count, policy.hourly_cap, policy.activity_days,
+       policy.settlement_hours, policy.effective_from,
+       CASE
+           WHEN NOT policy.enabled THEN 0::bigint
+           WHEN policy.hourly_cap = 0 THEN
+               floor((COALESCE((SELECT sum(reward) FROM latest_sources), 0)::numeric * policy.reward_bps + 5) / 10)::bigint
+           ELSE LEAST(
+               floor((COALESCE((SELECT sum(reward) FROM latest_sources), 0)::numeric * policy.reward_bps + 5) / 10)::bigint,
+               policy.hourly_cap * 1000
+           )
+       END AS current_estimate_milli,
+       live.awarded_amount, live.settlement_count, live.last_settled_at
+FROM policy CROSS JOIN live`, userID, asOf).Scan(
+		&network.LiveHaremReward.Policy.Revision,
+		&network.LiveHaremReward.Policy.Enabled,
+		&network.LiveHaremReward.Policy.RewardBPS,
+		&network.LiveHaremReward.Policy.Depth,
+		&network.LiveHaremReward.Policy.MinimumSeedCount,
+		&network.LiveHaremReward.Policy.HourlyCap,
+		&network.LiveHaremReward.Policy.ActivityDays,
+		&network.LiveHaremReward.Policy.SettlementHours,
+		&network.LiveHaremReward.Policy.EffectiveFrom,
+		&network.LiveHaremReward.CurrentHourlyEstimateMilli,
+		&network.LiveHaremReward.AwardedAmount,
+		&network.LiveHaremReward.SettlementCount,
+		&lastSettledAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrInvitationInvariant
+	}
+	if err != nil {
+		return fmt.Errorf("read live harem reward: %w", err)
+	}
+	network.LiveHaremReward.Policy.EffectiveFrom = network.LiveHaremReward.Policy.EffectiveFrom.UTC()
+	network.LiveHaremReward.LastSettledAt = invitationOptionalTime(lastSettledAt)
+	if network.LiveHaremReward.Policy.Revision == "" || network.LiveHaremReward.Policy.RewardBPS < 0 ||
+		network.LiveHaremReward.Policy.Depth < 1 || network.LiveHaremReward.Policy.MinimumSeedCount < 0 ||
+		network.LiveHaremReward.Policy.HourlyCap < 0 || network.LiveHaremReward.Policy.SettlementHours < 1 ||
+		network.LiveHaremReward.CurrentHourlyEstimateMilli < 0 || network.LiveHaremReward.AwardedAmount < 0 ||
+		network.LiveHaremReward.SettlementCount < 0 {
+		return ErrInvitationInvariant
+	}
+	return nil
 }
 
 // Issue locks both the policy singleton and member row before checking quota.

@@ -5,7 +5,16 @@ OperationsCount:
 TrackerControlStatus:
   type: object
   additionalProperties: false
-  required: [last_sequence, pending_events, retrying_events, enabled_torrents, disabled_torrents, oldest_pending_at, updated_at]
+  required:
+    [
+      last_sequence,
+      pending_events,
+      retrying_events,
+      enabled_torrents,
+      disabled_torrents,
+      oldest_pending_at,
+      updated_at,
+    ]
   properties:
     last_sequence: { $ref: "#/OperationsCount" }
     pending_events: { $ref: "#/OperationsCount" }
@@ -18,7 +27,16 @@ TrackerControlStatus:
 SwarmProjectionStatus:
   type: object
   additionalProperties: false
-  required: [source_id, routing_epoch, snapshot_sequence, observed_at, applied_at, collecting_runs, latest_run_progress]
+  required:
+    [
+      source_id,
+      routing_epoch,
+      snapshot_sequence,
+      observed_at,
+      applied_at,
+      collecting_runs,
+      latest_run_progress,
+    ]
   properties:
     source_id: { type: string, maxLength: 63 }
     routing_epoch: { $ref: "#/OperationsCount" }
@@ -31,7 +49,24 @@ SwarmProjectionStatus:
 EvidenceWindowStatus:
   type: object
   additionalProperties: false
-  required: [collecting_windows, complete_windows, latest_window_start, latest_window_end, latest_status, latest_item_count, latest_chunks, latest_received, month_starts_at, coverage_starts_at, expected_through, expected_windows, missing_windows, oldest_incomplete, health]
+  required:
+    [
+      collecting_windows,
+      complete_windows,
+      latest_window_start,
+      latest_window_end,
+      latest_status,
+      latest_item_count,
+      latest_chunks,
+      latest_received,
+      month_starts_at,
+      coverage_starts_at,
+      expected_through,
+      expected_windows,
+      missing_windows,
+      oldest_incomplete,
+      health,
+    ]
   properties:
     collecting_windows: { $ref: "#/OperationsCount" }
     complete_windows: { $ref: "#/OperationsCount" }
@@ -114,13 +149,24 @@ TrackerSeedboxRule:
 TrackerSeedboxRuntimePolicy:
   type: object
   additionalProperties: false
-  required: [enabled, upload_factor_basis_points, download_factor_basis_points, seedbox_speed_limit_bytes_per_second, standard_speed_limit_bytes_per_second, rules]
+  required:
+    [
+      enabled,
+      upload_factor_basis_points,
+      download_factor_basis_points,
+      seedbox_speed_limit_bytes_per_second,
+      standard_speed_limit_bytes_per_second,
+      rules,
+    ]
   properties:
     enabled: { type: boolean }
     upload_factor_basis_points: { type: integer, minimum: 0, maximum: 10000 }
-    download_factor_basis_points: { type: integer, minimum: 10000, maximum: 100000 }
-    seedbox_speed_limit_bytes_per_second: { type: integer, format: int64, minimum: 0 }
-    standard_speed_limit_bytes_per_second: { type: integer, format: int64, minimum: 0 }
+    download_factor_basis_points:
+      { type: integer, minimum: 10000, maximum: 100000 }
+    seedbox_speed_limit_bytes_per_second:
+      { type: integer, format: int64, minimum: 0 }
+    standard_speed_limit_bytes_per_second:
+      { type: integer, format: int64, minimum: 0 }
     rules:
       type: array
       maxItems: 4096
@@ -129,22 +175,42 @@ TrackerSeedboxRuntimePolicy:
 TrackerPolicySettings:
   type: object
   additionalProperties: false
-  required: [announce_interval_seconds, min_announce_interval_seconds, default_numwant, max_numwant, scrape_enabled, max_scrape_hashes, client_mode, allowed_clients, user_requests_per_minute, user_burst, address_requests_per_minute, address_burst, seedbox]
+  required:
+    [
+      announce_interval_seconds,
+      min_announce_interval_seconds,
+      default_numwant,
+      max_numwant,
+      scrape_enabled,
+      max_scrape_hashes,
+      client_mode,
+      allowed_clients,
+      user_requests_per_minute,
+      user_burst,
+      address_requests_per_minute,
+      address_burst,
+      seedbox,
+    ]
   properties:
-    announce_interval_seconds: { type: integer, format: int64, minimum: 60, maximum: 86400 }
-    min_announce_interval_seconds: { type: integer, format: int64, minimum: 30, maximum: 86400 }
+    announce_interval_seconds:
+      { type: integer, format: int64, minimum: 60, maximum: 86400 }
+    min_announce_interval_seconds:
+      { type: integer, format: int64, minimum: 30, maximum: 86400 }
     default_numwant: { type: integer, format: int64, minimum: 0, maximum: 500 }
     max_numwant: { type: integer, format: int64, minimum: 1, maximum: 500 }
     scrape_enabled: { type: boolean }
-    max_scrape_hashes: { type: integer, format: int64, minimum: 1, maximum: 100 }
+    max_scrape_hashes:
+      { type: integer, format: int64, minimum: 1, maximum: 100 }
     client_mode: { type: string, enum: [allow_all, allow_list] }
     allowed_clients:
       type: array
       maxItems: 16
       items: { $ref: "#/TrackerClientRule" }
-    user_requests_per_minute: { type: integer, format: int64, minimum: 1, maximum: 600 }
+    user_requests_per_minute:
+      { type: integer, format: int64, minimum: 1, maximum: 600 }
     user_burst: { type: integer, format: int64, minimum: 1, maximum: 1200 }
-    address_requests_per_minute: { type: integer, format: int64, minimum: 1, maximum: 5000 }
+    address_requests_per_minute:
+      { type: integer, format: int64, minimum: 1, maximum: 5000 }
     address_burst: { type: integer, format: int64, minimum: 1, maximum: 10000 }
     seedbox: { $ref: "#/TrackerSeedboxRuntimePolicy" }
 
@@ -175,7 +241,8 @@ TrackerCapacitySettings:
   additionalProperties: false
   required: [peer_ttl_seconds, max_swarms, max_peers, max_peers_per_swarm]
   properties:
-    peer_ttl_seconds: { type: integer, format: int64, minimum: 61, maximum: 86400 }
+    peer_ttl_seconds:
+      { type: integer, format: int64, minimum: 61, maximum: 86400 }
     max_swarms: { $ref: "#/OperationsCount" }
     max_peers: { $ref: "#/OperationsCount" }
     max_peers_per_swarm: { $ref: "#/OperationsCount" }
@@ -192,7 +259,15 @@ IssueTrackerPolicyRequest:
 TorrentUploadRules:
   type: object
   additionalProperties: false
-  required: [metainfo_max_bytes, max_files, required_private, supported_protocol, duplicate_swarm_rejected, initial_state]
+  required:
+    [
+      metainfo_max_bytes,
+      max_files,
+      required_private,
+      supported_protocol,
+      duplicate_swarm_rejected,
+      initial_state,
+    ]
   properties:
     metainfo_max_bytes: { $ref: "#/OperationsCount" }
     max_files: { type: integer, minimum: 1, maximum: 100000 }
@@ -219,7 +294,13 @@ TorrentScreenshotRules:
 TorrentObjectRules:
   type: object
   additionalProperties: false
-  required: [original_stored_immutable, announce_rewritten_on_download, legacy_import_profile, new_upload_profile]
+  required:
+    [
+      original_stored_immutable,
+      announce_rewritten_on_download,
+      legacy_import_profile,
+      new_upload_profile,
+    ]
   properties:
     original_stored_immutable: { type: boolean }
     announce_rewritten_on_download: { type: boolean }
@@ -229,12 +310,27 @@ TorrentObjectRules:
 TorrentPurchaseRules:
   type: object
   additionalProperties: false
-  required: [enabled, currency_name, whole_units_only, tax_basis_points, policy_revision, policy_effective_from, priced_torrents, legacy_entitlements, live_entitlements, permanent_access, atomic_settlement, refund_connected]
+  required:
+    [
+      enabled,
+      currency_name,
+      whole_units_only,
+      tax_basis_points,
+      policy_revision,
+      policy_effective_from,
+      priced_torrents,
+      legacy_entitlements,
+      live_entitlements,
+      permanent_access,
+      atomic_settlement,
+      refund_connected,
+    ]
   properties:
     enabled: { type: boolean }
     currency_name: { type: string, minLength: 1, maxLength: 32 }
     whole_units_only: { type: boolean }
-    tax_basis_points: { type: integer, format: int64, minimum: 0, maximum: 10000 }
+    tax_basis_points:
+      { type: integer, format: int64, minimum: 0, maximum: 10000 }
     policy_revision: { type: string, maxLength: 64 }
     policy_effective_from: { type: string, format: date-time, nullable: true }
     priced_torrents: { $ref: "#/OperationsCount" }
@@ -247,7 +343,16 @@ TorrentPurchaseRules:
 TorrentSettingsOverview:
   type: object
   additionalProperties: false
-  required: [generated_at, upload, screenshots, object, purchase, active_upload_policy, scheduled_upload_policies]
+  required:
+    [
+      generated_at,
+      upload,
+      screenshots,
+      object,
+      purchase,
+      active_upload_policy,
+      scheduled_upload_policies,
+    ]
   properties:
     generated_at: { type: string, format: date-time }
     upload: { $ref: "#/TorrentUploadRules" }
@@ -263,7 +368,15 @@ TorrentSettingsOverview:
 TorrentUploadPolicySettings:
   type: object
   additionalProperties: false
-  required: [metainfo_max_bytes, max_files, screenshot_max_count, screenshot_max_bytes, screenshot_max_pixels, screenshot_formats]
+  required:
+    [
+      metainfo_max_bytes,
+      max_files,
+      screenshot_max_count,
+      screenshot_max_bytes,
+      screenshot_max_pixels,
+      screenshot_formats,
+    ]
   properties:
     metainfo_max_bytes: { type: integer, minimum: 65536, maximum: 16777216 }
     max_files: { type: integer, minimum: 1, maximum: 100000 }
@@ -283,7 +396,8 @@ TorrentUploadPolicyRevision:
   required: [id, sequence, effective_at, settings, reason, created_at]
   properties:
     id: { type: string, format: uuid }
-    sequence: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    sequence:
+      { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
     effective_at: { type: string, format: date-time }
     settings: { $ref: "#/TorrentUploadPolicySettings" }
     reason: { type: string, minLength: 10, maxLength: 1000 }
@@ -294,7 +408,8 @@ IssueTorrentUploadPolicyRequest:
   additionalProperties: false
   required: [expected_sequence, effective_at, settings, reason]
   properties:
-    expected_sequence: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    expected_sequence:
+      { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
     effective_at: { type: string, format: date-time }
     settings: { $ref: "#/TorrentUploadPolicySettings" }
     reason: { type: string, minLength: 10, maxLength: 1000 }
@@ -302,7 +417,20 @@ IssueTorrentUploadPolicyRequest:
 HNRPolicySettings:
   type: object
   additionalProperties: false
-  required: [configured, revision_id, effective_at, rule_id, rule_version, mode, required_seed_seconds, required_ratio_basis_points, assessment_window_seconds, grace_period_seconds, max_interval_credit_seconds]
+  required:
+    [
+      configured,
+      revision_id,
+      effective_at,
+      rule_id,
+      rule_version,
+      mode,
+      required_seed_seconds,
+      required_ratio_basis_points,
+      assessment_window_seconds,
+      grace_period_seconds,
+      max_interval_credit_seconds,
+    ]
   properties:
     configured: { type: boolean }
     revision_id: { type: string, maxLength: 64 }
@@ -311,20 +439,33 @@ HNRPolicySettings:
     rule_version: { type: integer, format: int64, minimum: 0 }
     mode: { type: string, enum: ["", disabled, exempt, enforced] }
     required_seed_seconds: { type: integer, format: int64, minimum: 0 }
-    required_ratio_basis_points: { type: integer, format: int64, minimum: 0, maximum: 1000000 }
+    required_ratio_basis_points:
+      { type: integer, format: int64, minimum: 0, maximum: 1000000 }
     assessment_window_seconds: { type: integer, format: int64, minimum: 0 }
     grace_period_seconds: { type: integer, format: int64, minimum: 0 }
-    max_interval_credit_seconds: { type: integer, format: int64, minimum: 0, maximum: 86400 }
+    max_interval_credit_seconds:
+      { type: integer, format: int64, minimum: 0, maximum: 86400 }
 
 SeedboxPolicySettings:
   type: object
   additionalProperties: false
-  required: [settlement_primitive_supported, global_policy_configured, upload_factor_basis_points, download_factor_basis_points, classification_connected, registry_connected, speed_observation_connected]
+  required:
+    [
+      settlement_primitive_supported,
+      global_policy_configured,
+      upload_factor_basis_points,
+      download_factor_basis_points,
+      classification_connected,
+      registry_connected,
+      speed_observation_connected,
+    ]
   properties:
     settlement_primitive_supported: { type: boolean }
     global_policy_configured: { type: boolean }
-    upload_factor_basis_points: { type: integer, format: int64, minimum: 0, maximum: 10000 }
-    download_factor_basis_points: { type: integer, format: int64, minimum: 10000, maximum: 100000 }
+    upload_factor_basis_points:
+      { type: integer, format: int64, minimum: 0, maximum: 10000 }
+    download_factor_basis_points:
+      { type: integer, format: int64, minimum: 10000, maximum: 100000 }
     classification_connected: { type: boolean }
     registry_connected: { type: boolean }
     speed_observation_connected: { type: boolean }
@@ -342,7 +483,16 @@ SettlementSettingsOverview:
 ActivityRewardReadiness:
   type: object
   additionalProperties: false
-  required: [ledger_supported, daily_attendance_connected, random_attendance_connected, streak_reward_connected, retroactive_connected, torrent_publish_connected, invite_reward_connected]
+  required:
+    [
+      ledger_supported,
+      daily_attendance_connected,
+      random_attendance_connected,
+      streak_reward_connected,
+      retroactive_connected,
+      torrent_publish_connected,
+      invite_reward_connected,
+    ]
   properties:
     ledger_supported: { type: boolean }
     daily_attendance_connected: { type: boolean }
@@ -355,7 +505,19 @@ ActivityRewardReadiness:
 MagicUsageRules:
   type: object
   additionalProperties: false
-  required: [currency_name, whole_units_only, pt_coin_enabled, member_overdraft_allowed, append_only_ledger, torrent_purchase_supported, torrent_purchase_connected, member_gift_connected, content_tip_connected, refund_supported]
+  required:
+    [
+      currency_name,
+      whole_units_only,
+      pt_coin_enabled,
+      member_overdraft_allowed,
+      append_only_ledger,
+      torrent_purchase_supported,
+      torrent_purchase_connected,
+      member_gift_connected,
+      content_tip_connected,
+      refund_supported,
+    ]
   properties:
     currency_name: { type: string, minLength: 1, maxLength: 32 }
     whole_units_only: { type: boolean }
@@ -371,10 +533,22 @@ MagicUsageRules:
 EconomyTransactionCounts:
   type: object
   additionalProperties: false
-  required: [legacy_opening, seeding_reward, activity_reward, torrent_purchase, member_gift, tip, refund, adjustment]
+  required:
+    [
+      legacy_opening,
+      seeding_reward,
+      harem_reward,
+      activity_reward,
+      torrent_purchase,
+      member_gift,
+      tip,
+      refund,
+      adjustment,
+    ]
   properties:
     legacy_opening: { $ref: "#/OperationsCount" }
     seeding_reward: { $ref: "#/OperationsCount" }
+    harem_reward: { $ref: "#/OperationsCount" }
     activity_reward: { $ref: "#/OperationsCount" }
     torrent_purchase: { $ref: "#/OperationsCount" }
     member_gift: { $ref: "#/OperationsCount" }
@@ -395,11 +569,32 @@ EconomySettingsOverview:
 WorkerQueueStatus:
   type: object
   additionalProperties: false
-  required: [id, label, pending, processing, retrying, dead, completed, oldest_pending_at, last_error_code, last_error_at]
+  required:
+    [
+      id,
+      label,
+      pending,
+      processing,
+      retrying,
+      dead,
+      completed,
+      oldest_pending_at,
+      last_error_code,
+      last_error_at,
+    ]
   properties:
     id:
       type: string
-      enum: [seeding_reward, promotion_delivery, hnr_policy_delivery, entitlement_benefit_delivery, hnr_enforcement, tracker_control, audit_delivery]
+      enum:
+        [
+          seeding_reward,
+          promotion_delivery,
+          hnr_policy_delivery,
+          entitlement_benefit_delivery,
+          hnr_enforcement,
+          tracker_control,
+          audit_delivery,
+        ]
     label: { type: string, maxLength: 32 }
     pending: { $ref: "#/OperationsCount" }
     processing: { $ref: "#/OperationsCount" }
@@ -425,7 +620,14 @@ WorkerOperationsOverview:
 StorageRuntime:
   type: object
   additionalProperties: false
-  required: [backend_id, driver, torrent_upload_max_bytes, screenshot_max_bytes, avatar_max_bytes]
+  required:
+    [
+      backend_id,
+      driver,
+      torrent_upload_max_bytes,
+      screenshot_max_bytes,
+      avatar_max_bytes,
+    ]
   properties:
     backend_id:
       type: string
@@ -440,7 +642,19 @@ StorageRuntime:
 StorageInventory:
   type: object
   additionalProperties: false
-  required: [torrent_objects, torrent_bytes, screenshot_objects, screenshot_bytes, avatar_objects, avatar_bytes, preferred_on_active_backend, verified_on_other_backends, active_migrations, failed_migration_items]
+  required:
+    [
+      torrent_objects,
+      torrent_bytes,
+      screenshot_objects,
+      screenshot_bytes,
+      avatar_objects,
+      avatar_bytes,
+      preferred_on_active_backend,
+      verified_on_other_backends,
+      active_migrations,
+      failed_migration_items,
+    ]
   properties:
     torrent_objects: { $ref: "#/OperationsCount" }
     torrent_bytes: { $ref: "#/OperationsCount" }
@@ -456,7 +670,19 @@ StorageInventory:
 ImageDerivativeOverview:
   type: object
   additionalProperties: false
-  required: [policy_version, pending, processing, retrying, ready, dead, source_objects, output_objects, output_bytes, last_error_code]
+  required:
+    [
+      policy_version,
+      pending,
+      processing,
+      retrying,
+      ready,
+      dead,
+      source_objects,
+      output_objects,
+      output_bytes,
+      last_error_code,
+    ]
   properties:
     policy_version:
       type: string
@@ -485,7 +711,22 @@ ImageDerivativeOverview:
 StorageMigrationOverview:
   type: object
   additionalProperties: false
-  required: [id, mode, status, object_kinds, source_backend_id, destination_backend_id, total_items, pending_items, verified_items, failed_items, deleted_items, last_error_code, created_at]
+  required:
+    [
+      id,
+      mode,
+      status,
+      object_kinds,
+      source_backend_id,
+      destination_backend_id,
+      total_items,
+      pending_items,
+      verified_items,
+      failed_items,
+      deleted_items,
+      last_error_code,
+      created_at,
+    ]
   properties:
     id: { type: string, format: uuid }
     mode:
@@ -493,7 +734,8 @@ StorageMigrationOverview:
       enum: [replicate, move]
     status:
       type: string
-      enum: [copying, ready_for_cutover, retaining, cleaning, completed, cancelled]
+      enum:
+        [copying, ready_for_cutover, retaining, cleaning, completed, cancelled]
     object_kinds:
       type: array
       minItems: 1
@@ -544,7 +786,15 @@ VIPProfileStats:
 ProfileRules:
   type: object
   additionalProperties: false
-  required: [display_name_min_characters, display_name_max_characters, avatar_min_pixels, avatar_max_pixels, avatar_max_bytes, avatar_format]
+  required:
+    [
+      display_name_min_characters,
+      display_name_max_characters,
+      avatar_min_pixels,
+      avatar_max_pixels,
+      avatar_max_bytes,
+      avatar_format,
+    ]
   properties:
     display_name_min_characters: { type: integer, minimum: 1, maximum: 100 }
     display_name_max_characters: { type: integer, minimum: 1, maximum: 100 }
@@ -556,7 +806,16 @@ ProfileRules:
 VIPBenefits:
   type: object
   additionalProperties: false
-  required: [seeding_reward_policy_revision, seeding_reward_bonus_bps, free_download_enabled, share_ratio_exempt, newcomer_assessment_exempt, speed_limit_exempt, seedbox_no_discount]
+  required:
+    [
+      seeding_reward_policy_revision,
+      seeding_reward_bonus_bps,
+      free_download_enabled,
+      share_ratio_exempt,
+      newcomer_assessment_exempt,
+      speed_limit_exempt,
+      seedbox_no_discount,
+    ]
   properties:
     seeding_reward_policy_revision: { type: string, maxLength: 64 }
     seeding_reward_bonus_bps: { type: integer, minimum: 0, maximum: 100000 }
@@ -579,7 +838,17 @@ VIPProfileSettingsOverview:
 EmailDeliveryStats:
   type: object
   additionalProperties: false
-  required: [verification_pending, verification_sent, verification_failed, verification_verified, recovery_pending, recovery_sent, recovery_failed, recovery_completed]
+  required:
+    [
+      verification_pending,
+      verification_sent,
+      verification_failed,
+      verification_verified,
+      recovery_pending,
+      recovery_sent,
+      recovery_failed,
+      recovery_completed,
+    ]
   properties:
     verification_pending: { $ref: "#/OperationsCount" }
     verification_sent: { $ref: "#/OperationsCount" }
@@ -593,17 +862,32 @@ EmailDeliveryStats:
 EmailSettingsOverview:
   type: object
   additionalProperties: false
-  required: [generated_at, delivery_mode, verification_public_origin, password_recovery_public_origin, verification_ttl_seconds, password_recovery_ttl_seconds, cooldown_seconds, templates, stats]
+  required:
+    [
+      generated_at,
+      delivery_mode,
+      verification_public_origin,
+      password_recovery_public_origin,
+      verification_ttl_seconds,
+      password_recovery_ttl_seconds,
+      cooldown_seconds,
+      templates,
+      stats,
+    ]
   properties:
     generated_at: { type: string, format: date-time }
     delivery_mode:
       type: string
       enum: [development_outbox, https_relay]
     verification_public_origin: { type: string, format: uri, maxLength: 2048 }
-    password_recovery_public_origin: { type: string, format: uri, maxLength: 2048 }
-    verification_ttl_seconds: { type: integer, format: int64, minimum: 1, maximum: 86400 }
-    password_recovery_ttl_seconds: { type: integer, format: int64, minimum: 1, maximum: 86400 }
-    cooldown_seconds: { type: integer, format: int64, minimum: 1, maximum: 86400 }
+    password_recovery_public_origin:
+      { type: string, format: uri, maxLength: 2048 }
+    verification_ttl_seconds:
+      { type: integer, format: int64, minimum: 1, maximum: 86400 }
+    password_recovery_ttl_seconds:
+      { type: integer, format: int64, minimum: 1, maximum: 86400 }
+    cooldown_seconds:
+      { type: integer, format: int64, minimum: 1, maximum: 86400 }
     templates:
       type: array
       minItems: 2
