@@ -182,11 +182,14 @@ func insertHaremUser(
 	if _, err := pool.Exec(ctx, `
 INSERT INTO identity.users (
     id, credential_ref, username, display_name, status, created_at, updated_at
-) VALUES ($1,$2,$3,$3,'active',$4,$4);
-INSERT INTO identity.user_activity (user_id, last_active_at, updated_at)
-VALUES ($1,$5,$5)`,
-		userID, uuid.New(), username, at.Add(-72*time.Hour), at.Add(7*time.Hour)); err != nil {
+) VALUES ($1,$2,$3,$3,'active',$4,$4)`,
+		userID, uuid.New(), username, at.Add(-72*time.Hour)); err != nil {
 		t.Fatalf("insert harem user: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO identity.user_activity (user_id, last_active_at, updated_at)
+VALUES ($1,$2,$2)`, userID, at.Add(7*time.Hour)); err != nil {
+		t.Fatalf("insert harem user activity: %v", err)
 	}
 	return userID
 }
