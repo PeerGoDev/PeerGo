@@ -465,10 +465,10 @@ WITH policy AS (
 ), live AS (
     SELECT COALESCE(sum(reward), 0)::bigint AS awarded_amount,
            count(*)::bigint AS settlement_count,
-           max(window.window_end) AS last_settled_at
+           max(reward_window.window_end) AS last_settled_at
     FROM economy.harem_reward_payouts AS payout
-    JOIN economy.harem_reward_windows AS window
-      ON window.window_start = payout.window_start
+    JOIN economy.harem_reward_windows AS reward_window
+      ON reward_window.window_start = payout.window_start
     WHERE payout.inviter_user_id = $1
 ), latest_sources AS (
     SELECT latest.reward
