@@ -792,7 +792,11 @@ function WorkgroupContributionNotificationDetail({
       <header className="flex flex-col gap-2">
         <div className="min-w-0 flex-1">
           <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            {workgroupKindLabel(notification.workgroup_kind)}贡献进度提醒
+            {notification.workgroup_disciplinary_action === "membership_ended"
+              ? `${workgroupKindLabel(notification.workgroup_kind)}资格已结束`
+              : notification.workgroup_disciplinary_action === "marked"
+                ? `${workgroupKindLabel(notification.workgroup_kind)}月度未达标标记`
+                : `${workgroupKindLabel(notification.workgroup_kind)}贡献进度提醒`}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             来自：系统
@@ -833,9 +837,22 @@ function WorkgroupContributionNotificationDetail({
               : "仍在采集"}
           </dd>
         </div>
+        {notification.workgroup_miss_count ? (
+          <div>
+            <dt className="text-muted-foreground">未达标标记</dt>
+            <dd className="mt-1 font-medium">
+              {notification.workgroup_miss_count} /{" "}
+              {notification.workgroup_allowed_misses ?? 3}
+            </dd>
+          </div>
+        ) : null}
       </dl>
       <p className="mt-4 text-sm leading-6 text-muted-foreground">
-        这是一条人工进度提醒，不会自动暂停或结束你的成员资格。页面显示的是发送提醒时冻结的数值。
+        {notification.workgroup_disciplinary_action
+          ? notification.workgroup_disciplinary_action === "membership_ended"
+            ? `这是已结束自然月的不可变结算结果；未达标已超过 ${notification.workgroup_allowed_misses ?? 3} 次，系统已结束转种组资格。`
+            : `这是已结束自然月的不可变结算结果；前 ${notification.workgroup_allowed_misses ?? 3} 次未达标只做标记。`
+          : "这是一条人工进度提醒，不会自动变更你的成员资格。页面显示的是发送提醒时冻结的数值。"}
       </p>
       <div className="mt-6">
         <Link
@@ -1092,6 +1109,12 @@ function notificationListTitle(notification: MyNotification) {
     return `收到 ${sender} 赠送的 ${formatInteger(notification.member_gift_net_amount ?? "")} 魔力值`
   }
   if (notification.kind === "workgroup_contribution") {
+    if (notification.workgroup_disciplinary_action === "membership_ended") {
+      return `${workgroupKindLabel(notification.workgroup_kind)}资格已结束`
+    }
+    if (notification.workgroup_disciplinary_action === "marked") {
+      return `${workgroupKindLabel(notification.workgroup_kind)}月度未达标标记`
+    }
     return `${workgroupKindLabel(notification.workgroup_kind)}贡献进度提醒`
   }
   if (notification.kind === "ratio_watch") {

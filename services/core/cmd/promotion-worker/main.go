@@ -202,10 +202,20 @@ func main() {
 		logger.Error("compose H&R enforcement runner", "error", err)
 		os.Exit(1)
 	}
+	workgroupRepository := workgroups.NewPostgresRepository(pool)
+	workgroupEnforcementRunner, err := workgroups.NewContributionEnforcementRunner(
+		workgroupRepository, workgroupRepository,
+		settings.WorkgroupEnforcementInterval, settings.WorkgroupEnforcementBatch,
+		logger, time.Now,
+	)
+	if err != nil {
+		logger.Error("compose workgroup contribution enforcement runner", "error", err)
+		os.Exit(1)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	logger.Info("Core policy worker started", "controls", []string{"promotion", "hnr_policy", "workgroup_benefit", "vip_benefit", "ratio_watch", "newcomer_assessment", "hnr_enforcement"})
-	errors := make(chan error, 7)
+	logger.Info("Core policy worker started", "controls", []string{"promotion", "hnr_policy", "workgroup_benefit", "vip_benefit", "ratio_watch", "newcomer_assessment", "hnr_enforcement", "workgroup_contribution_enforcement"})
+	errors := make(chan error, 8)
 	go func() { errors <- dispatcher.Run(ctx) }()
 	go func() { errors <- hnrDispatcher.Run(ctx) }()
 	go func() { errors <- benefitDispatcher.Run(ctx) }()
@@ -213,6 +223,7 @@ func main() {
 	go func() { errors <- ratioRunner.Run(ctx) }()
 	go func() { errors <- newcomerRunner.Run(ctx) }()
 	go func() { errors <- hnrEnforcementRunner.Run(ctx) }()
+	go func() { errors <- workgroupEnforcementRunner.Run(ctx) }()
 	if err := <-errors; err != nil {
 		logger.Error("Core policy worker stopped unexpectedly", "error", err)
 		os.Exit(1)

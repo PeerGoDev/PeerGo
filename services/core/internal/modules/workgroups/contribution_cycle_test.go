@@ -85,20 +85,20 @@ func TestContributionAssessmentNeverCallsPartialOrMissingEvidenceAFailure(t *tes
 func TestContributionReminderAllowedOnlyForReliableBelowTargetCycle(t *testing.T) {
 	t.Parallel()
 	eligible := ContributionCycle{
-		EvidenceState: ContributionEvidenceCollecting,
+		EvidenceState:    ContributionEvidenceCollecting,
 		FullPeriodActive: true,
-		CurrentValue: 5,
-		TargetValue: 10,
-		AssessmentState: ContributionAssessmentInProgress,
+		CurrentValue:     5,
+		TargetValue:      10,
+		AssessmentState:  ContributionAssessmentInProgress,
 	}
 	if !contributionReminderAllowed(eligible) {
 		t.Fatal("eligible in-progress cycle was rejected")
 	}
 	for name, mutate := range map[string]func(*ContributionCycle){
-		"already met": func(cycle *ContributionCycle) { cycle.CurrentValue = cycle.TargetValue },
+		"already met":        func(cycle *ContributionCycle) { cycle.CurrentValue = cycle.TargetValue },
 		"partial membership": func(cycle *ContributionCycle) { cycle.FullPeriodActive = false },
-		"missing evidence": func(cycle *ContributionCycle) { cycle.EvidenceState = ContributionEvidenceIncomplete },
-		"indeterminate": func(cycle *ContributionCycle) { cycle.AssessmentState = ContributionAssessmentIndeterminate },
+		"missing evidence":   func(cycle *ContributionCycle) { cycle.EvidenceState = ContributionEvidenceIncomplete },
+		"indeterminate":      func(cycle *ContributionCycle) { cycle.AssessmentState = ContributionAssessmentIndeterminate },
 	} {
 		t.Run(name, func(t *testing.T) {
 			cycle := eligible
@@ -107,5 +107,32 @@ func TestContributionReminderAllowedOnlyForReliableBelowTargetCycle(t *testing.T
 				t.Fatalf("contributionReminderAllowed(%s) = true", name)
 			}
 		})
+	}
+}
+
+func TestContributionDisciplineEndsOnlyAfterThreeAllowedMisses(t *testing.T) {
+	t.Parallel()
+	for previous := int32(0); previous < 3; previous++ {
+		missCount, action := contributionDiscipline(previous, 3)
+		if missCount != previous+1 || action != ContributionDisciplinaryMarked {
+			t.Fatalf("contributionDiscipline(%d, 3) = %d/%s, want %d/marked", previous, missCount, action, previous+1)
+		}
+	}
+	missCount, action := contributionDiscipline(3, 3)
+	if missCount != 4 || action != ContributionDisciplinaryMembershipEnded {
+		t.Fatalf("contributionDiscipline(3, 3) = %d/%s, want 4/membership_ended", missCount, action)
+	}
+}
+
+func TestContributionAssessmentReasonExplainsMarkAndEndThreshold(t *testing.T) {
+	t.Parallel()
+	candidate := contributionEnforcementCandidate{
+		PeriodStartsAt: time.Date(2026, time.October, 1, 0, 0, 0, 0, time.UTC),
+		CurrentValue:   12, TargetValue: 40, AllowedMisses: 3,
+	}
+	marked := contributionAssessmentReason(candidate, ContributionAssessmentNotMet, 2, ContributionDisciplinaryMarked)
+	ended := contributionAssessmentReason(candidate, ContributionAssessmentNotMet, 4, ContributionDisciplinaryMembershipEnded)
+	if marked == ended || len(marked) < 10 || len(ended) < 10 {
+		t.Fatalf("assessment reasons must be distinct and user-safe: marked=%q ended=%q", marked, ended)
 	}
 }

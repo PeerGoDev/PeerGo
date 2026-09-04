@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func setPromotionWorkerEnvironment(t *testing.T, controlURL string) {
@@ -22,6 +23,17 @@ func TestLoadPromotionWorkerAllowsProductionIPLoopbackHTTP(t *testing.T) {
 	}
 	if settings.SettlementURL != "http://127.0.0.1:18085" {
 		t.Fatalf("unexpected settlement URL %q", settings.SettlementURL)
+	}
+	if settings.WorkgroupEnforcementInterval != time.Hour || settings.WorkgroupEnforcementBatch != 500 {
+		t.Fatalf("unexpected workgroup enforcement defaults: interval=%s batch=%d", settings.WorkgroupEnforcementInterval, settings.WorkgroupEnforcementBatch)
+	}
+}
+
+func TestLoadPromotionWorkerValidatesWorkgroupEnforcementBounds(t *testing.T) {
+	setPromotionWorkerEnvironment(t, "http://127.0.0.1:18085")
+	t.Setenv("PEERGO_WORKGROUP_ENFORCEMENT_INTERVAL", "30s")
+	if _, err := LoadPromotionWorker(); err == nil || !strings.Contains(err.Error(), "between 1m and 24h") {
+		t.Fatalf("expected workgroup enforcement interval rejection, got %v", err)
 	}
 }
 

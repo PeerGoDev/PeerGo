@@ -4639,8 +4639,11 @@ export interface components {
             /** Format: int64 */
             target_value: number;
             met: boolean;
-            /** @enum {string} */
-            enforcement_mode: "observe";
+            enforcement_mode: components["schemas"]["WorkgroupContributionEnforcementMode"];
+            /** Format: int32 */
+            allowed_misses: number;
+            /** Format: int32 */
+            miss_count: number;
         };
         WorkgroupContributionPolicyRevision: {
             group_kind: components["schemas"]["WorkgroupKind"];
@@ -4651,8 +4654,9 @@ export interface components {
             period_kind: "calendar_month";
             /** Format: int64 */
             target_value: number;
-            /** @enum {string} */
-            enforcement_mode: "observe";
+            enforcement_mode: components["schemas"]["WorkgroupContributionEnforcementMode"];
+            /** Format: int32 */
+            allowed_misses: number;
             /** Format: date-time */
             effective_from: string | null;
             opening: boolean;
@@ -4726,9 +4730,11 @@ export interface components {
             target_value: number;
             assessment_state: components["schemas"]["WorkgroupContributionAssessmentState"];
             explanation_code: components["schemas"]["WorkgroupContributionExplanationCode"];
-            /** @enum {string} */
-            enforcement_mode: "observe";
+            enforcement_mode: components["schemas"]["WorkgroupContributionEnforcementMode"];
+            /** Format: int32 */
+            allowed_misses: number;
             reminder: components["schemas"]["WorkgroupContributionReminder"] | null;
+            enforcement: components["schemas"]["WorkgroupContributionEnforcementAssessment"] | null;
         };
         WorkgroupContributionReminder: {
             /** Format: uuid */
@@ -5636,6 +5642,11 @@ export interface components {
             /** @enum {string} */
             workgroup_explanation_code?: "period_in_progress" | "below_target" | "no_contribution";
             workgroup_reason?: string;
+            /** Format: int32 */
+            workgroup_miss_count?: number;
+            /** Format: int32 */
+            workgroup_allowed_misses?: number;
+            workgroup_disciplinary_action?: components["schemas"]["WorkgroupContributionDisciplinaryAction"];
             member_gift_sender_numeric_id?: components["schemas"]["UnsignedIntegerText"];
             member_gift_sender_username?: string;
             member_gift_sender_display_name?: string;
@@ -7862,6 +7873,8 @@ export interface components {
         WorkgroupMembershipStatus: "active" | "suspended" | "ended";
         /** @enum {string} */
         WorkgroupContributionMetric: "trusted_torrents_published" | "torrent_review_votes" | "seeding_active_seconds";
+        /** @enum {string} */
+        WorkgroupContributionEnforcementMode: "observe" | "miss_limit";
         LegacyReviewerEvidence: {
             /** @enum {string} */
             status: "active" | "suspended" | "removed";
@@ -7881,6 +7894,42 @@ export interface components {
             membership?: components["schemas"]["WorkgroupMembership"];
             application?: components["schemas"]["WorkgroupApplication"];
             eligibility?: components["schemas"]["ReviewerEligibility"];
+        };
+        /** @enum {string} */
+        WorkgroupContributionDisciplinaryAction: "none" | "marked" | "membership_ended";
+        WorkgroupContributionEnforcementAssessment: {
+            /** Format: uuid */
+            id: string;
+            group_kind: components["schemas"]["WorkgroupKind"];
+            metric: components["schemas"]["WorkgroupContributionMetric"];
+            /** Format: int64 */
+            policy_revision: number;
+            /** Format: date-time */
+            period_starts_at: string;
+            /** Format: date-time */
+            period_ends_at: string;
+            /** Format: date-time */
+            observed_at: string;
+            /** Format: date-time */
+            evidence_through: string;
+            /** @enum {string} */
+            evidence_state: "complete";
+            /** Format: int64 */
+            current_value: number;
+            /** Format: int64 */
+            target_value: number;
+            /** @enum {string} */
+            assessment_state: "met" | "not_met";
+            /** @enum {string} */
+            explanation_code: "target_met" | "below_target" | "no_contribution";
+            /** Format: int32 */
+            miss_count: number;
+            /** Format: int32 */
+            allowed_misses: number;
+            disciplinary_action: components["schemas"]["WorkgroupContributionDisciplinaryAction"];
+            reason: string;
+            /** Format: date-time */
+            assessed_at: string;
         };
         /** @enum {string} */
         HNRAppealStatus: "pending" | "approved" | "rejected" | "obligation_resolved";

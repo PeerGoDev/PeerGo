@@ -89,18 +89,21 @@ type HNRNotification struct {
 }
 
 type WorkgroupContributionNotification struct {
-	GroupKind       workgroups.GroupKind
-	Metric          workgroups.ContributionMetric
-	PolicyRevision  int64
-	PeriodStartsAt  time.Time
-	PeriodEndsAt    time.Time
-	ObservedAt      time.Time
-	EvidenceState   workgroups.ContributionEvidenceState
-	CurrentValue    int64
-	TargetValue     int64
-	AssessmentState workgroups.ContributionAssessmentState
-	ExplanationCode workgroups.ContributionExplanationCode
-	Reason          string
+	GroupKind          workgroups.GroupKind
+	Metric             workgroups.ContributionMetric
+	PolicyRevision     int64
+	PeriodStartsAt     time.Time
+	PeriodEndsAt       time.Time
+	ObservedAt         time.Time
+	EvidenceState      workgroups.ContributionEvidenceState
+	CurrentValue       int64
+	TargetValue        int64
+	AssessmentState    workgroups.ContributionAssessmentState
+	ExplanationCode    workgroups.ContributionExplanationCode
+	Reason             string
+	MissCount          *int32
+	AllowedMisses      *int32
+	DisciplinaryAction *workgroups.ContributionDisciplinaryAction
 }
 
 // MemberGiftNotification contains only the recipient-safe projection needed

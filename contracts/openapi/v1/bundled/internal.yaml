@@ -12798,6 +12798,8 @@ components:
         - target_value
         - met
         - enforcement_mode
+        - allowed_misses
+        - miss_count
       properties:
         group_kind:
           $ref: '#/components/schemas/WorkgroupKind'
@@ -12834,9 +12836,17 @@ components:
         met:
           type: boolean
         enforcement_mode:
-          type: string
-          enum:
-            - observe
+          $ref: '#/components/schemas/WorkgroupContributionEnforcementMode'
+        allowed_misses:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
+        miss_count:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
     WorkgroupContributionPolicyRevision:
       type: object
       additionalProperties: false
@@ -12847,6 +12857,7 @@ components:
         - period_kind
         - target_value
         - enforcement_mode
+        - allowed_misses
         - effective_from
         - opening
         - reason
@@ -12872,9 +12883,12 @@ components:
           minimum: 1
           maximum: 3153600000
         enforcement_mode:
-          type: string
-          enum:
-            - observe
+          $ref: '#/components/schemas/WorkgroupContributionEnforcementMode'
+        allowed_misses:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
         effective_from:
           type: string
           format: date-time
@@ -13031,7 +13045,9 @@ components:
         - assessment_state
         - explanation_code
         - enforcement_mode
+        - allowed_misses
         - reminder
+        - enforcement
       properties:
         group_kind:
           $ref: '#/components/schemas/WorkgroupKind'
@@ -13074,14 +13090,22 @@ components:
         explanation_code:
           $ref: '#/components/schemas/WorkgroupContributionExplanationCode'
         enforcement_mode:
-          type: string
-          enum:
-            - observe
+          $ref: '#/components/schemas/WorkgroupContributionEnforcementMode'
+        allowed_misses:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
         reminder:
           type: object
           nullable: true
           allOf:
             - $ref: '#/components/schemas/WorkgroupContributionReminder'
+        enforcement:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/WorkgroupContributionEnforcementAssessment'
     WorkgroupContributionReminder:
       type: object
       additionalProperties: false
@@ -15813,6 +15837,18 @@ components:
           type: string
           minLength: 10
           maxLength: 1000
+        workgroup_miss_count:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 120
+        workgroup_allowed_misses:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 120
+        workgroup_disciplinary_action:
+          $ref: '#/components/schemas/WorkgroupContributionDisciplinaryAction'
         member_gift_sender_numeric_id:
           $ref: '#/components/schemas/UnsignedIntegerText'
         member_gift_sender_username:
@@ -22231,6 +22267,11 @@ components:
         - trusted_torrents_published
         - torrent_review_votes
         - seeding_active_seconds
+    WorkgroupContributionEnforcementMode:
+      type: string
+      enum:
+        - observe
+        - miss_limit
     LegacyReviewerEvidence:
       type: object
       additionalProperties: false
@@ -22283,6 +22324,100 @@ components:
           $ref: '#/components/schemas/WorkgroupApplication'
         eligibility:
           $ref: '#/components/schemas/ReviewerEligibility'
+    WorkgroupContributionDisciplinaryAction:
+      type: string
+      enum:
+        - none
+        - marked
+        - membership_ended
+    WorkgroupContributionEnforcementAssessment:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - group_kind
+        - metric
+        - policy_revision
+        - period_starts_at
+        - period_ends_at
+        - observed_at
+        - evidence_through
+        - evidence_state
+        - current_value
+        - target_value
+        - assessment_state
+        - explanation_code
+        - miss_count
+        - allowed_misses
+        - disciplinary_action
+        - reason
+        - assessed_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        group_kind:
+          $ref: '#/components/schemas/WorkgroupKind'
+        metric:
+          $ref: '#/components/schemas/WorkgroupContributionMetric'
+        policy_revision:
+          type: integer
+          format: int64
+          minimum: 1
+        period_starts_at:
+          type: string
+          format: date-time
+        period_ends_at:
+          type: string
+          format: date-time
+        observed_at:
+          type: string
+          format: date-time
+        evidence_through:
+          type: string
+          format: date-time
+        evidence_state:
+          type: string
+          enum:
+            - complete
+        current_value:
+          type: integer
+          format: int64
+          minimum: 0
+        target_value:
+          type: integer
+          format: int64
+          minimum: 1
+        assessment_state:
+          type: string
+          enum:
+            - met
+            - not_met
+        explanation_code:
+          type: string
+          enum:
+            - target_met
+            - below_target
+            - no_contribution
+        miss_count:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
+        allowed_misses:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 120
+        disciplinary_action:
+          $ref: '#/components/schemas/WorkgroupContributionDisciplinaryAction'
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        assessed_at:
+          type: string
+          format: date-time
     HNRAppealStatus:
       type: string
       enum:

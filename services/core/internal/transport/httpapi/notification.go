@@ -242,6 +242,12 @@ func notificationPageDTO(page notifications.Page) generated.MyNotificationPage {
 			dto.WorkgroupAssessmentState = &assessmentState
 			dto.WorkgroupExplanationCode = &explanationCode
 			dto.WorkgroupReason = &payload.Reason
+			dto.WorkgroupMissCount = payload.MissCount
+			dto.WorkgroupAllowedMisses = payload.AllowedMisses
+			if payload.DisciplinaryAction != nil {
+				action := generated.WorkgroupContributionDisciplinaryAction(*payload.DisciplinaryAction)
+				dto.WorkgroupDisciplinaryAction = &action
+			}
 		case notifications.KindMemberGift:
 			payload := item.MemberGift
 			senderNumericID := generated.UnsignedIntegerText(strconv.FormatInt(payload.SenderNumericID, 10))

@@ -11,12 +11,14 @@ import (
 )
 
 type PromotionWorkerConfig struct {
-	Environment        string
-	DatabaseURL        string
-	SettlementURL      string
-	SettlementToken    string
-	RatioWatchInterval time.Duration
-	RatioWatchBatch    int
+	Environment                  string
+	DatabaseURL                  string
+	SettlementURL                string
+	SettlementToken              string
+	RatioWatchInterval           time.Duration
+	RatioWatchBatch              int
+	WorkgroupEnforcementInterval time.Duration
+	WorkgroupEnforcementBatch    int
 }
 
 func LoadPromotionWorker() (PromotionWorkerConfig, error) {
@@ -74,9 +76,27 @@ func LoadPromotionWorker() (PromotionWorkerConfig, error) {
 		}
 		ratioWatchBatch = value
 	}
+	workgroupEnforcementInterval := time.Hour
+	if raw := strings.TrimSpace(os.Getenv("PEERGO_WORKGROUP_ENFORCEMENT_INTERVAL")); raw != "" {
+		value, parseErr := time.ParseDuration(raw)
+		if parseErr != nil || value < time.Minute || value > 24*time.Hour {
+			return PromotionWorkerConfig{}, errors.New("PEERGO_WORKGROUP_ENFORCEMENT_INTERVAL must be between 1m and 24h")
+		}
+		workgroupEnforcementInterval = value
+	}
+	workgroupEnforcementBatch := 500
+	if raw := strings.TrimSpace(os.Getenv("PEERGO_WORKGROUP_ENFORCEMENT_BATCH")); raw != "" {
+		value, parseErr := strconv.Atoi(raw)
+		if parseErr != nil || value < 1 || value > 5000 {
+			return PromotionWorkerConfig{}, errors.New("PEERGO_WORKGROUP_ENFORCEMENT_BATCH must be between 1 and 5000")
+		}
+		workgroupEnforcementBatch = value
+	}
 	return PromotionWorkerConfig{
 		Environment: environment, DatabaseURL: databaseURL,
 		SettlementURL: strings.TrimRight(settlementURL, "/"), SettlementToken: token,
 		RatioWatchInterval: ratioWatchInterval, RatioWatchBatch: ratioWatchBatch,
+		WorkgroupEnforcementInterval: workgroupEnforcementInterval,
+		WorkgroupEnforcementBatch:    workgroupEnforcementBatch,
 	}, nil
 }

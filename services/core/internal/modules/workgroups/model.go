@@ -190,13 +190,29 @@ const (
 	MetricSeedingActiveSeconds     ContributionMetric = "seeding_active_seconds"
 )
 
+type ContributionEnforcementMode string
+
+const (
+	ContributionEnforcementObserve   ContributionEnforcementMode = "observe"
+	ContributionEnforcementMissLimit ContributionEnforcementMode = "miss_limit"
+)
+
+type ContributionDisciplinaryAction string
+
+const (
+	ContributionDisciplinaryNone            ContributionDisciplinaryAction = "none"
+	ContributionDisciplinaryMarked          ContributionDisciplinaryAction = "marked"
+	ContributionDisciplinaryMembershipEnded ContributionDisciplinaryAction = "membership_ended"
+)
+
 type ContributionPolicy struct {
 	GroupKind       GroupKind
 	Revision        int64
 	Metric          ContributionMetric
 	PeriodKind      string
 	TargetValue     int64
-	EnforcementMode string
+	EnforcementMode ContributionEnforcementMode
+	AllowedMisses   int32
 	EffectiveFrom   *time.Time
 	Opening         bool
 	Reason          string
@@ -242,7 +258,8 @@ type ContributionSummary struct {
 }
 
 // ContributionProgress is a read projection over immutable publish, vote and
-// seeding evidence. Observe mode never changes membership automatically.
+// seeding evidence. MissCount is scoped to the latest active membership tenure
+// so a staff-approved reactivation starts a new, auditable probation window.
 type ContributionProgress struct {
 	GroupKind       GroupKind
 	Metric          ContributionMetric
@@ -255,7 +272,9 @@ type ContributionProgress struct {
 	CurrentValue    int64
 	TargetValue     int64
 	Met             bool
-	EnforcementMode string
+	EnforcementMode ContributionEnforcementMode
+	AllowedMisses   int32
+	MissCount       int32
 }
 
 // ContributionEvidenceState distinguishes an open period from a broken or
@@ -269,8 +288,8 @@ const (
 	ContributionEvidenceUnavailable ContributionEvidenceState = "unavailable"
 )
 
-// ContributionAssessmentState is explanatory only while enforcement_mode is
-// observe. In particular, indeterminate and not_assessable are not failures.
+// ContributionAssessmentState is derived from evidence. In particular,
+// indeterminate and not_assessable are never disciplinary failures.
 type ContributionAssessmentState string
 
 const (
@@ -295,8 +314,8 @@ const (
 )
 
 // ContributionCycle is rebuilt from immutable membership, publish, review and
-// seeding evidence. It is not an enforcement ledger and stores no mutable
-// verdict that could drift when a later projection arrives.
+// seeding evidence. Enforcement points at a frozen assessment when that cycle
+// was actually settled; absent evidence never creates an assessment.
 type ContributionCycle struct {
 	GroupKind        GroupKind
 	Metric           ContributionMetric
@@ -312,8 +331,45 @@ type ContributionCycle struct {
 	TargetValue      int64
 	AssessmentState  ContributionAssessmentState
 	ExplanationCode  ContributionExplanationCode
-	EnforcementMode  string
+	EnforcementMode  ContributionEnforcementMode
+	AllowedMisses    int32
 	Reminder         *ContributionReminder
+	Enforcement      *ContributionEnforcementAssessment
+}
+
+// ContributionEnforcementAssessment is one compact, immutable monthly result.
+// It stores no raw torrent events; those remain in their owning domain.
+type ContributionEnforcementAssessment struct {
+	ID                     uuid.UUID
+	MembershipID           uuid.UUID
+	TenureTransitionID     uuid.UUID
+	GroupKind              GroupKind
+	RecipientUserID        uuid.UUID
+	Metric                 ContributionMetric
+	PolicyRevision         int64
+	PeriodStartsAt         time.Time
+	PeriodEndsAt           time.Time
+	ObservedAt             time.Time
+	EvidenceThrough        time.Time
+	EvidenceState          ContributionEvidenceState
+	CurrentValue           int64
+	TargetValue            int64
+	AssessmentState        ContributionAssessmentState
+	ExplanationCode        ContributionExplanationCode
+	MissCount              int32
+	AllowedMisses          int32
+	DisciplinaryAction     ContributionDisciplinaryAction
+	MembershipTransitionID *uuid.UUID
+	Reason                 string
+	AssessedAt             time.Time
+}
+
+type ContributionEnforcementResult struct {
+	Skipped  bool
+	Examined int
+	Recorded int
+	Marked   int
+	Ended    int
 }
 
 // ContributionReminder is the frozen, member-visible observation that backed

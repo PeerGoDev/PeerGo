@@ -40,7 +40,8 @@ LEFT JOIN migration.legacy_reviewer_openings AS reviewer
 
 const contributionPolicyRevisionSelect = `
 SELECT policy.group_kind, policy.revision, policy.metric, policy.period_kind,
-       policy.target_value, policy.enforcement_mode, policy.effective_from,
+       policy.target_value, policy.enforcement_mode, policy.allowed_misses,
+       policy.effective_from,
        policy.source_kind, COALESCE(policy.reason, '首版观察目标'),
        policy.issued_by, policy.request_id, policy.created_at
 FROM workgroups.contribution_policy_revisions AS policy`
@@ -59,6 +60,20 @@ FROM workgroups.contribution_reminders AS reminder
 JOIN community.workgroup_contribution_notifications AS notification
   ON notification.reminder_id = reminder.id
  AND notification.recipient_user_id = reminder.recipient_user_id`
+
+const contributionAssessmentSelect = `
+SELECT assessment.id, assessment.membership_id,
+       assessment.tenure_transition_id, assessment.group_kind,
+       assessment.recipient_user_id, assessment.metric,
+       assessment.policy_revision, assessment.period_starts_at,
+       assessment.period_ends_at, assessment.observed_at,
+       assessment.evidence_through, assessment.evidence_state,
+       assessment.current_value, assessment.target_value,
+       assessment.assessment_state, assessment.explanation_code,
+       assessment.miss_count, assessment.allowed_misses,
+       assessment.disciplinary_action, assessment.membership_transition_id,
+       assessment.reason, assessment.assessed_at
+FROM workgroups.contribution_assessments AS assessment`
 
 type PostgresRepository struct {
 	pool *pgxpool.Pool
@@ -399,6 +414,13 @@ func (repository *PostgresRepository) attachContributionProgress(ctx context.Con
 		if err != nil {
 			return err
 		}
+		missCounts := make(map[uuid.UUID]int32)
+		if policy.EnforcementMode == ContributionEnforcementMissLimit {
+			missCounts, err = repository.contributionMissCounts(ctx, membershipIDs)
+			if err != nil {
+				return err
+			}
+		}
 		for _, index := range indexes {
 			value := values[memberships[index].ID]
 			memberships[index].Contribution = &ContributionProgress{
@@ -407,10 +429,48 @@ func (repository *PostgresRepository) attachContributionProgress(ctx context.Con
 				ObservedAt: observedAt, EvidenceThrough: evidenceThrough,
 				CurrentValue: value, TargetValue: policy.TargetValue,
 				Met: value >= policy.TargetValue, EnforcementMode: policy.EnforcementMode,
+				AllowedMisses: policy.AllowedMisses,
+				MissCount:     missCounts[memberships[index].ID],
 			}
 		}
 	}
 	return nil
+}
+
+func (repository *PostgresRepository) contributionMissCounts(ctx context.Context, membershipIDs []uuid.UUID) (map[uuid.UUID]int32, error) {
+	result := make(map[uuid.UUID]int32, len(membershipIDs))
+	rows, err := repository.pool.Query(ctx, `
+SELECT membership.id, COALESCE(max(assessment.miss_count), 0)::integer
+FROM workgroups.memberships AS membership
+JOIN LATERAL (
+    SELECT transition.id, transition.to_status
+    FROM workgroups.membership_transitions AS transition
+    WHERE transition.membership_id = membership.id
+    ORDER BY transition.occurred_at DESC,
+             transition.state_version DESC, transition.id DESC
+    LIMIT 1
+) AS tenure ON tenure.to_status = 'active'
+LEFT JOIN workgroups.contribution_assessments AS assessment
+  ON assessment.membership_id = membership.id
+ AND assessment.tenure_transition_id = tenure.id
+WHERE membership.id = ANY($1::uuid[])
+GROUP BY membership.id`, membershipIDs)
+	if err != nil {
+		return nil, fmt.Errorf("read workgroup contribution miss counts: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var membershipID uuid.UUID
+		var missCount int32
+		if err := rows.Scan(&membershipID, &missCount); err != nil {
+			return nil, fmt.Errorf("scan workgroup contribution miss count: %w", err)
+		}
+		result[membershipID] = missCount
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate workgroup contribution miss counts: %w", err)
+	}
+	return result, nil
 }
 
 func (repository *PostgresRepository) contributionSummary(ctx context.Context, kind GroupKind, asOf time.Time) (ContributionSummary, error) {
@@ -576,6 +636,7 @@ ORDER BY occurred_at, state_version, id`, membershipID)
 			FullPeriodActive: fullPeriodActive,
 			CurrentValue:     values[membershipID], TargetValue: policy.TargetValue,
 			EnforcementMode: policy.EnforcementMode,
+			AllowedMisses:   policy.AllowedMisses,
 		}
 		cycle.AssessmentState, cycle.ExplanationCode = contributionAssessment(cycle)
 		page.Items = append(page.Items, cycle)
@@ -584,7 +645,43 @@ ORDER BY occurred_at, state_version, id`, membershipID)
 	if err := attachContributionReminders(ctx, querier, membershipID, page.Items); err != nil {
 		return ContributionCyclePage{}, err
 	}
+	if err := attachContributionAssessments(ctx, querier, membershipID, page.Items); err != nil {
+		return ContributionCyclePage{}, err
+	}
 	return page, nil
+}
+
+func attachContributionAssessments(ctx context.Context, querier workgroupQuerier, membershipID uuid.UUID, cycles []ContributionCycle) error {
+	if len(cycles) == 0 {
+		return nil
+	}
+	oldestPeriod := cycles[len(cycles)-1].PeriodStartsAt
+	rows, err := querier.Query(ctx, contributionAssessmentSelect+`
+WHERE assessment.membership_id = $1
+  AND assessment.period_starts_at >= $2
+ORDER BY assessment.period_starts_at DESC`, membershipID, oldestPeriod)
+	if err != nil {
+		return fmt.Errorf("list workgroup contribution assessments: %w", err)
+	}
+	defer rows.Close()
+	byPeriod := make(map[time.Time]ContributionEnforcementAssessment, len(cycles))
+	for rows.Next() {
+		assessment, scanErr := scanContributionAssessment(rows)
+		if scanErr != nil {
+			return fmt.Errorf("scan workgroup contribution assessment: %w", scanErr)
+		}
+		byPeriod[assessment.PeriodStartsAt] = assessment
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate workgroup contribution assessments: %w", err)
+	}
+	for index := range cycles {
+		if assessment, ok := byPeriod[cycles[index].PeriodStartsAt]; ok {
+			copy := assessment
+			cycles[index].Enforcement = &copy
+		}
+	}
+	return nil
 }
 
 func attachContributionReminders(ctx context.Context, querier workgroupQuerier, membershipID uuid.UUID, cycles []ContributionCycle) error {
@@ -861,20 +958,21 @@ func (repository *PostgresRepository) contributionPolicyWith(ctx context.Context
 	var policy ContributionPolicy
 	if err := querier.QueryRow(ctx, `
 SELECT group_kind, revision, metric, period_kind, target_value,
-       enforcement_mode
+       enforcement_mode, allowed_misses
 FROM workgroups.contribution_policy_revisions
 WHERE group_kind = $1 AND effective_from <= $2
 ORDER BY effective_from DESC, revision DESC
 	LIMIT 1`, kind, periodStart).Scan(
 		&policy.GroupKind, &policy.Revision, &policy.Metric, &policy.PeriodKind,
-		&policy.TargetValue, &policy.EnforcementMode,
+		&policy.TargetValue, &policy.EnforcementMode, &policy.AllowedMisses,
 	); errors.Is(err, pgx.ErrNoRows) {
 		return ContributionPolicy{}, fmt.Errorf("workgroup contribution policy is missing for %s", kind)
 	} else if err != nil {
 		return ContributionPolicy{}, fmt.Errorf("read workgroup contribution policy: %w", err)
 	}
 	if policy.Revision < 1 || policy.TargetValue < 1 || policy.PeriodKind != "calendar_month" ||
-		policy.EnforcementMode != "observe" || !validContributionMetric(kind, policy.Metric) {
+		!validContributionEnforcement(kind, policy.EnforcementMode, policy.AllowedMisses) ||
+		!validContributionMetric(kind, policy.Metric) {
 		return ContributionPolicy{}, errors.New("workgroup contribution policy is invalid")
 	}
 	return policy, nil
@@ -995,11 +1093,12 @@ LIMIT 1`, command.GroupKind), command.OccurredAt)
 	_, err = tx.Exec(ctx, `
 INSERT INTO workgroups.contribution_policy_revisions (
     group_kind, revision, metric, period_kind, target_value,
-    enforcement_mode, effective_from, source_kind, source_reference,
+    enforcement_mode, allowed_misses, effective_from, source_kind, source_reference,
     authorization_decision_id, created_at, request_id, issued_by, reason
-) VALUES ($1, $2, $3, 'calendar_month', $4, 'observe', $5, 'staff', $6,
-          $7, $8, $9, $10, $11)`,
+) VALUES ($1, $2, $3, 'calendar_month', $4, $5, $6, $7, 'staff', $8,
+          $9, $10, $11, $12, $13)`,
 		command.GroupKind, revision, metric, command.TargetValue,
+		latest.EnforcementMode, latest.AllowedMisses,
 		command.EffectiveFrom, "staff:"+command.RequestID.String(),
 		command.AuthorizationDecisionID, command.OccurredAt, command.RequestID,
 		command.ActorID, command.Reason)
@@ -1016,8 +1115,9 @@ INSERT INTO workgroups.contribution_policy_revisions (
 	policy := ContributionPolicy{
 		GroupKind: command.GroupKind, Revision: revision, Metric: metric,
 		PeriodKind: "calendar_month", TargetValue: command.TargetValue,
-		EnforcementMode: "observe", EffectiveFrom: &effectiveFrom,
-		Reason: command.Reason, IssuedBy: &issuedBy, RequestID: &requestID,
+		EnforcementMode: latest.EnforcementMode, AllowedMisses: latest.AllowedMisses,
+		EffectiveFrom: &effectiveFrom,
+		Reason:        command.Reason, IssuedBy: &issuedBy, RequestID: &requestID,
 		CreatedAt: command.OccurredAt, TimelineState: ContributionPolicyScheduled,
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -1544,7 +1644,8 @@ func scanContributionPolicy(row scanner, asOf time.Time) (ContributionPolicy, er
 	var requestID pgtype.UUID
 	if err := row.Scan(
 		&policy.GroupKind, &policy.Revision, &policy.Metric, &policy.PeriodKind,
-		&policy.TargetValue, &policy.EnforcementMode, &effectiveFrom,
+		&policy.TargetValue, &policy.EnforcementMode, &policy.AllowedMisses,
+		&effectiveFrom,
 		&sourceKind, &policy.Reason, &issuedBy, &requestID, &policy.CreatedAt,
 	); err != nil {
 		return ContributionPolicy{}, err
@@ -1620,6 +1721,69 @@ func scanContributionReminder(row scanner) (ContributionReminder, error) {
 	return reminder, nil
 }
 
+func scanContributionAssessment(row scanner) (ContributionEnforcementAssessment, error) {
+	var assessment ContributionEnforcementAssessment
+	var membershipTransitionID pgtype.UUID
+	if err := row.Scan(
+		&assessment.ID, &assessment.MembershipID,
+		&assessment.TenureTransitionID, &assessment.GroupKind,
+		&assessment.RecipientUserID, &assessment.Metric,
+		&assessment.PolicyRevision, &assessment.PeriodStartsAt,
+		&assessment.PeriodEndsAt, &assessment.ObservedAt,
+		&assessment.EvidenceThrough, &assessment.EvidenceState,
+		&assessment.CurrentValue, &assessment.TargetValue,
+		&assessment.AssessmentState, &assessment.ExplanationCode,
+		&assessment.MissCount, &assessment.AllowedMisses,
+		&assessment.DisciplinaryAction, &membershipTransitionID,
+		&assessment.Reason, &assessment.AssessedAt,
+	); err != nil {
+		return ContributionEnforcementAssessment{}, err
+	}
+	if membershipTransitionID.Valid {
+		value := uuid.UUID(membershipTransitionID.Bytes)
+		assessment.MembershipTransitionID = &value
+	}
+	assessment.PeriodStartsAt = canonicalTime(assessment.PeriodStartsAt)
+	assessment.PeriodEndsAt = canonicalTime(assessment.PeriodEndsAt)
+	assessment.ObservedAt = canonicalTime(assessment.ObservedAt)
+	assessment.EvidenceThrough = canonicalTime(assessment.EvidenceThrough)
+	assessment.AssessedAt = canonicalTime(assessment.AssessedAt)
+	if assessment.ID == uuid.Nil || assessment.MembershipID == uuid.Nil ||
+		assessment.TenureTransitionID == uuid.Nil || assessment.RecipientUserID == uuid.Nil ||
+		assessment.PolicyRevision < 1 || assessment.CurrentValue < 0 || assessment.TargetValue < 1 ||
+		assessment.AllowedMisses < 1 || assessment.MissCount < 0 ||
+		assessment.GroupKind != GroupReseed || assessment.Metric != MetricTrustedTorrentsPublished ||
+		assessment.EvidenceState != ContributionEvidenceComplete ||
+		!validContributionDiscipline(assessment) {
+		return ContributionEnforcementAssessment{}, errors.New("workgroup contribution assessment is invalid")
+	}
+	return assessment, nil
+}
+
+func validContributionDiscipline(assessment ContributionEnforcementAssessment) bool {
+	switch assessment.AssessmentState {
+	case ContributionAssessmentMet:
+		return assessment.CurrentValue >= assessment.TargetValue &&
+			assessment.ExplanationCode == ContributionExplanationTargetMet &&
+			assessment.DisciplinaryAction == ContributionDisciplinaryNone &&
+			assessment.MembershipTransitionID == nil
+	case ContributionAssessmentNotMet:
+		if assessment.CurrentValue >= assessment.TargetValue || assessment.MissCount < 1 ||
+			(assessment.ExplanationCode != ContributionExplanationBelowTarget &&
+				assessment.ExplanationCode != ContributionExplanationNoContribution) {
+			return false
+		}
+		if assessment.MissCount <= assessment.AllowedMisses {
+			return assessment.DisciplinaryAction == ContributionDisciplinaryMarked &&
+				assessment.MembershipTransitionID == nil
+		}
+		return assessment.DisciplinaryAction == ContributionDisciplinaryMembershipEnded &&
+			assessment.MembershipTransitionID != nil
+	default:
+		return false
+	}
+}
+
 func contributionMetricFor(kind GroupKind) (ContributionMetric, bool) {
 	switch kind {
 	case GroupReseed:
@@ -1630,6 +1794,17 @@ func contributionMetricFor(kind GroupKind) (ContributionMetric, bool) {
 		return MetricSeedingActiveSeconds, true
 	default:
 		return "", false
+	}
+}
+
+func validContributionEnforcement(kind GroupKind, mode ContributionEnforcementMode, allowedMisses int32) bool {
+	switch mode {
+	case ContributionEnforcementObserve:
+		return allowedMisses == 0
+	case ContributionEnforcementMissLimit:
+		return kind == GroupReseed && allowedMisses > 0
+	default:
+		return false
 	}
 }
 

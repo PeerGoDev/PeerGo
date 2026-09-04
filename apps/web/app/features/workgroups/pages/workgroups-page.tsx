@@ -265,8 +265,10 @@ function MyContributionHistorySheet({
         <SheetHeader className="border-b pr-12">
           <SheetTitle>{item?.definition.display_name}贡献历史</SheetTitle>
           <SheetDescription>
-            按 UTC
-            自然月重建成员有效期、业务证据和达标结果；当前仅观察，不会自动暂停权益。
+            按 UTC 自然月重建成员有效期、业务证据和达标结果。
+            {item?.membership?.contribution?.enforcement_mode === "miss_limit"
+              ? `未达标会累计标记，超过 ${item.membership.contribution.allowed_misses} 次后结束资格。`
+              : "当前仅观察，不会自动变更资格。"}
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
@@ -367,7 +369,9 @@ function ContributionSummary({
         </Badge>
       </div>
       <p className="text-xs text-muted-foreground">
-        当前为观察目标，未达标不会自动暂停工作组权益。
+        {contribution.enforcement_mode === "miss_limit"
+          ? `完整自然月未达标将记录标记；当前 ${contribution.miss_count}/${contribution.allowed_misses} 次，第 ${contribution.allowed_misses + 1} 次自动结束资格。`
+          : "当前为观察目标，未达标不会自动变更工作组权益。"}
       </p>
     </div>
   )

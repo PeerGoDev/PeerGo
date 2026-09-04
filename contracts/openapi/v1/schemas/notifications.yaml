@@ -1,6 +1,16 @@
 MyNotificationKind:
   type: string
-  enum: [torrent_review, ratio_watch, ratio_appeal, hnr, hnr_appeal, workgroup_contribution, member_gift, content_tip]
+  enum:
+    [
+      torrent_review,
+      ratio_watch,
+      ratio_appeal,
+      hnr,
+      hnr_appeal,
+      workgroup_contribution,
+      member_gift,
+      content_tip,
+    ]
 
 MyRatioWatchNotificationStatus:
   type: string
@@ -125,6 +135,18 @@ MyNotification:
       type: string
       minLength: 10
       maxLength: 1000
+    workgroup_miss_count:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 120
+    workgroup_allowed_misses:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 120
+    workgroup_disciplinary_action:
+      $ref: "../schemas/workgroups.yaml#/WorkgroupContributionDisciplinaryAction"
     member_gift_sender_numeric_id:
       $ref: "../schemas/economy.yaml#/UnsignedIntegerText"
     member_gift_sender_username:
@@ -183,7 +205,8 @@ WorkgroupNotificationKind:
 
 WorkgroupNotificationMetric:
   type: string
-  enum: [trusted_torrents_published, torrent_review_votes, seeding_active_seconds]
+  enum:
+    [trusted_torrents_published, torrent_review_votes, seeding_active_seconds]
 
 MyNotificationPage:
   type: object

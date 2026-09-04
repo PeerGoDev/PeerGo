@@ -347,18 +347,33 @@ SELECT
     hnr_appeal_obligation.torrent_id AS hnr_appeal_torrent_id,
     hnr_appeal_torrent.title AS hnr_appeal_torrent_title,
     hnr_appeal_obligation.grace_ends_at AS hnr_appeal_grace_ends_at,
-    contribution_reminder.group_kind AS workgroup_group_kind,
-    contribution_reminder.metric AS workgroup_metric,
-    contribution_reminder.policy_revision AS workgroup_policy_revision,
-    contribution_reminder.period_starts_at AS workgroup_period_starts_at,
-    contribution_reminder.period_ends_at AS workgroup_period_ends_at,
-    contribution_reminder.observed_at AS workgroup_observed_at,
-    contribution_reminder.evidence_state AS workgroup_evidence_state,
-    contribution_reminder.current_value AS workgroup_current_value,
-    contribution_reminder.target_value AS workgroup_target_value,
-    contribution_reminder.assessment_state AS workgroup_assessment_state,
-    contribution_reminder.explanation_code AS workgroup_explanation_code,
-    contribution_reminder.reason AS workgroup_reason,
+    COALESCE(contribution_reminder.group_kind,
+             contribution_assessment.group_kind, '') AS workgroup_group_kind,
+    COALESCE(contribution_reminder.metric,
+             contribution_assessment.metric, '') AS workgroup_metric,
+    COALESCE(contribution_reminder.policy_revision,
+             contribution_assessment.policy_revision, 0) AS workgroup_policy_revision,
+    COALESCE(contribution_reminder.period_starts_at,
+             contribution_assessment.period_starts_at) AS workgroup_period_starts_at,
+    COALESCE(contribution_reminder.period_ends_at,
+             contribution_assessment.period_ends_at) AS workgroup_period_ends_at,
+    COALESCE(contribution_reminder.observed_at,
+             contribution_assessment.observed_at) AS workgroup_observed_at,
+    COALESCE(contribution_reminder.evidence_state,
+             contribution_assessment.evidence_state, '') AS workgroup_evidence_state,
+    COALESCE(contribution_reminder.current_value,
+             contribution_assessment.current_value, 0) AS workgroup_current_value,
+    COALESCE(contribution_reminder.target_value,
+             contribution_assessment.target_value, 0) AS workgroup_target_value,
+    COALESCE(contribution_reminder.assessment_state,
+             contribution_assessment.assessment_state, '') AS workgroup_assessment_state,
+    COALESCE(contribution_reminder.explanation_code,
+             contribution_assessment.explanation_code, '') AS workgroup_explanation_code,
+    COALESCE(contribution_reminder.reason,
+             contribution_assessment.reason, '') AS workgroup_reason,
+    COALESCE(contribution_assessment.miss_count, 0)::integer AS workgroup_miss_count,
+    COALESCE(contribution_assessment.allowed_misses, 0)::integer AS workgroup_allowed_misses,
+    COALESCE(contribution_assessment.disciplinary_action, '') AS workgroup_disciplinary_action,
     gift_sender.numeric_id AS member_gift_sender_numeric_id,
     gift_sender.username AS member_gift_sender_username,
     gift_sender.display_name AS member_gift_sender_display_name,
@@ -433,6 +448,9 @@ LEFT JOIN community.workgroup_contribution_notifications AS contribution_notific
 LEFT JOIN workgroups.contribution_reminders AS contribution_reminder
   ON contribution_reminder.id = contribution_notification.reminder_id
  AND contribution_reminder.recipient_user_id = contribution_notification.recipient_user_id
+LEFT JOIN workgroups.contribution_assessments AS contribution_assessment
+  ON contribution_assessment.id = contribution_notification.assessment_id
+ AND contribution_assessment.recipient_user_id = contribution_notification.recipient_user_id
 LEFT JOIN community.member_gift_notifications AS member_gift_notification
   ON inbox.kind = 'member_gift'
  AND member_gift_notification.id = inbox.id
@@ -496,18 +514,21 @@ type ListMyNotificationsRow struct {
 	HnrAppealTorrentID          pgtype.Int8
 	HnrAppealTorrentTitle       pgtype.Text
 	HnrAppealGraceEndsAt        pgtype.Timestamptz
-	WorkgroupGroupKind          pgtype.Text
-	WorkgroupMetric             pgtype.Text
-	WorkgroupPolicyRevision     pgtype.Int8
+	WorkgroupGroupKind          string
+	WorkgroupMetric             string
+	WorkgroupPolicyRevision     int64
 	WorkgroupPeriodStartsAt     pgtype.Timestamptz
 	WorkgroupPeriodEndsAt       pgtype.Timestamptz
 	WorkgroupObservedAt         pgtype.Timestamptz
-	WorkgroupEvidenceState      pgtype.Text
-	WorkgroupCurrentValue       pgtype.Int8
-	WorkgroupTargetValue        pgtype.Int8
-	WorkgroupAssessmentState    pgtype.Text
-	WorkgroupExplanationCode    pgtype.Text
-	WorkgroupReason             pgtype.Text
+	WorkgroupEvidenceState      string
+	WorkgroupCurrentValue       int64
+	WorkgroupTargetValue        int64
+	WorkgroupAssessmentState    string
+	WorkgroupExplanationCode    string
+	WorkgroupReason             string
+	WorkgroupMissCount          int32
+	WorkgroupAllowedMisses      int32
+	WorkgroupDisciplinaryAction string
 	MemberGiftSenderNumericID   pgtype.Int8
 	MemberGiftSenderUsername    pgtype.Text
 	MemberGiftSenderDisplayName pgtype.Text
@@ -576,6 +597,9 @@ func (q *Queries) ListMyNotifications(ctx context.Context, arg ListMyNotificatio
 			&i.WorkgroupAssessmentState,
 			&i.WorkgroupExplanationCode,
 			&i.WorkgroupReason,
+			&i.WorkgroupMissCount,
+			&i.WorkgroupAllowedMisses,
+			&i.WorkgroupDisciplinaryAction,
 			&i.MemberGiftSenderNumericID,
 			&i.MemberGiftSenderUsername,
 			&i.MemberGiftSenderDisplayName,

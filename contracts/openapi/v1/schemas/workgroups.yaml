@@ -16,7 +16,17 @@ WorkgroupEntitlement:
 WorkgroupDefinition:
   type: object
   additionalProperties: false
-  required: [kind, display_name, description, join_mode, entitlement, enabled, sort_order, version]
+  required:
+    [
+      kind,
+      display_name,
+      description,
+      join_mode,
+      entitlement,
+      enabled,
+      sort_order,
+      version,
+    ]
   properties:
     kind: { $ref: "#/WorkgroupKind" }
     display_name: { type: string, minLength: 1, maxLength: 32 }
@@ -104,6 +114,14 @@ WorkgroupContributionMetric:
     - torrent_review_votes
     - seeding_active_seconds
 
+WorkgroupContributionEnforcementMode:
+  type: string
+  enum: [observe, miss_limit]
+
+WorkgroupContributionDisciplinaryAction:
+  type: string
+  enum: [none, marked, membership_ended]
+
 WorkgroupContributionProgress:
   type: object
   additionalProperties: false
@@ -119,6 +137,8 @@ WorkgroupContributionProgress:
     - target_value
     - met
     - enforcement_mode
+    - allowed_misses
+    - miss_count
   properties:
     group_kind: { $ref: "#/WorkgroupKind" }
     metric: { $ref: "#/WorkgroupContributionMetric" }
@@ -131,7 +151,9 @@ WorkgroupContributionProgress:
     current_value: { type: integer, format: int64, minimum: 0 }
     target_value: { type: integer, format: int64, minimum: 1 }
     met: { type: boolean }
-    enforcement_mode: { type: string, enum: [observe] }
+    enforcement_mode: { $ref: "#/WorkgroupContributionEnforcementMode" }
+    allowed_misses: { type: integer, format: int32, minimum: 0, maximum: 120 }
+    miss_count: { type: integer, format: int32, minimum: 0, maximum: 120 }
 
 WorkgroupContributionPolicyRevision:
   type: object
@@ -143,6 +165,7 @@ WorkgroupContributionPolicyRevision:
     - period_kind
     - target_value
     - enforcement_mode
+    - allowed_misses
     - effective_from
     - opening
     - reason
@@ -154,8 +177,10 @@ WorkgroupContributionPolicyRevision:
     revision: { type: integer, format: int64, minimum: 1 }
     metric: { $ref: "#/WorkgroupContributionMetric" }
     period_kind: { type: string, enum: [calendar_month] }
-    target_value: { type: integer, format: int64, minimum: 1, maximum: 3153600000 }
-    enforcement_mode: { type: string, enum: [observe] }
+    target_value:
+      { type: integer, format: int64, minimum: 1, maximum: 3153600000 }
+    enforcement_mode: { $ref: "#/WorkgroupContributionEnforcementMode" }
+    allowed_misses: { type: integer, format: int32, minimum: 0, maximum: 120 }
     effective_from:
       type: string
       format: date-time
@@ -252,7 +277,9 @@ WorkgroupContributionCycle:
     - assessment_state
     - explanation_code
     - enforcement_mode
+    - allowed_misses
     - reminder
+    - enforcement
   properties:
     group_kind: { $ref: "#/WorkgroupKind" }
     metric: { $ref: "#/WorkgroupContributionMetric" }
@@ -268,12 +295,61 @@ WorkgroupContributionCycle:
     target_value: { type: integer, format: int64, minimum: 1 }
     assessment_state: { $ref: "#/WorkgroupContributionAssessmentState" }
     explanation_code: { $ref: "#/WorkgroupContributionExplanationCode" }
-    enforcement_mode: { type: string, enum: [observe] }
+    enforcement_mode: { $ref: "#/WorkgroupContributionEnforcementMode" }
+    allowed_misses: { type: integer, format: int32, minimum: 0, maximum: 120 }
     reminder:
       type: object
       nullable: true
       allOf:
         - $ref: "#/WorkgroupContributionReminder"
+    enforcement:
+      type: object
+      nullable: true
+      allOf:
+        - $ref: "#/WorkgroupContributionEnforcementAssessment"
+
+WorkgroupContributionEnforcementAssessment:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - group_kind
+    - metric
+    - policy_revision
+    - period_starts_at
+    - period_ends_at
+    - observed_at
+    - evidence_through
+    - evidence_state
+    - current_value
+    - target_value
+    - assessment_state
+    - explanation_code
+    - miss_count
+    - allowed_misses
+    - disciplinary_action
+    - reason
+    - assessed_at
+  properties:
+    id: { type: string, format: uuid }
+    group_kind: { $ref: "#/WorkgroupKind" }
+    metric: { $ref: "#/WorkgroupContributionMetric" }
+    policy_revision: { type: integer, format: int64, minimum: 1 }
+    period_starts_at: { type: string, format: date-time }
+    period_ends_at: { type: string, format: date-time }
+    observed_at: { type: string, format: date-time }
+    evidence_through: { type: string, format: date-time }
+    evidence_state: { type: string, enum: [complete] }
+    current_value: { type: integer, format: int64, minimum: 0 }
+    target_value: { type: integer, format: int64, minimum: 1 }
+    assessment_state: { type: string, enum: [met, not_met] }
+    explanation_code:
+      { type: string, enum: [target_met, below_target, no_contribution] }
+    miss_count: { type: integer, format: int32, minimum: 0, maximum: 120 }
+    allowed_misses: { type: integer, format: int32, minimum: 1, maximum: 120 }
+    disciplinary_action: { $ref: "#/WorkgroupContributionDisciplinaryAction" }
+    reason: { type: string, minLength: 10, maxLength: 1000 }
+    assessed_at: { type: string, format: date-time }
 
 WorkgroupContributionReminder:
   type: object
@@ -391,7 +467,15 @@ MyWorkgroupOverview:
 AdminWorkgroupOverview:
   type: object
   additionalProperties: false
-  required: [definitions, pending_applications, active_reseed_members, active_review_members, active_retention_members, contribution_summaries]
+  required:
+    [
+      definitions,
+      pending_applications,
+      active_reseed_members,
+      active_review_members,
+      active_retention_members,
+      contribution_summaries,
+    ]
   properties:
     definitions:
       type: array
@@ -505,7 +589,8 @@ WorkgroupTaskSubmission:
       nullable: true
       allOf:
         - $ref: "#/WorkgroupTaskReviewDecision"
-    review_reason: { type: string, minLength: 10, maxLength: 1000, nullable: true }
+    review_reason:
+      { type: string, minLength: 10, maxLength: 1000, nullable: true }
     decided_at: { type: string, format: date-time, nullable: true }
 
 WorkgroupTaskAssignment:
@@ -598,7 +683,8 @@ IssueWorkgroupContributionPolicyRequest:
   additionalProperties: false
   required: [target_value, effective_from, reason]
   properties:
-    target_value: { type: integer, format: int64, minimum: 1, maximum: 3153600000 }
+    target_value:
+      { type: integer, format: int64, minimum: 1, maximum: 3153600000 }
     effective_from: { type: string, format: date-time }
     reason: { type: string, minLength: 10, maxLength: 1000 }
 
