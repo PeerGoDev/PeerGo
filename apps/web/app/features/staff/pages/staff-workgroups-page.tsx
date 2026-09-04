@@ -243,6 +243,59 @@ function WorkgroupsContent({
       )}
 
       <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">
+            成员资格 · {groupLabel(groupKind)}
+          </CardTitle>
+          <CardDescription>
+            先选择工作组，再添加成员或管理现有资格；所有变更都会保留历史记录。
+          </CardDescription>
+          <CardAction className="flex items-center gap-2">
+            <Select
+              items={groupOptions}
+              value={groupKind}
+              onValueChange={(value) => value && setGroupKind(value)}
+            >
+              <SelectTrigger size="sm" aria-label="选择工作组">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" alignItemWithTrigger={false}>
+                <SelectGroup>
+                  {groupOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {canManage ? (
+              <Button size="sm" onClick={() => setGrantOpen(true)}>
+                <PlusIcon data-icon="inline-start" />
+                添加成员
+              </Button>
+            ) : null}
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          {memberships.isPending ? (
+            <Skeleton className="h-40 w-full" />
+          ) : memberships.isError || !memberships.data ? (
+            <ReadError error={memberships.error} onRetry={refresh} />
+          ) : (
+            <MembershipTable
+              items={memberships.data.items}
+              canManage={canManage}
+              onViewHistory={setHistoryMembership}
+              onChange={(membership, transition) =>
+                setMembershipDialog({ membership, transition })
+              }
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex-row items-center justify-between gap-3">
           <CardTitle className="text-lg">待处理申请</CardTitle>
           <Button variant="outline" size="sm" onClick={refresh}>
@@ -283,24 +336,6 @@ function WorkgroupsContent({
             当前目标用于本月展示；新目标只能从后续完整自然月生效，历史版本不会被覆盖。
           </CardDescription>
           <CardAction className="flex items-center gap-2">
-            <Select
-              items={groupOptions}
-              value={groupKind}
-              onValueChange={(value) => value && setGroupKind(value)}
-            >
-              <SelectTrigger size="sm" aria-label="选择工作组">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent align="end" alignItemWithTrigger={false}>
-                <SelectGroup>
-                  {groupOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
             {canIssuePolicy && policies.data ? (
               <Button size="sm" onClick={() => setPolicyOpen(true)}>
                 <CalendarClockIcon data-icon="inline-start" />
@@ -316,41 +351,6 @@ function WorkgroupsContent({
             <ReadError error={policies.error} onRetry={refresh} />
           ) : (
             <ContributionPolicyPanel page={policies.data} />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">
-            成员资格 · {groupLabel(groupKind)}
-          </CardTitle>
-          <CardDescription>
-            资格状态按实际变更时刻生效，历史记录保留供后续核对。
-          </CardDescription>
-          {canManage ? (
-            <CardAction>
-              <Button size="sm" onClick={() => setGrantOpen(true)}>
-                <PlusIcon data-icon="inline-start" />
-                添加成员
-              </Button>
-            </CardAction>
-          ) : null}
-        </CardHeader>
-        <CardContent>
-          {memberships.isPending ? (
-            <Skeleton className="h-40 w-full" />
-          ) : memberships.isError || !memberships.data ? (
-            <ReadError error={memberships.error} onRetry={refresh} />
-          ) : (
-            <MembershipTable
-              items={memberships.data.items}
-              canManage={canManage}
-              onViewHistory={setHistoryMembership}
-              onChange={(membership, transition) =>
-                setMembershipDialog({ membership, transition })
-              }
-            />
           )}
         </CardContent>
       </Card>
