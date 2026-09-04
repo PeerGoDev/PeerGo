@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/peergo/peergo/contracts/go/settlementseedingv1"
+	"github.com/peergo/peergo/services/core/internal/contracts/auditevent"
+	"github.com/peergo/peergo/services/core/internal/modules/audit"
 	"github.com/peergo/peergo/services/core/internal/modules/economy"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/seedingreward"
 	platformpostgres "github.com/peergo/peergo/services/core/internal/platform/postgres"
@@ -40,10 +43,24 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 	// Keep every modeled business event in the past. The production apply path
 	// uses the wall clock for immutable receipt timestamps and must never accept
 	// a synthetic approval from the future.
-	createdAt := time.Now().UTC().Add(-4 * time.Hour).Truncate(time.Microsecond)
+	createdAt := time.Now().UTC().Add(-8 * time.Hour).Truncate(time.Microsecond)
 	windowStart := createdAt.Truncate(time.Hour).Add(2 * time.Hour)
 	fixtureAt := windowStart.Add(-2 * time.Hour)
 	userID, torrentIDs := insertEvidenceFixture(t, ctx, pool, fixtureAt)
+	pendingTorrentID := insertSettlementTorrent(
+		t, ctx, pool, userID, torrentIDs[0], "pending_review",
+		windowStart.Add(-30*time.Minute), nil,
+	)
+	duringWindowPublishedAt := windowStart.Add(30 * time.Minute)
+	duringWindowTorrentID := insertSettlementTorrent(
+		t, ctx, pool, userID, torrentIDs[0], "published",
+		windowStart.Add(-30*time.Minute), &duringWindowPublishedAt,
+	)
+	afterWindowPublishedAt := windowStart.Add(90 * time.Minute)
+	afterWindowTorrentID := insertSettlementTorrent(
+		t, ctx, pool, userID, torrentIDs[0], "published",
+		windowStart.Add(-30*time.Minute), &afterWindowPublishedAt,
+	)
 
 	policyRepository, err := seedingreward.NewPostgresTimelineRepository(pool)
 	if err != nil {
@@ -58,10 +75,27 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	item := settlementseedingv1.Item{
-		UserID: userID.String(), TorrentID: torrentIDs[0], ActiveSeconds: 3600,
-		RawUploadedBytes: 4096, SnapshotSeeders: 1, SnapshotLeechers: 0,
-		EvidenceSHA256: digestText("settlement-reward-item"),
+	items := []settlementseedingv1.Item{
+		{
+			UserID: userID.String(), TorrentID: torrentIDs[0], ActiveSeconds: 3600,
+			RawUploadedBytes: 4096, SnapshotSeeders: 1, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-published-before-window"),
+		},
+		{
+			UserID: userID.String(), TorrentID: pendingTorrentID, ActiveSeconds: 3600,
+			RawUploadedBytes: 4096, SnapshotSeeders: 1, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-pending-review"),
+		},
+		{
+			UserID: userID.String(), TorrentID: duringWindowTorrentID, ActiveSeconds: 1800,
+			RawUploadedBytes: 2048, SnapshotSeeders: 1, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-published-during-window"),
+		},
+		{
+			UserID: userID.String(), TorrentID: afterWindowTorrentID, ActiveSeconds: 3600,
+			RawUploadedBytes: 4096, SnapshotSeeders: 1, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-published-after-window"),
+		},
 	}
 	header := settlementseedingv1.Event{
 		SchemaVersion: settlementseedingv1.SchemaVersion,
@@ -70,7 +104,7 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 		WindowEvidenceSHA256: digestText("settlement-reward-window"),
 		SnapshotID:           mustV7(t).String(), SnapshotSequence: 10,
 		SnapshotObservedAt: windowStart.Add(55 * time.Minute),
-		ItemCount:          1, ChunkIndex: 0, ChunkCount: 1, Items: []settlementseedingv1.Item{item},
+		ItemCount:          int32(len(items)), ChunkIndex: 0, ChunkCount: 1, Items: items,
 	}
 	projectionDigest, err := settlementseedingv1.ProjectionDigest(header, header.Items)
 	if err != nil {
@@ -92,7 +126,7 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 		t.Fatal(err)
 	}
 	worker, err := seedingreward.NewWorker(settlementRepository, seedingreward.WorkerConfig{
-		Now: func() time.Time { return evidenceNow.Add(time.Minute) },
+		Now: func() time.Time { return afterWindowPublishedAt.Add(time.Minute) },
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -108,20 +142,22 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 
 	var status string
 	var reward int64
+	var eligibleTorrentCount int
 	var experience string
 	var transactionID, experienceID uuid.UUID
 	err = pool.QueryRow(ctx, `
 SELECT work.status, calculation.reward, calculation.experience_amount::text,
+       calculation.eligible_torrent_count,
        calculation.magic_transaction_id, calculation.experience_entry_id
 FROM economy.seeding_reward_work_items AS work
 JOIN economy.seeding_reward_calculations AS calculation
   ON calculation.window_start = work.window_start AND calculation.user_id = work.user_id
 WHERE work.window_start = $1 AND work.user_id = $2`, windowStart, userID).
-		Scan(&status, &reward, &experience, &transactionID, &experienceID)
-	if err != nil || status != "completed" || reward <= 0 || experience == "0" ||
+		Scan(&status, &reward, &experience, &eligibleTorrentCount, &transactionID, &experienceID)
+	if err != nil || status != "completed" || reward <= 0 || experience == "0" || eligibleTorrentCount != 2 ||
 		transactionID == uuid.Nil || experienceID == uuid.Nil {
-		t.Fatalf("settlement status=%s reward=%d experience=%s transaction=%s entry=%s error=%v",
-			status, reward, experience, transactionID, experienceID, err)
+		t.Fatalf("settlement status=%s reward=%d experience=%s eligible=%d transaction=%s entry=%s error=%v",
+			status, reward, experience, eligibleTorrentCount, transactionID, experienceID, err)
 	}
 
 	var postingCount int
@@ -144,18 +180,144 @@ WHERE transaction_id = $3`, userID, economy.SeedingMintAccountID(), transactionI
 	}
 
 	var metadataCount, benefitCount int
+	var beforeCount, pendingCount, duringCount, afterCount int
 	if err := pool.QueryRow(ctx, `
 SELECT
     (SELECT count(*) FROM economy.seeding_reward_metadata_snapshots WHERE window_start = $1),
-    (SELECT count(*) FROM economy.seeding_reward_benefit_snapshots WHERE window_start = $1 AND user_id = $2)`,
-		windowStart, userID).Scan(&metadataCount, &benefitCount); err != nil || metadataCount != 1 || benefitCount != 1 {
-		t.Fatalf("metadata=%d benefits=%d error=%v", metadataCount, benefitCount, err)
+    (SELECT count(*) FROM economy.seeding_reward_benefit_snapshots WHERE window_start = $1 AND user_id = $2),
+    count(*) FILTER (WHERE torrent_id = $3),
+    count(*) FILTER (WHERE torrent_id = $4),
+    count(*) FILTER (WHERE torrent_id = $5),
+    count(*) FILTER (WHERE torrent_id = $6)
+FROM economy.seeding_reward_metadata_snapshots
+WHERE window_start = $1`, windowStart, userID, torrentIDs[0], pendingTorrentID,
+		duringWindowTorrentID, afterWindowTorrentID).
+		Scan(&metadataCount, &benefitCount, &beforeCount, &pendingCount, &duringCount, &afterCount); err != nil ||
+		metadataCount != 2 || benefitCount != 1 || beforeCount != 1 || pendingCount != 0 || duringCount != 1 || afterCount != 0 {
+		t.Fatalf("metadata=%d benefits=%d before=%d pending=%d during=%d after=%d error=%v",
+			metadataCount, benefitCount, beforeCount, pendingCount, duringCount, afterCount, err)
 	}
 	if _, err := pool.Exec(ctx, `
 UPDATE economy.seeding_reward_benefit_snapshots
 SET vip_active = NOT vip_active
 WHERE window_start = $1 AND user_id = $2`, windowStart, userID); err == nil {
 		t.Fatal("immutable benefit snapshot unexpectedly accepted update")
+	}
+
+	// Uploaders are allowed to seed a torrent while it is under review. If an
+	// entire evidence hour predates publication, settlement must record a zero
+	// result and advance the per-user queue instead of creating a dead letter.
+	deferredWindowStart := windowStart.Add(2 * time.Hour)
+	deferredPublishedAt := deferredWindowStart.Add(90 * time.Minute)
+	deferredTorrentID := insertSettlementTorrent(
+		t, ctx, pool, userID, torrentIDs[0], "published",
+		deferredWindowStart.Add(-30*time.Minute), &deferredPublishedAt,
+	)
+	deferredHeader := settlementseedingv1.Event{
+		SchemaVersion: settlementseedingv1.SchemaVersion,
+		EventID:       mustV7(t).String(), WindowStart: deferredWindowStart, WindowEnd: deferredWindowStart.Add(time.Hour),
+		BuiltAt:              deferredWindowStart.Add(time.Hour + 2*time.Minute),
+		WindowEvidenceSHA256: digestText("settlement-reward-all-prepublication-window"),
+		SnapshotID:           mustV7(t).String(), SnapshotSequence: 11,
+		SnapshotObservedAt: deferredWindowStart.Add(55 * time.Minute),
+		ItemCount:          1, ChunkIndex: 0, ChunkCount: 1,
+		Items: []settlementseedingv1.Item{{
+			UserID: userID.String(), TorrentID: deferredTorrentID, ActiveSeconds: 900,
+			RawUploadedBytes: 0, SnapshotSeeders: 2, SnapshotLeechers: 0,
+			EvidenceSHA256: digestText("settlement-reward-all-prepublication-item"),
+		}},
+	}
+	deferredDigest, err := settlementseedingv1.ProjectionDigest(deferredHeader, deferredHeader.Items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deferredHeader.ProjectionSHA256 = settlementseedingv1.DigestHex(deferredDigest)
+	deferredEvidenceNow := deferredWindowStart.Add(time.Hour + 3*time.Minute)
+	deferredEvidenceRepository, err := seedingreward.NewPostgresEvidenceRepository(
+		pool, func() time.Time { return deferredEvidenceNow }, 2*time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deferredApplied, err := deferredEvidenceRepository.ApplyEvidence(
+		ctx, encodeEvidence(t, deferredHeader), deferredHeader.BuiltAt,
+	)
+	if err != nil || !deferredApplied.Complete {
+		t.Fatalf("ApplyEvidence(prepublication) = %+v, %v", deferredApplied, err)
+	}
+	if commandTag, err := pool.Exec(ctx, `
+UPDATE economy.seeding_reward_work_items
+SET status = 'dead', attempts = 10, available_at = $3,
+    last_error_code = 'invariant_failed', last_error_at = $3, updated_at = $3
+WHERE window_start = $1 AND user_id = $2 AND status = 'pending'`,
+		deferredWindowStart, userID, deferredEvidenceNow); err != nil || commandTag.RowsAffected() != 1 {
+		t.Fatalf("prepare dead prepublication work rows=%d error=%v", commandTag.RowsAffected(), err)
+	}
+	retryBuilder, err := audit.NewSeedingRewardRetryEventBuilder(audit.RecorderConfig{
+		PseudonymKey: []byte("settlement-retry-test-key-32-bytes"), PseudonymKeyEpoch: "test-retry-v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryRepository, err := seedingreward.NewPostgresDeadWorkRetryRepository(
+		pool, retryBuilder,
+		func(tx pgx.Tx) auditevent.Appender { return audit.NewPostgresRepository(tx) },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryID := uuid.New()
+	retryReason := "修复发布前做种产生零可奖励窗口后的结算误判。"
+	retryResult, err := retryRepository.RequeueDead(ctx, seedingreward.DeadWorkRetryCommand{
+		ID: retryID, WindowStart: deferredWindowStart, UserID: userID,
+		ExpectedAttempts: 10, ExpectedErrorCode: "invariant_failed",
+		OperatorReference: "integration:prepublication-zero-reward", Reason: retryReason,
+		OccurredAt: deferredEvidenceNow.Add(time.Minute),
+	})
+	if err != nil || retryResult.RetryID != retryID || retryResult.PreviousAttempts != 10 {
+		t.Fatalf("RequeueDead() = %+v, %v", retryResult, err)
+	}
+	var retryAuditPayload string
+	if err := pool.QueryRow(ctx, `
+SELECT payload_json
+FROM audit.outbox
+WHERE event_type = $1 AND payload_json::jsonb ->> 'retry_id' = $2`,
+		audit.SeedingRewardRetryEventType, retryID.String()).Scan(&retryAuditPayload); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(retryAuditPayload, userID.String()) || strings.Contains(retryAuditPayload, retryReason) {
+		t.Fatalf("retry audit leaked target or reason: %s", retryAuditPayload)
+	}
+	deferredWorker, err := seedingreward.NewWorker(settlementRepository, seedingreward.WorkerConfig{
+		Now: func() time.Time { return deferredPublishedAt.Add(time.Minute) },
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if processed, err := deferredWorker.RunOnce(ctx); err != nil || processed != 1 {
+		t.Fatalf("RunOnce(prepublication) processed=%d error=%v", processed, err)
+	}
+	var deferredStatus string
+	var deferredReward int64
+	var deferredEligible, deferredMetadata, deferredBenefits int
+	var deferredMagicNull, deferredExperienceNull bool
+	if err := pool.QueryRow(ctx, `
+SELECT work.status, calculation.reward, calculation.eligible_torrent_count,
+       calculation.magic_transaction_id IS NULL,
+       calculation.experience_entry_id IS NULL,
+       (SELECT count(*) FROM economy.seeding_reward_metadata_snapshots WHERE window_start = $1),
+       (SELECT count(*) FROM economy.seeding_reward_benefit_snapshots WHERE window_start = $1 AND user_id = $2)
+FROM economy.seeding_reward_work_items AS work
+JOIN economy.seeding_reward_calculations AS calculation
+  ON calculation.window_start = work.window_start AND calculation.user_id = work.user_id
+WHERE work.window_start = $1 AND work.user_id = $2`, deferredWindowStart, userID).Scan(
+		&deferredStatus, &deferredReward, &deferredEligible,
+		&deferredMagicNull, &deferredExperienceNull, &deferredMetadata, &deferredBenefits,
+	); err != nil || deferredStatus != "completed" || deferredReward != 0 || deferredEligible != 0 ||
+		!deferredMagicNull || !deferredExperienceNull || deferredMetadata != 0 || deferredBenefits != 1 {
+		t.Fatalf("prepublication settlement status=%s reward=%d eligible=%d magic_null=%t experience_null=%t metadata=%d benefits=%d error=%v",
+			deferredStatus, deferredReward, deferredEligible, deferredMagicNull,
+			deferredExperienceNull, deferredMetadata, deferredBenefits, err)
 	}
 
 	var originalCalculation []byte
@@ -237,6 +399,63 @@ SET magic_delta = magic_delta + 1
 WHERE source_reference = $1`, correctionSource); err == nil {
 		t.Fatal("immutable compensation receipt unexpectedly accepted update")
 	}
+}
+
+func insertSettlementTorrent(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	uploaderID uuid.UUID,
+	referenceTorrentID int64,
+	state string,
+	submittedAt time.Time,
+	publishedAt *time.Time,
+) int64 {
+	t.Helper()
+	if (state == "published") != (publishedAt != nil) {
+		t.Fatalf("state=%q published_at=%v is inconsistent", state, publishedAt)
+	}
+	var categoryID string
+	if err := pool.QueryRow(ctx, `
+SELECT category_id
+FROM torrents.torrents
+WHERE id = $1`, referenceTorrentID).Scan(&categoryID); err != nil {
+		t.Fatal(err)
+	}
+	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
+	objectID := uuid.New()
+	objectDigest := sha256.Sum256([]byte("settlement-object-" + suffix))
+	infoDigest := sha256.Sum256([]byte("settlement-info-" + suffix))
+	if _, err := pool.Exec(ctx, `
+INSERT INTO torrents.torrent_objects (
+    id, content_sha256, byte_length, parser_version, validation_profile,
+    compatibility_flags, info_offset, info_length, created_at
+) VALUES ($1, $2, 256, 'integration-v1', 'strict_upload', ARRAY[]::text[], 0, 128, $3)`,
+		objectID, objectDigest[:], submittedAt); err != nil {
+		t.Fatal(err)
+	}
+	version := int64(1)
+	stateChangedAt := submittedAt
+	if publishedAt != nil {
+		version = 2
+		stateChangedAt = *publishedAt
+	}
+	var torrentID int64
+	if err := pool.QueryRow(ctx, `
+INSERT INTO torrents.torrents (
+    uploader_id, category_id, object_id, info_hash_v1,
+    content_name, title, subtitle, total_size_bytes, payload_size_bytes,
+    file_count, padding_file_count, piece_length_bytes, piece_count,
+    state, version, submitted_at, published_at, state_changed_at, updated_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, '', 4096, 4096,
+    1, 0, 16384, 1, $7, $8, $9, $10, $11, $11
+) RETURNING id`, uploaderID, categoryID, objectID, infoDigest[:20],
+		"settlement-"+suffix+".bin", "Settlement "+suffix, state, version,
+		submittedAt, publishedAt, stateChangedAt).Scan(&torrentID); err != nil {
+		t.Fatal(err)
+	}
+	return torrentID
 }
 
 func integrationRewardPolicy(effectiveAt time.Time, revision string) seedingreward.PolicyRevision {

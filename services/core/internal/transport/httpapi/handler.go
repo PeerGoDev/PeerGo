@@ -29,6 +29,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/newcomer"
 	"github.com/peergo/peergo/services/core/internal/modules/notifications"
 	"github.com/peergo/peergo/services/core/internal/modules/operations"
+	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 	"github.com/peergo/peergo/services/core/internal/modules/progression"
 	"github.com/peergo/peergo/services/core/internal/modules/promotions"
 	"github.com/peergo/peergo/services/core/internal/modules/ratiowatch"
@@ -149,6 +150,7 @@ type CategoryAdministrationService interface {
 	List(context.Context, authz.StaffActor) ([]catalog.ManagedCategory, error)
 	Create(context.Context, authz.StaffActor, catalog.CreateCategoryInput) (catalog.ManagedCategory, error)
 	Update(context.Context, authz.StaffActor, catalog.UpdateCategoryInput) (catalog.ManagedCategory, error)
+	UpsertFacet(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetInput) (catalog.ManagedCategoryFacet, error)
 	UpsertFacetOption(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetOptionInput) (catalog.ManagedCategoryFacetOption, error)
 }
 
@@ -199,21 +201,27 @@ type RSSService interface {
 	UpdateSettings(context.Context, authz.StaffActor, rss.UpdateSettingsInput) (rss.Settings, error)
 }
 
-// MoviePilotService owns both ordinary-session credential lifecycle and the
-// separately authenticated compatibility projection consumed by MoviePilot.
-// Keeping one typed interface prevents the transport from learning hashes,
-// signing keys or persistence details.
+// PersonalAPIKeyService owns the shared user credential used by external
+// adapters. Raw keys cross this boundary only once, when created or rotated.
+type PersonalAPIKeyService interface {
+	Status(context.Context, string) (personalapikey.Status, error)
+	Rotate(context.Context, string, string, *int64, []personalapikey.Scope) (personalapikey.IssuedCredential, error)
+	Revoke(context.Context, string, string, int64) error
+	Authenticate(context.Context, string) (personalapikey.AuthenticatedCredential, error)
+}
+
+// MoviePilotService is the canonical compatibility projection shared by
+// MoviePilot and PT-depiler. It consumes an already authenticated personal key
+// and owns no key rows.
 type MoviePilotService interface {
-	CredentialStatus(context.Context, string) (moviepilot.CredentialStatus, error)
-	RotateCredential(context.Context, string, string, *int64) (moviepilot.IssuedCredential, error)
-	RevokeCredential(context.Context, string, string, int64) error
-	Authenticate(context.Context, string) (moviepilot.AuthenticatedCredential, error)
-	Profile(context.Context, moviepilot.AuthenticatedCredential) (moviepilot.Profile, error)
-	ListTorrents(context.Context, moviepilot.AuthenticatedCredential, int, int, string, string) (moviepilot.TorrentPage, error)
-	Torrent(context.Context, moviepilot.AuthenticatedCredential, int64) (moviepilot.TorrentDownloadDescriptor, error)
+	Profile(context.Context, personalapikey.AuthenticatedCredential) (moviepilot.Profile, error)
+	SeedingReward(context.Context, personalapikey.AuthenticatedCredential) (int64, error)
+	ListTorrents(context.Context, personalapikey.AuthenticatedCredential, int, int, string, string) (moviepilot.TorrentPage, error)
+	Torrent(context.Context, personalapikey.AuthenticatedCredential, int64) (moviepilot.TorrentDownloadDescriptor, error)
 	Download(context.Context, int64, string) (torrents.TorrentDownloadResult, error)
-	AttendanceOverview(context.Context, moviepilot.AuthenticatedCredential) (attendance.Overview, error)
-	ClaimAttendance(context.Context, moviepilot.AuthenticatedCredential, attendance.Mode) (attendance.Record, error)
+	DownloadWithCredential(context.Context, personalapikey.AuthenticatedCredential, string) (torrents.TorrentDownloadResult, error)
+	AttendanceOverview(context.Context, personalapikey.AuthenticatedCredential) (attendance.Overview, error)
+	ClaimAttendance(context.Context, personalapikey.AuthenticatedCredential, attendance.Mode) (attendance.Record, error)
 }
 
 // UserAdministrationService exposes the authorized operational projection and
@@ -223,8 +231,11 @@ type MoviePilotService interface {
 type UserAdministrationService interface {
 	List(context.Context, authz.StaffActor, identity.ListManagedUsersInput) (identity.ManagedUserPage, error)
 	Get(context.Context, authz.StaffActor, uuid.UUID) (identity.ManagedUserDetail, error)
+	Adjust(context.Context, authz.StaffActor, identity.ManagedUserAdjustmentInput) (identity.ManagedUserDetail, error)
+	NetworkHistory(context.Context, authz.StaffActor, uuid.UUID) (identity.ManagedUserNetworkHistory, error)
 	CreateRestriction(context.Context, authz.StaffActor, identity.CreateAccountRestrictionInput) (identity.ManagedUserDetail, error)
 	RevokeRestriction(context.Context, authz.StaffActor, identity.RevokeAccountRestrictionInput) (identity.ManagedUserDetail, error)
+	Reactivate(context.Context, authz.StaffActor, identity.ReactivateManagedUserInput) (identity.ManagedUserDetail, error)
 	CreateManualDownloadRestriction(context.Context, authz.StaffActor, identity.CreateManualDownloadRestrictionInput) (identity.ManagedUserDetail, error)
 	UpdateManualDownloadRestriction(context.Context, authz.StaffActor, identity.UpdateManualDownloadRestrictionInput) (identity.ManagedUserDetail, error)
 	RevokeManualDownloadRestriction(context.Context, authz.StaffActor, identity.RevokeManualDownloadRestrictionInput) (identity.ManagedUserDetail, error)
@@ -342,6 +353,7 @@ type NewcomerAdministrationService interface {
 	Policies(context.Context, authz.StaffActor, int, int) (newcomer.PolicyPage, error)
 	Issue(context.Context, authz.StaffActor, newcomer.IssueInput) (newcomer.PolicyRevision, error)
 	Assessments(context.Context, authz.StaffActor, newcomer.AssessmentQuery) (newcomer.AssessmentPage, error)
+	Assign(context.Context, authz.StaffActor, newcomer.AssignInput) (newcomer.Assessment, error)
 	Exempt(context.Context, authz.StaffActor, newcomer.ExemptInput) (newcomer.Assessment, error)
 }
 
@@ -394,7 +406,7 @@ type TorrentBookmarkService interface {
 type CommentService interface {
 	ListTorrentComments(context.Context, int64, int, int) (social.CommentPage, error)
 	ListAnnouncementComments(context.Context, string, int, int) (social.CommentPage, error)
-	ListPostComments(context.Context, uuid.UUID, int, int) (social.CommentPage, error)
+	ListPostComments(context.Context, uuid.UUID, social.CommentThreadSort, int, int) (social.CommentThreadPage, error)
 	CreateTorrentComment(context.Context, string, string, social.CreateTorrentCommentInput) (social.Comment, error)
 	CreateAnnouncementComment(context.Context, string, string, social.CreateAnnouncementCommentInput) (social.Comment, error)
 	CreatePostComment(context.Context, string, string, social.CreatePostCommentInput) (social.Comment, error)
@@ -505,6 +517,7 @@ type Handler struct {
 	torrentResubmission         TorrentResubmissionService
 	torrentMaintenance          TorrentMaintenanceService
 	promotionAdministration     PromotionAdministrationService
+	personalAPIKeys             PersonalAPIKeyService
 	moviePilot                  MoviePilotService
 	rss                         RSSService
 	sessionCookie               SessionCookieConfig
@@ -512,7 +525,7 @@ type Handler struct {
 }
 
 // NewHandler creates the Core HTTP adapter.
-func NewHandler(catalogService *catalog.Service, identityService IdentityService, registrationService RegistrationService, humanVerificationService identity.HumanVerificationVerifier, invitationService InvitationService, emailVerificationService EmailVerificationService, passwordRecoveryService PasswordRecoveryService, sessionSecurityService SessionSecurityService, twoFactorService TwoFactorService, staffIdentityService StaffIdentityService, staffEnrollmentService StaffEnrollmentService, authorizationService AuthorizationService, grantAdministrationService GrantAdministrationService, categoryAdministrationService CategoryAdministrationService, announcementAdministrationService AnnouncementAdministrationService, wikiService WikiService, siteDisplaySettingsService SiteDisplaySettingsService, userAdministrationService UserAdministrationService, notificationService NotificationService, trafficOverviewService TrafficOverviewService, economyOverviewService EconomyOverviewService, attendanceService AttendanceService, memberGiftService MemberGiftService, contentTipService ContentTipService, workgroupService WorkgroupService, seedingRewardAdministrationService SeedingRewardAdministrationService, levelPolicyAdministrationService LevelPolicyAdministrationService, contributionExperiencePolicyService ContributionExperiencePolicyService, medalAdministrationService MedalAdministrationService, memberMedalService MemberMedalService, hnrPolicyAdministrationService HNRPolicyAdministrationService, ratioWatchAdministrationService RatioWatchAdministrationService, newcomerAdministrationService NewcomerAdministrationService, operationsService OperationsService, torrentBookmarkService TorrentBookmarkService, commentService CommentService, socialPostService SocialPostService, commentModerationService CommentModerationService, torrentReadService TorrentReadService, torrentUploadService TorrentUploadService, torrentDownloadService TorrentDownloadService, torrentReviewService TorrentReviewService, torrentResubmissionService TorrentResubmissionService, torrentMaintenanceService TorrentMaintenanceService, promotionAdministrationService PromotionAdministrationService, moviePilotService MoviePilotService, rssService RSSService, sessionCookie, staffSessionCookie SessionCookieConfig) *Handler {
+func NewHandler(catalogService *catalog.Service, identityService IdentityService, registrationService RegistrationService, humanVerificationService identity.HumanVerificationVerifier, invitationService InvitationService, emailVerificationService EmailVerificationService, passwordRecoveryService PasswordRecoveryService, sessionSecurityService SessionSecurityService, twoFactorService TwoFactorService, staffIdentityService StaffIdentityService, staffEnrollmentService StaffEnrollmentService, authorizationService AuthorizationService, grantAdministrationService GrantAdministrationService, categoryAdministrationService CategoryAdministrationService, announcementAdministrationService AnnouncementAdministrationService, wikiService WikiService, siteDisplaySettingsService SiteDisplaySettingsService, userAdministrationService UserAdministrationService, notificationService NotificationService, trafficOverviewService TrafficOverviewService, economyOverviewService EconomyOverviewService, attendanceService AttendanceService, memberGiftService MemberGiftService, contentTipService ContentTipService, workgroupService WorkgroupService, seedingRewardAdministrationService SeedingRewardAdministrationService, levelPolicyAdministrationService LevelPolicyAdministrationService, contributionExperiencePolicyService ContributionExperiencePolicyService, medalAdministrationService MedalAdministrationService, memberMedalService MemberMedalService, hnrPolicyAdministrationService HNRPolicyAdministrationService, ratioWatchAdministrationService RatioWatchAdministrationService, newcomerAdministrationService NewcomerAdministrationService, operationsService OperationsService, torrentBookmarkService TorrentBookmarkService, commentService CommentService, socialPostService SocialPostService, commentModerationService CommentModerationService, torrentReadService TorrentReadService, torrentUploadService TorrentUploadService, torrentDownloadService TorrentDownloadService, torrentReviewService TorrentReviewService, torrentResubmissionService TorrentResubmissionService, torrentMaintenanceService TorrentMaintenanceService, promotionAdministrationService PromotionAdministrationService, personalAPIKeyService PersonalAPIKeyService, moviePilotService MoviePilotService, rssService RSSService, sessionCookie, staffSessionCookie SessionCookieConfig) *Handler {
 	return &Handler{
 		catalog:                     catalogService,
 		identity:                    identityService,
@@ -559,6 +572,7 @@ func NewHandler(catalogService *catalog.Service, identityService IdentityService
 		torrentResubmission:         torrentResubmissionService,
 		torrentMaintenance:          torrentMaintenanceService,
 		promotionAdministration:     promotionAdministrationService,
+		personalAPIKeys:             personalAPIKeyService,
 		moviePilot:                  moviePilotService,
 		rss:                         rssService,
 		sessionCookie:               sessionCookie,
@@ -1082,6 +1096,107 @@ func (h *Handler) GetManagedUser(ctx context.Context, request generated.GetManag
 	return generated.GetManagedUser200JSONResponse(managedUserDetailDTO(result)), nil
 }
 
+func (h *Handler) AdjustManagedUserData(ctx context.Context, request generated.AdjustManagedUserDataRequestObject) (generated.AdjustManagedUserDataResponseObject, error) {
+	if request.Body == nil {
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_adjustment", "用户数据变更无效", "请检查字段、方向、数值和账户版本。")
+		return generated.AdjustManagedUserData400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	}
+	session, authenticationProblem, err := h.authenticateStaffWrite(ctx, request.Params.XCSRFToken)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.AdjustManagedUserData401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.AdjustManagedUserData403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	reason := ""
+	if request.Body.Reason != nil {
+		reason = *request.Body.Reason
+	}
+	result, err := h.userAdministration.Adjust(ctx, staffActor(session), identity.ManagedUserAdjustmentInput{
+		AdjustmentID:        request.Params.IdempotencyKey,
+		UserID:              request.UserId,
+		Field:               identity.ManagedUserAdjustmentField(request.Body.Field),
+		Operation:           identity.ManagedUserAdjustmentOperation(request.Body.Operation),
+		Amount:              request.Body.Amount,
+		Reason:              reason,
+		ExpectedUserVersion: request.Body.ExpectedUserVersion,
+	})
+	switch {
+	case errors.Is(err, identity.ErrUserAdministrationInput):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_adjustment", "用户数据变更无效", "流量、魔力值和邀请必须是整数；捐赠最多两位小数，经验最多二十位小数。")
+		return generated.AdjustManagedUserData400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, authz.ErrForbidden), errors.Is(err, identity.ErrAccountRestrictionSelfTarget):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "user_adjustment_denied", "无法变更用户数据", "当前后台身份没有 user.account.adjust，或不能调整自己的数据。")
+		return generated.AdjustManagedUserData403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "managed_user_not_found", "账户不存在", "目标账户不存在或已被移除。")
+		return generated.AdjustManagedUserData404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserVersionConflict),
+		errors.Is(err, identity.ErrManagedUserAdjustmentConflict),
+		errors.Is(err, identity.ErrManagedUserAdjustmentInsufficient):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "user_adjustment_conflict", "用户数据已经变化", "余额不足、数值超出范围或账户版本已更新；请刷新详情后重试。")
+		return generated.AdjustManagedUserData409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserDataUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "user_adjustment_unavailable", "用户数据管理暂时不可用", "请稍后重试；本次变更没有提交。")
+		return generated.AdjustManagedUserDatadefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.AdjustManagedUserData200JSONResponse(managedUserDetailDTO(result)), nil
+}
+
+func (h *Handler) GetManagedUserNetworkHistory(ctx context.Context, request generated.GetManagedUserNetworkHistoryRequestObject) (generated.GetManagedUserNetworkHistoryResponseObject, error) {
+	session, authenticationProblem, err := h.authenticateStaffRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.GetManagedUserNetworkHistory401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.GetManagedUserNetworkHistory403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	result, err := h.userAdministration.NetworkHistory(ctx, staffActor(session), request.UserId)
+	switch {
+	case errors.Is(err, identity.ErrUserAdministrationInput):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_id", "账户标识无效", "请使用有效的账户 UUID。")
+		return generated.GetManagedUserNetworkHistory400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, authz.ErrForbidden):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "user_network_read_denied", "无法查看 IP 历史", "当前后台身份没有 user.network.read。")
+		return generated.GetManagedUserNetworkHistory403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "managed_user_not_found", "账户不存在", "目标账户不存在或已被移除。")
+		return generated.GetManagedUserNetworkHistory404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserDataUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "user_network_history_unavailable", "IP 历史暂时不可用", "请稍后重试；账户登录与其他管理功能不受影响。")
+		return generated.GetManagedUserNetworkHistorydefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	items := make([]generated.ManagedUserNetworkObservation, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, generated.ManagedUserNetworkObservation{
+			Address:          item.Address,
+			FirstSeenAt:      item.FirstSeenAt,
+			LastSeenAt:       item.LastSeenAt,
+			SeenCount:        item.SeenCount,
+			RelatedUserCount: item.RelatedUserCount,
+		})
+	}
+	return generated.GetManagedUserNetworkHistory200JSONResponse{
+		Items: items, RetentionDays: result.RetentionDays, MaximumItems: result.MaximumItems,
+	}, nil
+}
+
 // CreateManagedUserAccountRestriction requires the staff CSRF token before the
 // owning use case performs typed authorization. Its expected user version is
 // checked under row lock; a successful command also invalidates live sessions.
@@ -1181,6 +1296,49 @@ func (h *Handler) RevokeManagedUserAccountRestriction(ctx context.Context, reque
 		return nil, err
 	}
 	return generated.RevokeManagedUserAccountRestriction200JSONResponse(managedUserDetailDTO(result)), nil
+}
+
+func (h *Handler) ReactivateManagedUser(ctx context.Context, request generated.ReactivateManagedUserRequestObject) (generated.ReactivateManagedUserResponseObject, error) {
+	if request.Body == nil {
+		return managedUserReactivationBadRequest(ctx), nil
+	}
+	session, authenticationProblem, err := h.authenticateStaffWrite(ctx, request.Params.XCSRFToken)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.ReactivateManagedUser401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.ReactivateManagedUser403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	reason := ""
+	if request.Body.Reason != nil {
+		reason = *request.Body.Reason
+	}
+	result, err := h.userAdministration.Reactivate(ctx, staffActor(session), identity.ReactivateManagedUserInput{
+		ReactivationID: request.Params.IdempotencyKey, UserID: request.UserId,
+		Reason: reason, ExpectedUserVersion: request.Body.ExpectedUserVersion,
+	})
+	switch {
+	case errors.Is(err, identity.ErrUserAdministrationInput):
+		return managedUserReactivationBadRequest(ctx), nil
+	case errors.Is(err, authz.ErrForbidden), errors.Is(err, identity.ErrAccountRestrictionSelfTarget):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "user_reactivation_denied", "无法解除账户封禁", "当前后台身份无权解封该账户。")
+		return generated.ReactivateManagedUser403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "managed_user_not_found", "账户不存在", "目标账户不存在或已被移除。")
+		return generated.ReactivateManagedUser404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserNotDisabled), errors.Is(err, identity.ErrManagedUserVersionConflict):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "managed_user_reactivation_conflict", "账户状态已变化", "该账户已不是封禁状态，或账户版本已经变化；请刷新详情后重试。")
+		return generated.ReactivateManagedUser409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrManagedUserCredentialUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "managed_user_credential_unavailable", "暂时无法恢复登录凭据", "隐私凭据服务暂时不可用，账户仍保持封禁；请稍后重试。")
+		return generated.ReactivateManagedUserdefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.ReactivateManagedUser200JSONResponse(managedUserDetailDTO(result)), nil
 }
 
 func (h *Handler) CreateManagedUserManualDownloadRestriction(ctx context.Context, request generated.CreateManagedUserManualDownloadRestrictionRequestObject) (generated.CreateManagedUserManualDownloadRestrictionResponseObject, error) {
@@ -1434,6 +1592,13 @@ func isAccountRestrictionConflict(err error) bool {
 		errors.Is(err, identity.ErrAccountRestrictionNotActive) ||
 		errors.Is(err, identity.ErrAccountRestrictionVersionConflict) ||
 		errors.Is(err, identity.ErrAccountRestrictionSelfTarget)
+}
+
+func managedUserReactivationBadRequest(ctx context.Context) generated.ReactivateManagedUser400ApplicationProblemPlusJSONResponse {
+	problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_managed_user_reactivation", "解封参数无效", "请刷新账户版本后重试；原因可留空，由系统自动记录。")
+	return generated.ReactivateManagedUser400ApplicationProblemPlusJSONResponse{
+		ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+	}
 }
 
 func accountRestrictionConflict(err error) (string, string, string) {
@@ -2196,6 +2361,59 @@ func (h *Handler) UpdateManagedCategory(ctx context.Context, request generated.U
 	return generated.UpdateManagedCategory200JSONResponse(managedCategoryDTO(result)), nil
 }
 
+// UpsertManagedCategoryFacet restores the missing PtYes category-attribute
+// administration surface. Stable IDs and selection modes become immutable
+// after creation; category-local label, requirement, order and availability
+// remain editable with optimistic concurrency.
+func (h *Handler) UpsertManagedCategoryFacet(ctx context.Context, request generated.UpsertManagedCategoryFacetRequestObject) (generated.UpsertManagedCategoryFacetResponseObject, error) {
+	if request.Body == nil {
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_category_facet", "分类属性无效", "请检查名称、选择模式、必填规则、排序、状态和版本。")
+		return generated.UpsertManagedCategoryFacet400ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	}
+	session, authenticationProblem, err := h.authenticateStaffWrite(ctx, request.Params.XCSRFToken)
+	if err != nil {
+		return nil, err
+	}
+	if authenticationProblem != nil {
+		if authenticationProblem.Status == http.StatusUnauthorized {
+			return generated.UpsertManagedCategoryFacet401ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+		}
+		return generated.UpsertManagedCategoryFacet403ApplicationProblemPlusJSONResponse(*authenticationProblem), nil
+	}
+	requirementGroup := ""
+	if request.Body.RequirementGroup != nil {
+		requirementGroup = *request.Body.RequirementGroup
+	}
+	result, err := h.categoryAdministration.UpsertFacet(ctx, staffActor(session), catalog.UpsertCategoryFacetInput{
+		CategoryID: string(request.CategoryId), FacetID: request.FacetId,
+		Name: request.Body.Name, SelectionMode: catalog.FacetSelectionMode(request.Body.SelectionMode),
+		Required: request.Body.Required, RequirementGroup: requirementGroup,
+		DisplayOrder: request.Body.DisplayOrder, Enabled: request.Body.Enabled,
+		ExpectedVersion: request.Body.ExpectedVersion, Reason: request.Body.Reason,
+	})
+	if err != nil {
+		problem, handled := categoryAdministrationProblem(ctx, err)
+		if !handled {
+			return nil, err
+		}
+		switch problem.Status {
+		case http.StatusBadRequest:
+			return generated.UpsertManagedCategoryFacet400ApplicationProblemPlusJSONResponse{
+				ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+			}, nil
+		case http.StatusForbidden:
+			return generated.UpsertManagedCategoryFacet403ApplicationProblemPlusJSONResponse(problem), nil
+		case http.StatusNotFound:
+			return generated.UpsertManagedCategoryFacet404ApplicationProblemPlusJSONResponse(problem), nil
+		default:
+			return generated.UpsertManagedCategoryFacet409ApplicationProblemPlusJSONResponse(problem), nil
+		}
+	}
+	return generated.UpsertManagedCategoryFacet200JSONResponse(managedCategoryFacetDTO(result)), nil
+}
+
 // UpsertManagedCategoryFacetOption restores PtYes-style category attribute
 // option management without duplicating the public upload vocabulary.
 func (h *Handler) UpsertManagedCategoryFacetOption(ctx context.Context, request generated.UpsertManagedCategoryFacetOptionRequestObject) (generated.UpsertManagedCategoryFacetOptionResponseObject, error) {
@@ -2255,6 +2473,14 @@ func categoryAdministrationProblem(ctx context.Context, err error) (generated.Pr
 		return newProblemFromContext(ctx, http.StatusConflict, "category_version_conflict", "分类版本已经变化", "当前编辑基于旧版本，请重新载入后再提交。"), true
 	case errors.Is(err, catalog.ErrCategoryFacetNotFound):
 		return newProblemFromContext(ctx, http.StatusNotFound, "category_facet_not_found", "分类属性不存在", "目标分类没有这个属性，请刷新列表。"), true
+	case errors.Is(err, catalog.ErrCategoryFacetAlreadyExists):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_facet_exists", "分类属性已经存在", "相同稳定标识已经绑定到这个分类。"), true
+	case errors.Is(err, catalog.ErrCategoryFacetUnavailable):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_facet_unavailable", "分类属性不可用", "同名规范属性已停用，或创建后不能再改变单选/多选模式。"), true
+	case errors.Is(err, catalog.ErrCategoryFacetVersionConflict):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_facet_version_conflict", "分类属性版本已经变化", "当前编辑基于旧版本，请刷新后再提交。"), true
+	case errors.Is(err, catalog.ErrCategoryFacetLimitReached):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_facet_limit_reached", "分类属性数量已达上限", "每个分类最多配置 20 个发种属性，请停用或复用已有属性。"), true
 	case errors.Is(err, catalog.ErrCategoryOptionNotFound):
 		return newProblemFromContext(ctx, http.StatusNotFound, "category_option_not_found", "类型选项不存在", "目标选项已经不存在，请刷新列表。"), true
 	case errors.Is(err, catalog.ErrCategoryOptionAlreadyExists):
@@ -2263,6 +2489,8 @@ func categoryAdministrationProblem(ctx context.Context, err error) (generated.Pr
 		return newProblemFromContext(ctx, http.StatusConflict, "category_option_unavailable", "类型选项不可用", "同名全局选项已停用或属性模式不一致。"), true
 	case errors.Is(err, catalog.ErrCategoryOptionVersionConflict):
 		return newProblemFromContext(ctx, http.StatusConflict, "category_option_version_conflict", "类型选项版本已经变化", "当前编辑基于旧版本，请刷新后再提交。"), true
+	case errors.Is(err, catalog.ErrCategoryOptionLimitReached):
+		return newProblemFromContext(ctx, http.StatusConflict, "category_option_limit_reached", "类型选项数量已达上限", "每个分类属性最多配置 200 个选项，请复用或停用已有选项。"), true
 	default:
 		return generated.Problem{}, false
 	}
@@ -2376,6 +2604,7 @@ func (h *Handler) CreateWebSession(ctx context.Context, request generated.Create
 		Password:         *request.Body.Password,
 		SecondFactorCode: secondFactorCode,
 		RememberMe:       request.Body.RememberMe,
+		ClientAddress:    clientAddressFromContext(ctx),
 	})
 	if errors.Is(err, identity.ErrInvalidInput) {
 		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_login", "登录信息无效", "请检查输入长度和验证码格式。")
@@ -3322,24 +3551,30 @@ func hnrPageDTO(result traffic.HNRPage) (generated.HNRPage, error) {
 func managedCategoryDTO(category catalog.ManagedCategory) generated.ManagedCategory {
 	facets := make([]generated.ManagedCategoryFacet, 0, len(category.Facets))
 	for _, facet := range category.Facets {
-		options := make([]generated.ManagedCategoryFacetOption, 0, len(facet.Options))
-		for _, option := range facet.Options {
-			options = append(options, managedCategoryFacetOptionDTO(option))
-		}
-		item := generated.ManagedCategoryFacet{
-			Id: facet.ID, Name: facet.Name, SelectionMode: generated.CategoryFacetSelectionMode(facet.SelectionMode),
-			Required: facet.Required, DisplayOrder: facet.DisplayOrder, Options: options,
-		}
-		if facet.RequirementGroup != "" {
-			item.RequirementGroup = &facet.RequirementGroup
-		}
-		facets = append(facets, item)
+		facets = append(facets, managedCategoryFacetDTO(facet))
 	}
 	return generated.ManagedCategory{
 		Id: category.ID, Name: category.Name, DisplayOrder: category.DisplayOrder,
 		Enabled: category.Enabled, Version: category.Version, TorrentCount: category.TorrentCount,
 		CreatedAt: category.CreatedAt, UpdatedAt: category.UpdatedAt, Facets: facets,
 	}
+}
+
+func managedCategoryFacetDTO(facet catalog.ManagedCategoryFacet) generated.ManagedCategoryFacet {
+	options := make([]generated.ManagedCategoryFacetOption, 0, len(facet.Options))
+	for _, option := range facet.Options {
+		options = append(options, managedCategoryFacetOptionDTO(option))
+	}
+	result := generated.ManagedCategoryFacet{
+		Id: facet.ID, Name: facet.Name, SelectionMode: generated.CategoryFacetSelectionMode(facet.SelectionMode),
+		Required: facet.Required, DisplayOrder: facet.DisplayOrder, Enabled: facet.Enabled,
+		Version: facet.Version, TorrentCount: facet.TorrentCount,
+		CreatedAt: facet.CreatedAt, UpdatedAt: facet.UpdatedAt, Options: options,
+	}
+	if facet.RequirementGroup != "" {
+		result.RequirementGroup = &facet.RequirementGroup
+	}
+	return result
 }
 
 func managedCategoryFacetOptionDTO(option catalog.ManagedCategoryFacetOption) generated.ManagedCategoryFacetOption {
@@ -3457,6 +3692,16 @@ func managedUserDetailDTO(user identity.ManagedUserDetail) generated.ManagedUser
 		origin := generated.ManualDownloadRestrictionOrigin(*user.ManualDownloadRestriction.Origin)
 		manualState.Origin = &origin
 	}
+	var registrationMode *generated.ManagedUserDetailRegistrationMode
+	if user.RegistrationMode != nil {
+		value := generated.ManagedUserDetailRegistrationMode(*user.RegistrationMode)
+		registrationMode = &value
+	}
+	var registrationState *generated.ManagedUserDetailRegistrationState
+	if user.RegistrationState != nil {
+		value := generated.ManagedUserDetailRegistrationState(*user.RegistrationState)
+		registrationState = &value
+	}
 	vipHistory := make([]generated.VIPTransition, 0, len(user.VIPHistory))
 	for _, transition := range user.VIPHistory {
 		vipHistory = append(vipHistory, generated.VIPTransition{
@@ -3482,6 +3727,14 @@ func managedUserDetailDTO(user identity.ManagedUserDetail) generated.ManagedUser
 		RoleNames:              append([]string(nil), user.RoleNames...),
 		LastActiveAt:           user.LastActiveAt,
 		CreatedAt:              user.CreatedAt, UpdatedAt: user.UpdatedAt,
+		Experience: user.Experience, RemainingInvites: int(user.RemainingInvites),
+		DonationAmount:            user.DonationAmount,
+		SubmittedTorrentCount:     user.SubmittedTorrentCount,
+		PublishedTorrentCount:     user.PublishedTorrentCount,
+		PendingReviewTorrentCount: user.PendingReviewTorrentCount,
+		DirectInviteCount:         user.DirectInviteCount,
+		InviterNumericId:          user.InviterNumericID, InviterUsername: user.InviterUsername,
+		RegistrationMode: registrationMode, RegistrationState: registrationState,
 		ActiveRestrictions:               restrictions,
 		ManualDownloadRestriction:        manualState,
 		ManualDownloadRestrictionHistory: manualHistory,

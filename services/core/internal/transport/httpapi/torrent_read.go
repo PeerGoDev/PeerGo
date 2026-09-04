@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -35,6 +36,17 @@ type TorrentReadService interface {
 	ManagedActivePeers(context.Context, authz.StaffActor, torrents.TorrentID) (torrents.ManagedTorrentPeerList, error)
 	ManagedUserTrackerActivity(context.Context, authz.StaffActor, uuid.UUID) (torrents.UserTrackerActivity, error)
 	ChangeAvailability(context.Context, authz.StaffActor, torrents.ChangeTorrentAvailabilityInput) (torrents.TorrentAvailabilityResult, error)
+}
+
+// TorrentViewerReadService is implemented by the production read service.
+// Public methods remain available to integrations, while canonical Web URLs
+// may reveal a pending submission only to its authenticated uploader.
+type TorrentViewerReadService interface {
+	DetailForViewer(context.Context, string, torrents.TorrentID) (torrents.PublicDetail, error)
+	CoverForViewer(context.Context, string, torrents.TorrentID) (torrents.PublicCover, error)
+	ScreenshotForViewer(context.Context, string, torrents.TorrentID, int) (torrents.PublicScreenshot, error)
+	ContentForViewer(context.Context, string, torrents.TorrentID) (torrents.PublicContent, error)
+	FilesForViewer(context.Context, string, torrents.TorrentID, int, int) (torrents.PublicFilePage, error)
 }
 
 func (h *Handler) GetMyTrackerActivity(ctx context.Context, _ generated.GetMyTrackerActivityRequestObject) (generated.GetMyTrackerActivityResponseObject, error) {
@@ -160,7 +172,15 @@ func userTrackerActivityDTO(activity torrents.UserTrackerActivity) generated.Use
 }
 
 func (h *Handler) GetTorrentScreenshot(ctx context.Context, request generated.GetTorrentScreenshotRequestObject) (generated.GetTorrentScreenshotResponseObject, error) {
-	screenshot, err := h.torrentRead.Screenshot(ctx, torrents.TorrentID(request.TorrentId), request.Position)
+	var screenshot torrents.PublicScreenshot
+	var err error
+	if viewer, ok := h.torrentRead.(TorrentViewerReadService); ok {
+		screenshot, err = viewer.ScreenshotForViewer(
+			ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId), request.Position,
+		)
+	} else {
+		screenshot, err = h.torrentRead.Screenshot(ctx, torrents.TorrentID(request.TorrentId), request.Position)
+	}
 	switch {
 	case errors.Is(err, torrents.ErrTorrentScreenshotNotFound),
 		errors.Is(err, torrents.ErrTorrentReadNotFound),
@@ -176,8 +196,12 @@ func (h *Handler) GetTorrentScreenshot(ctx context.Context, request generated.Ge
 	case err != nil:
 		return nil, err
 	}
+	cacheControl := "public, max-age=300, stale-while-revalidate=86400"
+	if screenshot.Private {
+		cacheControl = "private, no-store"
+	}
 	headers := generated.GetTorrentScreenshot200ResponseHeaders{
-		CacheControl: "public, max-age=300, stale-while-revalidate=86400",
+		CacheControl: cacheControl,
 		ETag:         screenshot.ETag,
 	}
 	reader := bytes.NewReader(screenshot.Data)
@@ -196,7 +220,13 @@ func (h *Handler) GetTorrentScreenshot(ctx context.Context, request generated.Ge
 }
 
 func (h *Handler) GetTorrentCover(ctx context.Context, request generated.GetTorrentCoverRequestObject) (generated.GetTorrentCoverResponseObject, error) {
-	cover, err := h.torrentRead.Cover(ctx, torrents.TorrentID(request.TorrentId))
+	var cover torrents.PublicCover
+	var err error
+	if viewer, ok := h.torrentRead.(TorrentViewerReadService); ok {
+		cover, err = viewer.CoverForViewer(ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId))
+	} else {
+		cover, err = h.torrentRead.Cover(ctx, torrents.TorrentID(request.TorrentId))
+	}
 	switch {
 	case errors.Is(err, torrents.ErrTorrentCoverNotFound),
 		errors.Is(err, torrents.ErrTorrentReadNotFound),
@@ -212,8 +242,12 @@ func (h *Handler) GetTorrentCover(ctx context.Context, request generated.GetTorr
 	case err != nil:
 		return nil, err
 	}
+	cacheControl := "public, max-age=300, stale-while-revalidate=86400"
+	if cover.Private {
+		cacheControl = "private, no-store"
+	}
 	headers := generated.GetTorrentCover200ResponseHeaders{
-		CacheControl: "public, max-age=300, stale-while-revalidate=86400",
+		CacheControl: cacheControl,
 		ETag:         cover.ETag,
 	}
 	reader := bytes.NewReader(cover.Data)
@@ -250,7 +284,13 @@ func (h *Handler) GetTorrentRelatedVersions(ctx context.Context, request generat
 }
 
 func (h *Handler) GetTorrentContent(ctx context.Context, request generated.GetTorrentContentRequestObject) (generated.GetTorrentContentResponseObject, error) {
-	content, err := h.torrentRead.Content(ctx, torrents.TorrentID(request.TorrentId))
+	var content torrents.PublicContent
+	var err error
+	if viewer, ok := h.torrentRead.(TorrentViewerReadService); ok {
+		content, err = viewer.ContentForViewer(ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId))
+	} else {
+		content, err = h.torrentRead.Content(ctx, torrents.TorrentID(request.TorrentId))
+	}
 	switch {
 	case errors.Is(err, torrents.ErrTorrentReadNotFound), errors.Is(err, torrents.ErrTorrentReadInput):
 		problem := newProblemFromContext(ctx, http.StatusNotFound, "torrent_not_found", "种子不可用", "该种子不存在、尚未发布或已经停止公开访问。")
@@ -269,7 +309,13 @@ func (h *Handler) GetTorrentContent(ctx context.Context, request generated.GetTo
 }
 
 func (h *Handler) GetTorrentDetail(ctx context.Context, request generated.GetTorrentDetailRequestObject) (generated.GetTorrentDetailResponseObject, error) {
-	detail, err := h.torrentRead.Detail(ctx, torrents.TorrentID(request.TorrentId))
+	var detail torrents.PublicDetail
+	var err error
+	if viewer, ok := h.torrentRead.(TorrentViewerReadService); ok {
+		detail, err = viewer.DetailForViewer(ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId))
+	} else {
+		detail, err = h.torrentRead.Detail(ctx, torrents.TorrentID(request.TorrentId))
+	}
 	switch {
 	case errors.Is(err, torrents.ErrTorrentReadNotFound), errors.Is(err, torrents.ErrTorrentReadInput):
 		problem := newProblemFromContext(ctx, http.StatusNotFound, "torrent_not_found", "种子不可用", "该种子不存在、尚未发布或已经停止公开访问。")
@@ -291,7 +337,15 @@ func (h *Handler) ListTorrentFiles(ctx context.Context, request generated.ListTo
 	if request.Params.Offset != nil {
 		offset = *request.Params.Offset
 	}
-	page, err := h.torrentRead.Files(ctx, torrents.TorrentID(request.TorrentId), limit, offset)
+	var page torrents.PublicFilePage
+	var err error
+	if viewer, ok := h.torrentRead.(TorrentViewerReadService); ok {
+		page, err = viewer.FilesForViewer(
+			ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId), limit, offset,
+		)
+	} else {
+		page, err = h.torrentRead.Files(ctx, torrents.TorrentID(request.TorrentId), limit, offset)
+	}
 	switch {
 	case errors.Is(err, torrents.ErrTorrentReadInput):
 		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_torrent_file_query", "文件查询无效", "文件数量必须在 1 到 100 之间，偏移量必须在 0 到 99999 之间。")
@@ -349,6 +403,11 @@ func torrentPublicDetailDTO(detail torrents.PublicDetail) generated.TorrentPubli
 			ExternalId: identifier.ExternalID,
 		})
 	}
+	var publishedAt *time.Time
+	if !detail.PublishedAt.IsZero() {
+		value := detail.PublishedAt.UTC()
+		publishedAt = &value
+	}
 	return generated.TorrentPublicDetail{
 		Id:       int64(detail.ID),
 		Category: generated.Category{Id: detail.Category.ID, Name: detail.Category.Name},
@@ -361,8 +420,8 @@ func torrentPublicDetailDTO(detail torrents.PublicDetail) generated.TorrentPubli
 		FileCount: detail.FileCount, PaddingFileCount: detail.PaddingFileCount,
 		ScreenshotCount:  detail.ScreenshotCount,
 		PieceLengthBytes: detail.PieceLengthBytes, PieceCount: detail.PieceCount,
-		State:       generated.TorrentPublicDetailStatePublished,
-		SubmittedAt: detail.SubmittedAt, PublishedAt: detail.PublishedAt,
+		State:       generated.TorrentPublicDetailState(detail.State),
+		SubmittedAt: detail.SubmittedAt, PublishedAt: publishedAt,
 	}
 }
 

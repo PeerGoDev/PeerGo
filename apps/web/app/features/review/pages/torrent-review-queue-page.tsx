@@ -61,7 +61,7 @@ export function TorrentReviewQueuePage() {
   })
 
   return (
-    <PageLayout className="max-w-[1172px] gap-6 px-10 py-6 pt-10! sm:px-6 sm:pt-12!">
+    <PageLayout className="max-w-[1172px] gap-5 p-4! sm:gap-6 sm:p-6! sm:pt-10!">
       <ReviewCenterNavigation canReview />
 
       <header>
@@ -99,7 +99,7 @@ export function TorrentReviewQueuePage() {
 
       {session.data ? (
         <div className="flex flex-col gap-6">
-          <div className="flex items-end justify-between gap-4 border-b">
+          <div className="flex flex-col gap-2 border-b sm:flex-row sm:items-end sm:justify-between sm:gap-4">
             <ToggleGroup
               value={[view]}
               onValueChange={(values) => {
@@ -108,7 +108,7 @@ export function TorrentReviewQueuePage() {
               }}
               spacing={0}
               aria-label="切换种审记录"
-              className="gap-0.5"
+              className="max-w-full gap-0.5"
             >
               <ToggleGroupItem
                 value="pending"
@@ -147,6 +147,7 @@ export function TorrentReviewQueuePage() {
                   ? reviews.refetch()
                   : history.refetch())
               }
+              className="mb-2 w-full sm:mb-0 sm:w-auto"
             >
               <RefreshCwIcon data-icon="inline-start" />
               {(view === "pending" ? reviews.isFetching : history.isFetching)

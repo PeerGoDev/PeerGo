@@ -102,6 +102,15 @@ JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
 WHERE torrent.id = sqlc.arg(torrent_id)::bigint
   AND torrent.state = 'pending_review';
 
+-- name: PendingReviewTorrentOwnedBy :one
+SELECT EXISTS (
+    SELECT 1
+    FROM torrents.torrents AS torrent
+    WHERE torrent.id = sqlc.arg(torrent_id)::bigint
+      AND torrent.uploader_id = sqlc.arg(uploader_id)::uuid
+      AND torrent.state = 'pending_review'
+);
+
 -- name: ListPublishedTorrentExternalIdentifiers :many
 SELECT identifier.provider, identifier.external_id
 FROM torrents.torrent_external_identifiers AS identifier

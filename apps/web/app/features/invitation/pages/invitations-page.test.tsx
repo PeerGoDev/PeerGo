@@ -129,6 +129,56 @@ describe("InvitationsPage", () => {
     expect(screen.getByText("Rousi 继承")).toBeVisible()
     expect(screen.getByText("旧站奖励已计入期初魔力值")).toBeVisible()
   })
+
+  it("lets the issuer revoke an unused invitation and refund its slot", async () => {
+    const user = userEvent.setup()
+    const availableInvitation = {
+      id: invitationId,
+      source: "member" as const,
+      status: "available" as const,
+      email_bound: true,
+      created_at: "2026-08-27T12:00:00Z",
+      expires_at: "2026-09-03T12:00:00Z",
+    }
+    const overview = {
+      ...eligibleOverview,
+      items: [availableInvitation],
+      total: 1,
+    }
+    const queryClient = invitationQueryClient(overview, true)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({ ...availableInvitation, status: "revoked" })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...overview,
+          eligibility: {
+            ...overview.eligibility,
+            remaining_invites: overview.eligibility.remaining_invites + 1,
+          },
+          items: [{ ...availableInvitation, status: "revoked" }],
+        })
+      )
+    vi.stubGlobal("fetch", fetchMock)
+
+    renderPage(queryClient)
+    await user.click(
+      await screen.findByRole("button", { name: "撤销并返还名额" })
+    )
+    expect(
+      screen.getByRole("heading", { name: "撤销这个邀请码？" })
+    ).toBeVisible()
+    await user.click(screen.getByRole("button", { name: "确认撤销" }))
+
+    const request = fetchMock.mock.calls[0]?.[0] as Request
+    expect(request.method).toBe("POST")
+    expect(request.url).toContain(
+      `/api/v1/me/invitations/${invitationId}/revocation`
+    )
+    expect(request.headers.get("X-CSRF-Token")).toBe("c".repeat(43))
+  })
 })
 
 function renderPage(queryClient: QueryClient) {
@@ -141,7 +191,10 @@ function renderPage(queryClient: QueryClient) {
   )
 }
 
-function invitationQueryClient(overview: InvitationOverview) {
+function invitationQueryClient(
+  overview: InvitationOverview,
+  canRevoke = false
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
@@ -164,6 +217,16 @@ function invitationQueryClient(overview: InvitationOverview) {
         scope: { type: "site", id: "peergo" },
         expires_at: "2026-09-17T12:00:00Z",
       },
+      ...(canRevoke
+        ? [
+            {
+              action: "invitation.revoke.self" as const,
+              description: "撤回自己签发且尚未领取的邀请码",
+              scope: { type: "site" as const, id: "peergo" },
+              expires_at: "2026-09-17T12:00:00Z",
+            },
+          ]
+        : []),
     ],
   })
   queryClient.setQueryData(invitationKeys.page(userId, 20, 0), overview)

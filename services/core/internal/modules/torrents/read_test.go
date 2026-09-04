@@ -21,6 +21,7 @@ import (
 
 type torrentReadRepositoryFixture struct {
 	detail          PublicDetail
+	detailErr       error
 	cover           PublicCoverSource
 	screenshot      PublicScreenshotSource
 	content         PublicContent
@@ -40,10 +41,16 @@ type torrentReadRepositoryFixture struct {
 	fileOffset      int
 	submissionOwner uuid.UUID
 	submissionLimit int
+	pendingEvidence PendingReviewEvidence
+	pendingOwned    bool
+	pendingErr      error
 }
 
 func (fixture *torrentReadRepositoryFixture) PublishedDetail(_ context.Context, id TorrentID) (PublicDetail, error) {
 	fixture.detailID = id
+	if fixture.detailErr != nil {
+		return PublicDetail{}, fixture.detailErr
+	}
 	return fixture.detail, fixture.err
 }
 
@@ -78,6 +85,26 @@ func (fixture *torrentReadRepositoryFixture) UserSubmissions(_ context.Context, 
 	fixture.submissionOwner = owner
 	fixture.submissionLimit = limit
 	return fixture.submissions, fixture.err
+}
+
+func (fixture *torrentReadRepositoryFixture) PendingReviewOwnedBy(_ context.Context, _ TorrentID, _ uuid.UUID) (bool, error) {
+	return fixture.pendingOwned, fixture.pendingErr
+}
+
+func (fixture *torrentReadRepositoryFixture) PendingReviewEvidence(_ context.Context, _ TorrentID) (PendingReviewEvidence, error) {
+	return fixture.pendingEvidence, fixture.pendingErr
+}
+
+func (fixture *torrentReadRepositoryFixture) PendingReviewCoverSource(context.Context, TorrentID) (PublicCoverSource, error) {
+	return PublicCoverSource{}, fixture.pendingErr
+}
+
+func (fixture *torrentReadRepositoryFixture) PendingReviewScreenshotSource(context.Context, TorrentID, int) (PublicScreenshotSource, error) {
+	return PublicScreenshotSource{}, fixture.pendingErr
+}
+
+func (fixture *torrentReadRepositoryFixture) PendingReviewFiles(context.Context, TorrentID, int, int) (PublicFilePage, error) {
+	return PublicFilePage{}, fixture.pendingErr
 }
 
 type rejectingTorrentReadAuthorizer struct{}
@@ -189,6 +216,52 @@ func TestTorrentReadKeepsPublicQueriesAnonymousAndBounded(t *testing.T) {
 	}
 	if repository.fileLimit != 25 {
 		t.Fatal("invalid file query reached repository")
+	}
+}
+
+func TestTorrentReadAllowsPendingDetailOnlyForUploader(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 27, 20, 0, 0, 0, time.UTC)
+	ownerID := uuid.New()
+	const torrentID TorrentID = 42
+	repository := &torrentReadRepositoryFixture{
+		detailErr:    ErrTorrentReadNotFound,
+		pendingOwned: true,
+		pendingEvidence: PendingReviewEvidence{
+			ID: torrentID, Title: "待审核种子", ContentName: "Pending.Release",
+			State: StatePendingReview, SubmittedAt: now,
+		},
+	}
+	authorizer := &recordingTorrentUploadAuthorizer{now: now}
+	service, err := NewTorrentReadService(
+		torrentDownloadAuthenticatorFixture{session: identity.WebSession{User: identity.User{ID: ownerID}}},
+		authorizer,
+		repository,
+		mustReadStores(t),
+		nil,
+		func() time.Time { return now },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	detail, err := service.DetailForViewer(context.Background(), "opaque-cookie", torrentID)
+	if err != nil || detail.ID != torrentID || detail.State != StatePendingReview || !detail.Private || !detail.PublishedAt.IsZero() {
+		t.Fatalf("DetailForViewer() = %+v, %v", detail, err)
+	}
+	if authorizer.request.Action != authz.ActionTorrentSubmissionReadSelf ||
+		authorizer.request.Resource.OwnerID != ownerID ||
+		authorizer.request.CredentialAudience != authz.AudienceWebSession {
+		t.Fatalf("authorization request = %+v", authorizer.request)
+	}
+
+	repository.pendingOwned = false
+	if _, err := service.DetailForViewer(context.Background(), "opaque-cookie", torrentID); !errors.Is(err, ErrTorrentReadNotFound) {
+		t.Fatalf("non-owner DetailForViewer() error = %v", err)
+	}
+	if _, err := service.DetailForViewer(context.Background(), "", torrentID); !errors.Is(err, ErrTorrentReadNotFound) {
+		t.Fatalf("anonymous DetailForViewer() error = %v", err)
 	}
 }
 

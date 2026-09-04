@@ -502,6 +502,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 增减一个账户的运营数据
+         * @description 调整上传、下载、魔力值、经验、可用邀请或捐赠金额。每次变更都使用 账户版本、幂等键和不可变事件记录；空理由由服务端生成，不会绕过审计。
+         */
+        post: operations["adjustManagedUserData"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/network-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取用户有限保留的登录 IP 聚合历史
+         * @description 最多返回最近 180 天的 20 个用户/IP 聚合，不返回逐请求记录、User-Agent、 Tracker peer 端点或其他可持续膨胀的数据。
+         */
+        get: operations["getManagedUserNetworkHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/tracker-activity": {
         parameters: {
             query?: never;
@@ -556,6 +596,26 @@ export interface paths {
          * @description 只撤销路径指定且当前有效的 account_access 限制；不会自动恢复会话， 也不会修改独立的账户状态。
          */
         post: operations["revokeManagedUserAccountRestriction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/reactivations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 解除已停用账户的封禁状态
+         * @description 同时恢复 Privacy Vault 凭据并将 Core 账户从 disabled 变为 active； 使用账户版本防止覆盖并发处置，且只保存一条最小化的不可变解封证据。
+         */
+        post: operations["reactivateManagedUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1338,25 +1398,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/moviepilot-credential": {
+    "/api/v1/me/api-key": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** 查看自己的 MoviePilot API Key 状态 */
-        get: operations["getMyMoviePilotCredential"];
+        /** 查看自己的个人 API Key 状态 */
+        get: operations["getMyPersonalAPIKey"];
         put?: never;
         post?: never;
-        /** 撤销自己的 MoviePilot API Key */
-        delete: operations["revokeMyMoviePilotCredential"];
+        /** 撤销自己的个人 API Key */
+        delete: operations["revokeMyPersonalAPIKey"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/moviepilot-credential/rotations": {
+    "/api/v1/me/api-key/rotations": {
         parameters: {
             query?: never;
             header?: never;
@@ -1365,8 +1425,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 创建或轮换自己的 MoviePilot API Key */
-        post: operations["rotateMyMoviePilotCredential"];
+        /** 创建或轮换自己的个人 API Key */
+        post: operations["rotateMyPersonalAPIKey"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1682,7 +1742,11 @@ export interface paths {
         /** 查询新人考核名单与当前进度 */
         get: operations["listNewcomerAssessments"];
         put?: never;
-        post?: never;
+        /**
+         * 为一个现有用户分配当前新人考核
+         * @description 仅可为正常且从未进入新人考核的账户分配；使用当前生效规则， 从分配时刻起计算期限，并保存最小化的不可变分配证据。
+         */
+        post: operations["assignNewcomerAssessment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2290,6 +2354,23 @@ export interface paths {
         get?: never;
         /** 以乐观并发更新或停用一个分类 */
         put: operations["updateManagedCategory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 创建或以乐观并发更新分类下的发种属性 */
+        put: operations["upsertManagedCategoryFacet"];
         post?: never;
         delete?: never;
         options?: never;
@@ -4223,6 +4304,7 @@ export interface components {
             /** @description 唯一站内资产魔力值，始终为整数。 */
             magic_balance: string;
             level: number;
+            /** @description 当前有效角色；待恢复或尚未完成初始化的账户可为空。 */
             role_names: string[];
             /** Format: date-time */
             last_active_at?: string;
@@ -4254,11 +4336,54 @@ export interface components {
             version: number;
         };
         ManagedUserDetail: components["schemas"]["ManagedUserSummary"] & {
+            /** @description 当前精确经验值；使用十进制字符串避免精度损失。 */
+            experience: string;
+            /** @description 当前累计捐赠金额；由 PtYes 开账值和后续不可变调整记录组成。 */
+            donation_amount: string;
+            remaining_invites: number;
+            /** Format: int64 */
+            submitted_torrent_count: number;
+            /** Format: int64 */
+            published_torrent_count: number;
+            /** Format: int64 */
+            pending_review_torrent_count: number;
+            /** Format: int64 */
+            direct_invite_count: number;
+            /** Format: int64 */
+            inviter_numeric_id: number | null;
+            inviter_username: string | null;
+            /**
+             * @description PeerGo 原生注册方式；迁移用户为空。
+             * @enum {string|null}
+             */
+            registration_mode: "open" | "invite" | null;
+            /**
+             * @description PeerGo 原生注册事务状态；迁移用户为空。
+             * @enum {string|null}
+             */
+            registration_state: "reserved" | "credential_provisioned" | "completed" | null;
             active_restrictions: components["schemas"]["CurrentAccountRestriction"][];
             manual_download_restriction: components["schemas"]["ManualDownloadRestrictionState"];
             manual_download_restriction_history: components["schemas"]["ManualDownloadRestrictionTransition"][];
             vip_state: components["schemas"]["VIPState"];
             vip_history: components["schemas"]["VIPTransition"][];
+        };
+        ManagedUserAdjustmentRequest: {
+            /** @enum {string} */
+            field: "uploaded_bytes" | "downloaded_bytes" | "magic_balance" | "experience" | "remaining_invites" | "donation_amount";
+            /** @enum {string} */
+            operation: "increase" | "decrease";
+            /** @description 正数；字段决定整数、两位金额或二十位经验精度。 */
+            amount: string;
+            /** @description 可留空；服务端会生成字段对应的审计理由。 */
+            reason?: string;
+            /** Format: int64 */
+            expected_user_version: number;
+        };
+        ManagedUserNetworkHistory: {
+            items: components["schemas"]["ManagedUserNetworkObservation"][];
+            retention_days: number;
+            maximum_items: number;
         };
         /** @enum {string} */
         AccountRestrictionReasonCode: "manual_review" | "security_incident";
@@ -4320,7 +4445,7 @@ export interface components {
             expected_state_version: number;
         };
         /** @enum {string} */
-        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.moviepilot.manage.self" | "integration.moviepilot.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
+        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.adjust" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.network.read" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
         CapabilityScope: {
             /** @enum {string} */
             type: "site" | "category";
@@ -4514,8 +4639,11 @@ export interface components {
             /** Format: int64 */
             target_value: number;
             met: boolean;
-            /** @enum {string} */
-            enforcement_mode: "observe";
+            enforcement_mode: components["schemas"]["WorkgroupContributionEnforcementMode"];
+            /** Format: int32 */
+            allowed_misses: number;
+            /** Format: int32 */
+            miss_count: number;
         };
         WorkgroupContributionPolicyRevision: {
             group_kind: components["schemas"]["WorkgroupKind"];
@@ -4526,8 +4654,9 @@ export interface components {
             period_kind: "calendar_month";
             /** Format: int64 */
             target_value: number;
-            /** @enum {string} */
-            enforcement_mode: "observe";
+            enforcement_mode: components["schemas"]["WorkgroupContributionEnforcementMode"];
+            /** Format: int32 */
+            allowed_misses: number;
             /** Format: date-time */
             effective_from: string | null;
             opening: boolean;
@@ -4601,9 +4730,11 @@ export interface components {
             target_value: number;
             assessment_state: components["schemas"]["WorkgroupContributionAssessmentState"];
             explanation_code: components["schemas"]["WorkgroupContributionExplanationCode"];
-            /** @enum {string} */
-            enforcement_mode: "observe";
+            enforcement_mode: components["schemas"]["WorkgroupContributionEnforcementMode"];
+            /** Format: int32 */
+            allowed_misses: number;
             reminder: components["schemas"]["WorkgroupContributionReminder"] | null;
+            enforcement: components["schemas"]["WorkgroupContributionEnforcementAssessment"] | null;
         };
         WorkgroupContributionReminder: {
             /** Format: uuid */
@@ -4941,12 +5072,13 @@ export interface components {
             expected_version: number;
             reason: string;
         };
-        MoviePilotCredentialStatus: {
+        PersonalAPIKeyStatus: {
             active: boolean;
             key_prefix?: string;
             /** Format: int64 */
             version?: number;
-            scopes: components["schemas"]["MoviePilotCredentialScope"][];
+            /** @description 当前密钥实际拥有的权限；未创建密钥时为空数组。 */
+            scopes: components["schemas"]["PersonalAPIKeyScope"][];
             /** Format: date-time */
             created_at?: string;
             /**
@@ -4955,15 +5087,17 @@ export interface components {
              */
             last_used_at?: string;
         };
-        RotateMoviePilotCredentialRequest: {
+        RotatePersonalAPIKeyRequest: {
             /**
              * Format: int64
              * @description 首次创建时省略；轮换现有密钥时必须与当前版本一致。
              */
             expected_version?: number;
+            /** @description 新密钥可以调用的最小权限集合。 */
+            scopes: components["schemas"]["PersonalAPIKeyScope"][];
         };
-        IssuedMoviePilotCredential: {
-            credential: components["schemas"]["MoviePilotCredentialStatus"];
+        IssuedPersonalAPIKey: {
+            credential: components["schemas"]["PersonalAPIKeyStatus"];
             /** @description 仅在创建或轮换成功响应中出现一次的 256 位随机 API Key。 */
             api_key: string;
         };
@@ -5180,6 +5314,7 @@ export interface components {
             name: string;
             display_order: number;
             enabled: boolean;
+            /** @description 可留空；服务端会生成明确的审计理由。 */
             reason: string;
         };
         UpdateManagedCategoryRequest: {
@@ -5188,6 +5323,7 @@ export interface components {
             enabled: boolean;
             /** Format: int64 */
             expected_version: number;
+            /** @description 可留空；服务端会生成明确的审计理由。 */
             reason: string;
         };
         ManagedCategoryFacet: {
@@ -5197,6 +5333,16 @@ export interface components {
             required: boolean;
             requirement_group?: string;
             display_order: number;
+            /** @description 停用后不再出现在新发种表单中，历史取值仍然保留。 */
+            enabled: boolean;
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            torrent_count: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
             options: components["schemas"]["ManagedCategoryFacetOption"][];
         };
         ManagedCategoryFacetOption: {
@@ -5223,6 +5369,7 @@ export interface components {
              * @description 传 0 表示新增；更新时必须传当前版本。
              */
             expected_version: number;
+            /** @description 可留空；服务端会生成明确的审计理由。 */
             reason: string;
         };
         TorrentSummary: {
@@ -5298,6 +5445,7 @@ export interface components {
             /** Format: date-time */
             submitted_at: string;
         };
+        /** @description 已发布种子的公开详情；待审核时，同一规范 URL 仅向经过会话鉴权的 原发布者返回私密预做种详情，其他访问者仍得到 404。 */
         TorrentPublicDetail: {
             /** Format: int64 */
             id: number;
@@ -5338,11 +5486,14 @@ export interface components {
             piece_length_bytes: number;
             piece_count: number;
             /** @enum {string} */
-            state: "published";
+            state: "pending_review" | "published";
             /** Format: date-time */
             submitted_at: string;
-            /** Format: date-time */
-            published_at: string;
+            /**
+             * Format: date-time
+             * @description 待审核的发布者私密详情中为 null。
+             */
+            published_at: string | null;
         };
         TorrentSwarmOverview: {
             /** Format: int64 */
@@ -5491,6 +5642,11 @@ export interface components {
             /** @enum {string} */
             workgroup_explanation_code?: "period_in_progress" | "below_target" | "no_contribution";
             workgroup_reason?: string;
+            /** Format: int32 */
+            workgroup_miss_count?: number;
+            /** Format: int32 */
+            workgroup_allowed_misses?: number;
+            workgroup_disciplinary_action?: components["schemas"]["WorkgroupContributionDisciplinaryAction"];
             member_gift_sender_numeric_id?: components["schemas"]["UnsignedIntegerText"];
             member_gift_sender_username?: string;
             member_gift_sender_display_name?: string;
@@ -5568,8 +5724,18 @@ export interface components {
         Comment: {
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 直接回复的评论，用于保留“回复谁”的精确上下文。
+             */
             parent_comment_id?: string | null;
+            /**
+             * Format: uuid
+             * @description 所属一级评论；一级评论自身为空，楼中楼回复均指向同一根楼。
+             */
+            root_comment_id?: string | null;
+            /** @description 直接回复对象的作者；仅回复评论返回。 */
+            reply_to?: components["schemas"]["CommentAuthor"] | null;
             author: components["schemas"]["CommentAuthor"];
             /** @description 可见评论正文；墓碑状态返回空字符串。 */
             body: string;
@@ -5855,11 +6021,21 @@ export interface components {
             /** Format: uuid */
             post_id: string;
             items: components["schemas"]["Comment"][];
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description 一级评论与楼中楼回复的总数。
+             */
             total: number;
+            /**
+             * Format: int64
+             * @description 用于分页的一级评论总数。
+             */
+            thread_total: number;
             limit: number;
             offset: number;
         };
+        /** @enum {string} */
+        SocialCommentSort: "hot" | "newest" | "oldest";
         SocialMediaUploadRequest: {
             /** Format: binary */
             image: string;
@@ -7228,6 +7404,21 @@ export interface components {
             actor_numeric_id?: number;
             actor_username?: string;
         };
+        ManagedUserNetworkObservation: {
+            /** @description 规范 IPv4 或 IPv6 地址。 */
+            address: string;
+            /** Format: date-time */
+            first_seen_at: string;
+            /** Format: date-time */
+            last_seen_at: string;
+            /** Format: int64 */
+            seen_count: number;
+            /**
+             * Format: int64
+             * @description 在同一保留窗口内出现此地址的用户数量。
+             */
+            related_user_count: number;
+        };
         UserTrackerTask: {
             /** Format: int64 */
             torrent_id: number;
@@ -7257,6 +7448,12 @@ export interface components {
              * @description Tracker 生成当前瞬时视图的服务端时间。
              */
             generated_at: string;
+        };
+        ReactivateManagedUserRequest: {
+            /** Format: int64 */
+            expected_user_version: number;
+            /** @description 可留空；留空时记录为管理员手动解除账户封禁。 */
+            reason?: string;
         };
         /** @enum {string} */
         ManualDownloadRestrictionReasonCode: "manual_review" | "policy_violation" | "abuse_prevention";
@@ -7676,6 +7873,8 @@ export interface components {
         WorkgroupMembershipStatus: "active" | "suspended" | "ended";
         /** @enum {string} */
         WorkgroupContributionMetric: "trusted_torrents_published" | "torrent_review_votes" | "seeding_active_seconds";
+        /** @enum {string} */
+        WorkgroupContributionEnforcementMode: "observe" | "miss_limit";
         LegacyReviewerEvidence: {
             /** @enum {string} */
             status: "active" | "suspended" | "removed";
@@ -7695,6 +7894,42 @@ export interface components {
             membership?: components["schemas"]["WorkgroupMembership"];
             application?: components["schemas"]["WorkgroupApplication"];
             eligibility?: components["schemas"]["ReviewerEligibility"];
+        };
+        /** @enum {string} */
+        WorkgroupContributionDisciplinaryAction: "none" | "marked" | "membership_ended";
+        WorkgroupContributionEnforcementAssessment: {
+            /** Format: uuid */
+            id: string;
+            group_kind: components["schemas"]["WorkgroupKind"];
+            metric: components["schemas"]["WorkgroupContributionMetric"];
+            /** Format: int64 */
+            policy_revision: number;
+            /** Format: date-time */
+            period_starts_at: string;
+            /** Format: date-time */
+            period_ends_at: string;
+            /** Format: date-time */
+            observed_at: string;
+            /** Format: date-time */
+            evidence_through: string;
+            /** @enum {string} */
+            evidence_state: "complete";
+            /** Format: int64 */
+            current_value: number;
+            /** Format: int64 */
+            target_value: number;
+            /** @enum {string} */
+            assessment_state: "met" | "not_met";
+            /** @enum {string} */
+            explanation_code: "target_met" | "below_target" | "no_contribution";
+            /** Format: int32 */
+            miss_count: number;
+            /** Format: int32 */
+            allowed_misses: number;
+            disciplinary_action: components["schemas"]["WorkgroupContributionDisciplinaryAction"];
+            reason: string;
+            /** Format: date-time */
+            assessed_at: string;
         };
         /** @enum {string} */
         HNRAppealStatus: "pending" | "approved" | "rejected" | "obligation_resolved";
@@ -7891,8 +8126,11 @@ export interface components {
         RSSPromotionFilter: "free" | "double_upload" | "double_upload_free" | "half_download" | "double_upload_half_download" | "thirty_percent_download";
         /** @enum {string} */
         RSSPriceFilter: "all" | "free" | "paid";
-        /** @enum {string} */
-        MoviePilotCredentialScope: "profile:read" | "torrent:read" | "torrent:download" | "attendance:read" | "attendance:claim";
+        /**
+         * @description 可授予个人 API Key 的最小权限范围；所有适配器共享同一套范围。
+         * @enum {string}
+         */
+        PersonalAPIKeyScope: "profile:read" | "torrent:read" | "torrent:download" | "torrent:upload" | "torrent:purchase:read" | "torrent:purchase:write" | "attendance:read" | "attendance:claim";
         TorrentPurchaseHistoryItem: {
             /** Format: int64 */
             torrent_id: number;
@@ -8034,6 +8272,12 @@ export interface components {
             limit: number;
             offset: number;
         };
+        AssignNewcomerAssessmentRequest: {
+            /** Format: uuid */
+            user_id: string;
+            /** @description 可留空；留空时记录为管理员手动分配。 */
+            reason?: string;
+        };
         ExemptNewcomerAssessmentRequest: {
             /** Format: int64 */
             expected_version: number;
@@ -8172,6 +8416,22 @@ export interface components {
             options: components["schemas"]["CategoryFacetOption"][];
         };
         CategoryFacetList: components["schemas"]["CategoryFacet"][];
+        UpsertManagedCategoryFacetRequest: {
+            name: string;
+            selection_mode: components["schemas"]["CategoryFacetSelectionMode"];
+            required: boolean;
+            /** @description 非必填属性可加入同一组，表示组内至少选择一个；直接必填时省略。 */
+            requirement_group?: string;
+            display_order: number;
+            enabled: boolean;
+            /**
+             * Format: int64
+             * @description 传 0 表示创建分类属性；更新时必须传当前版本。
+             */
+            expected_version: number;
+            /** @description 可留空；服务端会生成明确的审计理由。 */
+            reason: string;
+        };
         TorrentFacetSelectionInput: {
             facet_id: string;
             option_keys: string[];
@@ -10468,6 +10728,72 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
+    adjustManagedUserData: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagedUserAdjustmentRequest"];
+            };
+        };
+        responses: {
+            /** @description 变更已提交，并返回最新账户详情。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedUserDetail"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getManagedUserNetworkHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已授权的有限 IP 聚合历史。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedUserNetworkHistory"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
     getManagedUserTrackerActivity: {
         parameters: {
             query?: never;
@@ -10566,6 +10892,43 @@ export interface operations {
             404: components["responses"]["ProblemResponse"];
             409: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    reactivateManagedUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactivateManagedUserRequest"];
+            };
+        };
+        responses: {
+            /** @description 已解除封禁并返回最新账户详情。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedUserDetail"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };
@@ -12156,7 +12519,7 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
-    getMyMoviePilotCredential: {
+    getMyPersonalAPIKey: {
         parameters: {
             query?: never;
             header?: never;
@@ -12171,7 +12534,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MoviePilotCredentialStatus"];
+                    "application/json": components["schemas"]["PersonalAPIKeyStatus"];
                 };
             };
             401: components["responses"]["ProblemResponse"];
@@ -12179,7 +12542,7 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
-    revokeMyMoviePilotCredential: {
+    revokeMyPersonalAPIKey: {
         parameters: {
             query: {
                 expected_version: number;
@@ -12208,7 +12571,7 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
-    rotateMyMoviePilotCredential: {
+    rotateMyPersonalAPIKey: {
         parameters: {
             query?: never;
             header: {
@@ -12220,7 +12583,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RotateMoviePilotCredentialRequest"];
+                "application/json": components["schemas"]["RotatePersonalAPIKeyRequest"];
             };
         };
         responses: {
@@ -12230,7 +12593,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IssuedMoviePilotCredential"];
+                    "application/json": components["schemas"]["IssuedPersonalAPIKey"];
                 };
             };
             400: components["responses"]["ProblemResponse"];
@@ -12900,6 +13263,41 @@ export interface operations {
             400: components["responses"]["ProblemResponse"];
             401: components["responses"]["ProblemResponse"];
             403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    assignNewcomerAssessment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignNewcomerAssessmentRequest"];
+            };
+        };
+        responses: {
+            /** @description 已创建新人考核。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewcomerAssessment"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };
@@ -14342,6 +14740,44 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
+    upsertManagedCategoryFacet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                /** @description 创建后不可变的分类稳定标识。 */
+                category_id: components["parameters"]["CategoryIDPathParameter"];
+                facet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertManagedCategoryFacetRequest"];
+            };
+        };
+        responses: {
+            /** @description 分类属性和不可变审计记录已经原子提交。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedCategoryFacet"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            429: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
     upsertManagedCategoryFacetOption: {
         parameters: {
             query?: never;
@@ -15392,6 +15828,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                sort?: string & components["schemas"]["SocialCommentSort"];
             };
             header?: never;
             path: {
@@ -15402,7 +15839,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 动态评论与回复；删除项保留墓碑。 */
+            /** @description 按一级评论分页的动态评论与楼中楼回复；删除项保留墓碑。 */
             200: {
                 headers: {
                     [name: string]: unknown;

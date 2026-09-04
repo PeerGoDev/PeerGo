@@ -16,10 +16,15 @@ var (
 	ErrCategoryNotFound              = errors.New("category was not found")
 	ErrCategoryVersionConflict       = errors.New("category version changed")
 	ErrCategoryFacetNotFound         = errors.New("category facet was not found")
+	ErrCategoryFacetAlreadyExists    = errors.New("category facet already exists")
+	ErrCategoryFacetUnavailable      = errors.New("canonical category facet is unavailable")
+	ErrCategoryFacetVersionConflict  = errors.New("category facet version changed")
+	ErrCategoryFacetLimitReached     = errors.New("category facet limit was reached")
 	ErrCategoryOptionAlreadyExists   = errors.New("category facet option already exists")
 	ErrCategoryOptionNotFound        = errors.New("category facet option was not found")
 	ErrCategoryOptionUnavailable     = errors.New("canonical category facet option is unavailable")
 	ErrCategoryOptionVersionConflict = errors.New("category facet option version changed")
+	ErrCategoryOptionLimitReached    = errors.New("category facet option limit was reached")
 )
 
 type CategoryTransition string
@@ -53,7 +58,45 @@ type ManagedCategoryFacet struct {
 	Required         bool
 	RequirementGroup string
 	DisplayOrder     int
+	Enabled          bool
+	Version          int64
+	TorrentCount     int64
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 	Options          []ManagedCategoryFacetOption
+}
+
+type UpsertCategoryFacetInput struct {
+	CategoryID       string
+	FacetID          string
+	Name             string
+	SelectionMode    FacetSelectionMode
+	Required         bool
+	RequirementGroup string
+	DisplayOrder     int
+	Enabled          bool
+	ExpectedVersion  int64
+	Reason           string
+}
+
+type UpsertCategoryFacetCommand struct {
+	UpsertCategoryFacetInput
+	ChangeID      uuid.UUID
+	ActorID       uuid.UUID
+	OccurredAt    time.Time
+	Authorization authz.Decision
+}
+
+type CategoryFacetAuditState struct {
+	CategoryID       string             `json:"category_id"`
+	FacetID          string             `json:"facet_id"`
+	Name             string             `json:"name"`
+	SelectionMode    FacetSelectionMode `json:"selection_mode"`
+	Required         bool               `json:"required"`
+	RequirementGroup string             `json:"requirement_group,omitempty"`
+	DisplayOrder     int                `json:"display_order"`
+	Enabled          bool               `json:"enabled"`
+	Version          int64              `json:"version"`
 }
 
 type ManagedCategoryFacetOption struct {

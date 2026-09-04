@@ -141,3 +141,37 @@ export function useExemptNewcomerAssessment() {
     },
   })
 }
+
+export function useAssignNewcomerAssessment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      userId: string
+      reason: string
+      csrfToken: string
+      idempotencyKey: string
+    }): Promise<NewcomerAssessment> => {
+      const { data, error, response } = await apiClient.POST(
+        "/api/v1/admin/newcomer/assessments",
+        {
+          params: {
+            header: {
+              "X-CSRF-Token": input.csrfToken,
+              "Idempotency-Key": input.idempotencyKey,
+            },
+          },
+          body: { user_id: input.userId, reason: input.reason || undefined },
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: newcomerAdministrationKeys.all,
+      })
+    },
+  })
+}

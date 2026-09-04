@@ -18,6 +18,8 @@ export type UpdateManagedCategoryRequest =
 export type ManagedCategoryFacet = components["schemas"]["ManagedCategoryFacet"]
 export type ManagedCategoryFacetOption =
   components["schemas"]["ManagedCategoryFacetOption"]
+export type UpsertManagedCategoryFacetRequest =
+  components["schemas"]["UpsertManagedCategoryFacetRequest"]
 export type UpsertManagedCategoryFacetOptionRequest =
   components["schemas"]["UpsertManagedCategoryFacetOptionRequest"]
 
@@ -115,6 +117,42 @@ export function useUpsertManagedCategoryFacetOption() {
               category_id: input.categoryId,
               facet_id: input.facetId,
               option_key: input.optionKey,
+            },
+          },
+          body: input.body,
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+    onSuccess: invalidateCategoryQueries(queryClient),
+    onError: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: categoryAdministrationKeys.all,
+      })
+    },
+  })
+}
+
+export function useUpsertManagedCategoryFacet() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      csrfToken: string
+      categoryId: string
+      facetId: string
+      body: UpsertManagedCategoryFacetRequest
+    }): Promise<ManagedCategoryFacet> => {
+      const { data, error, response } = await apiClient.PUT(
+        "/api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}",
+        {
+          params: {
+            header: { "X-CSRF-Token": input.csrfToken },
+            path: {
+              category_id: input.categoryId,
+              facet_id: input.facetId,
             },
           },
           body: input.body,

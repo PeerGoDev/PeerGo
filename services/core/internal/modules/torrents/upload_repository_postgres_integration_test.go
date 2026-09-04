@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/peergo/peergo/services/core/internal/contracts/trackerevent"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	platformpostgres "github.com/peergo/peergo/services/core/internal/platform/postgres"
 )
@@ -90,7 +92,15 @@ INSERT INTO catalog.category_facet_options (
 	// test therefore targets a disposable migrated database and does not pretend
 	// that cleanup can safely erase the evidence it just verified.
 
-	repository, err := NewPostgresTorrentUploadRepository(pool)
+	var trackerEvents []trackerevent.Event
+	repository, err := NewPostgresTorrentUploadRepository(
+		pool,
+		PostgresTorrentUploadRepositoryConfig{
+			NewTrackerAppender: func(pgx.Tx) trackerevent.Appender {
+				return torrentUploadTrackerAppender{events: &trackerEvents}
+			},
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,6 +151,13 @@ INSERT INTO catalog.category_facet_options (
 	replayed, err := service.Submit(ctx, "cookie", "csrf", input)
 	if err != nil || replayed != result {
 		t.Fatalf("Submit() replay = %+v, %v; want %+v", replayed, err, result)
+	}
+	if len(trackerEvents) != 1 {
+		t.Fatalf("pending pre-seeding events = %d, want 1", len(trackerEvents))
+	}
+	eligibility, err := trackerevent.DecodeTorrentEligibilityChanged(trackerEvents[0])
+	if err != nil || !eligibility.Enabled || eligibility.TorrentID != int64(result.ID) || eligibility.TorrentVersion != 1 {
+		t.Fatalf("pending pre-seeding event = %+v, %v", eligibility, err)
 	}
 	changed := input
 	changed.Title = "Changed request"
@@ -289,6 +306,15 @@ WHERE torrent.id = $1`, result.ID).Scan(
 	if _, err := failingService.Submit(ctx, "cookie", "csrf", orphanInput); !errors.Is(err, ErrTorrentUploadExpired) {
 		t.Fatalf("abandoned Submit() error = %v", err)
 	}
+}
+
+type torrentUploadTrackerAppender struct {
+	events *[]trackerevent.Event
+}
+
+func (appender torrentUploadTrackerAppender) Append(_ context.Context, event trackerevent.Event) error {
+	*appender.events = append(*appender.events, event)
+	return nil
 }
 
 var errIntegrationFinalization = errors.New("integration finalization interrupted")

@@ -26,6 +26,11 @@ var (
 	ErrVIPAlreadyActive                  = errors.New("VIP is already active with the requested expiry")
 	ErrVIPNotActive                      = errors.New("VIP is not active")
 	ErrManagedUserContactUnavailable     = errors.New("managed user contact directory is unavailable")
+	ErrManagedUserCredentialUnavailable  = errors.New("managed user credential lifecycle is unavailable")
+	ErrManagedUserNotDisabled            = errors.New("managed user is not disabled")
+	ErrManagedUserDataUnavailable        = errors.New("managed user data administration is unavailable")
+	ErrManagedUserAdjustmentConflict     = errors.New("managed user adjustment conflicts with existing state")
+	ErrManagedUserAdjustmentInsufficient = errors.New("managed user adjustment would make a balance negative")
 )
 
 type AccountStatus string
@@ -114,11 +119,76 @@ type CurrentAccountRestriction struct {
 
 type ManagedUserDetail struct {
 	ManagedUserSummary
+	Experience                       string
+	DonationAmount                   string
+	RemainingInvites                 int32
+	SubmittedTorrentCount            int64
+	PublishedTorrentCount            int64
+	PendingReviewTorrentCount        int64
+	DirectInviteCount                int64
+	InviterNumericID                 *int64
+	InviterUsername                  *string
+	RegistrationMode                 *RegistrationMode
+	RegistrationState                *RegistrationState
 	ActiveRestrictions               []CurrentAccountRestriction
 	ManualDownloadRestriction        ManualDownloadRestrictionState
 	ManualDownloadRestrictionHistory []ManualDownloadRestrictionTransition
 	VIPState                         VIPState
 	VIPHistory                       []VIPTransition
+}
+
+type ManagedUserAdjustmentField string
+
+const (
+	ManagedUserAdjustmentUploadedBytes    ManagedUserAdjustmentField = "uploaded_bytes"
+	ManagedUserAdjustmentDownloadedBytes  ManagedUserAdjustmentField = "downloaded_bytes"
+	ManagedUserAdjustmentMagicBalance     ManagedUserAdjustmentField = "magic_balance"
+	ManagedUserAdjustmentExperience       ManagedUserAdjustmentField = "experience"
+	ManagedUserAdjustmentRemainingInvites ManagedUserAdjustmentField = "remaining_invites"
+	ManagedUserAdjustmentDonationAmount   ManagedUserAdjustmentField = "donation_amount"
+)
+
+type ManagedUserAdjustmentOperation string
+
+const (
+	ManagedUserAdjustmentIncrease ManagedUserAdjustmentOperation = "increase"
+	ManagedUserAdjustmentDecrease ManagedUserAdjustmentOperation = "decrease"
+)
+
+type ManagedUserAdjustmentInput struct {
+	AdjustmentID        uuid.UUID
+	UserID              uuid.UUID
+	Field               ManagedUserAdjustmentField
+	Operation           ManagedUserAdjustmentOperation
+	Amount              string
+	Reason              string
+	ExpectedUserVersion int64
+}
+
+type ManagedUserAdjustmentCommand struct {
+	AdjustmentID        uuid.UUID
+	UserID              uuid.UUID
+	ActorID             uuid.UUID
+	Field               ManagedUserAdjustmentField
+	Delta               string
+	Reason              string
+	ExpectedUserVersion int64
+	OccurredAt          time.Time
+	Authorization       authz.Decision
+}
+
+type ManagedUserNetworkObservation struct {
+	Address          string
+	FirstSeenAt      time.Time
+	LastSeenAt       time.Time
+	SeenCount        int64
+	RelatedUserCount int64
+}
+
+type ManagedUserNetworkHistory struct {
+	Items         []ManagedUserNetworkObservation
+	RetentionDays int
+	MaximumItems  int
 }
 
 type VIPTransitionKind string
@@ -327,6 +397,26 @@ type ChangeVIPCommand struct {
 	ActorID       uuid.UUID
 	OccurredAt    time.Time
 	Authorization authz.Decision
+}
+
+type ReactivateManagedUserInput struct {
+	ReactivationID      uuid.UUID
+	UserID              uuid.UUID
+	Reason              string
+	ExpectedUserVersion int64
+}
+
+type ReactivateManagedUserCommand struct {
+	ReactivateManagedUserInput
+	ActorID       uuid.UUID
+	OccurredAt    time.Time
+	Authorization authz.Decision
+}
+
+type ManagedUserReactivationPreflight struct {
+	CredentialRef uuid.UUID
+	Status        AccountStatus
+	Version       int64
 }
 
 // AccountRestrictionAuditState is the canonical security state hashed into

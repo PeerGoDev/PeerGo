@@ -204,6 +204,8 @@ case "${deployment_mode}" in
         expected_proxy_value="$(IFS=,; printf '%s' "${expected_proxy_cidrs[*]}")"
         [[ "$(env_get PEERGO_TRACKER_TRUSTED_PROXY_CIDRS)" == "${expected_proxy_value}" ]] ||
             fail "PEERGO_TRACKER_TRUSTED_PROXY_CIDRS must equal the exact ${network_name} gateway CIDR(s): ${expected_proxy_value}"
+        [[ "$(env_get PEERGO_CORE_TRUSTED_PROXY_CIDRS)" == "${expected_proxy_value}" ]] ||
+            fail "PEERGO_CORE_TRUSTED_PROXY_CIDRS must equal the exact ${network_name} gateway CIDR(s): ${expected_proxy_value}"
 
         directory_names=(
             PEERGO_OBJECTS_VOLUME_SOURCE

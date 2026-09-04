@@ -13,18 +13,25 @@ import (
 )
 
 type registrationRepositoryFixture struct {
-	mode           RegistrationMode
-	prepareCommand PrepareRegistrationCommand
-	record         RegistrationRecord
-	prepareErr     error
-	cancelErr      error
-	cancelCalls    int
-	attachCalls    int
-	completeCalls  int
+	mode                    RegistrationMode
+	prepareCommand          PrepareRegistrationCommand
+	record                  RegistrationRecord
+	prepareErr              error
+	preservePreparedRecord  bool
+	cancelErr               error
+	cancelCalls             int
+	cancelContextErr        error
+	attachCalls             int
+	attachContextErr        error
+	completeCalls           int
+	completeContextErr      error
+	incompleteRegistrations []RegistrationRecord
+	releasedReservations    int64
 }
 
-func (fixture *registrationRepositoryFixture) CancelRegistration(_ context.Context, registrationID uuid.UUID) error {
+func (fixture *registrationRepositoryFixture) CancelRegistration(ctx context.Context, registrationID uuid.UUID) error {
 	fixture.cancelCalls++
+	fixture.cancelContextErr = ctx.Err()
 	if registrationID != fixture.prepareCommand.ID {
 		return ErrRegistrationStateConflict
 	}
@@ -44,30 +51,38 @@ func (fixture *registrationRepositoryFixture) PrepareRegistration(_ context.Cont
 		return RegistrationRecord{}, fixture.prepareErr
 	}
 	record := fixture.record
-	record.ID = command.ID
-	record.UserID = command.UserID
+	if !fixture.preservePreparedRecord {
+		record.ID = command.ID
+		record.UserID = command.UserID
+	}
 	record.Username = command.Username
 	record.DisplayName = command.DisplayName
 	return record, nil
 }
 
-func (fixture *registrationRepositoryFixture) AttachRegistrationCredential(_ context.Context, registrationID, credentialRef uuid.UUID, _ time.Time) (RegistrationRecord, error) {
+func (fixture *registrationRepositoryFixture) AttachRegistrationCredential(ctx context.Context, registrationID, credentialRef uuid.UUID, _ time.Time) (RegistrationRecord, error) {
 	fixture.attachCalls++
+	fixture.attachContextErr = ctx.Err()
 	record := fixture.record
 	record.ID = registrationID
 	record.CredentialRef = &credentialRef
 	record.State = RegistrationStateCredentialProvisioned
 	record.Username = fixture.prepareCommand.Username
 	record.DisplayName = fixture.prepareCommand.DisplayName
-	record.UserID = fixture.prepareCommand.UserID
+	if record.UserID == uuid.Nil {
+		record.UserID = fixture.prepareCommand.UserID
+	}
 	return record, nil
 }
 
-func (fixture *registrationRepositoryFixture) CompleteRegistration(_ context.Context, registrationID uuid.UUID, occurredAt time.Time) (RegistrationRecord, error) {
+func (fixture *registrationRepositoryFixture) CompleteRegistration(ctx context.Context, registrationID uuid.UUID, occurredAt time.Time) (RegistrationRecord, error) {
 	fixture.completeCalls++
+	fixture.completeContextErr = ctx.Err()
 	record := fixture.record
 	record.ID = registrationID
-	record.UserID = fixture.prepareCommand.UserID
+	if record.UserID == uuid.Nil {
+		record.UserID = fixture.prepareCommand.UserID
+	}
 	record.Username = fixture.prepareCommand.Username
 	record.DisplayName = fixture.prepareCommand.DisplayName
 	record.State = RegistrationStateCompleted
@@ -75,20 +90,38 @@ func (fixture *registrationRepositoryFixture) CompleteRegistration(_ context.Con
 	return record, nil
 }
 
-type registrationVaultFixture struct {
-	credentialRef uuid.UUID
-	provisioned   RegistrationInput
-	provisionErr  error
-	activateCalls int
+func (fixture *registrationRepositoryFixture) ReleaseStaleRegistrationReservations(context.Context, time.Time, int32) (int64, error) {
+	return fixture.releasedReservations, nil
 }
 
-func (fixture *registrationVaultFixture) ProvisionRegistration(_ context.Context, input RegistrationInput) (uuid.UUID, error) {
+func (fixture *registrationRepositoryFixture) ListIncompleteRegistrations(context.Context, int32) ([]RegistrationRecord, error) {
+	return append([]RegistrationRecord(nil), fixture.incompleteRegistrations...), nil
+}
+
+type registrationVaultFixture struct {
+	credentialRef       uuid.UUID
+	provisioned         RegistrationInput
+	provisionCalls      int
+	provisionContextErr error
+	provisionErr        error
+	provisionHook       func()
+	activateCalls       int
+	activateContextErr  error
+}
+
+func (fixture *registrationVaultFixture) ProvisionRegistration(ctx context.Context, input RegistrationInput) (uuid.UUID, error) {
+	fixture.provisionCalls++
 	fixture.provisioned = input
+	if fixture.provisionHook != nil {
+		fixture.provisionHook()
+	}
+	fixture.provisionContextErr = ctx.Err()
 	return fixture.credentialRef, fixture.provisionErr
 }
 
-func (fixture *registrationVaultFixture) ActivateRegistration(context.Context, uuid.UUID) (uuid.UUID, error) {
+func (fixture *registrationVaultFixture) ActivateRegistration(ctx context.Context, _ uuid.UUID) (uuid.UUID, error) {
 	fixture.activateCalls++
+	fixture.activateContextErr = ctx.Err()
 	return fixture.credentialRef, nil
 }
 
@@ -171,16 +204,21 @@ func TestRegistrationServiceStopsBeforeVaultWhenAdmissionRejects(t *testing.T) {
 	}
 }
 
-func TestRegistrationServiceLeavesReservationRecoverableWhenVaultFails(t *testing.T) {
+func TestRegistrationServiceReleasesPreparedReservationWhenVaultFails(t *testing.T) {
 	repository := &registrationRepositoryFixture{record: RegistrationRecord{
 		Mode: RegistrationModeOpen, State: RegistrationStateReserved,
 	}}
-	vault := &registrationVaultFixture{provisionErr: ErrRegistrationServiceUnavailable}
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	defer cancelRequest()
+	vault := &registrationVaultFixture{
+		provisionErr:  ErrRegistrationServiceUnavailable,
+		provisionHook: cancelRequest,
+	}
 	service, err := NewRegistrationService(repository, vault, time.Now)
 	if err != nil {
 		t.Fatalf("NewRegistrationService() error = %v", err)
 	}
-	_, err = service.Register(context.Background(), RegistrationInput{
+	_, err = service.Register(requestCtx, RegistrationInput{
 		ID: uuid.New(), Username: "new_member", DisplayName: "新成员",
 		Email: "member@example.com", Password: "PeerGo-member-2026!",
 	})
@@ -190,8 +228,110 @@ func TestRegistrationServiceLeavesReservationRecoverableWhenVaultFails(t *testin
 	if repository.attachCalls != 0 || repository.completeCalls != 0 || vault.activateCalls != 0 {
 		t.Fatal("later saga steps ran after Vault provisioning failed")
 	}
-	if repository.cancelCalls != 0 {
-		t.Fatal("transient Vault failure released a recoverable reservation")
+	if repository.cancelCalls != 1 || repository.cancelContextErr != nil {
+		t.Fatalf("cancel calls=%d context error=%v", repository.cancelCalls, repository.cancelContextErr)
+	}
+}
+
+func TestRegistrationServiceResumesAdvancedRegistrationWithoutReprovisioning(t *testing.T) {
+	credentialRef := uuid.New()
+	repository := &registrationRepositoryFixture{record: RegistrationRecord{
+		Mode: RegistrationModeInvite, State: RegistrationStateCredentialProvisioned,
+		CredentialRef: &credentialRef,
+	}}
+	vault := &registrationVaultFixture{credentialRef: credentialRef, provisionErr: ErrRegistrationServiceUnavailable}
+	service, err := NewRegistrationService(repository, vault, time.Now)
+	if err != nil {
+		t.Fatalf("NewRegistrationService() error = %v", err)
+	}
+	result, err := service.Register(context.Background(), RegistrationInput{
+		ID: uuid.New(), Username: "new_member", DisplayName: "新成员",
+		Email: "member@example.com", Password: "PeerGo-member-2026!",
+		InvitationToken: "i" + strings.Repeat("a", 42),
+	})
+	if err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if result.Username != "new_member" || vault.provisionCalls != 0 || repository.cancelCalls != 0 || repository.completeCalls != 1 {
+		t.Fatalf("result=%+v provision=%d cancel=%d complete=%d", result, vault.provisionCalls, repository.cancelCalls, repository.completeCalls)
+	}
+}
+
+func TestRegistrationServiceVerifiesCrossPageRecoveryAgainstOriginalVaultKey(t *testing.T) {
+	originalID := uuid.New()
+	newBrowserID := uuid.New()
+	credentialRef := uuid.New()
+	userID := uuid.New()
+	repository := &registrationRepositoryFixture{
+		preservePreparedRecord: true,
+		record: RegistrationRecord{
+			ID: originalID, UserID: userID, Mode: RegistrationModeInvite,
+			State: RegistrationStateCredentialProvisioned, CredentialRef: &credentialRef,
+		},
+	}
+	vault := &registrationVaultFixture{credentialRef: credentialRef}
+	service, err := NewRegistrationService(repository, vault, time.Now)
+	if err != nil {
+		t.Fatalf("NewRegistrationService() error = %v", err)
+	}
+	result, err := service.Register(context.Background(), RegistrationInput{
+		ID: newBrowserID, Username: "new_member", DisplayName: "新成员",
+		Email: "member@example.com", Password: "PeerGo-member-2026!",
+		InvitationToken: "i" + strings.Repeat("a", 42),
+	})
+	if err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if vault.provisionCalls != 1 || vault.provisioned.ID != originalID || result.UserID != userID {
+		t.Fatalf("provision calls=%d input=%+v result=%+v", vault.provisionCalls, vault.provisioned, result)
+	}
+}
+
+func TestRegistrationServiceFinishesAfterClientCancellation(t *testing.T) {
+	credentialRef := uuid.New()
+	repository := &registrationRepositoryFixture{record: RegistrationRecord{
+		Mode: RegistrationModeInvite, State: RegistrationStateReserved,
+	}}
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	vault := &registrationVaultFixture{credentialRef: credentialRef, provisionHook: cancelRequest}
+	service, err := NewRegistrationService(repository, vault, time.Now)
+	if err != nil {
+		t.Fatalf("NewRegistrationService() error = %v", err)
+	}
+	_, err = service.Register(requestCtx, RegistrationInput{
+		ID: uuid.New(), Username: "new_member", DisplayName: "新成员",
+		Email: "member@example.com", Password: "PeerGo-member-2026!",
+		InvitationToken: "i" + strings.Repeat("a", 42),
+	})
+	if err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if vault.provisionContextErr != nil || repository.attachContextErr != nil || repository.completeContextErr != nil || vault.activateContextErr != nil {
+		t.Fatalf("detached context errors: provision=%v attach=%v activate=%v complete=%v", vault.provisionContextErr, repository.attachContextErr, vault.activateContextErr, repository.completeContextErr)
+	}
+}
+
+func TestRegistrationServiceRecoversIncompleteRegistrations(t *testing.T) {
+	credentialRef := uuid.New()
+	record := RegistrationRecord{
+		ID: uuid.New(), UserID: uuid.New(), Username: "recover_me", DisplayName: "恢复账户",
+		Mode: RegistrationModeInvite, State: RegistrationStateCredentialProvisioned,
+		CredentialRef: &credentialRef,
+	}
+	repository := &registrationRepositoryFixture{
+		record: record, incompleteRegistrations: []RegistrationRecord{record}, releasedReservations: 2,
+	}
+	vault := &registrationVaultFixture{credentialRef: credentialRef}
+	service, err := NewRegistrationService(repository, vault, time.Now)
+	if err != nil {
+		t.Fatalf("NewRegistrationService() error = %v", err)
+	}
+	result, err := service.RecoverIncompleteRegistrations(context.Background())
+	if err != nil {
+		t.Fatalf("RecoverIncompleteRegistrations() error = %v", err)
+	}
+	if result.ReleasedReservations != 2 || result.CompletedRegistrations != 1 || vault.activateCalls != 1 || repository.completeCalls != 1 {
+		t.Fatalf("result=%+v activate=%d complete=%d", result, vault.activateCalls, repository.completeCalls)
 	}
 }
 

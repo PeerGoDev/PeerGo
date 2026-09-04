@@ -1,28 +1,28 @@
-MoviePilotCredentialPath:
+PersonalAPIKeyPath:
   get:
-    operationId: getMyMoviePilotCredential
-    summary: 查看自己的 MoviePilot API Key 状态
+    operationId: getMyPersonalAPIKey
+    summary: 查看自己的个人 API Key 状态
     tags: [integrations]
     x-audience: [web]
     x-owner: core-integrations
-    x-permission: integration.moviepilot.read.self
+    x-permission: integration.apikey.read.self
     x-credential-audience: web-session
     responses:
       "200":
         description: 仅返回不可用于认证的密钥前缀和按六小时合并的最近使用时间。
         content:
           application/json:
-            schema: { $ref: "../schemas/integrations.yaml#/MoviePilotCredentialStatus" }
+            schema: { $ref: "../schemas/integrations.yaml#/PersonalAPIKeyStatus" }
       "401": { $ref: "../responses.yaml#/ProblemResponse" }
       "403": { $ref: "../responses.yaml#/ProblemResponse" }
       default: { $ref: "../responses.yaml#/ProblemResponse" }
   delete:
-    operationId: revokeMyMoviePilotCredential
-    summary: 撤销自己的 MoviePilot API Key
+    operationId: revokeMyPersonalAPIKey
+    summary: 撤销自己的个人 API Key
     tags: [integrations]
     x-audience: [web]
     x-owner: core-integrations
-    x-permission: integration.moviepilot.manage.self
+    x-permission: integration.apikey.manage.self
     x-credential-audience: web-session
     parameters:
       - $ref: "../domains/identity.yaml#/WebCSRFHeader"
@@ -39,14 +39,14 @@ MoviePilotCredentialPath:
       "409": { $ref: "../responses.yaml#/ProblemResponse" }
       default: { $ref: "../responses.yaml#/ProblemResponse" }
 
-MoviePilotCredentialRotationsPath:
+PersonalAPIKeyRotationsPath:
   post:
-    operationId: rotateMyMoviePilotCredential
-    summary: 创建或轮换自己的 MoviePilot API Key
+    operationId: rotateMyPersonalAPIKey
+    summary: 创建或轮换自己的个人 API Key
     tags: [integrations]
     x-audience: [web]
     x-owner: core-integrations
-    x-permission: integration.moviepilot.manage.self
+    x-permission: integration.apikey.manage.self
     x-credential-audience: web-session
     parameters:
       - $ref: "../domains/identity.yaml#/WebCSRFHeader"
@@ -54,13 +54,13 @@ MoviePilotCredentialRotationsPath:
       required: true
       content:
         application/json:
-          schema: { $ref: "../schemas/integrations.yaml#/RotateMoviePilotCredentialRequest" }
+          schema: { $ref: "../schemas/integrations.yaml#/RotatePersonalAPIKeyRequest" }
     responses:
       "201":
         description: 原始 API Key 仅在本响应返回一次；旧密钥立即失效。
         content:
           application/json:
-            schema: { $ref: "../schemas/integrations.yaml#/IssuedMoviePilotCredential" }
+            schema: { $ref: "../schemas/integrations.yaml#/IssuedPersonalAPIKey" }
       "400": { $ref: "../responses.yaml#/ProblemResponse" }
       "401": { $ref: "../responses.yaml#/ProblemResponse" }
       "403": { $ref: "../responses.yaml#/ProblemResponse" }

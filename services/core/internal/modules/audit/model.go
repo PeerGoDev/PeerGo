@@ -48,6 +48,8 @@ const (
 	HNRPolicyRevisionSchemaVersion         = "1.0.0"
 	CommentModerationDecisionEventType     = "social.comment-moderation-decision.recorded"
 	CommentModerationDecisionSchemaVersion = "4.0.0"
+	SeedingRewardRetryEventType            = "economy.seeding-reward-retry.recorded"
+	SeedingRewardRetrySchemaVersion        = "1.0.0"
 	MaxEventPayloadBytes                   = auditevent.MaxPayloadBytes
 )
 
@@ -61,6 +63,26 @@ type Event = auditevent.Event
 type PendingEvent struct {
 	Event
 	Attempts int32
+}
+
+// SeedingRewardRetryRecordedV1 proves that a terminal hourly reward item was
+// deliberately returned to the worker by the operator-only recovery command.
+// Mutable operator prose and the user UUID remain in Core and leave it only as
+// digests or a keyed pseudonym.
+type SeedingRewardRetryRecordedV1 struct {
+	SchemaVersion           string    `json:"schema_version"`
+	EventType               string    `json:"event_type"`
+	EventID                 uuid.UUID `json:"event_id"`
+	OccurredAt              time.Time `json:"occurred_at"`
+	RetryID                 uuid.UUID `json:"retry_id"`
+	WindowStart             time.Time `json:"window_start"`
+	UserPseudonym           string    `json:"user_pseudonym"`
+	PseudonymKeyEpoch       string    `json:"pseudonym_key_epoch"`
+	PreviousAttempts        int32     `json:"previous_attempts"`
+	PreviousErrorCode       string    `json:"previous_error_code"`
+	OperatorReferenceSHA256 string    `json:"operator_reference_sha256"`
+	ReasonSHA256            string    `json:"reason_sha256"`
+	Result                  string    `json:"result"`
 }
 
 // DecisionRecordedV1 is the reviewed JSON contract for one authorization

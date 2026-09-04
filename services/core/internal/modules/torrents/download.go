@@ -59,6 +59,14 @@ type TorrentDownloadRepository interface {
 	PublishedDownloadSource(context.Context, TorrentID) (TorrentDownloadSource, error)
 }
 
+// PendingTorrentDownloadRepository is an uploader-private extension. Keeping
+// it separate preserves the public/RSS repository contract while letting a
+// newly submitted torrent be pre-seeded before review without making the
+// object available to other members.
+type PendingTorrentDownloadRepository interface {
+	PendingReviewUploaderDownloadSource(context.Context, TorrentID, uuid.UUID) (TorrentDownloadSource, error)
+}
+
 type TorrentDownloadSessionAuthenticator interface {
 	CurrentSession(context.Context, string) (identity.WebSession, error)
 }
@@ -206,13 +214,20 @@ func (service *TorrentDownloadService) downloadForAuthorizedUser(ctx context.Con
 	if restricted {
 		return TorrentDownloadResult{}, ErrTorrentDownloadRestricted
 	}
-	if err := service.purchases.RequireDownloadAccess(ctx, user.ID, int64(torrentID)); err != nil {
-		if errors.Is(err, torrentpurchase.ErrNotFound) {
+	purchaseErr := service.purchases.RequireDownloadAccess(ctx, user.ID, int64(torrentID))
+	var source TorrentDownloadSource
+	switch {
+	case purchaseErr == nil:
+		source, err = service.repository.PublishedDownloadSource(ctx, torrentID)
+	case errors.Is(purchaseErr, torrentpurchase.ErrNotFound):
+		pendingRepository, ok := service.repository.(PendingTorrentDownloadRepository)
+		if !ok {
 			return TorrentDownloadResult{}, ErrTorrentDownloadNotFound
 		}
-		return TorrentDownloadResult{}, err
+		source, err = pendingRepository.PendingReviewUploaderDownloadSource(ctx, torrentID, user.ID)
+	default:
+		return TorrentDownloadResult{}, purchaseErr
 	}
-	source, err := service.repository.PublishedDownloadSource(ctx, torrentID)
 	if err != nil {
 		return TorrentDownloadResult{}, err
 	}

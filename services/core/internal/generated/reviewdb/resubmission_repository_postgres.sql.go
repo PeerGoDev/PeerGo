@@ -34,6 +34,8 @@ SELECT
     torrent.category_id,
     torrent.title,
     torrent.subtitle,
+    torrent.info_hash_v1,
+    torrent.total_size_bytes,
     torrent.state,
     torrent.version,
     torrent.submitted_at,
@@ -67,6 +69,8 @@ type GetRejectedTorrentForResubmissionForUpdateRow struct {
 	CategoryID              string
 	Title                   string
 	Subtitle                string
+	InfoHashV1              []byte
+	TotalSizeBytes          int64
 	State                   string
 	Version                 int64
 	SubmittedAt             pgtype.Timestamptz
@@ -88,6 +92,8 @@ func (q *Queries) GetRejectedTorrentForResubmissionForUpdate(ctx context.Context
 		&i.CategoryID,
 		&i.Title,
 		&i.Subtitle,
+		&i.InfoHashV1,
+		&i.TotalSizeBytes,
 		&i.State,
 		&i.Version,
 		&i.SubmittedAt,

@@ -177,6 +177,45 @@ func (handler *Handler) ListNewcomerAssessments(ctx context.Context, request gen
 	}, nil
 }
 
+func (handler *Handler) AssignNewcomerAssessment(ctx context.Context, request generated.AssignNewcomerAssessmentRequestObject) (generated.AssignNewcomerAssessmentResponseObject, error) {
+	if request.Body == nil {
+		return newcomerAssessmentAssignBadRequest(ctx), nil
+	}
+	session, problem, err := handler.authenticateStaffWrite(ctx, request.Params.XCSRFToken)
+	if err != nil {
+		return nil, err
+	}
+	if problem != nil {
+		if problem.Status == http.StatusUnauthorized {
+			return generated.AssignNewcomerAssessment401ApplicationProblemPlusJSONResponse(*problem), nil
+		}
+		return generated.AssignNewcomerAssessment403ApplicationProblemPlusJSONResponse(*problem), nil
+	}
+	reason := ""
+	if request.Body.Reason != nil {
+		reason = *request.Body.Reason
+	}
+	result, err := handler.newcomerAdministration.Assign(ctx, staffActor(session), newcomer.AssignInput{
+		AssignmentID: request.Params.IdempotencyKey, UserID: request.Body.UserId, Reason: reason,
+	})
+	switch {
+	case errors.Is(err, newcomer.ErrInput):
+		return newcomerAssessmentAssignBadRequest(ctx), nil
+	case errors.Is(err, authz.ErrForbidden), errors.Is(err, newcomer.ErrSelfTarget):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "newcomer_assessment_assign_denied", "无法分配新人考核", "当前后台身份无权为该账户分配考核。")
+		return generated.AssignNewcomerAssessment403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, newcomer.ErrNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "managed_user_not_found", "账户不存在", "目标账户不存在或已被移除。")
+		return generated.AssignNewcomerAssessment404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, newcomer.ErrConflict), errors.Is(err, newcomer.ErrIdempotencyConflict):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "newcomer_assignment_conflict", "无法重复分配考核", "账户不是正常状态、已经有考核，或当前没有启用的新人考核规则。")
+		return generated.AssignNewcomerAssessment409ApplicationProblemPlusJSONResponse(problem), nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.AssignNewcomerAssessment201JSONResponse(newcomerAssessmentDTO(result)), nil
+}
+
 func (handler *Handler) ExemptNewcomerAssessment(ctx context.Context, request generated.ExemptNewcomerAssessmentRequestObject) (generated.ExemptNewcomerAssessmentResponseObject, error) {
 	if request.Body == nil {
 		return newcomerAssessmentExemptBadRequest(ctx), nil
@@ -288,4 +327,9 @@ func newcomerPolicyIssueBadRequest(ctx context.Context) generated.IssueNewcomerP
 func newcomerAssessmentExemptBadRequest(ctx context.Context) generated.ExemptNewcomerAssessment400ApplicationProblemPlusJSONResponse {
 	problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_newcomer_exemption", "豁免参数无效", "请刷新考核版本并填写至少 10 个字符的原因。")
 	return generated.ExemptNewcomerAssessment400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}
+}
+
+func newcomerAssessmentAssignBadRequest(ctx context.Context) generated.AssignNewcomerAssessment400ApplicationProblemPlusJSONResponse {
+	problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_newcomer_assignment", "分配参数无效", "请刷新用户详情后重试；原因可留空，由系统自动记录。")
+	return generated.AssignNewcomerAssessment400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}
 }

@@ -168,7 +168,7 @@ SELECT EXISTS (SELECT 1 FROM social.follows WHERE follower_id=$1 AND followee_id
            SELECT 1 FROM identity.sessions AS session
            WHERE session.user_id=$2 AND session.audience='web'
              AND session.revoked_at IS NULL AND session.expires_at>$3
-             AND session.last_seen_at >= $3 - interval '15 minutes'
+             AND session.last_seen_at >= $3::timestamptz - interval '15 minutes'
              AND users.status='active'
              AND NOT EXISTS (
                  SELECT 1 FROM identity.account_restrictions AS restriction

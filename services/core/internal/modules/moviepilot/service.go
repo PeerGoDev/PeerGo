@@ -3,12 +3,9 @@ package moviepilot
 import (
 	"context"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"fmt"
-	"io"
 	"math"
 	"net/url"
 	"strconv"
@@ -18,22 +15,19 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/attendance"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
+	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 )
 
 const (
-	rawAPIKeyBytes        = 32
-	apiKeyPrefix          = "pgk_"
 	downloadCapabilityTTL = 5 * time.Minute
 )
 
-type SessionAuthenticator interface {
-	CurrentSession(context.Context, string) (identity.WebSession, error)
-	AuthenticateWrite(context.Context, string, string) (identity.WebSession, error)
+type APIKeyService interface {
+	ResolveActiveUser(context.Context, uuid.UUID, int64, personalapikey.Scope) (identity.User, error)
 }
 
 type CatalogService interface {
@@ -59,7 +53,6 @@ type ServiceConfig struct {
 	PublicOrigin string
 	SigningKey   []byte
 	Now          func() time.Time
-	ReadRandom   func([]byte) (int, error)
 }
 
 type rateWindow struct {
@@ -67,37 +60,37 @@ type rateWindow struct {
 	count  int
 }
 
-// Service is a deliberately narrow compatibility layer for MoviePilot. It
-// projects canonical PeerGo reads directly and keeps only one hashed API-key
-// row per user; searches, downloads and attendance calls create no API log or
-// copied torrent/profile record in PostgreSQL.
+// Service is a deliberately narrow compatibility adapter for external Rousi
+// clients. It projects canonical PeerGo reads directly; shared API-key
+// lifecycle and authentication are owned by personalapikey. Searches,
+// downloads and attendance calls create no API log or copied record in
+// PostgreSQL.
 type Service struct {
-	repository    Repository
-	authenticator SessionAuthenticator
-	authorizer    authz.Authorizer
-	catalog       CatalogService
-	torrentRead   TorrentReadService
-	downloader    TorrentDownloadService
-	attendance    AttendanceService
-	publicOrigin  url.URL
-	signingKey    []byte
-	now           func() time.Time
-	readRandom    func([]byte) (int, error)
-	rateMu        sync.Mutex
-	rateWindows   map[string]rateWindow
+	repository   Repository
+	apiKeys      APIKeyService
+	catalog      CatalogService
+	torrentRead  TorrentReadService
+	downloader   TorrentDownloadService
+	attendance   AttendanceService
+	legacy       LegacyServices
+	publicOrigin url.URL
+	signingKey   []byte
+	now          func() time.Time
+	rateMu       sync.Mutex
+	rateWindows  map[string]rateWindow
 }
 
 func NewService(
 	repository Repository,
-	authenticator SessionAuthenticator,
-	authorizer authz.Authorizer,
+	apiKeys APIKeyService,
 	catalogService CatalogService,
 	torrentRead TorrentReadService,
 	downloader TorrentDownloadService,
 	attendanceService AttendanceService,
 	config ServiceConfig,
+	legacy ...LegacyServices,
 ) (*Service, error) {
-	if repository == nil || authenticator == nil || authorizer == nil || catalogService == nil || torrentRead == nil || downloader == nil || attendanceService == nil {
+	if repository == nil || apiKeys == nil || catalogService == nil || torrentRead == nil || downloader == nil || attendanceService == nil {
 		return nil, errors.New("MoviePilot service dependencies are required")
 	}
 	origin, err := url.Parse(strings.TrimSpace(config.PublicOrigin))
@@ -112,84 +105,26 @@ func NewService(
 	if config.Now == nil {
 		config.Now = time.Now
 	}
-	if config.ReadRandom == nil {
-		config.ReadRandom = rand.Read
+	legacyServices := LegacyServices{}
+	if len(legacy) > 1 {
+		return nil, errors.New("only one legacy API dependency set may be configured")
+	}
+	if len(legacy) == 1 {
+		legacyServices = legacy[0]
 	}
 	return &Service{
-		repository: repository, authenticator: authenticator, authorizer: authorizer,
+		repository: repository, apiKeys: apiKeys,
 		catalog: catalogService, torrentRead: torrentRead, downloader: downloader,
-		attendance: attendanceService, publicOrigin: *origin,
+		attendance: attendanceService, legacy: legacyServices, publicOrigin: *origin,
 		signingKey: append([]byte(nil), config.SigningKey...), now: config.Now,
-		readRandom: config.ReadRandom, rateWindows: make(map[string]rateWindow),
+		rateWindows: make(map[string]rateWindow),
 	}, nil
 }
 
-func (service *Service) CredentialStatus(ctx context.Context, cookieToken string) (CredentialStatus, error) {
-	session, err := service.authenticator.CurrentSession(ctx, cookieToken)
-	if err != nil {
-		return CredentialStatus{}, err
+func (service *Service) Profile(ctx context.Context, credential personalapikey.AuthenticatedCredential) (Profile, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeProfileRead); err != nil {
+		return Profile{}, err
 	}
-	now := service.now().UTC()
-	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionIntegrationMoviePilotReadSelf, now); err != nil {
-		return CredentialStatus{}, err
-	}
-	credential, err := service.repository.Credential(ctx, session.User.ID)
-	if errors.Is(err, ErrCredentialNotFound) {
-		return CredentialStatus{Active: false}, nil
-	}
-	if err != nil {
-		return CredentialStatus{}, err
-	}
-	return credentialStatus(credential), nil
-}
-
-func (service *Service) RotateCredential(ctx context.Context, cookieToken, csrfToken string, expectedVersion *int64) (IssuedCredential, error) {
-	if expectedVersion != nil && *expectedVersion < 1 {
-		return IssuedCredential{}, ErrInput
-	}
-	session, err := service.authenticator.AuthenticateWrite(ctx, cookieToken, csrfToken)
-	if err != nil {
-		return IssuedCredential{}, err
-	}
-	now := service.now().UTC()
-	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionIntegrationMoviePilotManageSelf, now); err != nil {
-		return IssuedCredential{}, err
-	}
-	raw, digest, prefix, err := service.newAPIKey()
-	if err != nil {
-		return IssuedCredential{}, err
-	}
-	credential, err := service.repository.RotateCredential(ctx, session.User.ID, expectedVersion, digest, prefix, now)
-	if err != nil {
-		return IssuedCredential{}, err
-	}
-	return IssuedCredential{Credential: credentialStatus(credential), APIKey: raw}, nil
-}
-
-func (service *Service) RevokeCredential(ctx context.Context, cookieToken, csrfToken string, expectedVersion int64) error {
-	if expectedVersion < 1 {
-		return ErrInput
-	}
-	session, err := service.authenticator.AuthenticateWrite(ctx, cookieToken, csrfToken)
-	if err != nil {
-		return err
-	}
-	now := service.now().UTC()
-	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionIntegrationMoviePilotManageSelf, now); err != nil {
-		return err
-	}
-	return service.repository.RevokeCredential(ctx, session.User.ID, expectedVersion)
-}
-
-func (service *Service) Authenticate(ctx context.Context, raw string) (AuthenticatedCredential, error) {
-	digest, err := apiKeyDigest(raw)
-	if err != nil {
-		return AuthenticatedCredential{}, ErrCredentialInvalid
-	}
-	return service.repository.Authenticate(ctx, digest, service.now().UTC())
-}
-
-func (service *Service) Profile(ctx context.Context, credential AuthenticatedCredential) (Profile, error) {
 	if !service.allow(credential.User.ID, "profile", 60) {
 		return Profile{}, ErrRateLimited
 	}
@@ -216,14 +151,46 @@ func (service *Service) Profile(ctx context.Context, credential AuthenticatedCre
 	return profile, nil
 }
 
-func (service *Service) ListTorrents(ctx context.Context, credential AuthenticatedCredential, page, pageSize int, keyword, categoryID string) (TorrentPage, error) {
+// SeedingReward returns the latest completed hourly settlement used by
+// PT-depiler's bonusPerHour field. It never recomputes or stores a polling-time
+// estimate, keeping the integration read-only and storage-bounded.
+func (service *Service) SeedingReward(ctx context.Context, credential personalapikey.AuthenticatedCredential) (int64, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeProfileRead); err != nil {
+		return 0, err
+	}
+	if !service.allow(credential.User.ID, "seeding-reward", 30) {
+		return 0, ErrRateLimited
+	}
+	return service.repository.LatestSeedingReward(ctx, credential.User.ID)
+}
+
+func (service *Service) ListTorrents(ctx context.Context, credential personalapikey.AuthenticatedCredential, page, pageSize int, keyword, categoryID string) (TorrentPage, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeTorrentRead); err != nil {
+		return TorrentPage{}, err
+	}
 	if !service.allow(credential.User.ID, "torrent-list", 120) {
 		return TorrentPage{}, ErrRateLimited
 	}
 	if page < 1 || pageSize < 1 || pageSize > 100 || page > 1_000_001 || (page-1) > 1_000_000/pageSize {
 		return TorrentPage{}, ErrInput
 	}
-	categoryID, valid := peerGoCategory(categoryID)
+	rawCategoryID := categoryID
+	categoryID, valid := peerGoCategory(rawCategoryID)
+	if !valid && service.legacy.Catalog != nil {
+		candidate := strings.ToLower(strings.TrimSpace(rawCategoryID))
+		if legacyCategoryPattern.MatchString(candidate) {
+			categories, err := service.legacy.Catalog.ListCategories(ctx)
+			if err != nil {
+				return TorrentPage{}, err
+			}
+			for _, category := range categories {
+				if candidate == category.ID {
+					categoryID, valid = category.ID, true
+					break
+				}
+			}
+		}
+	}
 	if !valid {
 		return TorrentPage{}, ErrInput
 	}
@@ -234,15 +201,20 @@ func (service *Service) ListTorrents(ctx context.Context, credential Authenticat
 	if err != nil {
 		return TorrentPage{}, err
 	}
+	metadata := make(map[int64]TorrentMetadata)
+	if repository, ok := service.repository.(LegacyRepository); ok {
+		ids := make([]int64, 0, len(result.Items))
+		for _, item := range result.Items {
+			ids = append(ids, item.ID)
+		}
+		metadata, err = repository.TorrentMetadataBatch(ctx, ids)
+		if err != nil {
+			return TorrentPage{}, err
+		}
+	}
 	items := make([]TorrentSummary, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, TorrentSummary{
-			ID: item.ID, LegacyRouteID: strconv.FormatInt(item.ID, 10), Title: item.Name,
-			Subtitle: item.Subtitle, Category: moviePilotCategory(item.Category.ID), CategoryName: item.Category.Name,
-			Size: item.SizeBytes, Seeders: item.Swarm.Seeders, Leechers: item.Swarm.Leechers,
-			Downloads: item.Swarm.Completed, CreatedAt: item.UploadedAt.UTC(),
-			Promotion: promotion(item.Promotion, nil),
-		})
+		items = append(items, legacyTorrentSummary(item, metadata[item.ID]))
 	}
 	totalPages := 0
 	if result.Total > 0 {
@@ -251,7 +223,13 @@ func (service *Service) ListTorrents(ctx context.Context, credential Authenticat
 	return TorrentPage{Items: items, Total: result.Total, Page: page, PageSize: pageSize, TotalPages: totalPages}, nil
 }
 
-func (service *Service) Torrent(ctx context.Context, credential AuthenticatedCredential, torrentID int64) (TorrentDownloadDescriptor, error) {
+func (service *Service) Torrent(ctx context.Context, credential personalapikey.AuthenticatedCredential, torrentID int64) (TorrentDownloadDescriptor, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeTorrentRead); err != nil {
+		return TorrentDownloadDescriptor{}, err
+	}
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeTorrentDownload); err != nil {
+		return TorrentDownloadDescriptor{}, err
+	}
 	if torrentID < 1 {
 		return TorrentDownloadDescriptor{}, ErrInput
 	}
@@ -290,59 +268,56 @@ func (service *Service) Download(ctx context.Context, torrentID int64, capabilit
 	if !service.allow(userID, "torrent-download", 20) {
 		return torrents.TorrentDownloadResult{}, ErrRateLimited
 	}
-	now := service.now().UTC()
-	user, err := service.repository.ResolveCapabilityUser(ctx, userID, version, now)
+	user, err := service.apiKeys.ResolveActiveUser(ctx, userID, version, personalapikey.ScopeTorrentDownload)
 	if err != nil {
 		return torrents.TorrentDownloadResult{}, err
 	}
 	return service.downloader.DownloadForRSS(ctx, user, torrents.TorrentID(torrentID))
 }
 
-func (service *Service) AttendanceOverview(ctx context.Context, credential AuthenticatedCredential) (attendance.Overview, error) {
+// DownloadWithCredential supports PT-depiler's fixed legacy download route.
+// Numeric IDs remain canonical. A saved PtYes UUID may resolve through the
+// bounded one-way alias table without reintroducing UUID identity into torrent
+// aggregates or API projections.
+func (service *Service) DownloadWithCredential(ctx context.Context, credential personalapikey.AuthenticatedCredential, routeID string) (torrents.TorrentDownloadResult, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeTorrentDownload); err != nil {
+		return torrents.TorrentDownloadResult{}, err
+	}
+	if credential.User.ID == uuid.Nil || strings.TrimSpace(routeID) == "" {
+		return torrents.TorrentDownloadResult{}, ErrInput
+	}
+	repository, ok := service.repository.(LegacyRepository)
+	if !ok {
+		return torrents.TorrentDownloadResult{}, ErrUnavailable
+	}
+	torrentID, err := repository.ResolveTorrentID(ctx, routeID)
+	if err != nil {
+		return torrents.TorrentDownloadResult{}, err
+	}
+	if !service.allow(credential.User.ID, "torrent-download", 20) {
+		return torrents.TorrentDownloadResult{}, ErrRateLimited
+	}
+	return service.downloader.DownloadForRSS(ctx, credential.User, torrents.TorrentID(torrentID))
+}
+
+func (service *Service) AttendanceOverview(ctx context.Context, credential personalapikey.AuthenticatedCredential) (attendance.Overview, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeAttendanceRead); err != nil {
+		return attendance.Overview{}, err
+	}
 	if !service.allow(credential.User.ID, "attendance-read", 30) {
 		return attendance.Overview{}, ErrRateLimited
 	}
 	return service.attendance.OverviewForIntegration(ctx, credential.User)
 }
 
-func (service *Service) ClaimAttendance(ctx context.Context, credential AuthenticatedCredential, mode attendance.Mode) (attendance.Record, error) {
+func (service *Service) ClaimAttendance(ctx context.Context, credential personalapikey.AuthenticatedCredential, mode attendance.Mode) (attendance.Record, error) {
+	if err := personalapikey.RequireScope(credential, personalapikey.ScopeAttendanceClaim); err != nil {
+		return attendance.Record{}, err
+	}
 	if !service.allow(credential.User.ID, "attendance-claim", 10) {
 		return attendance.Record{}, ErrRateLimited
 	}
 	return service.attendance.ClaimForIntegration(ctx, credential.User, uuid.New(), mode)
-}
-
-func (service *Service) newAPIKey() (string, []byte, string, error) {
-	randomBytes := make([]byte, rawAPIKeyBytes)
-	n, err := service.readRandom(randomBytes)
-	if err != nil {
-		return "", nil, "", fmt.Errorf("generate MoviePilot API key: %w", err)
-	}
-	if n != len(randomBytes) {
-		return "", nil, "", fmt.Errorf("generate MoviePilot API key: %w", io.ErrUnexpectedEOF)
-	}
-	raw := apiKeyPrefix + base64.RawURLEncoding.EncodeToString(randomBytes)
-	digest := sha256.Sum256([]byte(raw))
-	return raw, digest[:], raw[:12], nil
-}
-
-func apiKeyDigest(raw string) ([]byte, error) {
-	if len(raw) != 47 || !strings.HasPrefix(raw, apiKeyPrefix) || strings.TrimSpace(raw) != raw {
-		return nil, ErrCredentialInvalid
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(raw, apiKeyPrefix))
-	if err != nil || len(decoded) != rawAPIKeyBytes {
-		return nil, ErrCredentialInvalid
-	}
-	digest := sha256.Sum256([]byte(raw))
-	return digest[:], nil
-}
-
-func credentialStatus(credential Credential) CredentialStatus {
-	return CredentialStatus{
-		Active: true, KeyPrefix: credential.KeyPrefix, Version: credential.Version,
-		CreatedAt: credential.CreatedAt.UTC(), LastUsedAt: credential.LastUsedAt,
-	}
 }
 
 func (service *Service) allow(userID uuid.UUID, operation string, maximum int) bool {

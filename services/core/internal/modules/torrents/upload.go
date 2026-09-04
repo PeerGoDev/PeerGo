@@ -55,6 +55,7 @@ type TorrentUploadInput struct {
 	Description         string
 	MediaInfo           string
 	Anonymous           bool
+	PurchasePrice       int64
 	ExternalIdentifiers []ExternalIdentifier
 	FacetSelections     []FacetSelection
 	Screenshots         []TorrentScreenshotInput
@@ -62,8 +63,9 @@ type TorrentUploadInput struct {
 }
 
 // TorrentUploadResult is deliberately a submission projection rather than a
-// public listing row. New uploads remain pending review and cannot enter the
-// Tracker allowlist until a separate reviewed transition succeeds.
+// public listing row. New uploads remain pending review and are admitted to
+// Tracker only for private pre-seeding; approval is still the sole transition
+// that creates a public catalog row.
 type TorrentUploadResult struct {
 	ID             TorrentID
 	InfoHashV1     InfoHashV1
@@ -137,8 +139,8 @@ type TorrentUploadRepository interface {
 }
 
 // TrustedTorrentPublisher is implemented by the review context. Upload owns
-// parsing and durable object creation; only review may transition a verified
-// pending aggregate into Tracker-visible published state.
+// parsing, durable object creation and pending pre-seeding admission; only
+// review may transition the verified aggregate into public published state.
 type TrustedTorrentPublisher interface {
 	PublishTrusted(context.Context, TrustedPublishCommand) (TrustedPublishResult, error)
 }
@@ -245,11 +247,25 @@ func (service *TorrentUploadService) Submit(ctx context.Context, cookieToken, cs
 	if err != nil {
 		return TorrentUploadResult{}, err
 	}
-	if session.User.EmailVerifiedAt == nil {
+	return service.submitAuthorized(ctx, session.User, input)
+}
+
+// SubmitForIntegration shares the canonical upload pipeline with API-key
+// clients. Authentication is already complete, but email verification and the
+// ordinary torrent.submit authorization are deliberately enforced again here.
+func (service *TorrentUploadService) SubmitForIntegration(ctx context.Context, user identity.User, input TorrentUploadInput) (TorrentUploadResult, error) {
+	if input.ID == uuid.Nil || user.ID == uuid.Nil {
+		return TorrentUploadResult{}, ErrTorrentInputInvalid
+	}
+	return service.submitAuthorized(ctx, user, input)
+}
+
+func (service *TorrentUploadService) submitAuthorized(ctx context.Context, user identity.User, input TorrentUploadInput) (TorrentUploadResult, error) {
+	if user.EmailVerifiedAt == nil {
 		return TorrentUploadResult{}, ErrTorrentUploadEmailUnverified
 	}
 	now := service.now().UTC()
-	authorization, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionTorrentSubmit, now)
+	authorization, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, user.ID, authz.ActionTorrentSubmit, now)
 	if err != nil {
 		return TorrentUploadResult{}, err
 	}
@@ -275,9 +291,9 @@ func (service *TorrentUploadService) Submit(ctx context.Context, cookieToken, cs
 	// Construct once before reservation so normalized metadata, parser-derived
 	// identity and all domain bounds participate in the idempotency fingerprint.
 	candidate, err := NewPendingTorrent(NewPendingTorrentInput{
-		UploaderID: session.User.ID,
+		UploaderID: user.ID,
 		CategoryID: input.CategoryID, Title: input.Title, Subtitle: input.Subtitle,
-		Description: input.Description, MediaInfo: input.MediaInfo, Anonymous: input.Anonymous,
+		Description: input.Description, MediaInfo: input.MediaInfo, Anonymous: input.Anonymous, PurchasePrice: input.PurchasePrice,
 		ExternalIdentifiers: input.ExternalIdentifiers,
 		FacetSelections:     input.FacetSelections,
 		Screenshots:         screenshotMetadata(preparedScreenshots),
@@ -289,7 +305,7 @@ func (service *TorrentUploadService) Submit(ctx context.Context, cookieToken, cs
 	fingerprint := torrentUploadFingerprint(candidate)
 	descriptor := StoredObjectDescriptor{SHA256: metainfo.ObjectSHA256, ByteLength: metainfo.ObjectByteLength}
 	reservation, err := service.repository.Reserve(ctx, ReserveTorrentUploadCommand{
-		ID: input.ID, UploaderID: session.User.ID, RequestFingerprint: fingerprint,
+		ID: input.ID, UploaderID: user.ID, RequestFingerprint: fingerprint,
 		ObjectID: candidate.Object.ID, CategoryID: candidate.CategoryID,
 		InfoHashV1: candidate.InfoHashV1, Descriptor: descriptor,
 		BackendID: service.activeBackendID, ObjectKey: TorrentObjectKey(descriptor.SHA256), OccurredAt: now,
@@ -324,9 +340,9 @@ func (service *TorrentUploadService) Submit(ctx context.Context, cookieToken, cs
 	// Existing reservations own their original IDs and submission time. This is
 	// what makes a response-loss retry return one stable aggregate.
 	pending, err := NewPendingTorrent(NewPendingTorrentInput{
-		UploaderID: session.User.ID,
+		UploaderID: user.ID,
 		CategoryID: input.CategoryID, Title: input.Title, Subtitle: input.Subtitle,
-		Description: input.Description, MediaInfo: input.MediaInfo, Anonymous: input.Anonymous,
+		Description: input.Description, MediaInfo: input.MediaInfo, Anonymous: input.Anonymous, PurchasePrice: input.PurchasePrice,
 		ExternalIdentifiers: input.ExternalIdentifiers,
 		FacetSelections:     input.FacetSelections,
 		Screenshots:         screenshotMetadata(preparedScreenshots),
@@ -480,6 +496,9 @@ func torrentUploadFingerprint(torrent Torrent) ObjectSHA256 {
 	} else {
 		_, _ = hasher.Write([]byte{0})
 	}
+	var purchasePrice [8]byte
+	binary.BigEndian.PutUint64(purchasePrice[:], uint64(torrent.PurchasePrice))
+	_, _ = hasher.Write(purchasePrice[:])
 	for _, identifier := range torrent.ExternalIdentifiers {
 		writeFingerprintString(hasher, identifier.Provider)
 		writeFingerprintString(hasher, identifier.ExternalID)

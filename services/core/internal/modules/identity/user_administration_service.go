@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -23,7 +25,11 @@ const (
 	maxRestrictionRevocationReasonRunes = 500
 	maxAccountRestrictionDurationHours  = 7 * 24
 	maxVIPDurationDays                  = 10 * 365
+	managedUserNetworkRetentionDays     = 180
+	managedUserNetworkMaximumItems      = 20
 )
+
+var managedUserDecimalAmountPattern = regexp.MustCompile(`^[0-9]+(?:\.[0-9]+)?$`)
 
 type UserAdministrationRepository interface {
 	ListManagedUsers(context.Context, ManagedUserListQuery) (ManagedUserPage, error)
@@ -37,10 +43,21 @@ type AccountRestrictionCommandRepository interface {
 	UpdateManualDownloadRestriction(context.Context, ManualDownloadRestrictionCommand) (ManagedUserDetail, error)
 	RevokeManualDownloadRestriction(context.Context, ManualDownloadRestrictionCommand) (ManagedUserDetail, error)
 	ChangeVIP(context.Context, ChangeVIPCommand) (ManagedUserDetail, error)
+	ManagedUserReactivationPreflight(context.Context, uuid.UUID) (ManagedUserReactivationPreflight, error)
+	ReactivateManagedUser(context.Context, ReactivateManagedUserCommand) (ManagedUserDetail, error)
 }
 
 type ManagedUserContactDirectory interface {
 	Emails(context.Context, []uuid.UUID) (map[uuid.UUID]string, error)
+}
+
+type ManagedUserDataAdministrationRepository interface {
+	AdjustManagedUser(context.Context, ManagedUserAdjustmentCommand) error
+	ListManagedUserNetworkHistory(context.Context, uuid.UUID, time.Time, int) ([]ManagedUserNetworkObservation, error)
+}
+
+type ManagedUserCredentialLifecycle interface {
+	EnableAfterAccountAppeal(context.Context, uuid.UUID) error
 }
 
 type UserAdministrationService struct {
@@ -48,7 +65,30 @@ type UserAdministrationService struct {
 	restrictionRepository AccountRestrictionCommandRepository
 	authorizer            authz.Authorizer
 	contactDirectory      ManagedUserContactDirectory
+	credentialLifecycle   ManagedUserCredentialLifecycle
+	dataRepository        ManagedUserDataAdministrationRepository
 	now                   func() time.Time
+}
+
+func NewUserAdministrationServiceWithData(
+	repository UserAdministrationRepository,
+	restrictionRepository AccountRestrictionCommandRepository,
+	dataRepository ManagedUserDataAdministrationRepository,
+	authorizer authz.Authorizer,
+	now func() time.Time,
+	contactDirectories ...ManagedUserContactDirectory,
+) (*UserAdministrationService, error) {
+	if dataRepository == nil {
+		return nil, errors.New("managed user data administration repository is required")
+	}
+	service, err := NewUserAdministrationService(
+		repository, restrictionRepository, authorizer, now, contactDirectories...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	service.dataRepository = dataRepository
+	return service, nil
 }
 
 func NewUserAdministrationService(repository UserAdministrationRepository, restrictionRepository AccountRestrictionCommandRepository, authorizer authz.Authorizer, now func() time.Time, contactDirectories ...ManagedUserContactDirectory) (*UserAdministrationService, error) {
@@ -68,10 +108,74 @@ func NewUserAdministrationService(repository UserAdministrationRepository, restr
 		}
 		contactDirectory = contactDirectories[0]
 	}
+	var credentialLifecycle ManagedUserCredentialLifecycle
+	if contactDirectory != nil {
+		credentialLifecycle, _ = contactDirectory.(ManagedUserCredentialLifecycle)
+	}
 	return &UserAdministrationService{
 		repository: repository, restrictionRepository: restrictionRepository,
-		authorizer: authorizer, contactDirectory: contactDirectory, now: now,
+		authorizer: authorizer, contactDirectory: contactDirectory,
+		credentialLifecycle: credentialLifecycle, now: now,
 	}, nil
+}
+
+func (service *UserAdministrationService) Reactivate(ctx context.Context, actor authz.StaffActor, input ReactivateManagedUserInput) (ManagedUserDetail, error) {
+	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = "管理员手动解除账户封禁"
+	}
+	if input.ReactivationID == uuid.Nil || input.UserID == uuid.Nil || input.ExpectedUserVersion < 1 || !validAdministrationReason(input.Reason) {
+		return ManagedUserDetail{}, ErrUserAdministrationInput
+	}
+	if input.UserID == actor.Subject.ID {
+		return ManagedUserDetail{}, ErrAccountRestrictionSelfTarget
+	}
+	if service.credentialLifecycle == nil {
+		return ManagedUserDetail{}, ErrManagedUserCredentialUnavailable
+	}
+	now := service.now().UTC().Round(0)
+	decision, err := authz.AuthorizeStaffAction(ctx, service.authorizer, actor, authz.ActionUserAccountRestrictionRevoke, authz.SiteScope(), now, "identity-account-reactivation")
+	if err != nil {
+		return ManagedUserDetail{}, err
+	}
+	preflight, err := service.restrictionRepository.ManagedUserReactivationPreflight(ctx, input.UserID)
+	if err != nil {
+		return ManagedUserDetail{}, err
+	}
+	if preflight.Version != input.ExpectedUserVersion {
+		// A completed idempotent replay has already advanced the version once.
+		if preflight.Status != AccountStatusActive || preflight.Version != input.ExpectedUserVersion+1 {
+			return ManagedUserDetail{}, ErrManagedUserVersionConflict
+		}
+		result, err := service.restrictionRepository.ReactivateManagedUser(ctx, ReactivateManagedUserCommand{
+			ReactivateManagedUserInput: input, ActorID: actor.Subject.ID, OccurredAt: now, Authorization: decision,
+		})
+		if err != nil {
+			return ManagedUserDetail{}, fmt.Errorf("replay managed user reactivation: %w", err)
+		}
+		if err := service.enrichManagedUser(ctx, &result.ManagedUserSummary); err != nil {
+			return ManagedUserDetail{}, err
+		}
+		return result, nil
+	}
+	if preflight.Status != AccountStatusDisabled {
+		return ManagedUserDetail{}, ErrManagedUserNotDisabled
+	}
+	// Vault first and Core second is fail-closed: a Core race still leaves the
+	// disabled account projection blocking login and the command can be retried.
+	if err := service.credentialLifecycle.EnableAfterAccountAppeal(ctx, preflight.CredentialRef); err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("%w: %v", ErrManagedUserCredentialUnavailable, err)
+	}
+	result, err := service.restrictionRepository.ReactivateManagedUser(ctx, ReactivateManagedUserCommand{
+		ReactivateManagedUserInput: input, ActorID: actor.Subject.ID, OccurredAt: now, Authorization: decision,
+	})
+	if err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("reactivate managed user: %w", err)
+	}
+	if err := service.enrichManagedUser(ctx, &result.ManagedUserSummary); err != nil {
+		return ManagedUserDetail{}, err
+	}
+	return result, nil
 }
 
 func (service *UserAdministrationService) List(ctx context.Context, actor authz.StaffActor, input ListManagedUsersInput) (ManagedUserPage, error) {
@@ -113,6 +217,76 @@ func (service *UserAdministrationService) Get(ctx context.Context, actor authz.S
 		return ManagedUserDetail{}, err
 	}
 	return result, nil
+}
+
+func (service *UserAdministrationService) Adjust(ctx context.Context, actor authz.StaffActor, input ManagedUserAdjustmentInput) (ManagedUserDetail, error) {
+	normalized, err := normalizeManagedUserAdjustmentInput(input)
+	if err != nil {
+		return ManagedUserDetail{}, err
+	}
+	if service.dataRepository == nil {
+		return ManagedUserDetail{}, ErrManagedUserDataUnavailable
+	}
+	if normalized.UserID == actor.Subject.ID {
+		return ManagedUserDetail{}, ErrAccountRestrictionSelfTarget
+	}
+	now := service.now().UTC().Round(0)
+	decision, err := authz.AuthorizeStaffAction(
+		ctx, service.authorizer, actor, authz.ActionUserAccountAdjust,
+		authz.SiteScope(), now, "identity-user-data-administration",
+	)
+	if err != nil {
+		return ManagedUserDetail{}, err
+	}
+	if err := service.dataRepository.AdjustManagedUser(ctx, ManagedUserAdjustmentCommand{
+		AdjustmentID:        normalized.AdjustmentID,
+		UserID:              normalized.UserID,
+		ActorID:             actor.Subject.ID,
+		Field:               normalized.Field,
+		Delta:               normalized.Amount,
+		Reason:              normalized.Reason,
+		ExpectedUserVersion: normalized.ExpectedUserVersion,
+		OccurredAt:          now,
+		Authorization:       decision,
+	}); err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("adjust managed user data: %w", err)
+	}
+	result, err := service.repository.GetManagedUser(ctx, normalized.UserID, now)
+	if err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("read adjusted managed user: %w", err)
+	}
+	if err := service.enrichManagedUser(ctx, &result.ManagedUserSummary); err != nil {
+		return ManagedUserDetail{}, err
+	}
+	return result, nil
+}
+
+func (service *UserAdministrationService) NetworkHistory(ctx context.Context, actor authz.StaffActor, userID uuid.UUID) (ManagedUserNetworkHistory, error) {
+	if userID == uuid.Nil {
+		return ManagedUserNetworkHistory{}, ErrUserAdministrationInput
+	}
+	if service.dataRepository == nil {
+		return ManagedUserNetworkHistory{}, ErrManagedUserDataUnavailable
+	}
+	now := service.now().UTC().Round(0)
+	if _, err := authz.AuthorizeStaffAction(
+		ctx, service.authorizer, actor, authz.ActionUserNetworkRead,
+		authz.SiteScope(), now, "identity-user-network-history",
+	); err != nil {
+		return ManagedUserNetworkHistory{}, err
+	}
+	items, err := service.dataRepository.ListManagedUserNetworkHistory(
+		ctx, userID, now.AddDate(0, 0, -managedUserNetworkRetentionDays),
+		managedUserNetworkMaximumItems,
+	)
+	if err != nil {
+		return ManagedUserNetworkHistory{}, fmt.Errorf("list managed user network history: %w", err)
+	}
+	return ManagedUserNetworkHistory{
+		Items:         items,
+		RetentionDays: managedUserNetworkRetentionDays,
+		MaximumItems:  managedUserNetworkMaximumItems,
+	}, nil
 }
 
 func (service *UserAdministrationService) CreateRestriction(ctx context.Context, actor authz.StaffActor, input CreateAccountRestrictionInput) (ManagedUserDetail, error) {
@@ -311,6 +485,101 @@ func normalizeManagedUserListInput(input ListManagedUsersInput) (ListManagedUser
 		return ListManagedUsersInput{}, ErrUserAdministrationInput
 	}
 	return input, nil
+}
+
+func normalizeManagedUserAdjustmentInput(input ManagedUserAdjustmentInput) (ManagedUserAdjustmentInput, error) {
+	if input.AdjustmentID == uuid.Nil || input.UserID == uuid.Nil || input.ExpectedUserVersion < 1 ||
+		(input.Operation != ManagedUserAdjustmentIncrease && input.Operation != ManagedUserAdjustmentDecrease) {
+		return ManagedUserAdjustmentInput{}, ErrUserAdministrationInput
+	}
+	amount, err := canonicalManagedUserAdjustmentAmount(input.Field, input.Amount)
+	if err != nil {
+		return ManagedUserAdjustmentInput{}, err
+	}
+	if input.Operation == ManagedUserAdjustmentDecrease {
+		amount = "-" + amount
+	}
+	input.Amount = amount
+	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = "管理员调整" + managedUserAdjustmentFieldLabel(input.Field)
+	}
+	reasonRunes := utf8.RuneCountInString(input.Reason)
+	if !utf8.ValidString(input.Reason) || reasonRunes < 1 || reasonRunes > maxRestrictionRevocationReasonRunes {
+		return ManagedUserAdjustmentInput{}, ErrUserAdministrationInput
+	}
+	return input, nil
+}
+
+func canonicalManagedUserAdjustmentAmount(field ManagedUserAdjustmentField, raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if !managedUserDecimalAmountPattern.MatchString(value) {
+		return "", ErrUserAdministrationInput
+	}
+	parts := strings.SplitN(value, ".", 2)
+	integer := strings.TrimLeft(parts[0], "0")
+	if integer == "" {
+		integer = "0"
+	}
+	fraction := ""
+	if len(parts) == 2 {
+		fraction = strings.TrimRight(parts[1], "0")
+	}
+	canonical := integer
+	if fraction != "" {
+		canonical += "." + fraction
+	}
+	if canonical == "0" {
+		return "", ErrUserAdministrationInput
+	}
+
+	switch field {
+	case ManagedUserAdjustmentUploadedBytes, ManagedUserAdjustmentDownloadedBytes, ManagedUserAdjustmentMagicBalance:
+		if fraction != "" {
+			return "", ErrUserAdministrationInput
+		}
+		if _, err := strconv.ParseInt(integer, 10, 64); err != nil {
+			return "", ErrUserAdministrationInput
+		}
+	case ManagedUserAdjustmentRemainingInvites:
+		if fraction != "" {
+			return "", ErrUserAdministrationInput
+		}
+		amount, err := strconv.ParseInt(integer, 10, 32)
+		if err != nil || amount > 1_000_000 {
+			return "", ErrUserAdministrationInput
+		}
+	case ManagedUserAdjustmentExperience:
+		if len(integer) > 18 || len(fraction) > 20 {
+			return "", ErrUserAdministrationInput
+		}
+	case ManagedUserAdjustmentDonationAmount:
+		if len(integer) > 10 || len(fraction) > 2 {
+			return "", ErrUserAdministrationInput
+		}
+	default:
+		return "", ErrUserAdministrationInput
+	}
+	return canonical, nil
+}
+
+func managedUserAdjustmentFieldLabel(field ManagedUserAdjustmentField) string {
+	switch field {
+	case ManagedUserAdjustmentUploadedBytes:
+		return "用户上传量"
+	case ManagedUserAdjustmentDownloadedBytes:
+		return "用户下载量"
+	case ManagedUserAdjustmentMagicBalance:
+		return "用户魔力值"
+	case ManagedUserAdjustmentExperience:
+		return "用户经验值"
+	case ManagedUserAdjustmentRemainingInvites:
+		return "用户可用邀请"
+	case ManagedUserAdjustmentDonationAmount:
+		return "用户捐赠金额"
+	default:
+		return "用户数据"
+	}
 }
 
 func normalizeCreateAccountRestrictionInput(input CreateAccountRestrictionInput) (CreateAccountRestrictionInput, error) {

@@ -132,27 +132,38 @@ func (repository *PostgresRepository) List(ctx context.Context, userID uuid.UUID
 				Response:     strings.TrimSpace(row.HnrAppealResponse.String),
 			}
 		case KindWorkgroupContribution:
-			if !row.WorkgroupGroupKind.Valid || !row.WorkgroupMetric.Valid ||
-				!row.WorkgroupPolicyRevision.Valid || !row.WorkgroupPeriodStartsAt.Valid ||
+			if row.WorkgroupGroupKind == "" || row.WorkgroupMetric == "" ||
+				row.WorkgroupPolicyRevision < 1 || !row.WorkgroupPeriodStartsAt.Valid ||
 				!row.WorkgroupPeriodEndsAt.Valid || !row.WorkgroupObservedAt.Valid ||
-				!row.WorkgroupEvidenceState.Valid || !row.WorkgroupCurrentValue.Valid ||
-				!row.WorkgroupTargetValue.Valid || !row.WorkgroupAssessmentState.Valid ||
-				!row.WorkgroupExplanationCode.Valid || !row.WorkgroupReason.Valid {
+				row.WorkgroupEvidenceState == "" || row.WorkgroupTargetValue < 1 ||
+				row.WorkgroupAssessmentState == "" || row.WorkgroupExplanationCode == "" ||
+				row.WorkgroupReason == "" {
 				return Page{}, ErrInvariant
 			}
 			payload := &WorkgroupContributionNotification{
-				GroupKind:       workgroups.GroupKind(row.WorkgroupGroupKind.String),
-				Metric:          workgroups.ContributionMetric(row.WorkgroupMetric.String),
-				PolicyRevision:  row.WorkgroupPolicyRevision.Int64,
+				GroupKind:       workgroups.GroupKind(row.WorkgroupGroupKind),
+				Metric:          workgroups.ContributionMetric(row.WorkgroupMetric),
+				PolicyRevision:  row.WorkgroupPolicyRevision,
 				PeriodStartsAt:  row.WorkgroupPeriodStartsAt.Time.UTC(),
 				PeriodEndsAt:    row.WorkgroupPeriodEndsAt.Time.UTC(),
 				ObservedAt:      row.WorkgroupObservedAt.Time.UTC(),
-				EvidenceState:   workgroups.ContributionEvidenceState(row.WorkgroupEvidenceState.String),
-				CurrentValue:    row.WorkgroupCurrentValue.Int64,
-				TargetValue:     row.WorkgroupTargetValue.Int64,
-				AssessmentState: workgroups.ContributionAssessmentState(row.WorkgroupAssessmentState.String),
-				ExplanationCode: workgroups.ContributionExplanationCode(row.WorkgroupExplanationCode.String),
-				Reason:          strings.TrimSpace(row.WorkgroupReason.String),
+				EvidenceState:   workgroups.ContributionEvidenceState(row.WorkgroupEvidenceState),
+				CurrentValue:    row.WorkgroupCurrentValue,
+				TargetValue:     row.WorkgroupTargetValue,
+				AssessmentState: workgroups.ContributionAssessmentState(row.WorkgroupAssessmentState),
+				ExplanationCode: workgroups.ContributionExplanationCode(row.WorkgroupExplanationCode),
+				Reason:          strings.TrimSpace(row.WorkgroupReason),
+			}
+			if row.WorkgroupMissCount != 0 || row.WorkgroupAllowedMisses != 0 || row.WorkgroupDisciplinaryAction != "" {
+				if row.WorkgroupMissCount < 1 || row.WorkgroupAllowedMisses < 1 || row.WorkgroupDisciplinaryAction == "" {
+					return Page{}, ErrInvariant
+				}
+				missCount := row.WorkgroupMissCount
+				allowedMisses := row.WorkgroupAllowedMisses
+				action := workgroups.ContributionDisciplinaryAction(row.WorkgroupDisciplinaryAction)
+				payload.MissCount = &missCount
+				payload.AllowedMisses = &allowedMisses
+				payload.DisciplinaryAction = &action
 			}
 			if !validWorkgroupContributionPayload(payload) {
 				return Page{}, ErrInvariant
@@ -240,7 +251,16 @@ func validWorkgroupContributionPayload(payload *WorkgroupContributionNotificatio
 		(payload.GroupKind == workgroups.GroupReseed && payload.Metric == workgroups.MetricTrustedTorrentsPublished) ||
 			(payload.GroupKind == workgroups.GroupReview && payload.Metric == workgroups.MetricTorrentReviewVotes) ||
 			(payload.GroupKind == workgroups.GroupRetention && payload.Metric == workgroups.MetricSeedingActiveSeconds)
-	return validKindMetric &&
+	validEnforcement := payload.MissCount == nil && payload.AllowedMisses == nil && payload.DisciplinaryAction == nil
+	if payload.MissCount != nil || payload.AllowedMisses != nil || payload.DisciplinaryAction != nil {
+		validEnforcement = payload.MissCount != nil && payload.AllowedMisses != nil && payload.DisciplinaryAction != nil &&
+			*payload.MissCount > 0 && *payload.AllowedMisses > 0 &&
+			((*payload.MissCount <= *payload.AllowedMisses && *payload.DisciplinaryAction == workgroups.ContributionDisciplinaryMarked) ||
+				(*payload.MissCount > *payload.AllowedMisses && *payload.DisciplinaryAction == workgroups.ContributionDisciplinaryMembershipEnded)) &&
+			payload.EvidenceState == workgroups.ContributionEvidenceComplete &&
+			payload.AssessmentState == workgroups.ContributionAssessmentNotMet
+	}
+	return validKindMetric && validEnforcement &&
 		(payload.EvidenceState == workgroups.ContributionEvidenceCollecting ||
 			payload.EvidenceState == workgroups.ContributionEvidenceComplete) &&
 		(payload.AssessmentState == workgroups.ContributionAssessmentInProgress ||

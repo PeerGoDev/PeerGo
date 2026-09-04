@@ -11,18 +11,39 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/peergo/peergo/services/core/internal/contracts/trackerevent"
 	"github.com/peergo/peergo/services/core/internal/generated/torrentdb"
 )
 
 type PostgresTorrentUploadRepository struct {
-	pool *pgxpool.Pool
+	pool               *pgxpool.Pool
+	newTrackerAppender func(pgx.Tx) trackerevent.Appender
+	newEventID         func() uuid.UUID
 }
 
-func NewPostgresTorrentUploadRepository(pool *pgxpool.Pool) (*PostgresTorrentUploadRepository, error) {
+type PostgresTorrentUploadRepositoryConfig struct {
+	NewTrackerAppender func(pgx.Tx) trackerevent.Appender
+	NewEventID         func() uuid.UUID
+}
+
+func NewPostgresTorrentUploadRepository(
+	pool *pgxpool.Pool,
+	configs ...PostgresTorrentUploadRepositoryConfig,
+) (*PostgresTorrentUploadRepository, error) {
 	if pool == nil {
 		return nil, errors.New("torrent upload repository requires a database pool")
 	}
-	return &PostgresTorrentUploadRepository{pool: pool}, nil
+	if len(configs) > 1 {
+		return nil, errors.New("torrent upload repository accepts at most one configuration")
+	}
+	repository := &PostgresTorrentUploadRepository{pool: pool, newEventID: uuid.New}
+	if len(configs) == 1 {
+		repository.newTrackerAppender = configs[0].NewTrackerAppender
+		if configs[0].NewEventID != nil {
+			repository.newEventID = configs[0].NewEventID
+		}
+	}
+	return repository, nil
 }
 
 // Reserve claims the protocol and object identities before object storage is
@@ -224,6 +245,9 @@ func (repository *PostgresTorrentUploadRepository) Finalize(ctx context.Context,
 	if err := validateFinalizeTorrentUploadCommand(command); err != nil {
 		return TorrentUploadResult{}, err
 	}
+	if repository.newTrackerAppender == nil || repository.newEventID == nil {
+		return TorrentUploadResult{}, errors.New("torrent upload Tracker eligibility outbox is required")
+	}
 	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return TorrentUploadResult{}, fmt.Errorf("begin torrent upload finalization: %w", err)
@@ -302,6 +326,7 @@ func (repository *PostgresTorrentUploadRepository) Finalize(ctx context.Context,
 		Title: command.Torrent.Title, Subtitle: command.Torrent.Subtitle,
 		Description: command.Torrent.Description, DescriptionFormat: command.Torrent.DescriptionFormat,
 		MediaInfo: command.Torrent.MediaInfo, Anonymous: command.Torrent.Anonymous,
+		PurchasePrice:  command.Torrent.PurchasePrice,
 		TotalSizeBytes: command.Torrent.TotalSizeBytes, PayloadSizeBytes: command.Torrent.PayloadSizeBytes,
 		FileCount: int32(command.Torrent.FileCount), PaddingFileCount: int32(command.Torrent.PaddingFileCount),
 		PieceLengthBytes: command.Torrent.PieceLengthBytes, PieceCount: int32(command.Torrent.PieceCount),
@@ -397,6 +422,17 @@ func (repository *PostgresTorrentUploadRepository) Finalize(ctx context.Context,
 		}); err != nil {
 			return TorrentUploadResult{}, torrentUploadWriteError("insert torrent screenshot", err)
 		}
+	}
+	controlEvent, err := trackerevent.NewTorrentEligibilityChanged(trackerevent.TorrentEligibilityInput{
+		EventID: repository.newEventID(), OccurredAt: command.OccurredAt,
+		TorrentID: int64(torrentID), InfoHashV1: command.Torrent.InfoHashV1,
+		TotalSizeBytes: command.Torrent.TotalSizeBytes, Enabled: true, TorrentVersion: 1,
+	})
+	if err != nil {
+		return TorrentUploadResult{}, fmt.Errorf("build pending torrent pre-seeding eligibility event: %w", err)
+	}
+	if err := repository.newTrackerAppender(tx).Append(ctx, controlEvent); err != nil {
+		return TorrentUploadResult{}, fmt.Errorf("append pending torrent pre-seeding eligibility event: %w", err)
 	}
 	rows, err := queries.CompleteTorrentUpload(ctx, torrentdb.CompleteTorrentUploadParams{
 		TorrentID: torrentID, CompletedAt: storageTimestamp(command.OccurredAt), UploadID: command.UploadID,

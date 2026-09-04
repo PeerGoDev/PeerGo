@@ -2,49 +2,73 @@ package moviepilot
 
 import (
 	"bytes"
-	"crypto/sha256"
+	"context"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
+	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 )
 
-func TestNewAPIKeyReturnsOnlyHighEntropyRawValueAndDigest(t *testing.T) {
-	random := bytes.Repeat([]byte{0x5a}, rawAPIKeyBytes)
-	service := &Service{readRandom: func(target []byte) (int, error) {
-		return copy(target, random), nil
-	}}
-
-	raw, digest, prefix, err := service.newAPIKey()
-	if err != nil {
-		t.Fatalf("newAPIKey() error = %v", err)
+func TestMoviePilotAdapterEnforcesSharedPersonalAPIKeyScopes(t *testing.T) {
+	service := &Service{}
+	credential := personalapikey.AuthenticatedCredential{
+		Credential: personalapikey.Credential{Scopes: []personalapikey.Scope{personalapikey.ScopeTorrentRead}},
 	}
-	if len(raw) != 47 || raw[:4] != apiKeyPrefix || prefix != raw[:12] {
-		t.Fatalf("unexpected API key shape: len=%d prefix=%q", len(raw), prefix)
+	if _, err := service.Profile(context.Background(), credential); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("Profile() scope error = %v", err)
 	}
-	expectedDigest := sha256.Sum256([]byte(raw))
-	if !bytes.Equal(digest, expectedDigest[:]) {
-		t.Fatal("newAPIKey() did not return the SHA-256 digest of the raw key")
+	if _, err := service.SeedingReward(context.Background(), credential); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("SeedingReward() scope error = %v", err)
 	}
-	parsed, err := apiKeyDigest(raw)
-	if err != nil || !bytes.Equal(parsed, digest) {
-		t.Fatalf("apiKeyDigest() = %x, %v", parsed, err)
+	if _, err := service.Torrent(context.Background(), credential, 9830); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("Torrent() download scope error = %v", err)
 	}
-	if _, err := apiKeyDigest(raw + "x"); !errors.Is(err, ErrCredentialInvalid) {
-		t.Fatalf("apiKeyDigest(invalid) error = %v", err)
+	if _, err := service.DownloadWithCredential(context.Background(), credential, "9830"); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("DownloadWithCredential() scope error = %v", err)
+	}
+	if _, err := service.Upload(context.Background(), credential, LegacyUploadInput{}); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("Upload() scope error = %v", err)
+	}
+	if _, err := service.PurchaseStatus(context.Background(), credential, "9830"); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("PurchaseStatus() scope error = %v", err)
+	}
+	if _, err := service.Purchase(context.Background(), credential, "9830", uuid.New(), nil); !errors.Is(err, personalapikey.ErrScopeDenied) {
+		t.Fatalf("Purchase() scope error = %v", err)
 	}
 }
 
-func TestNewAPIKeyRejectsShortRandomRead(t *testing.T) {
-	service := &Service{readRandom: func(target []byte) (int, error) {
-		return copy(target, []byte("short")), nil
-	}}
-	if _, _, _, err := service.newAPIKey(); err == nil {
-		t.Fatal("newAPIKey() accepted a short random read")
+func TestLegacyFacetSelectionsAcceptKeysLabelsAndPtYesSourceAlias(t *testing.T) {
+	facets := []catalog.CategoryFacet{
+		{
+			ID: "source-medium", Name: "来源", SelectionMode: catalog.FacetSelectionSingle,
+			Options: []catalog.CategoryFacetOption{{Key: "bluray", Label: "Blu-ray"}},
+		},
+		{
+			ID: "genre", Name: "类型", SelectionMode: catalog.FacetSelectionMulti,
+			Options: []catalog.CategoryFacetOption{{Key: "action", Label: "动作"}, {Key: "comedy", Label: "喜剧"}},
+		},
+	}
+	result, err := legacyFacetSelections(facets, map[string][]string{
+		"source": {"Blu-ray"},
+		"类型":     {"喜剧", "action"},
+	})
+	if err != nil {
+		t.Fatalf("legacyFacetSelections() error = %v", err)
+	}
+	if len(result) != 2 || result[0].FacetID != "genre" || result[1].FacetID != "source-medium" ||
+		len(result[0].OptionKeys) != 2 || result[0].OptionKeys[0] != "comedy" || result[0].OptionKeys[1] != "action" ||
+		result[1].OptionKeys[0] != "bluray" {
+		t.Fatalf("legacyFacetSelections() = %+v", result)
+	}
+	if _, err := legacyFacetSelections(facets, map[string][]string{"disabled-facet": {"value"}}); !errors.Is(err, ErrInput) {
+		t.Fatalf("disabled facet error = %v", err)
+	}
+	if !markdownImagePattern.MatchString("![cover](https://example.test/a.jpg)") || !markdownImagePattern.MatchString("<IMG src=x>") {
+		t.Fatal("legacy upload description image guard did not detect an image")
 	}
 }
 
@@ -99,16 +123,5 @@ func TestMoviePilotCategoryAndPromotionCompatibility(t *testing.T) {
 	result := promotion(catalog.PromotionDoubleUploadHalfDownload, nil)
 	if !result.Active || result.Type != 6 || result.TimeType != 1 || result.UploadFactor != 2 || result.DownloadFactor != 0.5 {
 		t.Fatalf("promotion() = %+v", result)
-	}
-}
-
-func TestMoviePilotCredentialWriteConflictMapping(t *testing.T) {
-	for _, code := range []string{"23505", "40001", "40P01"} {
-		if !moviePilotCredentialWriteConflict(&pgconn.PgError{Code: code}) {
-			t.Fatalf("PostgreSQL error %s was not classified as a credential conflict", code)
-		}
-	}
-	if moviePilotCredentialWriteConflict(&pgconn.PgError{Code: "23503"}) {
-		t.Fatal("foreign-key violation was classified as a credential conflict")
 	}
 }

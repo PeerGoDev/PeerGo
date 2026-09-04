@@ -41,6 +41,8 @@ func (fixture *commentAuthorizerFixture) Authorize(_ context.Context, request au
 type commentRepositoryFixture struct {
 	items         []Comment
 	total         int64
+	threadTotal   int64
+	threadSort    CommentThreadSort
 	created       Comment
 	updated       Comment
 	listTarget    CommentTarget
@@ -54,6 +56,11 @@ type commentRepositoryFixture struct {
 func (fixture *commentRepositoryFixture) List(_ context.Context, target CommentTarget, limit, offset int) ([]Comment, int64, error) {
 	fixture.listTarget, fixture.listLimit, fixture.listOffset = target, limit, offset
 	return fixture.items, fixture.total, nil
+}
+
+func (fixture *commentRepositoryFixture) ListThreads(_ context.Context, target CommentTarget, sort CommentThreadSort, limit, offset int) ([]Comment, int64, int64, error) {
+	fixture.listTarget, fixture.threadSort, fixture.listLimit, fixture.listOffset = target, sort, limit, offset
+	return fixture.items, fixture.total, fixture.threadTotal, nil
 }
 
 func (fixture *commentRepositoryFixture) Create(_ context.Context, command createCommentCommand) (Comment, error) {
@@ -151,6 +158,42 @@ func TestCommentServiceReusesTheThreadBoundaryForAnnouncements(t *testing.T) {
 	if err != nil || created.ID != commentID || repository.createCommand.Target != target ||
 		repository.createCommand.Body != "公告回复" || authorizer.requests[0].Action != authz.ActionAnnouncementCommentCreateSelf {
 		t.Fatalf("CreateAnnouncementComment() comment=%+v command=%+v auth=%+v error=%v", created, repository.createCommand, authorizer.requests, err)
+	}
+}
+
+func TestCommentServicePagesSocialPostThreadsInsteadOfIndividualReplies(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 27, 10, 0, 0, 0, time.UTC)
+	postID, rootID, replyID := uuid.New(), uuid.New(), uuid.New()
+	rootAuthor := CommentAuthor{ID: uuid.New(), DisplayName: "北岸"}
+	replyAuthor := CommentAuthor{ID: uuid.New(), DisplayName: "南岸"}
+	target := PostCommentTarget(postID)
+	root := Comment{
+		ID: rootID, Target: target, Author: rootAuthor, Body: "一级评论",
+		BodyFormat: CommentBodyPlainText, State: CommentVisible, Version: 1,
+		CreatedAt: now, UpdatedAt: now,
+	}
+	reply := Comment{
+		ID: replyID, Target: target, ParentCommentID: &rootID, RootCommentID: &rootID,
+		Author: replyAuthor, ReplyTo: &rootAuthor, Body: "楼中楼回复",
+		BodyFormat: CommentBodyPlainText, State: CommentVisible, Version: 1,
+		CreatedAt: now.Add(time.Minute), UpdatedAt: now.Add(time.Minute),
+	}
+	repository := &commentRepositoryFixture{
+		items: []Comment{root, reply}, total: 2, threadTotal: 1,
+	}
+	service, err := NewCommentService(
+		&commentAuthenticatorFixture{}, &commentAuthorizerFixture{}, repository, func() time.Time { return now },
+	)
+	if err != nil {
+		t.Fatalf("NewCommentService() error = %v", err)
+	}
+
+	page, err := service.ListPostComments(context.Background(), postID, CommentThreadHot, 20, 0)
+	if err != nil || page.Total != 2 || page.ThreadTotal != 1 || len(page.Items) != 2 ||
+		repository.threadSort != CommentThreadHot || repository.listTarget != target {
+		t.Fatalf("ListPostComments() page=%+v repository=%+v error=%v", page, repository, err)
 	}
 }
 

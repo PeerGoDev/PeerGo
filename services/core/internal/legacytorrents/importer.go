@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/peergo/peergo/services/core/internal/contracts/trackerevent"
+	"github.com/peergo/peergo/services/core/internal/legacyroutealiases"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	"github.com/peergo/peergo/services/core/internal/modules/trackercontrol"
 	platformpostgres "github.com/peergo/peergo/services/core/internal/platform/postgres"
@@ -530,6 +531,9 @@ func persistTorrentImport(
 	if err := insertTorrentAggregate(ctx, tx, record); err != nil {
 		return err
 	}
+	if err := insertLegacyTorrentRouteAlias(ctx, tx, config.OccurredAt, record); err != nil {
+		return err
+	}
 	if err := insertTorrentFiles(ctx, tx, record); err != nil {
 		return err
 	}
@@ -691,6 +695,31 @@ INSERT INTO torrents.torrents (
 		record.source.Anonymous, record.source.GroupLegacyID,
 	); err != nil {
 		return fmt.Errorf("insert legacy torrent aggregate: %w", err)
+	}
+	return nil
+}
+
+func insertLegacyTorrentRouteAlias(ctx context.Context, tx pgx.Tx, occurredAt time.Time, record torrentImportRecord) error {
+	digest, err := legacyroutealiases.Digest(record.sourceObjectID.String())
+	if err != nil {
+		return sourceTorrentError(record.source.LegacyID, "legacy_route_alias_invalid")
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO migration.legacy_torrent_route_aliases (
+    alias_sha256, torrent_id, created_at
+) VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING`, digest[:], record.source.LegacyID, occurredAt); err != nil {
+		return fmt.Errorf("insert legacy torrent %d route alias: %w", record.source.LegacyID, err)
+	}
+	var storedDigest []byte
+	if err := tx.QueryRow(ctx, `
+SELECT alias_sha256
+FROM migration.legacy_torrent_route_aliases
+WHERE torrent_id = $1`, record.source.LegacyID).Scan(&storedDigest); err != nil {
+		return fmt.Errorf("read legacy torrent %d route alias: %w", record.source.LegacyID, err)
+	}
+	if !bytes.Equal(storedDigest, digest[:]) {
+		return sourceTorrentError(record.source.LegacyID, "legacy_route_alias_conflict")
 	}
 	return nil
 }

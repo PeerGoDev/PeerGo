@@ -33,7 +33,7 @@ describe("UserProfilePage", () => {
     ).toHaveClass("md:min-h-[262px]")
     expect(
       screen.getByRole("heading", { name: "迁移用户" }).closest("header")
-    ).toHaveClass("min-h-[116px]", "md:min-h-[88px]")
+    ).toHaveClass("flex-col", "items-stretch", "sm:min-h-[88px]", "sm:flex-row")
     expect(screen.getByText("2 KB")).toBeVisible()
     expect(screen.getAllByText("1 KB")).toHaveLength(2)
     expect(screen.getByText("2.00")).toBeVisible()
@@ -47,7 +47,9 @@ describe("UserProfilePage", () => {
     )
     expect(screen.getByRole("button", { name: "设置" })).toHaveClass(
       "font-normal",
-      "gap-1"
+      "gap-1",
+      "w-full",
+      "sm:w-auto"
     )
     expect(
       screen.getByRole("heading", { name: "基本信息" }).parentElement

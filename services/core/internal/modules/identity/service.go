@@ -131,10 +131,11 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (WebSession, erro
 	}
 	expiresAt := now.Add(duration)
 	if err := s.repository.CreateSession(ctx, SessionRecord{
-		TokenHash: tokenHash,
-		User:      user,
-		CreatedAt: now,
-		ExpiresAt: expiresAt,
+		TokenHash:     tokenHash,
+		User:          user,
+		ClientAddress: input.ClientAddress,
+		CreatedAt:     now,
+		ExpiresAt:     expiresAt,
 	}); err != nil {
 		return WebSession{}, fmt.Errorf("persist web session: %w", err)
 	}

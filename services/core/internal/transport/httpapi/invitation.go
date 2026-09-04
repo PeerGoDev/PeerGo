@@ -71,6 +71,12 @@ func (h *Handler) IssueMyInvitation(ctx context.Context, request generated.Issue
 	case errors.Is(err, identity.ErrInvitationQuota):
 		problem := newProblemFromContext(ctx, http.StatusConflict, "invitation_quota_exhausted", "邀请名额已用完", "已成功邀请和当前有效邀请码已经占满可用名额。")
 		return generated.IssueMyInvitation409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrInvitationEmailRegistered):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "invitation_email_already_registered", "该邮箱已注册", "请填写尚未注册本站的邮箱。")
+		return generated.IssueMyInvitation409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrInvitationEmailDirectoryUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusServiceUnavailable, "invitation_email_check_unavailable", "暂时无法核验邮箱", "隐私凭据服务暂时不可用，请稍后重试；本次没有扣除邀请名额。")
+		return generated.IssueMyInvitationdefaultApplicationProblemPlusJSONResponse{Body: problem, StatusCode: http.StatusServiceUnavailable}, nil
 	case err != nil:
 		return nil, err
 	}

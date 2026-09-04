@@ -67,6 +67,41 @@ test("second-factor challenge remains usable", async ({ page }) => {
   await expect(page.getByLabel("两步验证码（可选）")).toBeFocused()
 })
 
+test("authenticated navigation stays inside the mobile viewport", async ({
+  page,
+}) => {
+  await mockPublicApi(page, { includeTorrent: true })
+  await page.goto("/login")
+  await page.getByLabel("用户名 / 邮箱").fill("demo")
+  await page.getByLabel("密码", { exact: true }).fill("correct-password")
+  await page.getByRole("button", { name: "登录", exact: true }).click()
+
+  await expect(page.getByRole("heading", { name: "首页" })).toBeVisible()
+  await expect(
+    page.locator("a:visible").filter({ hasText: "Published Release" })
+  ).toBeVisible()
+  expect(await hasHorizontalPageOverflow(page)).toBe(false)
+
+  if ((page.viewportSize()?.width ?? 0) < 1024) {
+    await page.getByRole("button", { name: "切换侧栏" }).click()
+    const mobileSidebar = page.locator(
+      '[data-sidebar="sidebar"][data-mobile="true"]'
+    )
+    await expect(mobileSidebar).toBeVisible()
+    await mobileSidebar.getByRole("link", { name: "种子", exact: true }).click()
+    await expect(mobileSidebar).toBeHidden()
+  } else {
+    await page.getByRole("link", { name: "种子", exact: true }).click()
+  }
+
+  await expect(page).toHaveURL(/\/torrents$/)
+  await expect(page.getByLabel("搜索种子标题")).toBeVisible()
+  await expect(
+    page.locator("a:visible").filter({ hasText: "Published Release" })
+  ).toBeVisible()
+  expect(await hasHorizontalPageOverflow(page)).toBe(false)
+})
+
 test("Core outage produces a bounded user-facing state", async ({ page }) => {
   const browserErrors: Error[] = []
   page.on("pageerror", (error) => browserErrors.push(error))

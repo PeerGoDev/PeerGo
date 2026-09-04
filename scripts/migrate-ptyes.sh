@@ -335,6 +335,10 @@ run_users() {
     run_core_command legacy-user-state
     note "verifying an idempotent user operational-state retry"
     run_core_command legacy-user-state
+    note "importing PtYes donation totals and bounded login IP aggregates"
+    run_core_command legacy-user-administration
+    note "verifying an idempotent user-administration metadata retry"
+    run_core_command legacy-user-administration
 }
 
 run_medals() {

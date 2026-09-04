@@ -64,12 +64,18 @@ paths:
     $ref: "./domains/identity.yaml#/ManagedUsersPath"
   /api/v1/admin/users/{user_id}:
     $ref: "./domains/identity.yaml#/ManagedUserPath"
+  /api/v1/admin/users/{user_id}/adjustments:
+    $ref: "./domains/identity.yaml#/ManagedUserAdjustmentsPath"
+  /api/v1/admin/users/{user_id}/network-history:
+    $ref: "./domains/identity.yaml#/ManagedUserNetworkHistoryPath"
   /api/v1/admin/users/{user_id}/tracker-activity:
     $ref: "./domains/profile-activity.yaml#/ManagedUserTrackerActivityPath"
   /api/v1/admin/users/{user_id}/account-restrictions:
     $ref: "./domains/identity.yaml#/ManagedUserAccountRestrictionsPath"
   /api/v1/admin/users/{user_id}/account-restrictions/{restriction_id}/revocations:
     $ref: "./domains/identity.yaml#/ManagedUserAccountRestrictionRevocationsPath"
+  /api/v1/admin/users/{user_id}/reactivations:
+    $ref: "./domains/identity.yaml#/ManagedUserReactivationsPath"
   /api/v1/admin/users/{user_id}/manual-download-restriction:
     $ref: "./domains/identity.yaml#/ManagedUserManualDownloadRestrictionPath"
   /api/v1/admin/users/{user_id}/manual-download-restriction/revocations:
@@ -156,10 +162,10 @@ paths:
     $ref: "./domains/rss.yaml#/MyRSSSubscriptionPath"
   /api/v1/me/rss-subscriptions/{subscription_id}/token-rotations:
     $ref: "./domains/rss.yaml#/MyRSSSubscriptionTokenRotationsPath"
-  /api/v1/me/moviepilot-credential:
-    $ref: "./domains/integrations.yaml#/MoviePilotCredentialPath"
-  /api/v1/me/moviepilot-credential/rotations:
-    $ref: "./domains/integrations.yaml#/MoviePilotCredentialRotationsPath"
+  /api/v1/me/api-key:
+    $ref: "./domains/integrations.yaml#/PersonalAPIKeyPath"
+  /api/v1/me/api-key/rotations:
+    $ref: "./domains/integrations.yaml#/PersonalAPIKeyRotationsPath"
   /api/v1/torrents/{torrent_id}/reports:
     $ref: "./domains/torrents.yaml#/TorrentReportsPath"
   /api/v1/me/torrent-bookmarks:
@@ -266,6 +272,8 @@ paths:
     $ref: "./domains/catalog.yaml#/ManagedCategoriesPath"
   /api/v1/admin/catalog/categories/{category_id}:
     $ref: "./domains/catalog.yaml#/ManagedCategoryPath"
+  /api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}:
+    $ref: "./domains/catalog.yaml#/ManagedCategoryFacetPath"
   /api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}/options/{option_key}:
     $ref: "./domains/catalog.yaml#/ManagedCategoryFacetOptionPath"
   /api/v1/admin/catalog/announcements:
@@ -518,6 +526,10 @@ components:
       $ref: "./schemas/identity.yaml#/CurrentAccountRestriction"
     ManagedUserDetail:
       $ref: "./schemas/identity.yaml#/ManagedUserDetail"
+    ManagedUserAdjustmentRequest:
+      $ref: "./schemas/identity.yaml#/ManagedUserAdjustmentRequest"
+    ManagedUserNetworkHistory:
+      $ref: "./schemas/identity.yaml#/ManagedUserNetworkHistory"
     AccountRestrictionReasonCode:
       $ref: "./schemas/identity.yaml#/AccountRestrictionReasonCode"
     AccountRestrictionRevocationReasonCode:
@@ -652,12 +664,12 @@ components:
       $ref: "./schemas/rss.yaml#/RSSSettings"
     UpdateRSSSettingsRequest:
       $ref: "./schemas/rss.yaml#/UpdateRSSSettingsRequest"
-    MoviePilotCredentialStatus:
-      $ref: "./schemas/integrations.yaml#/MoviePilotCredentialStatus"
-    RotateMoviePilotCredentialRequest:
-      $ref: "./schemas/integrations.yaml#/RotateMoviePilotCredentialRequest"
-    IssuedMoviePilotCredential:
-      $ref: "./schemas/integrations.yaml#/IssuedMoviePilotCredential"
+    PersonalAPIKeyStatus:
+      $ref: "./schemas/integrations.yaml#/PersonalAPIKeyStatus"
+    RotatePersonalAPIKeyRequest:
+      $ref: "./schemas/integrations.yaml#/RotatePersonalAPIKeyRequest"
+    IssuedPersonalAPIKey:
+      $ref: "./schemas/integrations.yaml#/IssuedPersonalAPIKey"
     RegistrationPolicySettings:
       $ref: "./schemas/identity.yaml#/RegistrationPolicySettings"
     UpdateRegistrationPolicySettingsRequest:
@@ -834,6 +846,8 @@ components:
       $ref: "./schemas/social.yaml#/UpdateSocialPostRequest"
     SocialPostCommentPage:
       $ref: "./schemas/social.yaml#/SocialPostCommentPage"
+    SocialCommentSort:
+      $ref: "./schemas/social.yaml#/SocialCommentSort"
     SocialMediaUploadRequest:
       $ref: "./schemas/social.yaml#/SocialMediaUploadRequest"
     SocialInteractionState:

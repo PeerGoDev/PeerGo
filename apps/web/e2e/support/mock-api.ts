@@ -3,6 +3,7 @@ import type { Page, Route } from "@playwright/test"
 type MockApiOptions = {
   serviceUnavailable?: boolean
   secondFactorRequired?: boolean
+  includeTorrent?: boolean
 }
 
 const siteInfo = {
@@ -34,6 +35,22 @@ const session = {
   },
   expires_at: "2026-09-20T12:00:00Z",
   csrf_token: "c".repeat(43),
+}
+
+const torrent = {
+  id: 42,
+  name: "Published Release",
+  subtitle: "PeerGo mobile fixture",
+  category: { id: "movies", name: "电影" },
+  size_bytes: 1_073_741_824,
+  seeders: 12,
+  leechers: 3,
+  completed: 40,
+  promotion: "free",
+  sticky_until: null,
+  uploaded_at: "2026-08-05T10:00:00Z",
+  swarm_observed_at: "2026-08-05T09:00:00Z",
+  swarm_stale: false,
 }
 
 export async function mockPublicApi(page: Page, options: MockApiOptions = {}) {
@@ -69,8 +86,19 @@ export async function mockPublicApi(page: Page, options: MockApiOptions = {}) {
       await json(route, 200, { items: [] })
       return
     }
+    if (url.pathname === "/api/v1/categories" && request.method() === "GET") {
+      await json(route, 200, [
+        { id: "movies", name: "电影", enabled: true, torrent_count: 1 },
+      ])
+      return
+    }
     if (url.pathname === "/api/v1/torrents" && request.method() === "GET") {
-      await json(route, 200, { items: [], total: 0, limit: 20, offset: 0 })
+      await json(route, 200, {
+        items: options.includeTorrent ? [torrent] : [],
+        total: options.includeTorrent ? 1 : 0,
+        limit: 20,
+        offset: 0,
+      })
       return
     }
 

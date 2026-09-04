@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	DefaultTorrentBookmarkLimit       = 20
-	MaxTorrentBookmarkLimit           = 50
-	MaxTorrentBookmarkOffset          = 99_999
-	MaxTorrentBookmarkStatusBatchSize = 100
+	DefaultTorrentBookmarkLimit        = 20
+	MaxTorrentBookmarkLimit            = 50
+	MaxTorrentBookmarkIntegrationLimit = 100
+	MaxTorrentBookmarkOffset           = 99_999
+	MaxTorrentBookmarkStatusBatchSize  = 100
 )
 
 var (
@@ -100,6 +101,23 @@ func (service *TorrentBookmarkService) List(ctx context.Context, cookieToken str
 	if err != nil {
 		return TorrentBookmarkPage{}, err
 	}
+	return service.listAuthorized(ctx, userID, limit, offset)
+}
+
+// ListForIntegration projects the same self-only bookmark page after an API
+// key adapter has established the canonical user. It intentionally reuses the
+// ordinary authorization action instead of trusting the transport scope alone.
+func (service *TorrentBookmarkService) ListForIntegration(ctx context.Context, user identity.User, limit, offset int) (TorrentBookmarkPage, error) {
+	if user.ID == uuid.Nil || limit < 1 || limit > MaxTorrentBookmarkIntegrationLimit || offset < 0 || offset > MaxTorrentBookmarkOffset {
+		return TorrentBookmarkPage{}, ErrTorrentBookmarkInput
+	}
+	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, user.ID, authz.ActionTorrentBookmarkReadSelf, service.now().UTC()); err != nil {
+		return TorrentBookmarkPage{}, err
+	}
+	return service.listAuthorized(ctx, user.ID, limit, offset)
+}
+
+func (service *TorrentBookmarkService) listAuthorized(ctx context.Context, userID uuid.UUID, limit, offset int) (TorrentBookmarkPage, error) {
 	records, total, err := service.repository.List(ctx, userID, limit, offset)
 	if err != nil {
 		return TorrentBookmarkPage{}, err

@@ -37,7 +37,7 @@ export function HeaderAttendanceButton({
         nativeButton={false}
         variant="ghost"
         size="sm"
-        className="hidden h-8 gap-1.5 rounded-full px-2.5 text-success-foreground sm:inline-flex"
+        className="hidden h-8 gap-1.5 rounded-full px-2.5 text-success-foreground md:inline-flex"
       >
         <CalendarCheck2Icon />
         已签到 {overview.current_streak} 天
@@ -51,7 +51,7 @@ export function HeaderAttendanceButton({
     <Button
       variant="outline"
       size="sm"
-      className="h-8 rounded-full border-primary/30 bg-primary/5 px-2.5 text-primary hover:bg-primary/10 hover:text-primary"
+      className="hidden h-8 rounded-full border-primary/30 bg-primary/5 px-2.5 text-primary hover:bg-primary/10 hover:text-primary md:inline-flex"
       disabled={mutation.isPending}
       onClick={() =>
         mutation.mutate({

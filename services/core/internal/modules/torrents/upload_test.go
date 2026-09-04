@@ -310,3 +310,13 @@ func (repository *memoryTorrentUploadOrphanRepository) ReleaseUploadCleanupTask(
 	})
 	return nil
 }
+
+func TestTorrentUploadFingerprintIncludesPurchasePrice(t *testing.T) {
+	t.Parallel()
+	base := Torrent{UploaderID: uuid.New(), CategoryID: "movies", Title: "Release"}
+	priced := base
+	priced.PurchasePrice = 100
+	if torrentUploadFingerprint(base) == torrentUploadFingerprint(priced) {
+		t.Fatal("purchase price did not participate in upload idempotency fingerprint")
+	}
+}

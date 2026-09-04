@@ -403,14 +403,12 @@ func (repository *PostgresRepository) finalizeLocked(
 	if err := repository.newAuditAppender(tx).Append(ctx, auditEvent); err != nil {
 		return DecisionResult{}, fmt.Errorf("append torrent review audit event: %w", err)
 	}
-	if command.Decision == DecisionApprove {
-		controlEvent, buildErr := repository.eligibilityBuilder.BuildTorrentEligibilityEvent(result, pending)
-		if buildErr != nil {
-			return DecisionResult{}, fmt.Errorf("build Tracker eligibility event: %w", buildErr)
-		}
-		if err := repository.newTrackerAppender(tx).Append(ctx, controlEvent); err != nil {
-			return DecisionResult{}, fmt.Errorf("append Tracker eligibility event: %w", err)
-		}
+	controlEvent, buildErr := repository.eligibilityBuilder.BuildTorrentEligibilityEvent(result, pending)
+	if buildErr != nil {
+		return DecisionResult{}, fmt.Errorf("build Tracker eligibility event: %w", buildErr)
+	}
+	if err := repository.newTrackerAppender(tx).Append(ctx, controlEvent); err != nil {
+		return DecisionResult{}, fmt.Errorf("append Tracker eligibility event: %w", err)
 	}
 	return result, nil
 }

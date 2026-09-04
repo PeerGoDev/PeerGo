@@ -82,7 +82,7 @@ SELECT board.id, board.name, board.description, board.icon, board.tone,
              AND session.audience = 'web'
              AND session.revoked_at IS NULL
              AND session.expires_at > $3
-             AND session.last_seen_at >= $3 - interval '15 minutes'
+             AND session.last_seen_at >= $3::timestamptz - interval '15 minutes'
              AND users.status = 'active'
              AND NOT EXISTS (
                  SELECT 1

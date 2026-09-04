@@ -712,6 +712,11 @@ ManagedCategoryFacet:
     - selection_mode
     - required
     - display_order
+    - enabled
+    - version
+    - torrent_count
+    - created_at
+    - updated_at
     - options
   properties:
     id:
@@ -732,6 +737,25 @@ ManagedCategoryFacet:
       type: integer
       minimum: 0
       maximum: 1000000
+    enabled:
+      type: boolean
+      description: 停用后不再出现在新发种表单中，历史取值仍然保留。
+    version:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9007199254740991
+    torrent_count:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
     options:
       type: array
       maxItems: 200
@@ -809,8 +833,49 @@ UpsertManagedCategoryFacetOptionRequest:
       description: 传 0 表示新增；更新时必须传当前版本。
     reason:
       type: string
-      minLength: 10
       maxLength: 500
+      description: 可留空；服务端会生成明确的审计理由。
+
+UpsertManagedCategoryFacetRequest:
+  type: object
+  additionalProperties: false
+  required:
+    - name
+    - selection_mode
+    - required
+    - display_order
+    - enabled
+    - expected_version
+    - reason
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 40
+    selection_mode:
+      $ref: "#/CategoryFacetSelectionMode"
+    required:
+      type: boolean
+    requirement_group:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,63}$"
+      description: 非必填属性可加入同一组，表示组内至少选择一个；直接必填时省略。
+    display_order:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+    enabled:
+      type: boolean
+    expected_version:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9007199254740991
+      description: 传 0 表示创建分类属性；更新时必须传当前版本。
+    reason:
+      type: string
+      maxLength: 500
+      description: 可留空；服务端会生成明确的审计理由。
 
 ManagedCategoryList:
   type: array
@@ -837,8 +902,8 @@ CreateManagedCategoryRequest:
       type: boolean
     reason:
       type: string
-      minLength: 10
       maxLength: 500
+      description: 可留空；服务端会生成明确的审计理由。
 
 UpdateManagedCategoryRequest:
   type: object
@@ -862,8 +927,8 @@ UpdateManagedCategoryRequest:
       maximum: 9007199254740991
     reason:
       type: string
-      minLength: 10
       maxLength: 500
+      description: 可留空；服务端会生成明确的审计理由。
 
 TorrentSummary:
   type: object

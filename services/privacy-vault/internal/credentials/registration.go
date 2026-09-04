@@ -82,7 +82,10 @@ func (s *Service) ProvisionRegistration(ctx context.Context, input ProvisionRegi
 	if err != nil {
 		return uuid.Nil, err
 	}
-	now := time.Now().UTC()
+	// PostgreSQL stores timestamptz values with microsecond precision. Keep the
+	// in-memory value on the same boundary so an insert followed by an equality
+	// check cannot mistake discarded nanoseconds for conflicting Vault state.
+	now := time.Now().UTC().Truncate(time.Microsecond)
 	return s.repository.ProvisionRegistration(ctx, RegistrationProvisionRecord{
 		RegistrationID: input.RegistrationID,
 		CredentialRef:  uuid.New(),

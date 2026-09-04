@@ -12,6 +12,60 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getPendingReviewUploaderDownloadObject = `-- name: GetPendingReviewUploaderDownloadObject :one
+SELECT
+    torrent.id AS torrent_id,
+    torrent.title,
+    site.torrent_filename_prefix,
+    object.id AS object_id,
+    object.content_sha256,
+    object.byte_length,
+    object.info_offset,
+    object.info_length
+FROM torrents.torrents AS torrent
+JOIN torrents.torrent_objects AS object ON object.id = torrent.object_id
+CROSS JOIN catalog.site_profile AS site
+WHERE torrent.id = $1::bigint
+  AND torrent.uploader_id = $2::uuid
+  AND torrent.state = 'pending_review'
+  AND site.singleton = true
+`
+
+type GetPendingReviewUploaderDownloadObjectParams struct {
+	TorrentID  int64
+	UploaderID uuid.UUID
+}
+
+type GetPendingReviewUploaderDownloadObjectRow struct {
+	TorrentID             int64
+	Title                 string
+	TorrentFilenamePrefix string
+	ObjectID              uuid.UUID
+	ContentSha256         []byte
+	ByteLength            int64
+	InfoOffset            int64
+	InfoLength            int64
+}
+
+// A pending object is private to its uploader. Reviewers inspect immutable
+// evidence through the review surface; ordinary members must not be able to
+// probe or download another uploader's pre-release swarm.
+func (q *Queries) GetPendingReviewUploaderDownloadObject(ctx context.Context, arg GetPendingReviewUploaderDownloadObjectParams) (GetPendingReviewUploaderDownloadObjectRow, error) {
+	row := q.db.QueryRow(ctx, getPendingReviewUploaderDownloadObject, arg.TorrentID, arg.UploaderID)
+	var i GetPendingReviewUploaderDownloadObjectRow
+	err := row.Scan(
+		&i.TorrentID,
+		&i.Title,
+		&i.TorrentFilenamePrefix,
+		&i.ObjectID,
+		&i.ContentSha256,
+		&i.ByteLength,
+		&i.InfoOffset,
+		&i.InfoLength,
+	)
+	return i, err
+}
+
 const getPublishedTorrentDownloadObject = `-- name: GetPublishedTorrentDownloadObject :one
 SELECT
     torrent.id AS torrent_id,

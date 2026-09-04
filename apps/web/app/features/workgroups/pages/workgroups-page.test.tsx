@@ -58,6 +58,8 @@ describe("WorkgroupsPage", () => {
               target_value: 20,
               met: false,
               enforcement_mode: "observe",
+              allowed_misses: 0,
+              miss_count: 0,
             },
           },
         },
@@ -84,7 +86,9 @@ describe("WorkgroupsPage", () => {
             assessment_state: "in_progress",
             explanation_code: "period_in_progress",
             enforcement_mode: "observe",
+            allowed_misses: 0,
             reminder: null,
+            enforcement: null,
           },
         ],
         limit: 6,
@@ -135,7 +139,7 @@ describe("WorkgroupsPage", () => {
     expect(screen.getByText("12 票 / 20 票")).toBeVisible()
     expect(screen.getByText("进行中")).toBeVisible()
     expect(
-      screen.getByText("当前为观察目标，未达标不会自动暂停工作组权益。")
+      screen.getByText("当前为观察目标，未达标不会自动变更工作组权益。")
     ).toBeVisible()
     expect(screen.getByText("完成首轮种子审核")).toBeVisible()
     expect(screen.getByRole("button", { name: "提交成果" })).toBeVisible()

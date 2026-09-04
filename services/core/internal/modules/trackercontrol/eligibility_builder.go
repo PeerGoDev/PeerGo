@@ -22,15 +22,28 @@ func NewEligibilityEventBuilder(newEventID func() uuid.UUID) *EligibilityEventBu
 }
 
 func (builder *EligibilityEventBuilder) BuildTorrentEligibilityEvent(result review.DecisionResult, pending review.PendingTorrent) (trackerevent.Event, error) {
-	if result.State != torrents.StatePublished || result.Decision != review.DecisionApprove ||
-		result.TorrentID < 1 || result.TorrentID != pending.ID || result.Version < 2 {
-		return trackerevent.Event{}, errors.New("published torrent eligibility event has invalid review metadata")
+	if result.TorrentID < 1 || result.TorrentID != pending.ID || result.Version < 2 {
+		return trackerevent.Event{}, errors.New("reviewed torrent eligibility event has invalid metadata")
+	}
+	enabled := false
+	switch result.Decision {
+	case review.DecisionApprove:
+		if result.State != torrents.StatePublished {
+			return trackerevent.Event{}, errors.New("approved torrent eligibility event has invalid state")
+		}
+		enabled = true
+	case review.DecisionReject:
+		if result.State != torrents.StateRejected {
+			return trackerevent.Event{}, errors.New("rejected torrent eligibility event has invalid state")
+		}
+	default:
+		return trackerevent.Event{}, errors.New("reviewed torrent eligibility event has invalid decision")
 	}
 	return trackerevent.NewTorrentEligibilityChanged(trackerevent.TorrentEligibilityInput{
 		EventID: builder.newEventID(), OccurredAt: result.OccurredAt,
 		TorrentID:  int64(result.TorrentID),
 		InfoHashV1: pending.InfoHashV1, TotalSizeBytes: pending.TotalSizeBytes,
-		Enabled: true, TorrentVersion: result.Version,
+		Enabled: enabled, TorrentVersion: result.Version,
 	})
 }
 

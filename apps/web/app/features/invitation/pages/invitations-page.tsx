@@ -102,6 +102,11 @@ export function InvitationsPage() {
       (capability) => capability.action === "invitation.read.self"
     )
   )
+  const canRevoke = Boolean(
+    capabilities.data?.items.some(
+      (capability) => capability.action === "invitation.revoke.self"
+    )
+  )
   const [offset, setOffset] = React.useState(0)
   const overview = useQuery({
     ...invitationOverviewQueryOptions(session.data?.user.id, pageSize, offset),
@@ -252,6 +257,7 @@ export function InvitationsPage() {
                 items={overview.data.items}
                 total={overview.data.total}
                 offset={offset}
+                canRevoke={canRevoke}
                 revokePending={revoke.isPending}
                 onRevoke={setRevokeTarget}
                 onPrevious={() =>
@@ -768,6 +774,7 @@ function InvitationHistory({
   items,
   total,
   offset,
+  canRevoke,
   revokePending,
   onRevoke,
   onPrevious,
@@ -776,6 +783,7 @@ function InvitationHistory({
   items: MemberInvitation[]
   total: number
   offset: number
+  canRevoke: boolean
   revokePending: boolean
   onRevoke: (item: MemberInvitation) => void
   onPrevious: () => void
@@ -787,7 +795,8 @@ function InvitationHistory({
         <div>
           <CardTitle>邀请记录</CardTitle>
           <CardDescription>
-            共 {total.toLocaleString("zh-CN")} 条记录
+            共 {total.toLocaleString("zh-CN")} 条记录。签发者可以撤回尚未领取的
+            PeerGo 邀请并立即返还名额；注册处理中、已使用及历史邀请不可撤回。
           </CardDescription>
         </div>
       </CardHeader>
@@ -826,7 +835,7 @@ function InvitationHistory({
                     {formatDateTime(item.expires_at)}
                   </p>
                 </div>
-                {item.status === "available" ? (
+                {item.status === "available" && canRevoke ? (
                   <Button
                     size="sm"
                     variant="outline"

@@ -1,5 +1,5 @@
-.PHONY: generate format test check test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-storage-maintenance dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-storage-maintenance dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
-.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-prune-one-shots production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-seeding-reward-compensation-preview production-seeding-reward-compensation-apply production-hnr-work-reconcile production-traffic-pipeline-reconfigure
+.PHONY: generate format test check check-postgres-time-parameters test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-storage-maintenance dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-storage-maintenance dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
+.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-prune-one-shots production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-seeding-reward-retry production-seeding-reward-compensation-preview production-seeding-reward-compensation-apply production-hnr-work-reconcile production-traffic-pipeline-reconfigure
 
 # These values are synthetic and limited to the loopback-only local Compose
 # environment. Production processes require explicit secret-backed variables.
@@ -95,7 +95,10 @@ format:
 	GOWORK=off go -C services/tracker fmt ./...
 	GOWORK=off go -C tools/traffic-corpus fmt ./...
 
-test:
+check-postgres-time-parameters:
+	./scripts/check-postgres-time-parameters.sh
+
+test: check-postgres-time-parameters
 	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_bootstrap_production_policies.py
 	pnpm test:web
 	GOWORK=off go -C contracts/go test ./...
@@ -109,7 +112,7 @@ test:
 	GOWORK=off go -C services/tracker test ./...
 	GOWORK=off go -C tools/traffic-corpus test ./...
 
-check: generate
+check: generate check-postgres-time-parameters
 	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_bootstrap_production_policies.py
 	pnpm contract:lint
 	pnpm typecheck:web
@@ -1099,6 +1102,25 @@ production-tracker-rate-policy: production-config
 		--user-burst "$${PEERGO_TRACKER_RATE_USER_BURST:-1200}" \
 		--address-requests-per-minute "$${PEERGO_TRACKER_RATE_ADDRESS_RPM:-5000}" \
 		--address-burst "$${PEERGO_TRACKER_RATE_ADDRESS_BURST:-10000}"
+
+# Requeue one exact terminal hourly reward only after its code and attempt
+# count have been inspected. State recovery and its pseudonymized audit event
+# commit together; this target cannot clear or bulk-retry a queue.
+production-seeding-reward-retry: production-config
+	test -n "$(WINDOW_START)"
+	test -n "$(USER_ID)"
+	test -n "$(EXPECTED_ATTEMPTS)"
+	test -n "$(OPERATOR_REFERENCE)"
+	test "$(CONFIRM_PEERGO_SEEDING_REWARD_RETRY)" = "RETRY:$(WINDOW_START):$(USER_ID)"
+	./scripts/production-compose.sh run --rm --no-deps \
+		--entrypoint core-seeding-reward-retry core-api \
+		--window-start "$(WINDOW_START)" \
+		--user-id "$(USER_ID)" \
+		--expected-attempts "$(EXPECTED_ATTEMPTS)" \
+		--expected-error-code "$(if $(EXPECTED_ERROR_CODE),$(EXPECTED_ERROR_CODE),invariant_failed)" \
+		--operator-reference "$(OPERATOR_REFERENCE)" \
+		--reason "$(REASON)" \
+		--confirm "$(CONFIRM_PEERGO_SEEDING_REWARD_RETRY)"
 
 # Build a private, read-only approval artifact for historical v1 seeding
 # evidence. This target never changes evidence, balances or experience.

@@ -22,6 +22,7 @@ RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-policy-worker ./services/core/cmd/promotion-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-image-derivative-worker ./services/core/cmd/image-derivative-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-worker ./services/core/cmd/seeding-reward-worker && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-retry ./services/core/cmd/seeding-reward-retry && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-compensation-preview ./services/core/cmd/seeding-reward-compensation-preview && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-compensation-apply ./services/core/cmd/seeding-reward-compensation-apply && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-contribution-experience-worker ./services/core/cmd/contribution-experience-worker && \
@@ -36,6 +37,8 @@ RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-hnr-consumer-init ./services/core/cmd/hnr-consumer-init && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-swarm-consumer-init ./services/core/cmd/swarm-consumer-init && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-legacy-wikis ./services/core/cmd/legacy-wikis && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-legacy-user-administration ./services/core/cmd/legacy-user-administration && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-legacy-torrent-route-aliases ./services/core/cmd/legacy-torrent-route-aliases && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/peergo-preflight ./services/core/cmd/preflight && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/vault-api ./services/privacy-vault/cmd/api && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/email-relay ./services/email-relay/cmd/email-relay && \

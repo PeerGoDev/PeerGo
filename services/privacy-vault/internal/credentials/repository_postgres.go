@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
 	"errors"
 	"fmt"
@@ -29,6 +30,19 @@ type vaultDB interface {
 // NewPostgresRepository creates the Vault credential persistence adapter.
 func NewPostgresRepository(db vaultDB) *PostgresRepository {
 	return &PostgresRepository{db: db, queries: vaultdb.New(db)}
+}
+
+func (r *PostgresRepository) IdentifierExists(ctx context.Context, lookup []byte) (bool, error) {
+	if len(lookup) != sha256.Size {
+		return false, ErrRegistrationInput
+	}
+	var exists bool
+	if err := r.db.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM vault.direct_identifiers WHERE kind = 'email' AND lookup_hmac = $1
+	)`, lookup).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check direct email identifier: %w", err)
+	}
+	return exists, nil
 }
 
 func (r *PostgresRepository) EmailOperations(ctx context.Context, now time.Time) (EmailOperationsStats, error) {

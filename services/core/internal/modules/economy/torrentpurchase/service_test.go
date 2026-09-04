@@ -113,6 +113,30 @@ func TestServiceUsesTypedPurchaseCapabilities(t *testing.T) {
 	}
 }
 
+func TestIntegrationPurchasePreservesExpectedPrice(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 27, 12, 0, 0, 0, time.UTC)
+	user := identity.User{ID: uuid.New()}
+	repository := &purchaseRepositoryStub{}
+	authorizer := &purchaseAuthorizerStub{now: now}
+	service, err := NewService(purchaseSessionStub{}, repository, authorizer, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestID := uuid.New()
+	expectedPrice := int64(100)
+	if _, err := service.PurchaseForIntegration(context.Background(), user, requestID, 42, &expectedPrice); err != nil {
+		t.Fatalf("PurchaseForIntegration() error = %v", err)
+	}
+	if repository.command.UserID != user.ID || repository.command.RequestID != requestID || repository.command.TorrentID != 42 ||
+		repository.command.ExpectedPrice == nil || *repository.command.ExpectedPrice != expectedPrice {
+		t.Fatalf("repository command = %+v", repository.command)
+	}
+	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionTorrentPurchaseCreateSelf {
+		t.Fatalf("authorization requests = %+v", authorizer.requests)
+	}
+}
+
 func TestRequireDownloadAccessFailsClosedForPricedTorrent(t *testing.T) {
 	t.Parallel()
 	userID := uuid.New()

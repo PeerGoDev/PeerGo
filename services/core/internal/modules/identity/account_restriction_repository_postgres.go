@@ -225,6 +225,101 @@ func (repository *PostgresAccountRestrictionRepository) appendEvent(ctx context.
 	return nil
 }
 
+func (repository *PostgresAccountRestrictionRepository) ManagedUserReactivationPreflight(ctx context.Context, userID uuid.UUID) (ManagedUserReactivationPreflight, error) {
+	if userID == uuid.Nil {
+		return ManagedUserReactivationPreflight{}, ErrUserAdministrationInput
+	}
+	var result ManagedUserReactivationPreflight
+	if err := repository.pool.QueryRow(ctx, `
+SELECT credential_ref, status, administration_version
+FROM identity.users WHERE id = $1`, userID).Scan(&result.CredentialRef, &result.Status, &result.Version); errors.Is(err, pgx.ErrNoRows) {
+		return ManagedUserReactivationPreflight{}, ErrManagedUserNotFound
+	} else if err != nil {
+		return ManagedUserReactivationPreflight{}, fmt.Errorf("read managed user reactivation preflight: %w", err)
+	}
+	return result, nil
+}
+
+func (repository *PostgresAccountRestrictionRepository) ReactivateManagedUser(ctx context.Context, command ReactivateManagedUserCommand) (ManagedUserDetail, error) {
+	if command.ReactivationID == uuid.Nil || command.UserID == uuid.Nil || command.ActorID == uuid.Nil ||
+		command.ExpectedUserVersion < 1 || command.Authorization.ID == uuid.Nil || !command.Authorization.Allow {
+		return ManagedUserDetail{}, ErrUserAdministrationInput
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("begin managed user reactivation: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := identitydb.New(tx)
+	var replayUser, replayActor uuid.UUID
+	var replayReason string
+	var replayVersion int64
+	err = tx.QueryRow(ctx, `
+SELECT user_id, reason, actor_id, previous_administration_version
+FROM identity.account_reactivations WHERE id = $1`, command.ReactivationID).Scan(
+		&replayUser, &replayReason, &replayActor, &replayVersion,
+	)
+	if err == nil {
+		if replayUser != command.UserID || replayReason != command.Reason || replayActor != command.ActorID || replayVersion != command.ExpectedUserVersion {
+			return ManagedUserDetail{}, ErrManagedUserVersionConflict
+		}
+		detail, readErr := managedUserDetailWithQueries(ctx, queries, command.UserID, command.OccurredAt)
+		if readErr != nil {
+			return ManagedUserDetail{}, fmt.Errorf("read replayed managed user reactivation: %w", readErr)
+		}
+		if detail.Status != AccountStatusActive || detail.Version != command.ExpectedUserVersion+1 {
+			return ManagedUserDetail{}, ErrManagedUserVersionConflict
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return ManagedUserDetail{}, fmt.Errorf("commit managed user reactivation replay: %w", err)
+		}
+		return detail, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return ManagedUserDetail{}, fmt.Errorf("read managed user reactivation replay: %w", err)
+	}
+	user, err := queries.LockManagedUserForAccountRestriction(ctx, command.UserID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ManagedUserDetail{}, ErrManagedUserNotFound
+	}
+	if err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("lock managed user reactivation: %w", err)
+	}
+	if AccountStatus(user.Status) != AccountStatusDisabled {
+		return ManagedUserDetail{}, ErrManagedUserNotDisabled
+	}
+	if user.AdministrationVersion != command.ExpectedUserVersion {
+		return ManagedUserDetail{}, ErrManagedUserVersionConflict
+	}
+	result, err := tx.Exec(ctx, `
+UPDATE identity.users
+SET status = 'active', administration_version = administration_version + 1,
+    updated_at = GREATEST(updated_at, $2)
+WHERE id = $1 AND status = 'disabled' AND administration_version = $3`, command.UserID, command.OccurredAt, command.ExpectedUserVersion)
+	if err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("reactivate managed user: %w", err)
+	}
+	if result.RowsAffected() != 1 {
+		return ManagedUserDetail{}, ErrManagedUserVersionConflict
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO identity.account_reactivations (
+    id, user_id, reason, actor_id, authorization_decision_id,
+    previous_administration_version, occurred_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7)`, command.ReactivationID, command.UserID,
+		command.Reason, command.ActorID, command.Authorization.ID, command.ExpectedUserVersion, command.OccurredAt); err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("record managed user reactivation: %w", err)
+	}
+	detail, err := managedUserDetailWithQueries(ctx, queries, command.UserID, command.OccurredAt)
+	if err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("read reactivated managed user: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ManagedUserDetail{}, fmt.Errorf("commit managed user reactivation: %w", err)
+	}
+	return detail, nil
+}
+
 func validateLockedManagedUser(user identitydb.LockManagedUserForAccountRestrictionRow) error {
 	status := AccountStatus(user.Status)
 	if user.ID == uuid.Nil || user.Username == "" || user.DisplayName == "" ||

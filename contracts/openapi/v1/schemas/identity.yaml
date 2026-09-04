@@ -1613,9 +1613,9 @@ ManagedUserSummary:
       maximum: 99
     role_names:
       type: array
-      minItems: 1
       maxItems: 32
       uniqueItems: true
+      description: 当前有效角色；待恢复或尚未完成初始化的账户可为空。
       items:
         type: string
         minLength: 1
@@ -1720,12 +1720,71 @@ ManagedUserDetail:
     - type: object
       additionalProperties: false
       required:
+        - experience
+        - donation_amount
+        - remaining_invites
+        - submitted_torrent_count
+        - published_torrent_count
+        - pending_review_torrent_count
+        - direct_invite_count
+        - inviter_numeric_id
+        - inviter_username
+        - registration_mode
+        - registration_state
         - active_restrictions
         - manual_download_restriction
         - manual_download_restriction_history
         - vip_state
         - vip_history
       properties:
+        experience:
+          type: string
+          pattern: "^[0-9]+(?:\\.[0-9]{1,20})?$"
+          description: 当前精确经验值；使用十进制字符串避免精度损失。
+        donation_amount:
+          type: string
+          pattern: "^[0-9]+(?:\\.[0-9]{1,2})?$"
+          description: 当前累计捐赠金额；由 PtYes 开账值和后续不可变调整记录组成。
+        remaining_invites:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        submitted_torrent_count:
+          type: integer
+          format: int64
+          minimum: 0
+        published_torrent_count:
+          type: integer
+          format: int64
+          minimum: 0
+        pending_review_torrent_count:
+          type: integer
+          format: int64
+          minimum: 0
+        direct_invite_count:
+          type: integer
+          format: int64
+          minimum: 0
+        inviter_numeric_id:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+        inviter_username:
+          type: string
+          minLength: 1
+          maxLength: 64
+          nullable: true
+        registration_mode:
+          type: string
+          enum: [open, invite]
+          nullable: true
+          description: PeerGo 原生注册方式；迁移用户为空。
+        registration_state:
+          type: string
+          enum: [reserved, credential_provisioned, completed]
+          nullable: true
+          description: PeerGo 原生注册事务状态；迁移用户为空。
         active_restrictions:
           type: array
           maxItems: 50
@@ -1745,6 +1804,83 @@ ManagedUserDetail:
           maxItems: 20
           items:
             $ref: "#/VIPTransition"
+
+ManagedUserAdjustmentRequest:
+  type: object
+  additionalProperties: false
+  required: [field, operation, amount, expected_user_version]
+  properties:
+    field:
+      type: string
+      enum:
+        - uploaded_bytes
+        - downloaded_bytes
+        - magic_balance
+        - experience
+        - remaining_invites
+        - donation_amount
+    operation:
+      type: string
+      enum: [increase, decrease]
+    amount:
+      type: string
+      pattern: "^[0-9]+(?:\\.[0-9]{1,20})?$"
+      maxLength: 40
+      description: 正数；字段决定整数、两位金额或二十位经验精度。
+    reason:
+      type: string
+      minLength: 0
+      maxLength: 500
+      description: 可留空；服务端会生成字段对应的审计理由。
+    expected_user_version:
+      type: integer
+      format: int64
+      minimum: 1
+
+ManagedUserNetworkObservation:
+  type: object
+  additionalProperties: false
+  required: [address, first_seen_at, last_seen_at, seen_count, related_user_count]
+  properties:
+    address:
+      type: string
+      minLength: 2
+      maxLength: 45
+      description: 规范 IPv4 或 IPv6 地址。
+    first_seen_at:
+      type: string
+      format: date-time
+    last_seen_at:
+      type: string
+      format: date-time
+    seen_count:
+      type: integer
+      format: int64
+      minimum: 1
+    related_user_count:
+      type: integer
+      format: int64
+      minimum: 1
+      description: 在同一保留窗口内出现此地址的用户数量。
+
+ManagedUserNetworkHistory:
+  type: object
+  additionalProperties: false
+  required: [items, retention_days, maximum_items]
+  properties:
+    items:
+      type: array
+      maxItems: 20
+      items:
+        $ref: "#/ManagedUserNetworkObservation"
+    retention_days:
+      type: integer
+      minimum: 1
+      maximum: 365
+    maximum_items:
+      type: integer
+      minimum: 1
+      maximum: 20
 
 VIPState:
   type: object
@@ -2006,3 +2142,17 @@ RevokeAccountRestrictionRequest:
       type: integer
       format: int64
       minimum: 1
+
+ReactivateManagedUserRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_user_version]
+  properties:
+    expected_user_version:
+      type: integer
+      format: int64
+      minimum: 1
+    reason:
+      type: string
+      maxLength: 500
+      description: 可留空；留空时记录为管理员手动解除账户封禁。

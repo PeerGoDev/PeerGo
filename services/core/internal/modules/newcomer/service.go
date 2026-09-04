@@ -93,6 +93,27 @@ func (service *Service) Assessments(ctx context.Context, actor authz.StaffActor,
 	return service.repository.Assessments(ctx, query)
 }
 
+func (service *Service) Assign(ctx context.Context, actor authz.StaffActor, input AssignInput) (Assessment, error) {
+	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = "管理员手动分配新人考核"
+	}
+	if input.AssignmentID == uuid.Nil || input.UserID == uuid.Nil || !validReason(input.Reason) {
+		return Assessment{}, ErrInput
+	}
+	if input.UserID == actor.Subject.ID {
+		return Assessment{}, ErrSelfTarget
+	}
+	now := service.now().UTC().Round(0)
+	decision, err := authz.AuthorizeStaffAction(ctx, service.authorizer, actor, authz.ActionNewcomerAssessmentAssign, authz.SiteScope(), now, "newcomer-assessment-assign")
+	if err != nil {
+		return Assessment{}, err
+	}
+	return service.repository.Assign(ctx, AssignCommand{
+		AssignInput: input, ActorID: actor.Subject.ID, OccurredAt: now, Authorization: decision,
+	})
+}
+
 func (service *Service) Exempt(ctx context.Context, actor authz.StaffActor, input ExemptInput) (Assessment, error) {
 	input.Reason = strings.TrimSpace(input.Reason)
 	if input.ExemptionID == uuid.Nil || input.AssessmentID == uuid.Nil || input.ExpectedVersion < 1 || !validReason(input.Reason) {

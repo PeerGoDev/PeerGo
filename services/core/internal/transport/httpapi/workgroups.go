@@ -873,7 +873,9 @@ func workgroupContributionDTO(progress workgroups.ContributionProgress) generate
 		PeriodStartsAt: progress.PeriodStartsAt, PeriodEndsAt: progress.PeriodEndsAt,
 		ObservedAt: progress.ObservedAt, EvidenceThrough: progress.EvidenceThrough,
 		CurrentValue: progress.CurrentValue, TargetValue: progress.TargetValue,
-		Met: progress.Met, EnforcementMode: generated.WorkgroupContributionProgressEnforcementModeObserve,
+		Met:             progress.Met,
+		EnforcementMode: generated.WorkgroupContributionEnforcementMode(progress.EnforcementMode),
+		AllowedMisses:   progress.AllowedMisses, MissCount: progress.MissCount,
 	}
 }
 
@@ -901,13 +903,41 @@ func workgroupContributionCycleDTO(cycle workgroups.ContributionCycle) generated
 		TargetValue:      cycle.TargetValue,
 		AssessmentState:  generated.WorkgroupContributionAssessmentState(cycle.AssessmentState),
 		ExplanationCode:  generated.WorkgroupContributionExplanationCode(cycle.ExplanationCode),
-		EnforcementMode:  generated.WorkgroupContributionCycleEnforcementModeObserve,
+		EnforcementMode:  generated.WorkgroupContributionEnforcementMode(cycle.EnforcementMode),
+		AllowedMisses:    cycle.AllowedMisses,
 	}
 	if cycle.Reminder != nil {
 		value := workgroupContributionReminderDTO(*cycle.Reminder)
 		dto.Reminder = &value
 	}
+	if cycle.Enforcement != nil {
+		value := workgroupContributionEnforcementDTO(*cycle.Enforcement)
+		dto.Enforcement = &value
+	}
 	return dto
+}
+
+func workgroupContributionEnforcementDTO(assessment workgroups.ContributionEnforcementAssessment) generated.WorkgroupContributionEnforcementAssessment {
+	return generated.WorkgroupContributionEnforcementAssessment{
+		Id:                 assessment.ID,
+		GroupKind:          generated.WorkgroupKind(assessment.GroupKind),
+		Metric:             generated.WorkgroupContributionMetric(assessment.Metric),
+		PolicyRevision:     assessment.PolicyRevision,
+		PeriodStartsAt:     assessment.PeriodStartsAt,
+		PeriodEndsAt:       assessment.PeriodEndsAt,
+		ObservedAt:         assessment.ObservedAt,
+		EvidenceThrough:    assessment.EvidenceThrough,
+		EvidenceState:      generated.WorkgroupContributionEnforcementAssessmentEvidenceState(assessment.EvidenceState),
+		CurrentValue:       assessment.CurrentValue,
+		TargetValue:        assessment.TargetValue,
+		AssessmentState:    generated.WorkgroupContributionEnforcementAssessmentAssessmentState(assessment.AssessmentState),
+		ExplanationCode:    generated.WorkgroupContributionEnforcementAssessmentExplanationCode(assessment.ExplanationCode),
+		MissCount:          assessment.MissCount,
+		AllowedMisses:      assessment.AllowedMisses,
+		DisciplinaryAction: generated.WorkgroupContributionDisciplinaryAction(assessment.DisciplinaryAction),
+		Reason:             assessment.Reason,
+		AssessedAt:         assessment.AssessedAt,
+	}
 }
 
 func workgroupContributionReminderDTO(reminder workgroups.ContributionReminder) generated.WorkgroupContributionReminder {
@@ -930,7 +960,8 @@ func workgroupContributionPolicyDTO(policy workgroups.ContributionPolicy) genera
 		GroupKind: generated.WorkgroupKind(policy.GroupKind), Revision: policy.Revision,
 		Metric:     generated.WorkgroupContributionMetric(policy.Metric),
 		PeriodKind: generated.WorkgroupContributionPolicyRevisionPeriodKindCalendarMonth, TargetValue: policy.TargetValue,
-		EnforcementMode: generated.WorkgroupContributionPolicyRevisionEnforcementModeObserve, EffectiveFrom: policy.EffectiveFrom,
+		EnforcementMode: generated.WorkgroupContributionEnforcementMode(policy.EnforcementMode),
+		AllowedMisses:   policy.AllowedMisses, EffectiveFrom: policy.EffectiveFrom,
 		Opening: policy.Opening, Reason: policy.Reason, CreatedAt: policy.CreatedAt,
 		TimelineState: generated.WorkgroupContributionPolicyRevisionTimelineState(policy.TimelineState),
 		Replayed:      policy.Replayed,

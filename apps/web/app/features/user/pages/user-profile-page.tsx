@@ -277,12 +277,12 @@ export function UserProfilePage() {
 
   return (
     <PageLayout className="gap-6">
-      <header className="flex min-h-[116px] items-start justify-between gap-4 md:min-h-[88px]">
+      <header className="flex flex-col items-stretch gap-4 sm:min-h-[88px] sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-4">
           <UserAvatar
             username={publicUser.username}
             displayName={publicUser.display_name}
-            className="mt-3 size-16!"
+            className="mt-1 size-14! sm:mt-3 sm:size-16!"
             fallbackClassName="text-xl"
           />
           <div className="flex min-w-0 flex-col gap-2">
@@ -310,6 +310,7 @@ export function UserProfilePage() {
           <Button
             variant="outline"
             size="legacySm"
+            className="w-full justify-center sm:w-auto"
             nativeButton={false}
             render={<Link to="/account" />}
           >
@@ -319,7 +320,10 @@ export function UserProfilePage() {
         ) : null}
       </header>
 
-      <section aria-label="用户统计" className="grid gap-6 xl:grid-cols-3">
+      <section
+        aria-label="用户统计"
+        className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-6"
+      >
         <ProfileCard title="基本信息">
           <ProfileMetric
             icon={CalendarDaysIcon}
@@ -523,7 +527,7 @@ function SeedingRewardCard({
 }) {
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="px-6 pt-6 pb-4">
+      <CardHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
         <CardTitle>
           <h2 className="flex items-center gap-2">
             <SparklesIcon className="size-4 text-warning-foreground" />
@@ -532,7 +536,7 @@ function SeedingRewardCard({
         </CardTitle>
         <CardDescription>仅自己可见的最近一次结算结果。</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 px-6 pb-6 sm:grid-cols-2 lg:grid-cols-4">
+      <CardContent className="grid gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-6 sm:pb-6 lg:grid-cols-4">
         {loading && !reward ? (
           <p className="text-sm text-muted-foreground">正在加载奖励结算…</p>
         ) : reward ? (
@@ -611,12 +615,12 @@ function ProfileCard({
 }) {
   return (
     <Card className={cn("gap-0 py-0 md:min-h-[262px]", className)}>
-      <CardHeader className="px-6 pt-6 pb-2">
+      <CardHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6">
         <CardTitle className="leading-6">
           <h2>{title}</h2>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2 px-6 pb-6">
+      <CardContent className="flex flex-col gap-2 px-4 pb-4 sm:px-6 sm:pb-6">
         {children}
       </CardContent>
     </Card>

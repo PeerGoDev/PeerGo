@@ -114,12 +114,42 @@ function ContributionCycleRow({
             </p>
           </div>
         ) : null}
+        {cycle.enforcement ? (
+          <div className="mt-2">
+            <Badge
+              variant={
+                cycle.enforcement.disciplinary_action === "membership_ended"
+                  ? "destructive"
+                  : cycle.enforcement.assessment_state === "not_met"
+                    ? "secondary"
+                    : "outline"
+              }
+            >
+              {enforcementLabel(cycle.enforcement)}
+            </Badge>
+            <p className="mt-1 max-w-60 text-xs text-muted-foreground">
+              {cycle.enforcement.reason}
+            </p>
+          </div>
+        ) : null}
       </TableCell>
       {renderAction ? (
         <TableCell className="align-top">{renderAction(cycle)}</TableCell>
       ) : null}
     </TableRow>
   )
+}
+
+function enforcementLabel(
+  assessment: NonNullable<WorkgroupContributionCycle["enforcement"]>
+) {
+  if (assessment.disciplinary_action === "membership_ended") {
+    return `资格已结束 · 第 ${assessment.miss_count} 次未达标`
+  }
+  if (assessment.disciplinary_action === "marked") {
+    return `已标记 · ${assessment.miss_count}/${assessment.allowed_misses}`
+  }
+  return `已结算 · 累计 ${assessment.miss_count} 次未达标`
 }
 
 function EvidenceBadge({

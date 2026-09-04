@@ -87,6 +87,36 @@ func (q *Queries) BindTorrentCommentThread(ctx context.Context, arg BindTorrentC
 	return err
 }
 
+const countCommentThreads = `-- name: CountCommentThreads :one
+SELECT
+    count(comment.id)::bigint AS comment_total,
+    count(comment.id) FILTER (WHERE comment.parent_comment_id IS NULL)::bigint AS thread_total
+FROM social.comment_target_projection AS target
+LEFT JOIN social.comments AS comment
+    ON comment.thread_id = target.thread_id
+WHERE target.target_kind = $1::text
+  AND target.target_key = $2::text
+  AND target.target_is_public = true
+GROUP BY target.target_kind, target.target_key
+`
+
+type CountCommentThreadsParams struct {
+	TargetKind string
+	TargetKey  string
+}
+
+type CountCommentThreadsRow struct {
+	CommentTotal int64
+	ThreadTotal  int64
+}
+
+func (q *Queries) CountCommentThreads(ctx context.Context, arg CountCommentThreadsParams) (CountCommentThreadsRow, error) {
+	row := q.db.QueryRow(ctx, countCommentThreads, arg.TargetKind, arg.TargetKey)
+	var i CountCommentThreadsRow
+	err := row.Scan(&i.CommentTotal, &i.ThreadTotal)
+	return i, err
+}
+
 const countComments = `-- name: CountComments :one
 SELECT count(comment.id)::bigint
 FROM social.comment_target_projection AS target
@@ -531,6 +561,146 @@ func (q *Queries) InsertCommentRevision(ctx context.Context, arg InsertCommentRe
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const listCommentThreads = `-- name: ListCommentThreads :many
+WITH root_stats AS (
+    SELECT
+        root.id,
+        root.created_at,
+        count(reply.id)::bigint AS reply_count
+    FROM social.comment_target_projection AS target
+    JOIN social.comments AS root
+      ON root.thread_id = target.thread_id
+     AND root.root_comment_id IS NULL
+    LEFT JOIN social.comments AS reply
+      ON reply.thread_id = root.thread_id
+     AND reply.root_comment_id = root.id
+    WHERE target.target_kind = $1::text
+      AND target.target_key = $2::text
+      AND target.target_is_public = true
+    GROUP BY root.id, root.created_at
+), ranked_roots AS (
+    SELECT
+        root_stats.id,
+        row_number() OVER (
+            ORDER BY
+                CASE WHEN $3::text = 'hot' THEN root_stats.reply_count END DESC NULLS LAST,
+                CASE WHEN $3::text IN ('hot', 'newest') THEN root_stats.created_at END DESC NULLS LAST,
+                CASE WHEN $3::text = 'oldest' THEN root_stats.created_at END ASC NULLS LAST,
+                CASE WHEN $3::text IN ('hot', 'newest') THEN root_stats.id END DESC NULLS LAST,
+                CASE WHEN $3::text = 'oldest' THEN root_stats.id END ASC NULLS LAST
+        ) AS root_position
+    FROM root_stats
+), selected_roots AS (
+    SELECT ranked_roots.id, ranked_roots.root_position
+    FROM ranked_roots
+    WHERE ranked_roots.root_position > $4::integer
+      AND ranked_roots.root_position <= $4::integer + $5::integer
+)
+SELECT
+    comment.id AS comment_internal_id,
+    comment.public_id,
+    target.target_kind,
+    target.target_key,
+    parent.public_id AS parent_public_id,
+    owning_root.public_id AS root_public_id,
+    comment.author_id,
+    author.display_name AS author_display_name,
+    comment.body,
+    comment.body_format,
+    comment.state,
+    comment.version,
+    comment.created_at,
+    comment.updated_at,
+    comment.edited_at
+FROM selected_roots
+JOIN social.comments AS comment
+  ON comment.id = selected_roots.id
+  OR comment.root_comment_id = selected_roots.id
+JOIN social.comment_target_projection AS target
+  ON target.thread_id = comment.thread_id
+JOIN identity.users AS author
+  ON author.id = comment.author_id
+LEFT JOIN social.comments AS parent
+  ON parent.id = comment.parent_comment_id
+ AND parent.thread_id = comment.thread_id
+LEFT JOIN social.comments AS owning_root
+  ON owning_root.id = comment.root_comment_id
+ AND owning_root.thread_id = comment.thread_id
+ORDER BY
+    selected_roots.root_position,
+    (comment.id = selected_roots.id) DESC,
+    comment.created_at,
+    comment.id
+`
+
+type ListCommentThreadsParams struct {
+	TargetKind   string
+	TargetKey    string
+	SortOrder    string
+	ResultOffset int32
+	ResultLimit  int32
+}
+
+type ListCommentThreadsRow struct {
+	CommentInternalID int64
+	PublicID          uuid.UUID
+	TargetKind        string
+	TargetKey         string
+	ParentPublicID    pgtype.UUID
+	RootPublicID      pgtype.UUID
+	AuthorID          uuid.UUID
+	AuthorDisplayName string
+	Body              string
+	BodyFormat        string
+	State             string
+	Version           int64
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+	EditedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) ListCommentThreads(ctx context.Context, arg ListCommentThreadsParams) ([]ListCommentThreadsRow, error) {
+	rows, err := q.db.Query(ctx, listCommentThreads,
+		arg.TargetKind,
+		arg.TargetKey,
+		arg.SortOrder,
+		arg.ResultOffset,
+		arg.ResultLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCommentThreadsRow{}
+	for rows.Next() {
+		var i ListCommentThreadsRow
+		if err := rows.Scan(
+			&i.CommentInternalID,
+			&i.PublicID,
+			&i.TargetKind,
+			&i.TargetKey,
+			&i.ParentPublicID,
+			&i.RootPublicID,
+			&i.AuthorID,
+			&i.AuthorDisplayName,
+			&i.Body,
+			&i.BodyFormat,
+			&i.State,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.EditedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listComments = `-- name: ListComments :many

@@ -775,8 +775,8 @@ func (unavailableCommentService) ListAnnouncementComments(context.Context, strin
 	return social.CommentPage{}, social.ErrCommentTargetNotFound
 }
 
-func (unavailableCommentService) ListPostComments(context.Context, uuid.UUID, int, int) (social.CommentPage, error) {
-	return social.CommentPage{}, social.ErrCommentTargetNotFound
+func (unavailableCommentService) ListPostComments(context.Context, uuid.UUID, social.CommentThreadSort, int, int) (social.CommentThreadPage, error) {
+	return social.CommentThreadPage{}, social.ErrCommentTargetNotFound
 }
 
 func (unavailableCommentService) CreateTorrentComment(context.Context, string, string, social.CreateTorrentCommentInput) (social.Comment, error) {
@@ -889,6 +889,7 @@ func (unavailableCommentModerationService) Decide(context.Context, authz.StaffAc
 
 type recordingCommentService struct {
 	page                    social.CommentPage
+	threadPage              social.CommentThreadPage
 	created                 social.Comment
 	updated                 social.Comment
 	listTorrentID           int64
@@ -896,6 +897,7 @@ type recordingCommentService struct {
 	listAnnouncementID      string
 	listLimit               int
 	listOffset              int
+	listThreadSort          social.CommentThreadSort
 	createCookie            string
 	createCSRF              string
 	createInput             social.CreateTorrentCommentInput
@@ -947,9 +949,9 @@ func (service *recordingCommentService) ListAnnouncementComments(_ context.Conte
 	return service.page, nil
 }
 
-func (service *recordingCommentService) ListPostComments(_ context.Context, postID uuid.UUID, limit, offset int) (social.CommentPage, error) {
-	service.listPostID, service.listLimit, service.listOffset = postID, limit, offset
-	return service.page, nil
+func (service *recordingCommentService) ListPostComments(_ context.Context, postID uuid.UUID, sort social.CommentThreadSort, limit, offset int) (social.CommentThreadPage, error) {
+	service.listPostID, service.listThreadSort, service.listLimit, service.listOffset = postID, sort, limit, offset
+	return service.threadPage, nil
 }
 
 func (service *recordingCommentService) CreateTorrentComment(_ context.Context, cookie, csrf string, input social.CreateTorrentCommentInput) (social.Comment, error) {
@@ -1485,6 +1487,10 @@ func (unavailableNewcomerAdministrationService) Assessments(context.Context, aut
 	return newcomer.AssessmentPage{}, authz.ErrForbidden
 }
 
+func (unavailableNewcomerAdministrationService) Assign(context.Context, authz.StaffActor, newcomer.AssignInput) (newcomer.Assessment, error) {
+	return newcomer.Assessment{}, authz.ErrForbidden
+}
+
 func (unavailableNewcomerAdministrationService) Exempt(context.Context, authz.StaffActor, newcomer.ExemptInput) (newcomer.Assessment, error) {
 	return newcomer.Assessment{}, authz.ErrForbidden
 }
@@ -1722,6 +1728,10 @@ func (unavailableCategoryAdministrationService) Update(context.Context, authz.St
 	return catalog.ManagedCategory{}, authz.ErrForbidden
 }
 
+func (unavailableCategoryAdministrationService) UpsertFacet(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetInput) (catalog.ManagedCategoryFacet, error) {
+	return catalog.ManagedCategoryFacet{}, authz.ErrForbidden
+}
+
 func (unavailableCategoryAdministrationService) UpsertFacetOption(context.Context, authz.StaffActor, catalog.UpsertCategoryFacetOptionInput) (catalog.ManagedCategoryFacetOption, error) {
 	return catalog.ManagedCategoryFacetOption{}, authz.ErrForbidden
 }
@@ -1848,11 +1858,23 @@ func (unavailableUserAdministrationService) Get(context.Context, authz.StaffActo
 	return identity.ManagedUserDetail{}, authz.ErrForbidden
 }
 
+func (unavailableUserAdministrationService) Adjust(context.Context, authz.StaffActor, identity.ManagedUserAdjustmentInput) (identity.ManagedUserDetail, error) {
+	return identity.ManagedUserDetail{}, authz.ErrForbidden
+}
+
+func (unavailableUserAdministrationService) NetworkHistory(context.Context, authz.StaffActor, uuid.UUID) (identity.ManagedUserNetworkHistory, error) {
+	return identity.ManagedUserNetworkHistory{}, authz.ErrForbidden
+}
+
 func (unavailableUserAdministrationService) CreateRestriction(context.Context, authz.StaffActor, identity.CreateAccountRestrictionInput) (identity.ManagedUserDetail, error) {
 	return identity.ManagedUserDetail{}, authz.ErrForbidden
 }
 
 func (unavailableUserAdministrationService) RevokeRestriction(context.Context, authz.StaffActor, identity.RevokeAccountRestrictionInput) (identity.ManagedUserDetail, error) {
+	return identity.ManagedUserDetail{}, authz.ErrForbidden
+}
+
+func (unavailableUserAdministrationService) Reactivate(context.Context, authz.StaffActor, identity.ReactivateManagedUserInput) (identity.ManagedUserDetail, error) {
 	return identity.ManagedUserDetail{}, authz.ErrForbidden
 }
 
@@ -1881,6 +1903,11 @@ type recordingUserAdministrationService struct {
 	listInput         identity.ListManagedUsersInput
 	getActor          authz.StaffActor
 	getUserID         uuid.UUID
+	adjustActor       authz.StaffActor
+	adjustInput       identity.ManagedUserAdjustmentInput
+	networkActor      authz.StaffActor
+	networkUserID     uuid.UUID
+	networkResult     identity.ManagedUserNetworkHistory
 	createActor       authz.StaffActor
 	createInput       identity.CreateAccountRestrictionInput
 	revokeActor       authz.StaffActor
@@ -1904,6 +1931,18 @@ func (service *recordingUserAdministrationService) Get(_ context.Context, actor 
 	return service.detail, service.err
 }
 
+func (service *recordingUserAdministrationService) Adjust(_ context.Context, actor authz.StaffActor, input identity.ManagedUserAdjustmentInput) (identity.ManagedUserDetail, error) {
+	service.adjustActor = actor
+	service.adjustInput = input
+	return service.detail, service.err
+}
+
+func (service *recordingUserAdministrationService) NetworkHistory(_ context.Context, actor authz.StaffActor, userID uuid.UUID) (identity.ManagedUserNetworkHistory, error) {
+	service.networkActor = actor
+	service.networkUserID = userID
+	return service.networkResult, service.err
+}
+
 func (service *recordingUserAdministrationService) CreateRestriction(_ context.Context, actor authz.StaffActor, input identity.CreateAccountRestrictionInput) (identity.ManagedUserDetail, error) {
 	service.createActor = actor
 	service.createInput = input
@@ -1913,6 +1952,11 @@ func (service *recordingUserAdministrationService) CreateRestriction(_ context.C
 func (service *recordingUserAdministrationService) RevokeRestriction(_ context.Context, actor authz.StaffActor, input identity.RevokeAccountRestrictionInput) (identity.ManagedUserDetail, error) {
 	service.revokeActor = actor
 	service.revokeInput = input
+	return service.revokeResult, service.err
+}
+
+func (service *recordingUserAdministrationService) Reactivate(_ context.Context, actor authz.StaffActor, input identity.ReactivateManagedUserInput) (identity.ManagedUserDetail, error) {
+	service.revokeActor = actor
 	return service.revokeResult, service.err
 }
 
@@ -1987,6 +2031,11 @@ func (service *recordingCategoryAdministrationService) Update(_ context.Context,
 	service.updateActor = actor
 	service.updateInput = input
 	return service.updateResult, service.err
+}
+
+func (service *recordingCategoryAdministrationService) UpsertFacet(_ context.Context, actor authz.StaffActor, input catalog.UpsertCategoryFacetInput) (catalog.ManagedCategoryFacet, error) {
+	service.updateActor = actor
+	return catalog.ManagedCategoryFacet{}, service.err
 }
 
 func (service *recordingCategoryAdministrationService) UpsertFacetOption(_ context.Context, actor authz.StaffActor, input catalog.UpsertCategoryFacetOptionInput) (catalog.ManagedCategoryFacetOption, error) {
@@ -4008,6 +4057,67 @@ func TestUserAdministrationMapsAuthorizedOperationalListAndCurrentRestrictions(t
 		t.Fatalf("detail actor=%+v user_id=%s body=%s", userService.getActor, userService.getUserID, detailResponse.Body.String())
 	}
 	assertSafeUserAdministrationJSON(t, detailResponse.Body.String())
+}
+
+func TestManagedUserDataAdjustmentAndNetworkHistoryUseSeparateStaffBoundaries(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 28, 13, 0, 0, 0, time.UTC)
+	staffID, targetID, adjustmentID := uuid.New(), uuid.New(), uuid.New()
+	staffCSRF := strings.Repeat("u", 43)
+	staffService := &recordingStaffIdentityService{currentResult: identity.StaffSession{
+		User:                    identity.User{ID: staffID, Username: "user-operator", DisplayName: "用户管理员"},
+		WebAuthnAuthenticatedAt: now.Add(-time.Minute), CSRFToken: staffCSRF,
+	}}
+	userService := &recordingUserAdministrationService{
+		detail: identity.ManagedUserDetail{
+			ManagedUserSummary: identity.ManagedUserSummary{
+				ID: targetID, NumericID: 12331, Username: "adjust-target", DisplayName: "数据调整目标",
+				Status: identity.AccountStatusActive, Email: "adjust@example.com", RoleNames: []string{"member"},
+				Version: 5, CreatedAt: now.Add(-time.Hour), UpdatedAt: now,
+			},
+			Experience: "1200", DonationAmount: "42.50",
+		},
+		networkResult: identity.ManagedUserNetworkHistory{
+			Items: []identity.ManagedUserNetworkObservation{{
+				Address: "2001:db8::8", FirstSeenAt: now.Add(-time.Hour), LastSeenAt: now,
+				SeenCount: 4, RelatedUserCount: 1,
+			}},
+			RetentionDays: 180, MaximumItems: 20,
+		},
+	}
+	handler := testHandlerWithUserAdministration(t, staffService, userService)
+
+	adjustRequest := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users/"+targetID.String()+"/adjustments", strings.NewReader(`{"field":"donation_amount","operation":"increase","amount":"2.50","reason":"","expected_user_version":4}`))
+	adjustRequest.Header.Set("Content-Type", "application/json")
+	adjustRequest.Header.Set("Origin", "http://peergo.test")
+	adjustRequest.Header.Set("X-CSRF-Token", staffCSRF)
+	adjustRequest.Header.Set("Idempotency-Key", adjustmentID.String())
+	adjustRequest.AddCookie(&http.Cookie{Name: "peergo_staff_session", Value: "staff-token"})
+	adjustResponse := httptest.NewRecorder()
+	handler.ServeHTTP(adjustResponse, adjustRequest)
+	if adjustResponse.Code != http.StatusOK || !strings.Contains(adjustResponse.Body.String(), `"donation_amount":"42.50"`) {
+		t.Fatalf("adjust status=%d body=%s", adjustResponse.Code, adjustResponse.Body.String())
+	}
+	if staffService.writeStaffToken != "staff-token" || staffService.writeCSRF != staffCSRF ||
+		userService.adjustActor.Subject.ID != staffID || userService.adjustInput.AdjustmentID != adjustmentID ||
+		userService.adjustInput.UserID != targetID || userService.adjustInput.Field != identity.ManagedUserAdjustmentDonationAmount ||
+		userService.adjustInput.Operation != identity.ManagedUserAdjustmentIncrease || userService.adjustInput.Amount != "2.50" ||
+		userService.adjustInput.Reason != "系统自动记录：操作时未填写变更理由。" || userService.adjustInput.ExpectedUserVersion != 4 {
+		t.Fatalf("staff=%+v adjustment=%+v", staffService, userService.adjustInput)
+	}
+	assertSafeUserAdministrationJSON(t, adjustResponse.Body.String())
+
+	networkRequest := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users/"+targetID.String()+"/network-history", nil)
+	networkRequest.AddCookie(&http.Cookie{Name: "peergo_staff_session", Value: "staff-token"})
+	networkResponse := httptest.NewRecorder()
+	handler.ServeHTTP(networkResponse, networkRequest)
+	if networkResponse.Code != http.StatusOK || userService.networkActor.Subject.ID != staffID ||
+		userService.networkUserID != targetID || !strings.Contains(networkResponse.Body.String(), `"address":"2001:db8::8"`) ||
+		!strings.Contains(networkResponse.Body.String(), `"retention_days":180`) ||
+		strings.Contains(networkResponse.Body.String(), "user_agent") {
+		t.Fatalf("network status=%d actor=%+v user=%s body=%s", networkResponse.Code, userService.networkActor, userService.networkUserID, networkResponse.Body.String())
+	}
 }
 
 func TestAccountRestrictionCommandsRequireStaffWriteAndMapVersions(t *testing.T) {

@@ -39,6 +39,89 @@ ORDER BY comment.created_at, comment.id
 LIMIT sqlc.arg(result_limit)::integer
 OFFSET sqlc.arg(result_offset)::integer;
 
+-- name: CountCommentThreads :one
+SELECT
+    count(comment.id)::bigint AS comment_total,
+    count(comment.id) FILTER (WHERE comment.parent_comment_id IS NULL)::bigint AS thread_total
+FROM social.comment_target_projection AS target
+LEFT JOIN social.comments AS comment
+    ON comment.thread_id = target.thread_id
+WHERE target.target_kind = sqlc.arg(target_kind)::text
+  AND target.target_key = sqlc.arg(target_key)::text
+  AND target.target_is_public = true
+GROUP BY target.target_kind, target.target_key;
+
+-- name: ListCommentThreads :many
+WITH root_stats AS (
+    SELECT
+        root.id,
+        root.created_at,
+        count(reply.id)::bigint AS reply_count
+    FROM social.comment_target_projection AS target
+    JOIN social.comments AS root
+      ON root.thread_id = target.thread_id
+     AND root.root_comment_id IS NULL
+    LEFT JOIN social.comments AS reply
+      ON reply.thread_id = root.thread_id
+     AND reply.root_comment_id = root.id
+    WHERE target.target_kind = sqlc.arg(target_kind)::text
+      AND target.target_key = sqlc.arg(target_key)::text
+      AND target.target_is_public = true
+    GROUP BY root.id, root.created_at
+), ranked_roots AS (
+    SELECT
+        root_stats.id,
+        row_number() OVER (
+            ORDER BY
+                CASE WHEN sqlc.arg(sort_order)::text = 'hot' THEN root_stats.reply_count END DESC NULLS LAST,
+                CASE WHEN sqlc.arg(sort_order)::text IN ('hot', 'newest') THEN root_stats.created_at END DESC NULLS LAST,
+                CASE WHEN sqlc.arg(sort_order)::text = 'oldest' THEN root_stats.created_at END ASC NULLS LAST,
+                CASE WHEN sqlc.arg(sort_order)::text IN ('hot', 'newest') THEN root_stats.id END DESC NULLS LAST,
+                CASE WHEN sqlc.arg(sort_order)::text = 'oldest' THEN root_stats.id END ASC NULLS LAST
+        ) AS root_position
+    FROM root_stats
+), selected_roots AS (
+    SELECT ranked_roots.id, ranked_roots.root_position
+    FROM ranked_roots
+    WHERE ranked_roots.root_position > sqlc.arg(result_offset)::integer
+      AND ranked_roots.root_position <= sqlc.arg(result_offset)::integer + sqlc.arg(result_limit)::integer
+)
+SELECT
+    comment.id AS comment_internal_id,
+    comment.public_id,
+    target.target_kind,
+    target.target_key,
+    parent.public_id AS parent_public_id,
+    owning_root.public_id AS root_public_id,
+    comment.author_id,
+    author.display_name AS author_display_name,
+    comment.body,
+    comment.body_format,
+    comment.state,
+    comment.version,
+    comment.created_at,
+    comment.updated_at,
+    comment.edited_at
+FROM selected_roots
+JOIN social.comments AS comment
+  ON comment.id = selected_roots.id
+  OR comment.root_comment_id = selected_roots.id
+JOIN social.comment_target_projection AS target
+  ON target.thread_id = comment.thread_id
+JOIN identity.users AS author
+  ON author.id = comment.author_id
+LEFT JOIN social.comments AS parent
+  ON parent.id = comment.parent_comment_id
+ AND parent.thread_id = comment.thread_id
+LEFT JOIN social.comments AS owning_root
+  ON owning_root.id = comment.root_comment_id
+ AND owning_root.thread_id = comment.thread_id
+ORDER BY
+    selected_roots.root_position,
+    (comment.id = selected_roots.id) DESC,
+    comment.created_at,
+    comment.id;
+
 -- name: FindCommentByCreateRequest :one
 SELECT
     comment.id AS comment_internal_id,

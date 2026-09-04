@@ -109,6 +109,37 @@ NewcomerAssessmentsPath:
       "401": { $ref: "../responses.yaml#/ProblemResponse" }
       "403": { $ref: "../responses.yaml#/ProblemResponse" }
       default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: assignNewcomerAssessment
+    summary: 为一个现有用户分配当前新人考核
+    description: >-
+      仅可为正常且从未进入新人考核的账户分配；使用当前生效规则，
+      从分配时刻起计算期限，并保存最小化的不可变分配证据。
+    tags: [newcomer]
+    x-audience: [staff]
+    x-owner: core-newcomer
+    x-permission: newcomer.assessment.assign
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - $ref: "../domains/identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/newcomer.yaml#/AssignNewcomerAssessmentRequest" }
+    responses:
+      "201":
+        description: 已创建新人考核。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/newcomer.yaml#/NewcomerAssessment" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
 
 NewcomerAssessmentExemptionPath:
   post:

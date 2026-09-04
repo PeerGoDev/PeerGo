@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"testing"
 	"time"
 
@@ -44,6 +45,15 @@ type invitationRepositoryStub struct {
 	command  IssueInvitationCommand
 }
 
+type invitationEmailDirectoryStub struct {
+	registered bool
+	err        error
+}
+
+func (stub invitationEmailDirectoryStub) EmailRegistered(context.Context, string) (bool, error) {
+	return stub.registered, stub.err
+}
+
 func (stub *invitationRepositoryStub) Overview(context.Context, uuid.UUID, time.Time, int, int) (invitationIssuerSnapshot, []MemberInvitation, int, InvitationNetwork, error) {
 	return stub.snapshot, stub.items, stub.total, InvitationNetwork{}, nil
 }
@@ -70,7 +80,7 @@ func TestInvitationOverviewExplainsAccountAgeBlocker(t *testing.T) {
 	authorizer := &invitationAuthorizerStub{}
 	service, err := NewInvitationService(
 		invitationAuthenticatorStub{session: WebSession{User: User{ID: userID}}},
-		authorizer, repository, func() time.Time { return now },
+		authorizer, repository, invitationEmailDirectoryStub{}, func() time.Time { return now },
 	)
 	if err != nil {
 		t.Fatalf("NewInvitationService() error = %v", err)
@@ -96,7 +106,7 @@ func TestInvitationIssueReturnsOneTimeTokenAndPersistsOnlyDigest(t *testing.T) {
 	authorizer := &invitationAuthorizerStub{}
 	service, err := NewInvitationService(
 		invitationAuthenticatorStub{session: WebSession{User: User{ID: userID}}},
-		authorizer, repository, func() time.Time { return now },
+		authorizer, repository, invitationEmailDirectoryStub{}, func() time.Time { return now },
 	)
 	if err != nil {
 		t.Fatalf("NewInvitationService() error = %v", err)
@@ -125,5 +135,27 @@ func TestInvitationIssueReturnsOneTimeTokenAndPersistsOnlyDigest(t *testing.T) {
 	}
 	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionInvitationIssueSelf {
 		t.Fatalf("authorization requests = %+v", authorizer.requests)
+	}
+}
+
+func TestInvitationIssueRejectsRegisteredEmailBeforeTokenCreation(t *testing.T) {
+	t.Parallel()
+	repository := &invitationRepositoryStub{}
+	service, err := NewInvitationService(
+		invitationAuthenticatorStub{session: WebSession{User: User{ID: uuid.New()}}},
+		&invitationAuthorizerStub{}, repository, invitationEmailDirectoryStub{registered: true}, time.Now,
+	)
+	if err != nil {
+		t.Fatalf("NewInvitationService() error = %v", err)
+	}
+	service.random = func([]byte) (int, error) {
+		t.Fatal("token generation must not run for an occupied email")
+		return 0, nil
+	}
+	if _, err := service.Issue(context.Background(), "cookie", "csrf", "member@example.com"); !errors.Is(err, ErrInvitationEmailRegistered) {
+		t.Fatalf("Issue() error = %v", err)
+	}
+	if repository.command.ID != uuid.Nil {
+		t.Fatal("repository received a command for an occupied email")
 	}
 }

@@ -1,13 +1,17 @@
-MoviePilotCredentialScope:
+PersonalAPIKeyScope:
   type: string
+  description: 可授予个人 API Key 的最小权限范围；所有适配器共享同一套范围。
   enum:
     - profile:read
     - torrent:read
     - torrent:download
+    - torrent:upload
+    - torrent:purchase:read
+    - torrent:purchase:write
     - attendance:read
     - attendance:claim
 
-MoviePilotCredentialStatus:
+PersonalAPIKeyStatus:
   type: object
   additionalProperties: false
   required: [active, scopes]
@@ -21,19 +25,21 @@ MoviePilotCredentialStatus:
     version: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
     scopes:
       type: array
-      minItems: 5
-      maxItems: 5
+      minItems: 0
+      maxItems: 8
       uniqueItems: true
-      items: { $ref: "#/MoviePilotCredentialScope" }
+      items: { $ref: "#/PersonalAPIKeyScope" }
+      description: 当前密钥实际拥有的权限；未创建密钥时为空数组。
     created_at: { type: string, format: date-time }
     last_used_at:
       type: string
       format: date-time
       description: 最多每六小时合并更新一次，不构成逐请求活动记录。
 
-RotateMoviePilotCredentialRequest:
+RotatePersonalAPIKeyRequest:
   type: object
   additionalProperties: false
+  required: [scopes]
   properties:
     expected_version:
       type: integer
@@ -41,13 +47,20 @@ RotateMoviePilotCredentialRequest:
       minimum: 1
       maximum: 9007199254740991
       description: 首次创建时省略；轮换现有密钥时必须与当前版本一致。
+    scopes:
+      type: array
+      minItems: 1
+      maxItems: 8
+      uniqueItems: true
+      items: { $ref: "#/PersonalAPIKeyScope" }
+      description: 新密钥可以调用的最小权限集合。
 
-IssuedMoviePilotCredential:
+IssuedPersonalAPIKey:
   type: object
   additionalProperties: false
   required: [credential, api_key]
   properties:
-    credential: { $ref: "#/MoviePilotCredentialStatus" }
+    credential: { $ref: "#/PersonalAPIKeyStatus" }
     api_key:
       type: string
       minLength: 47

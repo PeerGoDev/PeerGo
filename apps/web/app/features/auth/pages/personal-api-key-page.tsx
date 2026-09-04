@@ -35,11 +35,14 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card"
+import { Checkbox } from "~/components/ui/checkbox"
 import {
   Field,
   FieldDescription,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "~/components/ui/field"
 import {
   InputGroup,
@@ -49,42 +52,105 @@ import {
 } from "~/components/ui/input-group"
 import { Skeleton } from "~/components/ui/skeleton"
 import {
-  moviePilotCredentialQueryOptions,
-  useRevokeMoviePilotCredential,
-  useRotateMoviePilotCredential,
-} from "~/features/auth/api/moviepilot-credential.queries"
+  personalAPIKeyQueryOptions,
+  useRevokePersonalAPIKey,
+  useRotatePersonalAPIKey,
+  type PersonalAPIKeyScope,
+} from "~/features/auth/api/personal-api-key.queries"
 import { useWebSession } from "~/features/auth/api/session.mutations"
 import { AccountSettingsLayout } from "~/features/auth/components/account-settings-layout"
 import { requestErrorDescription } from "~/shared/api/problem"
 import { formatDateTime } from "~/shared/formatters/date-time"
 
-const scopeLabels: Record<string, string> = {
-  "profile:read": "读取账户资料",
-  "torrent:read": "搜索种子",
-  "torrent:download": "下载种子",
-  "attendance:read": "读取签到状态",
-  "attendance:claim": "执行签到",
-}
+const availableScopes = [
+  {
+    value: "profile:read",
+    label: "读取账户资料",
+    description: "读取用户名、等级、流量和做种概况。",
+  },
+  {
+    value: "torrent:read",
+    label: "读取与搜索种子",
+    description: "查看种子列表、分类与详情。",
+  },
+  {
+    value: "torrent:download",
+    label: "下载种子",
+    description: "为当前账户生成受限、短时的种子下载链接。",
+  },
+  {
+    value: "torrent:upload",
+    label: "发布种子",
+    description: "允许外部工具按站点分类属性提交待审核种子。",
+  },
+  {
+    value: "torrent:purchase:read",
+    label: "读取种子购买",
+    description: "查看付费种子的购买状态和自己的购买记录。",
+  },
+  {
+    value: "torrent:purchase:write",
+    label: "购买种子",
+    description: "允许外部工具使用魔力值代表当前账户购买种子。",
+  },
+  {
+    value: "attendance:read",
+    label: "读取签到状态",
+    description: "查看今日签到状态和连续签到数据。",
+  },
+  {
+    value: "attendance:claim",
+    label: "执行签到",
+    description: "允许外部工具代表当前账户完成签到。",
+  },
+] as const satisfies ReadonlyArray<{
+  value: PersonalAPIKeyScope
+  label: string
+  description: string
+}>
 
-export function MoviePilotCredentialPage() {
+// Keep newly introduced write powers opt-in. Existing users rotating a key do
+// not accidentally grant an external tool upload or purchase authority.
+const defaultScopes: PersonalAPIKeyScope[] = [
+  "profile:read",
+  "torrent:read",
+  "torrent:download",
+  "attendance:read",
+  "attendance:claim",
+]
+const scopeLabels = Object.fromEntries(
+  availableScopes.map((scope) => [scope.value, scope.label])
+) as Record<PersonalAPIKeyScope, string>
+
+export function PersonalAPIKeyPage() {
   const session = useWebSession()
   const credential = useQuery({
-    ...moviePilotCredentialQueryOptions(session.data?.user.id),
+    ...personalAPIKeyQueryOptions(session.data?.user.id),
     enabled: Boolean(session.data),
   })
-  const rotate = useRotateMoviePilotCredential()
-  const revoke = useRevokeMoviePilotCredential()
+  const rotate = useRotatePersonalAPIKey()
+  const revoke = useRevokePersonalAPIKey()
+  const [selectedScopes, setSelectedScopes] =
+    React.useState<PersonalAPIKeyScope[]>(defaultScopes)
   const [issuedKey, setIssuedKey] = React.useState<string>()
   const [copied, setCopied] = React.useState(false)
   const [copyError, setCopyError] = React.useState("")
   const [confirmRotation, setConfirmRotation] = React.useState(false)
   const [confirmRevocation, setConfirmRevocation] = React.useState(false)
 
+  React.useEffect(() => {
+    if (!credential.data) return
+    setSelectedScopes(
+      credential.data.active ? [...credential.data.scopes] : [...defaultScopes]
+    )
+  }, [credential.data])
+
   async function createOrRotate(expectedVersion?: number) {
-    if (!session.data) return
+    if (!session.data || selectedScopes.length === 0) return
     const issued = await rotate.mutateAsync({
       csrfToken: session.data.csrf_token,
       expectedVersion,
+      scopes: selectedScopes,
     })
     setIssuedKey(issued.api_key)
     setCopied(false)
@@ -114,20 +180,43 @@ export function MoviePilotCredentialPage() {
     }
   }
 
+  function setScope(scope: PersonalAPIKeyScope, checked: boolean) {
+    setSelectedScopes((current) =>
+      checked
+        ? defaultScopes.filter(
+            (candidate) => candidate === scope || current.includes(candidate)
+          )
+        : current.filter((candidate) => candidate !== scope)
+    )
+  }
+
   const mutationError = rotate.error ?? revoke.error
+  const canIssue = selectedScopes.length > 0 && !rotate.isPending
 
   return (
     <AccountSettingsLayout
       active="api-key"
       title="API Key"
-      description="管理 MoviePilot 使用的独立站点凭据。"
+      description="管理供外部工具共用的个人站点凭据与最小权限。"
     >
       <Alert>
         <ShieldCheckIcon />
-        <AlertTitle>这是 MoviePilot 专用凭据</AlertTitle>
-        <AlertDescription>
-          在 MoviePilot 的 Rousi 站点配置中填入此
-          Key。它不会替代浏览器登录，也不会出现在种子下载地址中。
+        <AlertTitle>一把通用的个人 API Key</AlertTitle>
+        <AlertDescription className="flex flex-col gap-2">
+          <p>
+            同一把 Key 可用于 MoviePilot、PT-depiler
+            及后续接入的工具；每个工具只能调用你授予的权限。它不会替代浏览器登录。
+          </p>
+          <p>
+            PT-depiler 设置里的 Passkey 字段请粘贴本页 API Key，不要填写 Tracker
+            Passkey，并授予“读取账户资料”“读取与搜索种子”“下载种子”三项权限。其上游下载协议会在请求路径中携带
+            Key；PeerGo 已关闭该专用路径的访问与错误日志并禁止
+            Referrer，但仍不要分享下载地址。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">MoviePilot · 已支持</Badge>
+            <Badge variant="outline">PT-depiler · 已支持</Badge>
+          </div>
         </AlertDescription>
       </Alert>
 
@@ -139,7 +228,7 @@ export function MoviePilotCredentialPage() {
             <p>原文只显示这一次；关闭页面后无法再次查看，只能重新轮换。</p>
             <InputGroup>
               <InputGroupInput
-                aria-label="新 MoviePilot API Key"
+                aria-label="新个人 API Key"
                 value={issuedKey}
                 readOnly
                 className="font-mono"
@@ -173,7 +262,7 @@ export function MoviePilotCredentialPage() {
       ) : null}
 
       {session.isPending || (session.data && credential.isPending) ? (
-        <MoviePilotCredentialSkeleton />
+        <PersonalAPIKeySkeleton />
       ) : null}
 
       {session.isError || credential.isError ? (
@@ -209,7 +298,7 @@ export function MoviePilotCredentialPage() {
           <CardHeader>
             <CardTitle>需要登录</CardTitle>
             <CardDescription>
-              登录后可以创建和管理 MoviePilot API Key。
+              登录后可以创建和管理个人 API Key。
             </CardDescription>
           </CardHeader>
           <CardFooter>
@@ -224,9 +313,9 @@ export function MoviePilotCredentialPage() {
       {session.data && credential.data ? (
         <Card>
           <CardHeader>
-            <CardTitle>MoviePilot API Key</CardTitle>
+            <CardTitle>个人 API Key</CardTitle>
             <CardDescription>
-              每个账户最多保留一个密钥；轮换会立刻替换旧密钥，撤销会同时让未过期下载链接失效。
+              每个账户最多保留一个共用密钥；轮换会替换所有工具正在使用的旧密钥，撤销也会让尚未过期的下载能力失效。
             </CardDescription>
             <CardAction>
               <Badge variant={credential.data.active ? "default" : "secondary"}>
@@ -235,15 +324,15 @@ export function MoviePilotCredentialPage() {
             </CardAction>
           </CardHeader>
           <CardContent>
-            {credential.data.active ? (
-              <FieldGroup>
+            <FieldGroup>
+              {credential.data.active ? (
                 <Field>
-                  <FieldLabel htmlFor="moviepilot-key-prefix">
+                  <FieldLabel htmlFor="personal-api-key-prefix">
                     当前密钥
                   </FieldLabel>
                   <InputGroup>
                     <InputGroupInput
-                      id="moviepilot-key-prefix"
+                      id="personal-api-key-prefix"
                       value={`${credential.data.key_prefix ?? "pgk_"}••••••••••••••••`}
                       readOnly
                       className="font-mono"
@@ -260,27 +349,58 @@ export function MoviePilotCredentialPage() {
                       "尚未使用"
                     )}
                   </FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel>固定权限范围</FieldLabel>
                   <div className="flex flex-wrap gap-2">
                     {credential.data.scopes.map((scope) => (
                       <Badge key={scope} variant="outline">
-                        {scopeLabels[scope] ?? scope}
+                        {scopeLabels[scope]}
                       </Badge>
                     ))}
                   </div>
-                  <FieldDescription>
-                    不支持任意扩权，也不会记录每次搜索或下载的数据库日志。
-                  </FieldDescription>
                 </Field>
-              </FieldGroup>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                创建后，将返回一次完整密钥。PeerGo 仅保存 SHA-256
-                哈希和状态，不保存可还原的原文。
-              </p>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  创建后，将返回一次完整密钥。PeerGo 仅保存 SHA-256
+                  哈希、权限和按六小时合并的最近使用状态，不保存可还原的原文或逐请求日志。
+                </p>
+              )}
+
+              <FieldSet>
+                <FieldLegend>授予权限</FieldLegend>
+                <FieldDescription>
+                  至少选择一项。现有密钥的修改会在轮换后生效。
+                </FieldDescription>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {availableScopes.map((scope) => {
+                    const id = `personal-api-key-scope-${scope.value.replace(":", "-")}`
+                    return (
+                      <Field key={scope.value} orientation="horizontal">
+                        <Checkbox
+                          id={id}
+                          checked={selectedScopes.includes(scope.value)}
+                          onCheckedChange={(checked) =>
+                            setScope(scope.value, checked)
+                          }
+                          disabled={rotate.isPending || revoke.isPending}
+                        />
+                        <div className="flex flex-col gap-0.5">
+                          <FieldLabel htmlFor={id} className="font-normal">
+                            {scope.label}
+                          </FieldLabel>
+                          <FieldDescription>
+                            {scope.description}
+                          </FieldDescription>
+                        </div>
+                      </Field>
+                    )
+                  })}
+                </div>
+                {selectedScopes.length === 0 ? (
+                  <p className="text-sm text-destructive" role="alert">
+                    请至少选择一项权限。
+                  </p>
+                ) : null}
+              </FieldSet>
+            </FieldGroup>
           </CardContent>
           <CardFooter className="flex flex-wrap gap-2">
             {credential.data.active ? (
@@ -288,7 +408,7 @@ export function MoviePilotCredentialPage() {
                 <Button
                   variant="outline"
                   onClick={() => setConfirmRotation(true)}
-                  disabled={rotate.isPending || revoke.isPending}
+                  disabled={!canIssue || revoke.isPending}
                 >
                   <RefreshCwIcon data-icon="inline-start" />
                   轮换密钥
@@ -305,7 +425,7 @@ export function MoviePilotCredentialPage() {
             ) : (
               <Button
                 onClick={() => void createOrRotate()}
-                disabled={rotate.isPending}
+                disabled={!canIssue}
               >
                 <KeyRoundIcon data-icon="inline-start" />
                 {rotate.isPending ? "创建中…" : "创建 API Key"}
@@ -331,17 +451,16 @@ export function MoviePilotCredentialPage() {
             <AlertDialogMedia>
               <RefreshCwIcon />
             </AlertDialogMedia>
-            <AlertDialogTitle>轮换 MoviePilot API Key？</AlertDialogTitle>
+            <AlertDialogTitle>轮换个人 API Key？</AlertDialogTitle>
             <AlertDialogDescription>
-              旧密钥会立即失效，需要在 MoviePilot
-              中替换为新密钥。新原文仍只显示一次。
+              旧密钥会立即失效，需要在所有已连接工具中替换为新密钥；当前选择的权限会同时生效。新原文仍只显示一次。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void createOrRotate(credential.data?.version)}
-              disabled={rotate.isPending}
+              disabled={!canIssue}
             >
               {rotate.isPending ? "轮换中…" : "确认轮换"}
             </AlertDialogAction>
@@ -355,9 +474,9 @@ export function MoviePilotCredentialPage() {
             <AlertDialogMedia>
               <Trash2Icon />
             </AlertDialogMedia>
-            <AlertDialogTitle>撤销 MoviePilot API Key？</AlertDialogTitle>
+            <AlertDialogTitle>撤销个人 API Key？</AlertDialogTitle>
             <AlertDialogDescription>
-              MoviePilot 将无法再读取账户、搜索、下载或签到；此操作无法撤销。
+              MoviePilot 和其他已连接工具将无法再访问当前账户；此操作无法撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -376,7 +495,7 @@ export function MoviePilotCredentialPage() {
   )
 }
 
-function MoviePilotCredentialSkeleton() {
+function PersonalAPIKeySkeleton() {
   return (
     <Card>
       <CardHeader>
@@ -385,7 +504,7 @@ function MoviePilotCredentialSkeleton() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-6 w-80 max-w-full" />
+        <Skeleton className="h-24 w-full" />
       </CardContent>
       <CardFooter>
         <Skeleton className="h-8 w-24" />

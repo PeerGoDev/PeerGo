@@ -200,7 +200,7 @@ make dev-settlement-promotion-control
 make dev-settlement-control-worker
 ```
 
-持续开发控制链路时可分别改用 `make dev-settlement-promotion-control-watch` 和 `make dev-settlement-control-worker-watch`。后一个 worker 同时消费优惠与 H&R 的独立 outbox，并运行 Core 长期分享率巡检、H&R 状态提醒补扫与新人考核；三项 Core 巡检共用默认一分钟、最多 500 条的有界节奏，可用 `PEERGO_RATIO_WATCH_INTERVAL`（10 秒至 1 小时）和 `PEERGO_RATIO_WATCH_BATCH`（1–5000）调整，不另造一组重复配置。两者使用项目在 `tools/devtools` 固定的 Air 版本，只监听各自 Go 服务与共享 Go contract，代码变化后重编译并优雅重启当前进程，不重启 PostgreSQL、NATS、Web 或其它 worker。旧 `dev-promotion-worker*` 名称仍作为兼容别名保留。
+持续开发控制链路时可分别改用 `make dev-settlement-promotion-control-watch` 和 `make dev-settlement-control-worker-watch`。后一个 worker 同时消费优惠与 H&R 的独立 outbox，并运行 Core 长期分享率巡检、H&R 状态提醒补扫、新人考核与工作组月度结算，不增加常驻容器。前三项 Core 巡检共用默认一分钟、最多 500 条的有界节奏，可用 `PEERGO_RATIO_WATCH_INTERVAL`（10 秒至 1 小时）和 `PEERGO_RATIO_WATCH_BATCH`（1–5000）调整。工作组月度结算默认每小时检查一次，可用 `PEERGO_WORKGROUP_ENFORCEMENT_INTERVAL`（1 分钟至 24 小时）和 `PEERGO_WORKGROUP_ENFORCEMENT_BATCH`（1–5000）调整。两者使用项目在 `tools/devtools` 固定的 Air 版本，只监听各自 Go 服务与共享 Go contract，代码变化后重编译并优雅重启当前进程，不重启 PostgreSQL、NATS、Web 或其它 worker。旧 `dev-promotion-worker*` 名称仍作为兼容别名保留。
 
 Core 与 Web 启动后，具有 `promotion.manage.read` 的管理员可进入 `/staff/settings/promotions`；只有另具 `promotion.schedule` 时才显示“签发优惠”和“修改成员购买价格”。普通成员从种子详情购买，并在 `/account/promotions` 查看记录。
 

@@ -363,7 +363,8 @@ LIMIT 1`, windowStart)
 	if err := tx.QueryRow(ctx, `
 SELECT status
 FROM economy.seeding_reward_evidence_windows
-WHERE window_start = $1 AND window_end = $1 + interval '1 hour'`, windowStart).Scan(&windowStatus); err != nil || windowStatus != "complete" {
+WHERE window_start = $1::timestamptz
+  AND window_end = $1::timestamptz + interval '1 hour'`, windowStart).Scan(&windowStatus); err != nil || windowStatus != "complete" {
 		if err != nil {
 			return false, fmt.Errorf("read compensation Core window: %w", err)
 		}

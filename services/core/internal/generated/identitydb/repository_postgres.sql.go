@@ -1165,6 +1165,75 @@ func (q *Queries) GetManagedUserDirectorySummary(ctx context.Context, asOf pgtyp
 	return i, err
 }
 
+const getManagedUserOperations = `-- name: GetManagedUserOperations :one
+SELECT
+    COALESCE(progress.experience, 0)::text AS experience,
+    COALESCE(donation.amount, 0)::text AS donation_amount,
+    COALESCE(invitation_account.remaining_invites, 0)::integer AS remaining_invites,
+    COALESCE(torrent_counts.submitted_count, 0)::bigint AS submitted_torrent_count,
+    COALESCE(torrent_counts.published_count, 0)::bigint AS published_torrent_count,
+    COALESCE(torrent_counts.pending_review_count, 0)::bigint AS pending_review_torrent_count,
+    COALESCE(invitation_counts.direct_count, 0)::bigint AS direct_invite_count,
+    inviter.numeric_id AS inviter_numeric_id,
+    inviter.username AS inviter_username,
+    registration.admission_mode AS registration_mode,
+    registration.state AS registration_state
+FROM identity.users AS users
+LEFT JOIN progression.user_progress AS progress ON progress.user_id = users.id
+LEFT JOIN identity.user_donation_totals AS donation ON donation.user_id = users.id
+LEFT JOIN identity.invitation_accounts AS invitation_account ON invitation_account.user_id = users.id
+LEFT JOIN identity.invitation_relationships AS invitation_relationship ON invitation_relationship.invitee_user_id = users.id
+LEFT JOIN identity.users AS inviter ON inviter.id = invitation_relationship.inviter_user_id
+LEFT JOIN identity.registrations AS registration ON registration.user_id = users.id
+LEFT JOIN LATERAL (
+    SELECT
+        count(*)::bigint AS submitted_count,
+        count(*) FILTER (WHERE torrent.state = 'published')::bigint AS published_count,
+        count(*) FILTER (WHERE torrent.state = 'pending_review')::bigint AS pending_review_count
+    FROM torrents.torrents AS torrent
+    WHERE torrent.uploader_id = users.id
+) AS torrent_counts ON true
+LEFT JOIN LATERAL (
+    SELECT count(*)::bigint AS direct_count
+    FROM identity.invitation_relationships AS direct_relationship
+    WHERE direct_relationship.inviter_user_id = users.id
+) AS invitation_counts ON true
+WHERE users.id = $1
+`
+
+type GetManagedUserOperationsRow struct {
+	Experience                string
+	DonationAmount            string
+	RemainingInvites          int32
+	SubmittedTorrentCount     int64
+	PublishedTorrentCount     int64
+	PendingReviewTorrentCount int64
+	DirectInviteCount         int64
+	InviterNumericID          pgtype.Int8
+	InviterUsername           pgtype.Text
+	RegistrationMode          pgtype.Text
+	RegistrationState         pgtype.Text
+}
+
+func (q *Queries) GetManagedUserOperations(ctx context.Context, userID uuid.UUID) (GetManagedUserOperationsRow, error) {
+	row := q.db.QueryRow(ctx, getManagedUserOperations, userID)
+	var i GetManagedUserOperationsRow
+	err := row.Scan(
+		&i.Experience,
+		&i.DonationAmount,
+		&i.RemainingInvites,
+		&i.SubmittedTorrentCount,
+		&i.PublishedTorrentCount,
+		&i.PendingReviewTorrentCount,
+		&i.DirectInviteCount,
+		&i.InviterNumericID,
+		&i.InviterUsername,
+		&i.RegistrationMode,
+		&i.RegistrationState,
+	)
+	return i, err
+}
+
 const getManualDownloadRestrictionState = `-- name: GetManualDownloadRestrictionState :one
 SELECT
     download_restricted,
@@ -1372,6 +1441,39 @@ func (q *Queries) GetPublicUserProfileByUsername(ctx context.Context, arg GetPub
 		&i.DisplayName,
 		&i.JoinedAt,
 		&i.PublishedTorrentCount,
+	)
+	return i, err
+}
+
+const getRecoverableInvitationRegistrationForUpdate = `-- name: GetRecoverableInvitationRegistrationForUpdate :one
+SELECT
+    id, user_id, username, display_name, admission_mode, invitation_id,
+    credential_ref, state, created_at, updated_at, completed_at
+FROM identity.registrations
+WHERE lower(username) = lower($1::text)
+  AND admission_mode = 'invite'
+  AND invitation_id IS NOT NULL
+  AND state IN ('credential_provisioned', 'completed')
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+FOR UPDATE
+`
+
+func (q *Queries) GetRecoverableInvitationRegistrationForUpdate(ctx context.Context, username string) (IdentityRegistration, error) {
+	row := q.db.QueryRow(ctx, getRecoverableInvitationRegistrationForUpdate, username)
+	var i IdentityRegistration
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Username,
+		&i.DisplayName,
+		&i.AdmissionMode,
+		&i.InvitationID,
+		&i.CredentialRef,
+		&i.State,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.CompletedAt,
 	)
 	return i, err
 }
@@ -2654,6 +2756,49 @@ func (q *Queries) ListCurrentAccountRestrictions(ctx context.Context, arg ListCu
 	return items, nil
 }
 
+const listIncompleteRegistrations = `-- name: ListIncompleteRegistrations :many
+SELECT
+    id, user_id, username, display_name, admission_mode, invitation_id,
+    credential_ref, state, created_at, updated_at, completed_at
+FROM identity.registrations
+WHERE state = 'credential_provisioned'
+  AND credential_ref IS NOT NULL
+ORDER BY created_at, id
+LIMIT $1::integer
+`
+
+func (q *Queries) ListIncompleteRegistrations(ctx context.Context, resultLimit int32) ([]IdentityRegistration, error) {
+	rows, err := q.db.Query(ctx, listIncompleteRegistrations, resultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []IdentityRegistration{}
+	for rows.Next() {
+		var i IdentityRegistration
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Username,
+			&i.DisplayName,
+			&i.AdmissionMode,
+			&i.InvitationID,
+			&i.CredentialRef,
+			&i.State,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInvitationHistory = `-- name: ListInvitationHistory :many
 SELECT
     invitation.id,
@@ -3512,6 +3657,10 @@ SELECT (CASE
     WHEN candidate.source_kind NOT IN ('member', 'legacy') THEN true
     ELSE EXISTS (
         SELECT 1
+        FROM inserted
+        WHERE inserted.invitee_user_id = candidate.invitee_user_id
+    ) OR EXISTS (
+        SELECT 1
         FROM identity.invitation_relationships AS relationship
         WHERE relationship.invitee_user_id = candidate.invitee_user_id
           AND relationship.inviter_user_id = candidate.inviter_user_id
@@ -3582,6 +3731,46 @@ func (q *Queries) RegistrationUsernameUnavailable(ctx context.Context, arg Regis
 	var unavailable bool
 	err := row.Scan(&unavailable)
 	return unavailable, err
+}
+
+const releaseStaleRegistrationReservations = `-- name: ReleaseStaleRegistrationReservations :one
+WITH deleted AS (
+    DELETE FROM identity.registrations AS registration
+    WHERE registration.id IN (
+        SELECT candidate.id
+        FROM identity.registrations AS candidate
+        WHERE candidate.state = 'reserved'
+          AND candidate.credential_ref IS NULL
+          AND candidate.created_at < $1::timestamptz
+        ORDER BY candidate.created_at, candidate.id
+        LIMIT $2::integer
+        FOR UPDATE SKIP LOCKED
+    )
+      AND registration.state = 'reserved'
+      AND registration.credential_ref IS NULL
+    RETURNING registration.id, registration.invitation_id
+), released AS (
+    UPDATE identity.registration_invitations AS invitation
+    SET claimed_by = NULL,
+        claimed_at = NULL
+    FROM deleted
+    WHERE invitation.id = deleted.invitation_id
+      AND invitation.claimed_by = deleted.id
+    RETURNING invitation.id
+)
+SELECT count(*)::bigint FROM deleted
+`
+
+type ReleaseStaleRegistrationReservationsParams struct {
+	CreatedBefore pgtype.Timestamptz
+	ResultLimit   int32
+}
+
+func (q *Queries) ReleaseStaleRegistrationReservations(ctx context.Context, arg ReleaseStaleRegistrationReservationsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, releaseStaleRegistrationReservations, arg.CreatedBefore, arg.ResultLimit)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const reserveTwoFactorChange = `-- name: ReserveTwoFactorChange :one

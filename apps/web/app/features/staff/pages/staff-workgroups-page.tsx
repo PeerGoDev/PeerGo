@@ -243,6 +243,59 @@ function WorkgroupsContent({
       )}
 
       <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">
+            成员资格 · {groupLabel(groupKind)}
+          </CardTitle>
+          <CardDescription>
+            先选择工作组，再添加成员或管理现有资格；所有变更都会保留历史记录。
+          </CardDescription>
+          <CardAction className="flex items-center gap-2">
+            <Select
+              items={groupOptions}
+              value={groupKind}
+              onValueChange={(value) => value && setGroupKind(value)}
+            >
+              <SelectTrigger size="sm" aria-label="选择工作组">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" alignItemWithTrigger={false}>
+                <SelectGroup>
+                  {groupOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {canManage ? (
+              <Button size="sm" onClick={() => setGrantOpen(true)}>
+                <PlusIcon data-icon="inline-start" />
+                添加成员
+              </Button>
+            ) : null}
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          {memberships.isPending ? (
+            <Skeleton className="h-40 w-full" />
+          ) : memberships.isError || !memberships.data ? (
+            <ReadError error={memberships.error} onRetry={refresh} />
+          ) : (
+            <MembershipTable
+              items={memberships.data.items}
+              canManage={canManage}
+              onViewHistory={setHistoryMembership}
+              onChange={(membership, transition) =>
+                setMembershipDialog({ membership, transition })
+              }
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex-row items-center justify-between gap-3">
           <CardTitle className="text-lg">待处理申请</CardTitle>
           <Button variant="outline" size="sm" onClick={refresh}>
@@ -283,24 +336,6 @@ function WorkgroupsContent({
             当前目标用于本月展示；新目标只能从后续完整自然月生效，历史版本不会被覆盖。
           </CardDescription>
           <CardAction className="flex items-center gap-2">
-            <Select
-              items={groupOptions}
-              value={groupKind}
-              onValueChange={(value) => value && setGroupKind(value)}
-            >
-              <SelectTrigger size="sm" aria-label="选择工作组">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent align="end" alignItemWithTrigger={false}>
-                <SelectGroup>
-                  {groupOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
             {canIssuePolicy && policies.data ? (
               <Button size="sm" onClick={() => setPolicyOpen(true)}>
                 <CalendarClockIcon data-icon="inline-start" />
@@ -316,41 +351,6 @@ function WorkgroupsContent({
             <ReadError error={policies.error} onRetry={refresh} />
           ) : (
             <ContributionPolicyPanel page={policies.data} />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">
-            成员资格 · {groupLabel(groupKind)}
-          </CardTitle>
-          <CardDescription>
-            资格状态按实际变更时刻生效，历史记录保留供后续核对。
-          </CardDescription>
-          {canManage ? (
-            <CardAction>
-              <Button size="sm" onClick={() => setGrantOpen(true)}>
-                <PlusIcon data-icon="inline-start" />
-                添加成员
-              </Button>
-            </CardAction>
-          ) : null}
-        </CardHeader>
-        <CardContent>
-          {memberships.isPending ? (
-            <Skeleton className="h-40 w-full" />
-          ) : memberships.isError || !memberships.data ? (
-            <ReadError error={memberships.error} onRetry={refresh} />
-          ) : (
-            <MembershipTable
-              items={memberships.data.items}
-              canManage={canManage}
-              onViewHistory={setHistoryMembership}
-              onChange={(membership, transition) =>
-                setMembershipDialog({ membership, transition })
-              }
-            />
           )}
         </CardContent>
       </Card>
@@ -455,7 +455,11 @@ function ContributionPolicyPanel({
         </div>
         <div>
           <div className="text-xs text-muted-foreground">统计方式</div>
-          <div className="mt-1 font-medium">自然月 · 仅观察</div>
+          <div className="mt-1 font-medium">
+            {current?.enforcement_mode === "miss_limit"
+              ? `自然月 · 允许 ${current.allowed_misses} 次未达标`
+              : "自然月 · 仅观察"}
+          </div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">下个可生效月份</div>
@@ -484,6 +488,7 @@ function ContributionPolicyPanel({
               <TableRow>
                 <TableHead>版本</TableHead>
                 <TableHead>目标</TableHead>
+                <TableHead>执行规则</TableHead>
                 <TableHead>生效月份</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>设置理由</TableHead>
@@ -501,6 +506,11 @@ function ContributionPolicyPanel({
                       policy.metric,
                       policy.target_value
                     )}
+                  </TableCell>
+                  <TableCell>
+                    {policy.enforcement_mode === "miss_limit"
+                      ? `前 ${policy.allowed_misses} 次标记 · 第 ${policy.allowed_misses + 1} 次结束资格`
+                      : "仅观察"}
                   </TableCell>
                   <TableCell>
                     {policy.opening || !policy.effective_from
@@ -635,7 +645,9 @@ function ContributionPolicyDialog({
                 onChange={(event) => setTarget(event.target.value)}
               />
               <FieldDescription>
-                当前阶段只展示完成情况，不会自动暂停成员资格。
+                {page.current?.enforcement_mode === "miss_limit"
+                  ? `调整后仍保留现有执行规则：前 ${page.current.allowed_misses} 次未达标标记，第 ${page.current.allowed_misses + 1} 次结束资格。`
+                  : "当前阶段只展示完成情况，不会自动变更成员资格。"}
               </FieldDescription>
               <FieldError>{targetError}</FieldError>
             </Field>
@@ -876,8 +888,20 @@ function MembershipTable({
                               : "secondary"
                           }
                         >
-                          {membership.contribution.met ? "已达标" : "观察中"}
+                          {membership.contribution.met
+                            ? "已达标"
+                            : membership.contribution.enforcement_mode ===
+                                "miss_limit"
+                              ? "进行中"
+                              : "观察中"}
                         </Badge>
+                        {membership.contribution.enforcement_mode ===
+                        "miss_limit" ? (
+                          <span className="text-xs text-muted-foreground">
+                            未达标标记 {membership.contribution.miss_count}/
+                            {membership.contribution.allowed_misses}
+                          </span>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -970,7 +994,10 @@ function StaffContributionHistorySheet({
               {membership
                 ? `${groupLabel(membership.group_kind)} · 用户 ID ${membership.user_numeric_id}`
                 : "工作组成员贡献历史"}
-              。历史按成员状态变化与业务证据重建，仅供观察和人工核对。
+              。历史按成员状态变化与业务证据重建。
+              {membership?.contribution?.enforcement_mode === "miss_limit"
+                ? `月度结算会冻结标记，超过 ${membership.contribution.allowed_misses} 次后自动结束资格。`
+                : "当前仅供观察和人工核对。"}
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-1 flex-col gap-4 px-4 pb-4">

@@ -14,16 +14,41 @@ import (
 )
 
 const (
-	maxCategoryDisplayOrder = 1_000_000
-	minCategoryReasonRunes  = 10
-	maxCategoryReasonRunes  = 500
+	maxCategoryDisplayOrder          = 1_000_000
+	minCategoryReasonRunes           = 10
+	maxCategoryReasonRunes           = 500
+	defaultCategoryCreateReason      = "创建分类并记录初始配置。"
+	defaultCategoryUpdateReason      = "更新分类展示与可用状态。"
+	defaultCategoryFacetReason       = "更新分类下的发种属性配置。"
+	defaultCategoryFacetOptionReason = "更新分类属性的可选值配置。"
 )
 
 type CategoryAdministrationRepository interface {
 	ListManagedCategories(context.Context) ([]ManagedCategory, error)
 	CreateCategory(context.Context, CreateCategoryCommand) (ManagedCategory, error)
 	UpdateCategory(context.Context, UpdateCategoryCommand) (ManagedCategory, error)
+	UpsertCategoryFacet(context.Context, UpsertCategoryFacetCommand) (ManagedCategoryFacet, error)
 	UpsertCategoryFacetOption(context.Context, UpsertCategoryFacetOptionCommand) (ManagedCategoryFacetOption, error)
+}
+
+func (service *CategoryAdministrationService) UpsertFacet(ctx context.Context, actor authz.StaffActor, input UpsertCategoryFacetInput) (ManagedCategoryFacet, error) {
+	normalized, err := normalizedUpsertCategoryFacetInput(input)
+	if err != nil {
+		return ManagedCategoryFacet{}, err
+	}
+	now := service.now().UTC()
+	decision, err := authorizeCatalogStaff(ctx, service.authorizer, actor, authz.ActionCategoryUpdate, now, "catalog-category-facet-administration")
+	if err != nil {
+		return ManagedCategoryFacet{}, err
+	}
+	result, err := service.repository.UpsertCategoryFacet(ctx, UpsertCategoryFacetCommand{
+		UpsertCategoryFacetInput: normalized,
+		ChangeID:                 uuid.New(), ActorID: actor.Subject.ID, OccurredAt: now, Authorization: decision,
+	})
+	if err != nil {
+		return ManagedCategoryFacet{}, fmt.Errorf("upsert category facet: %w", err)
+	}
+	return result, nil
 }
 
 func (service *CategoryAdministrationService) UpsertFacetOption(ctx context.Context, actor authz.StaffActor, input UpsertCategoryFacetOptionInput) (ManagedCategoryFacetOption, error) {
@@ -121,6 +146,9 @@ func normalizedCreateCategoryInput(input CreateCategoryInput) (CreateCategoryInp
 	input.ID = strings.TrimSpace(input.ID)
 	input.Name = strings.TrimSpace(input.Name)
 	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = defaultCategoryCreateReason
+	}
 	if !validCategoryFields(input.ID, input.Name, input.DisplayOrder, input.Reason) {
 		return CreateCategoryInput{}, ErrCategoryAdministrationInput
 	}
@@ -131,6 +159,9 @@ func normalizedUpdateCategoryInput(input UpdateCategoryInput) (UpdateCategoryInp
 	input.ID = strings.TrimSpace(input.ID)
 	input.Name = strings.TrimSpace(input.Name)
 	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = defaultCategoryUpdateReason
+	}
 	if input.ExpectedVersion < 1 || !validCategoryFields(input.ID, input.Name, input.DisplayOrder, input.Reason) {
 		return UpdateCategoryInput{}, ErrCategoryAdministrationInput
 	}
@@ -151,6 +182,9 @@ func normalizedUpsertCategoryFacetOptionInput(input UpsertCategoryFacetOptionInp
 	input.OptionKey = strings.TrimSpace(input.OptionKey)
 	input.Label = strings.TrimSpace(input.Label)
 	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = defaultCategoryFacetOptionReason
+	}
 	optionKeyRunes := utf8.RuneCountInString(input.OptionKey)
 	labelRunes := utf8.RuneCountInString(input.Label)
 	reasonRunes := utf8.RuneCountInString(input.Reason)
@@ -160,6 +194,29 @@ func normalizedUpsertCategoryFacetOptionInput(input UpsertCategoryFacetOptionInp
 		input.DisplayOrder < 0 || input.DisplayOrder > maxCategoryDisplayOrder || input.ExpectedVersion < 0 ||
 		!utf8.ValidString(input.Reason) || reasonRunes < minCategoryReasonRunes || reasonRunes > maxCategoryReasonRunes {
 		return UpsertCategoryFacetOptionInput{}, ErrCategoryAdministrationInput
+	}
+	return input, nil
+}
+
+func normalizedUpsertCategoryFacetInput(input UpsertCategoryFacetInput) (UpsertCategoryFacetInput, error) {
+	input.CategoryID = strings.TrimSpace(input.CategoryID)
+	input.FacetID = strings.TrimSpace(input.FacetID)
+	input.Name = strings.TrimSpace(input.Name)
+	input.RequirementGroup = strings.TrimSpace(input.RequirementGroup)
+	input.Reason = strings.TrimSpace(input.Reason)
+	if input.Reason == "" {
+		input.Reason = defaultCategoryFacetReason
+	}
+	nameRunes := utf8.RuneCountInString(input.Name)
+	reasonRunes := utf8.RuneCountInString(input.Reason)
+	if !validCatalogID(input.CategoryID) || !validCatalogID(input.FacetID) ||
+		!utf8.ValidString(input.Name) || nameRunes < 1 || nameRunes > 40 ||
+		(input.SelectionMode != FacetSelectionSingle && input.SelectionMode != FacetSelectionMulti) ||
+		(input.Required && input.RequirementGroup != "") ||
+		(input.RequirementGroup != "" && !validCatalogID(input.RequirementGroup)) ||
+		input.DisplayOrder < 0 || input.DisplayOrder > maxCategoryDisplayOrder || input.ExpectedVersion < 0 ||
+		!utf8.ValidString(input.Reason) || reasonRunes < minCategoryReasonRunes || reasonRunes > maxCategoryReasonRunes {
+		return UpsertCategoryFacetInput{}, ErrCategoryAdministrationInput
 	}
 	return input, nil
 }

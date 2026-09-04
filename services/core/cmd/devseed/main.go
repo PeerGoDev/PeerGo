@@ -312,7 +312,14 @@ func ensurePublishedTorrent(
 		return 0, fmt.Errorf("development fixture has unsupported state %q", state)
 	}
 	if state != string(torrents.StatePublished) {
-		uploadRepository, err := torrents.NewPostgresTorrentUploadRepository(pool)
+		uploadRepository, err := torrents.NewPostgresTorrentUploadRepository(
+			pool,
+			torrents.PostgresTorrentUploadRepositoryConfig{
+				NewTrackerAppender: func(tx pgx.Tx) trackerevent.Appender {
+					return trackercontrol.NewPostgresOutbox(tx)
+				},
+			},
+		)
 		if err != nil {
 			return 0, err
 		}

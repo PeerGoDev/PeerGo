@@ -12,18 +12,67 @@ import (
 )
 
 type userAdministrationRepositoryStub struct {
-	listResult     ManagedUserPage
-	detail         ManagedUserDetail
-	listQuery      ManagedUserListQuery
-	getUserID      uuid.UUID
-	getAsOf        time.Time
-	createCommand  CreateAccountRestrictionCommand
-	revokeCommand  RevokeAccountRestrictionCommand
-	manualCommand  ManualDownloadRestrictionCommand
-	manualMutation string
-	vipCommand     ChangeVIPCommand
-	commandResult  ManagedUserDetail
-	commandErr     error
+	listResult        ManagedUserPage
+	detail            ManagedUserDetail
+	listQuery         ManagedUserListQuery
+	getUserID         uuid.UUID
+	getAsOf           time.Time
+	createCommand     CreateAccountRestrictionCommand
+	revokeCommand     RevokeAccountRestrictionCommand
+	manualCommand     ManualDownloadRestrictionCommand
+	manualMutation    string
+	vipCommand        ChangeVIPCommand
+	preflight         ManagedUserReactivationPreflight
+	reactivateCommand ReactivateManagedUserCommand
+	commandResult     ManagedUserDetail
+	commandErr        error
+}
+
+func (stub *userAdministrationRepositoryStub) ManagedUserReactivationPreflight(context.Context, uuid.UUID) (ManagedUserReactivationPreflight, error) {
+	return stub.preflight, stub.commandErr
+}
+
+func (stub *userAdministrationRepositoryStub) ReactivateManagedUser(_ context.Context, command ReactivateManagedUserCommand) (ManagedUserDetail, error) {
+	stub.reactivateCommand = command
+	return stub.commandResult, stub.commandErr
+}
+
+type managedUserLifecycleStub struct {
+	enabled uuid.UUID
+}
+
+type managedUserDataRepositoryStub struct {
+	adjustCommand ManagedUserAdjustmentCommand
+	networkUserID uuid.UUID
+	networkCutoff time.Time
+	networkLimit  int
+	networkResult []ManagedUserNetworkObservation
+	err           error
+}
+
+func (stub *managedUserDataRepositoryStub) AdjustManagedUser(_ context.Context, command ManagedUserAdjustmentCommand) error {
+	stub.adjustCommand = command
+	return stub.err
+}
+
+func (stub *managedUserDataRepositoryStub) ListManagedUserNetworkHistory(_ context.Context, userID uuid.UUID, cutoff time.Time, limit int) ([]ManagedUserNetworkObservation, error) {
+	stub.networkUserID = userID
+	stub.networkCutoff = cutoff
+	stub.networkLimit = limit
+	return stub.networkResult, stub.err
+}
+
+func (stub *managedUserLifecycleStub) EnableAfterAccountAppeal(_ context.Context, credentialRef uuid.UUID) error {
+	stub.enabled = credentialRef
+	return nil
+}
+
+func (stub *managedUserLifecycleStub) Emails(_ context.Context, refs []uuid.UUID) (map[uuid.UUID]string, error) {
+	result := make(map[uuid.UUID]string, len(refs))
+	for _, ref := range refs {
+		result[ref] = "member@example.com"
+	}
+	return result, nil
 }
 
 func (stub *userAdministrationRepositoryStub) ChangeVIP(_ context.Context, command ChangeVIPCommand) (ManagedUserDetail, error) {
@@ -133,6 +182,136 @@ func TestUserAdministrationGetUsesOneProjectionInstant(t *testing.T) {
 	}
 	if result.ID != userID || repository.getUserID != userID || !repository.getAsOf.Equal(now) {
 		t.Fatalf("result=%+v user_id=%s as_of=%v", result, repository.getUserID, repository.getAsOf)
+	}
+}
+
+func TestUserAdministrationAdjustNormalizesAuditsAndReloadsDetail(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 28, 10, 30, 0, 123, time.UTC)
+	targetID, adjustmentID := uuid.New(), uuid.New()
+	repository := &userAdministrationRepositoryStub{detail: ManagedUserDetail{
+		ManagedUserSummary: ManagedUserSummary{ID: targetID, Version: 8},
+		DonationAmount:     "41.20",
+	}}
+	dataRepository := &managedUserDataRepositoryStub{}
+	authorizer := &userAdministrationAuthorizerStub{}
+	service, err := NewUserAdministrationServiceWithData(
+		repository, repository, dataRepository, authorizer,
+		func() time.Time { return now },
+	)
+	if err != nil {
+		t.Fatalf("NewUserAdministrationServiceWithData() error = %v", err)
+	}
+	actor := userAdministrationActor(now)
+	result, err := service.Adjust(context.Background(), actor, ManagedUserAdjustmentInput{
+		AdjustmentID: adjustmentID, UserID: targetID,
+		Field: ManagedUserAdjustmentDonationAmount, Operation: ManagedUserAdjustmentDecrease,
+		Amount: "001.20", ExpectedUserVersion: 7,
+	})
+	if err != nil {
+		t.Fatalf("Adjust() error = %v", err)
+	}
+	command := dataRepository.adjustCommand
+	if result.DonationAmount != "41.20" || command.AdjustmentID != adjustmentID ||
+		command.UserID != targetID || command.ActorID != actor.Subject.ID ||
+		command.Field != ManagedUserAdjustmentDonationAmount || command.Delta != "-1.2" ||
+		command.Reason != "管理员调整用户捐赠金额" || command.ExpectedUserVersion != 7 ||
+		!command.OccurredAt.Equal(now.Round(0)) || repository.getUserID != targetID ||
+		!repository.getAsOf.Equal(now.Round(0)) {
+		t.Fatalf("result=%+v command=%+v repository=%+v", result, command, repository)
+	}
+	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionUserAccountAdjust ||
+		authorizer.requests[0].Context.Purpose != "identity-user-data-administration" {
+		t.Fatalf("authorization requests = %+v", authorizer.requests)
+	}
+}
+
+func TestUserAdministrationAdjustRejectsInvalidAndSelfTargetBeforeWriting(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 28, 11, 0, 0, 0, time.UTC)
+	repository := &userAdministrationRepositoryStub{}
+	dataRepository := &managedUserDataRepositoryStub{}
+	authorizer := &userAdministrationAuthorizerStub{}
+	service, err := NewUserAdministrationServiceWithData(repository, repository, dataRepository, authorizer, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewUserAdministrationServiceWithData() error = %v", err)
+	}
+	actor := userAdministrationActor(now)
+	base := ManagedUserAdjustmentInput{
+		AdjustmentID: uuid.New(), UserID: uuid.New(), Field: ManagedUserAdjustmentUploadedBytes,
+		Operation: ManagedUserAdjustmentIncrease, Amount: "1.5", ExpectedUserVersion: 1,
+	}
+	if _, err := service.Adjust(context.Background(), actor, base); !errors.Is(err, ErrUserAdministrationInput) {
+		t.Fatalf("fractional byte Adjust() error = %v", err)
+	}
+	base.Field = ManagedUserAdjustmentMagicBalance
+	base.Amount = "1"
+	base.UserID = actor.Subject.ID
+	if _, err := service.Adjust(context.Background(), actor, base); !errors.Is(err, ErrAccountRestrictionSelfTarget) {
+		t.Fatalf("self-target Adjust() error = %v", err)
+	}
+	if len(authorizer.requests) != 0 || dataRepository.adjustCommand.AdjustmentID != uuid.Nil {
+		t.Fatalf("authorizations=%+v command=%+v", authorizer.requests, dataRepository.adjustCommand)
+	}
+}
+
+func TestUserAdministrationNetworkHistoryUsesPrivatePermissionAndBoundedWindow(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 28, 12, 0, 0, 0, time.UTC)
+	targetID := uuid.New()
+	repository := &userAdministrationRepositoryStub{}
+	dataRepository := &managedUserDataRepositoryStub{networkResult: []ManagedUserNetworkObservation{{
+		Address: "203.0.113.8", FirstSeenAt: now.Add(-time.Hour), LastSeenAt: now, SeenCount: 2, RelatedUserCount: 1,
+	}}}
+	authorizer := &userAdministrationAuthorizerStub{}
+	service, err := NewUserAdministrationServiceWithData(repository, repository, dataRepository, authorizer, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewUserAdministrationServiceWithData() error = %v", err)
+	}
+	result, err := service.NetworkHistory(context.Background(), userAdministrationActor(now), targetID)
+	if err != nil {
+		t.Fatalf("NetworkHistory() error = %v", err)
+	}
+	if len(result.Items) != 1 || result.RetentionDays != 180 || result.MaximumItems != 20 ||
+		dataRepository.networkUserID != targetID || dataRepository.networkLimit != 20 ||
+		!dataRepository.networkCutoff.Equal(now.Add(-180*24*time.Hour)) {
+		t.Fatalf("result=%+v repository=%+v", result, dataRepository)
+	}
+	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionUserNetworkRead ||
+		authorizer.requests[0].Context.Purpose != "identity-user-network-history" {
+		t.Fatalf("authorization requests = %+v", authorizer.requests)
+	}
+}
+
+func TestUserAdministrationReactivationRestoresCredentialAndDefaultsReason(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+	targetID, credentialRef := uuid.New(), uuid.New()
+	repository := &userAdministrationRepositoryStub{
+		preflight: ManagedUserReactivationPreflight{
+			CredentialRef: credentialRef, Status: AccountStatusDisabled, Version: 4,
+		},
+		commandResult: ManagedUserDetail{ManagedUserSummary: ManagedUserSummary{
+			ID: targetID, credentialRef: credentialRef, Status: AccountStatusActive, Version: 5,
+		}},
+	}
+	lifecycle := &managedUserLifecycleStub{}
+	service, err := NewUserAdministrationService(repository, repository, &userAdministrationAuthorizerStub{}, func() time.Time { return now }, lifecycle)
+	if err != nil {
+		t.Fatalf("NewUserAdministrationService() error = %v", err)
+	}
+	result, err := service.Reactivate(context.Background(), userAdministrationActor(now), ReactivateManagedUserInput{
+		ReactivationID: uuid.New(), UserID: targetID, ExpectedUserVersion: 4,
+	})
+	if err != nil {
+		t.Fatalf("Reactivate() error = %v", err)
+	}
+	if lifecycle.enabled != credentialRef || repository.reactivateCommand.Reason != "管理员手动解除账户封禁" ||
+		repository.reactivateCommand.ExpectedUserVersion != 4 || result.Status != AccountStatusActive {
+		t.Fatalf("lifecycle=%+v command=%+v result=%+v", lifecycle, repository.reactivateCommand, result)
 	}
 }
 

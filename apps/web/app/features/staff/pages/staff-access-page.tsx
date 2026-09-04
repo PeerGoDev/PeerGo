@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "react-router"
 import {
+  ArrowUpRightIcon,
   BadgeCheckIcon,
   BadgePercentIcon,
   Clock3Icon,
@@ -18,6 +19,9 @@ import {
   UserRoundIcon,
   UsersRoundIcon,
   MessageCircleMoreIcon,
+  ListTodoIcon,
+  CircleCheckBigIcon,
+  CircleAlertIcon,
 } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
@@ -32,9 +36,14 @@ import {
   CardTitle,
 } from "~/components/ui/card"
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
+import {
+  useStaffPendingOverview,
+  type StaffPendingItem,
+} from "~/features/staff/api/staff-pending-overview.queries"
 import { StaffPageHeader } from "~/features/staff/components/staff-page-header"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
 import { hasCapability } from "~/features/staff/model/capability"
+import { staffSettingsNavigationItems } from "~/features/staff/model/staff-settings-navigation"
 import { managedUserListQueryOptions } from "~/features/staff/api/user-administration.queries"
 import { torrentListQueryOptions } from "~/features/torrent/api/torrent.queries"
 import { useSiteInfo } from "~/features/site/api/site.queries"
@@ -59,12 +68,6 @@ const quickActions: Array<{
   icon: typeof Settings2Icon
   action: CapabilityAction
 }> = [
-  {
-    label: "站点设置",
-    to: "/staff/settings/site",
-    icon: Settings2Icon,
-    action: "site.display.manage.read",
-  },
   {
     label: "用户管理",
     to: "/staff/users",
@@ -146,16 +149,24 @@ function StaffDashboard({
   })
   const torrents = useQuery(torrentListQueryOptions({ limit: 1 }))
   const canReadGovernance = hasCapability(capabilities, "authz.grant.read")
+  const canAccessSettings = staffSettingsNavigationItems.some((item) =>
+    hasCapability(capabilities, item.action)
+  )
+  const pending = useStaffPendingOverview(capabilities)
   const availableQuickActions = quickActions.filter((item) =>
     hasCapability(capabilities, item.action)
   )
   const refreshing =
-    siteInfo.isFetching || users.isFetching || torrents.isFetching
+    siteInfo.isFetching ||
+    users.isFetching ||
+    torrents.isFetching ||
+    pending.isFetching
 
   async function refreshDashboard() {
     await Promise.all([
       siteInfo.refetch(),
       torrents.refetch(),
+      pending.refetch(),
       ...(canReadUsers ? [users.refetch()] : []),
     ])
   }
@@ -208,12 +219,30 @@ function StaffDashboard({
         />
       </div>
 
-      {availableQuickActions.length > 0 ? (
+      <StaffPendingWorkbench
+        items={pending.items}
+        total={pending.total}
+        hasError={pending.hasError}
+      />
+
+      {canAccessSettings || availableQuickActions.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">快捷操作</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
+            {canAccessSettings ? (
+              <Link
+                to="/staff/settings"
+                className={buttonVariants({
+                  variant: "outline",
+                  className: "min-w-[114px]",
+                })}
+              >
+                <Settings2Icon data-icon="inline-start" />
+                设置中心
+              </Link>
+            ) : null}
             {availableQuickActions.map((item) => (
               <Link
                 key={item.to}
@@ -282,6 +311,76 @@ function StaffDashboard({
         ) : null}
       </Card>
     </StaffPageFrame>
+  )
+}
+
+function StaffPendingWorkbench({
+  items,
+  total,
+  hasError,
+}: {
+  items: StaffPendingItem[]
+  total: number
+  hasError: boolean
+}) {
+  return (
+    <Card className="gap-0 py-0">
+      <CardHeader className="border-b p-6">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ListTodoIcon className="size-[18px] text-primary" />
+          待办工作台
+        </CardTitle>
+        <CardDescription>
+          只汇总需要人工处理的队列，处理完成后徽章会自动更新。
+        </CardDescription>
+        <CardAction>
+          <Badge variant={total > 0 ? "destructiveSolid" : "secondary"}>
+            {total > 0 ? `${total} 项待处理` : "暂无待办"}
+          </Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="p-0">
+        {items.length > 0 ? (
+          <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+            {items.map((item) => (
+              <Link
+                key={item.id}
+                to={item.to}
+                className="group flex min-h-24 items-center gap-3 rounded-lg border bg-background p-4 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Badge
+                  variant="destructive"
+                  className="h-9 min-w-9 rounded-lg px-2 text-sm tabular-nums"
+                >
+                  {item.count > 99 ? "99+" : item.count}
+                </Badge>
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="font-medium">{item.label}</span>
+                  <span className="line-clamp-1 text-sm text-muted-foreground">
+                    {item.description}
+                  </span>
+                </span>
+                <ArrowUpRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="flex min-h-28 items-center justify-center gap-3 px-6 py-8 text-sm text-muted-foreground">
+            {hasError ? (
+              <>
+                <CircleAlertIcon className="size-5 text-destructive" />
+                部分待办队列暂时无法读取，请刷新后重试
+              </>
+            ) : (
+              <>
+                <CircleCheckBigIcon className="size-5 text-success" />
+                当前没有需要人工处理的事项
+              </>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

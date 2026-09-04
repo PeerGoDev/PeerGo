@@ -259,6 +259,24 @@ make production-tracker-rate-policy \
 现有快照发布器生成签名版本，Tracker 热加载完成后应在后台核对“已配置版本”和“实际加载
 版本”一致。
 
+Worker 页面发现做种奖励进入“需人工处理”时，先核对精确窗口、用户、尝试次数和错误码，
+修复根因并部署后才可重新执行。禁止直接更新 `economy.seeding_reward_work_items`；下面的
+命令只接受一个已终止任务，使用当前状态作为乐观锁，并在同一事务写入脱敏审计事件。理由
+为空时 CLI 会生成系统理由，但仍必须提供变更或事故编号：
+
+```bash
+make production-seeding-reward-retry \
+  WINDOW_START='2026-08-30T11:00:00Z' \
+  USER_ID='00000000-0000-0000-0000-000000000000' \
+  EXPECTED_ATTEMPTS='10' \
+  OPERATOR_REFERENCE='incident:reward-settlement-example' \
+  CONFIRM_PEERGO_SEEDING_REWARD_RETRY='RETRY:2026-08-30T11:00:00Z:00000000-0000-0000-0000-000000000000'
+```
+
+命令会把本轮尝试数重置为零，但旧尝试数、错误码、目标用户伪名、操作引用摘要和理由摘要
+保留在不可变 Audit 事件中。任务已经被其他操作处理、已存在结算结果或状态与预期不符时，
+命令会拒绝执行，不提供全队列重试或清除入口。
+
 不要只根据总 `rate_limited` 比例猜测该放宽哪一级。Tracker 另提供不含用户、地址或种子
 标识的低基数指标 `peergo_tracker_rate_limited_total`，用下面的 PromQL 分开观察用户预算和
 共享出口地址预算；只有连续窗口明确集中于同一 `scope` 时，才审阅对应参数：

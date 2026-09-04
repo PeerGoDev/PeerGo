@@ -26,6 +26,7 @@ type credentialService interface {
 	EnableCredentialAfterAccountAppeal(context.Context, uuid.UUID) error
 	ProvisionRegistration(context.Context, credentials.ProvisionRegistrationInput) (uuid.UUID, error)
 	ActivateRegistration(context.Context, uuid.UUID) (uuid.UUID, error)
+	EmailRegistered(context.Context, string) (bool, error)
 }
 
 type emailVerificationService interface {
@@ -170,6 +171,35 @@ func New(service credentialService, emailVerification emailVerificationService, 
 			})
 		}
 		writeJSON(w, http.StatusOK, response)
+	})))
+	mux.Handle("POST /internal/v1/identifiers/email-registration", requireServiceToken(serviceToken, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !requireJSON(w, r) {
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxCredentialRequestBytes)
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		var request struct {
+			Email string `json:"email"`
+		}
+		if err := decoder.Decode(&request); err != nil || ensureJSONEOF(decoder) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_request"})
+			return
+		}
+		registered, err := service.EmailRegistered(r.Context(), request.Email)
+		if errors.Is(err, credentials.ErrRegistrationInput) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_email"})
+			return
+		}
+		if err != nil {
+			// Never log the requested address or request body.
+			logger.ErrorContext(r.Context(), "vault email registration check failed", "error", err)
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "directory_unavailable"})
+			return
+		}
+		writeJSON(w, http.StatusOK, struct {
+			Registered bool `json:"registered"`
+		}{registered})
 	})))
 	mux.Handle("POST /internal/v1/credentials/verify", requireServiceToken(serviceToken, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))

@@ -245,6 +245,23 @@ func (repository *PostgresTorrentReadRepository) PendingReviewEvidence(ctx conte
 	}, nil
 }
 
+func (repository *PostgresTorrentReadRepository) PendingReviewOwnedBy(
+	ctx context.Context,
+	torrentID TorrentID,
+	uploaderID uuid.UUID,
+) (bool, error) {
+	if torrentID < 1 || uploaderID == uuid.Nil {
+		return false, ErrTorrentReadInput
+	}
+	owned, err := repository.queries.PendingReviewTorrentOwnedBy(ctx, torrentdb.PendingReviewTorrentOwnedByParams{
+		TorrentID: int64(torrentID), UploaderID: uploaderID,
+	})
+	if err != nil {
+		return false, fmt.Errorf("check pending-review torrent ownership: %w", err)
+	}
+	return owned, nil
+}
+
 func (repository *PostgresTorrentReadRepository) PendingReviewScreenshotSource(ctx context.Context, torrentID TorrentID, position int) (PublicScreenshotSource, error) {
 	if torrentID < 1 || position < 0 || position >= MaxTorrentScreenshots {
 		return PublicScreenshotSource{}, ErrTorrentReadInput
@@ -827,3 +844,4 @@ func validReadState(state State) bool {
 }
 
 var _ TorrentReadRepository = (*PostgresTorrentReadRepository)(nil)
+var _ PendingReviewOwnerRepository = (*PostgresTorrentReadRepository)(nil)

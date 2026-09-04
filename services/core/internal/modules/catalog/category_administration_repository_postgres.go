@@ -51,7 +51,7 @@ func (repository *PostgresCategoryAdministrationRepository) ListManagedCategorie
 			Facets: make([]ManagedCategoryFacet, 0),
 		})
 	}
-	facetRows, err := repository.queries.ListManagedCategoryFacetOptions(ctx)
+	facetRows, err := repository.queries.ListManagedCategoryFacets(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("query managed category facets: %w", err)
 	}
@@ -59,33 +59,181 @@ func (repository *PostgresCategoryAdministrationRepository) ListManagedCategorie
 	for index := range result {
 		categoryIndexes[result[index].ID] = index
 	}
+	facetIndexes := make(map[string]int, len(facetRows))
 	for _, row := range facetRows {
 		categoryIndex, exists := categoryIndexes[row.CategoryID]
 		mode := FacetSelectionMode(row.SelectionMode)
 		if !exists || (mode != FacetSelectionSingle && mode != FacetSelectionMulti) ||
-			row.FacetName == "" || row.OptionKey == "" || row.OptionLabel == "" || row.CanonicalLabel == "" ||
-			row.FacetDisplayOrder < 0 || row.OptionDisplayOrder < 0 || row.Version < 1 || row.TorrentCount < 0 ||
+			row.FacetName == "" || row.CanonicalName == "" || row.DisplayOrder < 0 || row.Version < 1 || row.TorrentCount < 0 ||
 			!row.CreatedAt.Valid || !row.UpdatedAt.Valid {
-			return nil, fmt.Errorf("%w: category facet option %q/%q/%q is invalid", errCatalogProjectionInvalid, row.CategoryID, row.FacetID, row.OptionKey)
+			return nil, fmt.Errorf("%w: category facet %q/%q is invalid", errCatalogProjectionInvalid, row.CategoryID, row.FacetID)
 		}
 		category := &result[categoryIndex]
-		if len(category.Facets) == 0 || category.Facets[len(category.Facets)-1].ID != row.FacetID {
-			category.Facets = append(category.Facets, ManagedCategoryFacet{
-				ID: row.FacetID, Name: row.FacetName, SelectionMode: mode,
-				Required: row.Required, RequirementGroup: row.RequirementGroup,
-				DisplayOrder: int(row.FacetDisplayOrder), Options: make([]ManagedCategoryFacetOption, 0),
-			})
+		facetIndexes[row.CategoryID+"\x00"+row.FacetID] = len(category.Facets)
+		category.Facets = append(category.Facets, ManagedCategoryFacet{
+			ID: row.FacetID, Name: row.FacetName, SelectionMode: mode,
+			Required: row.Required, RequirementGroup: row.RequirementGroup,
+			DisplayOrder: int(row.DisplayOrder), Enabled: row.Enabled,
+			Version: row.Version, TorrentCount: row.TorrentCount,
+			CreatedAt: row.CreatedAt.Time.UTC(), UpdatedAt: row.UpdatedAt.Time.UTC(),
+			Options: make([]ManagedCategoryFacetOption, 0),
+		})
+	}
+	optionRows, err := repository.queries.ListManagedCategoryFacetOptions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("query managed category facet options: %w", err)
+	}
+	for _, row := range optionRows {
+		categoryIndex, categoryExists := categoryIndexes[row.CategoryID]
+		facetIndex, facetExists := facetIndexes[row.CategoryID+"\x00"+row.FacetID]
+		if !categoryExists || !facetExists || row.OptionKey == "" || row.OptionLabel == "" || row.CanonicalLabel == "" ||
+			row.OptionDisplayOrder < 0 || row.Version < 1 || row.TorrentCount < 0 || !row.CreatedAt.Valid || !row.UpdatedAt.Valid {
+			return nil, fmt.Errorf("%w: category facet option %q/%q/%q is invalid", errCatalogProjectionInvalid, row.CategoryID, row.FacetID, row.OptionKey)
 		}
-		facet := &category.Facets[len(category.Facets)-1]
-		if facet.Name != row.FacetName || facet.SelectionMode != mode || facet.Required != row.Required ||
-			facet.RequirementGroup != row.RequirementGroup || facet.DisplayOrder != int(row.FacetDisplayOrder) {
-			return nil, fmt.Errorf("%w: category facet %q/%q rows disagree", errCatalogProjectionInvalid, row.CategoryID, row.FacetID)
-		}
+		facet := &result[categoryIndex].Facets[facetIndex]
 		facet.Options = append(facet.Options, ManagedCategoryFacetOption{
 			Key: row.OptionKey, Label: row.OptionLabel, CanonicalLabel: row.CanonicalLabel,
 			DisplayOrder: int(row.OptionDisplayOrder), Enabled: row.Enabled, Version: row.Version,
 			TorrentCount: row.TorrentCount, CreatedAt: row.CreatedAt.Time.UTC(), UpdatedAt: row.UpdatedAt.Time.UTC(),
 		})
+	}
+	return result, nil
+}
+
+func (repository *PostgresCategoryAdministrationRepository) UpsertCategoryFacet(ctx context.Context, command UpsertCategoryFacetCommand) (ManagedCategoryFacet, error) {
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return ManagedCategoryFacet{}, fmt.Errorf("begin category facet change: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := catalogdb.New(tx)
+
+	if _, err := queries.GetManagedCategoryForUpdate(ctx, command.CategoryID); errors.Is(err, pgx.ErrNoRows) {
+		return ManagedCategoryFacet{}, ErrCategoryNotFound
+	} else if err != nil {
+		return ManagedCategoryFacet{}, fmt.Errorf("lock category for facet change: %w", err)
+	}
+
+	existing, existingErr := queries.GetManagedCategoryFacetForUpdate(ctx, catalogdb.GetManagedCategoryFacetForUpdateParams{
+		CategoryID: command.CategoryID, FacetID: command.FacetID,
+	})
+	if existingErr != nil && !errors.Is(existingErr, pgx.ErrNoRows) {
+		return ManagedCategoryFacet{}, fmt.Errorf("lock managed category facet: %w", existingErr)
+	}
+	if command.ExpectedVersion == 0 && existingErr == nil {
+		return ManagedCategoryFacet{}, ErrCategoryFacetAlreadyExists
+	}
+	if command.ExpectedVersion == 0 {
+		count, countErr := queries.CountManagedCategoryFacets(ctx, command.CategoryID)
+		if countErr != nil {
+			return ManagedCategoryFacet{}, fmt.Errorf("count managed category facets: %w", countErr)
+		}
+		if count >= maxCategoryFacets {
+			return ManagedCategoryFacet{}, ErrCategoryFacetLimitReached
+		}
+	}
+	if command.ExpectedVersion > 0 && errors.Is(existingErr, pgx.ErrNoRows) {
+		return ManagedCategoryFacet{}, ErrCategoryFacetNotFound
+	}
+	if command.ExpectedVersion > 0 && existing.Version != command.ExpectedVersion {
+		return ManagedCategoryFacet{}, ErrCategoryFacetVersionConflict
+	}
+
+	canonical, canonicalErr := queries.GetFacetDefinitionForCategoryAdministration(ctx, command.FacetID)
+	if errors.Is(canonicalErr, pgx.ErrNoRows) && command.ExpectedVersion == 0 {
+		_, insertErr := queries.InsertFacetDefinitionForCategoryAdministration(ctx, catalogdb.InsertFacetDefinitionForCategoryAdministrationParams{
+			FacetID: command.FacetID, FacetName: command.Name, SelectionMode: string(command.SelectionMode),
+			DisplayOrder: int32(command.DisplayOrder), OccurredAt: categoryTimestamp(command.OccurredAt),
+		})
+		if insertErr != nil && !errors.Is(insertErr, pgx.ErrNoRows) {
+			return ManagedCategoryFacet{}, fmt.Errorf("insert canonical category facet: %w", insertErr)
+		}
+		canonical, canonicalErr = queries.GetFacetDefinitionForCategoryAdministration(ctx, command.FacetID)
+	}
+	if canonicalErr != nil {
+		return ManagedCategoryFacet{}, fmt.Errorf("resolve canonical category facet: %w", canonicalErr)
+	}
+	if !canonical.Enabled || canonical.SelectionMode != string(command.SelectionMode) {
+		return ManagedCategoryFacet{}, ErrCategoryFacetUnavailable
+	}
+	if command.ExpectedVersion > 0 && existing.SelectionMode != string(command.SelectionMode) {
+		return ManagedCategoryFacet{}, ErrCategoryFacetUnavailable
+	}
+
+	nameOverride := nullableCategoryText(command.Name, canonical.Name)
+	requirementGroup := nullableCategoryText(command.RequirementGroup, "")
+	transition := "created"
+	var before *CategoryFacetAuditState
+	var result ManagedCategoryFacet
+	if command.ExpectedVersion == 0 {
+		row, insertErr := queries.InsertManagedCategoryFacet(ctx, catalogdb.InsertManagedCategoryFacetParams{
+			CategoryID: command.CategoryID, FacetID: command.FacetID,
+			SelectionMode: string(command.SelectionMode), Required: command.Required,
+			RequirementGroup: requirementGroup, DisplayOrder: int32(command.DisplayOrder),
+			NameOverride: nameOverride, Enabled: command.Enabled, OccurredAt: categoryTimestamp(command.OccurredAt),
+		})
+		if isUniqueViolation(insertErr) {
+			return ManagedCategoryFacet{}, ErrCategoryFacetAlreadyExists
+		}
+		if insertErr != nil {
+			return ManagedCategoryFacet{}, fmt.Errorf("insert managed category facet: %w", insertErr)
+		}
+		result, err = managedCategoryFacetFromMutation(
+			command.FacetID, command.Name, command.SelectionMode, row.Required,
+			command.RequirementGroup, row.DisplayOrder, row.Enabled, row.Version, 0,
+			row.CreatedAt, row.UpdatedAt,
+		)
+	} else {
+		beforeState := categoryFacetAuditState(
+			command.CategoryID, existing.FacetID, existing.FacetName,
+			FacetSelectionMode(existing.SelectionMode), existing.Required,
+			existing.RequirementGroup, int(existing.DisplayOrder), existing.Enabled, existing.Version,
+		)
+		before = &beforeState
+		transition = "updated"
+		row, updateErr := queries.UpdateManagedCategoryFacet(ctx, catalogdb.UpdateManagedCategoryFacetParams{
+			Required: command.Required, RequirementGroup: requirementGroup,
+			DisplayOrder: int32(command.DisplayOrder), NameOverride: nameOverride,
+			Enabled: command.Enabled, OccurredAt: categoryTimestamp(command.OccurredAt),
+			CategoryID: command.CategoryID, FacetID: command.FacetID,
+			ExpectedVersion: command.ExpectedVersion,
+		})
+		if errors.Is(updateErr, pgx.ErrNoRows) {
+			return ManagedCategoryFacet{}, ErrCategoryFacetVersionConflict
+		}
+		if updateErr != nil {
+			return ManagedCategoryFacet{}, fmt.Errorf("update managed category facet: %w", updateErr)
+		}
+		result, err = managedCategoryFacetFromMutation(
+			command.FacetID, command.Name, command.SelectionMode, row.Required,
+			command.RequirementGroup, row.DisplayOrder, row.Enabled, row.Version,
+			existing.TorrentCount, row.CreatedAt, row.UpdatedAt,
+		)
+	}
+	if err != nil {
+		return ManagedCategoryFacet{}, err
+	}
+	after := categoryFacetAuditState(
+		command.CategoryID, result.ID, result.Name, result.SelectionMode,
+		result.Required, result.RequirementGroup, result.DisplayOrder, result.Enabled, result.Version,
+	)
+	beforeJSON, afterJSON, err := categoryFacetAuditJSON(before, after)
+	if err != nil {
+		return ManagedCategoryFacet{}, err
+	}
+	if err := queries.InsertCategoryFacetChange(ctx, catalogdb.InsertCategoryFacetChangeParams{
+		ChangeID:   pgtype.UUID{Bytes: command.ChangeID, Valid: true},
+		CategoryID: command.CategoryID, FacetID: command.FacetID, Transition: transition,
+		ActorID: pgtype.UUID{Bytes: command.ActorID, Valid: true}, Reason: command.Reason,
+		ExpectedVersion: command.ExpectedVersion, ResultingVersion: result.Version,
+		BeforeState: beforeJSON, AfterState: afterJSON,
+		AuthorizationDecisionID: pgtype.UUID{Bytes: command.Authorization.ID, Valid: true},
+		OccurredAt:              categoryTimestamp(command.OccurredAt),
+	}); err != nil {
+		return ManagedCategoryFacet{}, fmt.Errorf("insert category facet audit: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ManagedCategoryFacet{}, fmt.Errorf("commit category facet change: %w", err)
 	}
 	return result, nil
 }
@@ -116,6 +264,17 @@ func (repository *PostgresCategoryAdministrationRepository) UpsertCategoryFacetO
 	}
 	if command.ExpectedVersion == 0 && existingErr == nil {
 		return ManagedCategoryFacetOption{}, ErrCategoryOptionAlreadyExists
+	}
+	if command.ExpectedVersion == 0 {
+		count, countErr := queries.CountManagedCategoryFacetOptions(ctx, catalogdb.CountManagedCategoryFacetOptionsParams{
+			CategoryID: command.CategoryID, FacetID: command.FacetID,
+		})
+		if countErr != nil {
+			return ManagedCategoryFacetOption{}, fmt.Errorf("count managed category facet options: %w", countErr)
+		}
+		if count >= maxCategoryFacetOptions {
+			return ManagedCategoryFacetOption{}, ErrCategoryOptionLimitReached
+		}
 	}
 	if command.ExpectedVersion > 0 && errors.Is(existingErr, pgx.ErrNoRows) {
 		return ManagedCategoryFacetOption{}, ErrCategoryOptionNotFound
@@ -344,6 +503,63 @@ func categoryAuditState(category ManagedCategory) CategoryAuditState {
 	}
 }
 
+func managedCategoryFacetFromMutation(
+	facetID, name string,
+	selectionMode FacetSelectionMode,
+	required bool,
+	requirementGroup string,
+	displayOrder int32,
+	enabled bool,
+	version, torrentCount int64,
+	createdAt, updatedAt pgtype.Timestamptz,
+) (ManagedCategoryFacet, error) {
+	if facetID == "" || name == "" ||
+		(selectionMode != FacetSelectionSingle && selectionMode != FacetSelectionMulti) ||
+		displayOrder < 0 || version < 1 || torrentCount < 0 || !createdAt.Valid || !updatedAt.Valid {
+		return ManagedCategoryFacet{}, errCatalogProjectionInvalid
+	}
+	return ManagedCategoryFacet{
+		ID: facetID, Name: name, SelectionMode: selectionMode,
+		Required: required, RequirementGroup: requirementGroup,
+		DisplayOrder: int(displayOrder), Enabled: enabled, Version: version,
+		TorrentCount: torrentCount, CreatedAt: createdAt.Time.UTC(), UpdatedAt: updatedAt.Time.UTC(),
+		Options: make([]ManagedCategoryFacetOption, 0),
+	}, nil
+}
+
+func categoryFacetAuditState(
+	categoryID, facetID, name string,
+	selectionMode FacetSelectionMode,
+	required bool,
+	requirementGroup string,
+	displayOrder int,
+	enabled bool,
+	version int64,
+) CategoryFacetAuditState {
+	return CategoryFacetAuditState{
+		CategoryID: categoryID, FacetID: facetID, Name: name,
+		SelectionMode: selectionMode, Required: required,
+		RequirementGroup: requirementGroup, DisplayOrder: displayOrder,
+		Enabled: enabled, Version: version,
+	}
+}
+
+func categoryFacetAuditJSON(before *CategoryFacetAuditState, after CategoryFacetAuditState) ([]byte, []byte, error) {
+	var beforeJSON []byte
+	var err error
+	if before != nil {
+		beforeJSON, err = json.Marshal(before)
+		if err != nil {
+			return nil, nil, fmt.Errorf("marshal category facet before state: %w", err)
+		}
+	}
+	afterJSON, err := json.Marshal(after)
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshal category facet after state: %w", err)
+	}
+	return beforeJSON, afterJSON, nil
+}
+
 func managedCategoryFacetOptionFromMutation(
 	optionKey, label, canonicalLabel string,
 	displayOrder int32,
@@ -392,6 +608,13 @@ func isUniqueViolation(err error) bool {
 
 func categoryTimestamp(value time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: value.UTC(), Valid: true}
+}
+
+func nullableCategoryText(value, canonical string) pgtype.Text {
+	if value == "" || value == canonical {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: value, Valid: true}
 }
 
 var _ CategoryAdministrationRepository = (*PostgresCategoryAdministrationRepository)(nil)

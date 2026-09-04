@@ -315,6 +315,119 @@ INSERT INTO newcomer.assessment_transitions (
 	return assessment, nil
 }
 
+func (repository *PostgresRepository) Assign(ctx context.Context, command AssignCommand) (Assessment, error) {
+	if command.AssignmentID == uuid.Nil || command.UserID == uuid.Nil || command.ActorID == uuid.Nil ||
+		command.Authorization.ID == uuid.Nil || !command.Authorization.Allow || command.OccurredAt.IsZero() {
+		return Assessment{}, ErrInput
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	if err != nil {
+		return Assessment{}, fmt.Errorf("begin newcomer assignment: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var existingUser, existingActor uuid.UUID
+	var existingReason string
+	err = tx.QueryRow(ctx, `
+SELECT user_id, reason, actor_id
+FROM newcomer.assessment_assignments WHERE id = $1`, command.AssignmentID).Scan(
+		&existingUser, &existingReason, &existingActor,
+	)
+	if err == nil {
+		if existingUser != command.UserID || existingReason != command.Reason || existingActor != command.ActorID {
+			return Assessment{}, ErrIdempotencyConflict
+		}
+		result, scanErr := scanAssessment(tx.QueryRow(ctx, assessmentSelect+` WHERE assessment.assignment_id = $1`, command.AssignmentID))
+		if scanErr != nil {
+			return Assessment{}, scanErr
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return Assessment{}, fmt.Errorf("commit newcomer assignment replay: %w", err)
+		}
+		return result, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return Assessment{}, fmt.Errorf("read newcomer assignment replay: %w", err)
+	}
+
+	var userStatus string
+	if err := tx.QueryRow(ctx, `SELECT status FROM identity.users WHERE id = $1 FOR UPDATE`, command.UserID).Scan(&userStatus); errors.Is(err, pgx.ErrNoRows) {
+		return Assessment{}, ErrNotFound
+	} else if err != nil {
+		return Assessment{}, fmt.Errorf("lock newcomer assignment target: %w", err)
+	}
+	if userStatus != "active" {
+		return Assessment{}, ErrConflict
+	}
+	var alreadyAssigned bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM newcomer.assessments WHERE user_id = $1)`, command.UserID).Scan(&alreadyAssigned); err != nil {
+		return Assessment{}, fmt.Errorf("check existing newcomer assessment: %w", err)
+	}
+	if alreadyAssigned {
+		return Assessment{}, ErrConflict
+	}
+
+	var policyID uuid.UUID
+	var durationSeconds int64
+	var policyEnabled bool
+	err = tx.QueryRow(ctx, `
+SELECT id, duration_seconds, enabled
+FROM newcomer.policy_revisions
+WHERE effective_at <= $1
+ORDER BY effective_at DESC, revision DESC
+LIMIT 1`, command.OccurredAt).Scan(&policyID, &durationSeconds, &policyEnabled)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Assessment{}, ErrConflict
+	}
+	if err != nil {
+		return Assessment{}, fmt.Errorf("read active newcomer policy: %w", err)
+	}
+	if !policyEnabled {
+		return Assessment{}, ErrConflict
+	}
+	var openingUpload int64
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(credited_uploaded, 0) FROM traffic.user_totals WHERE user_id = $1`, command.UserID).Scan(&openingUpload); errors.Is(err, pgx.ErrNoRows) {
+		openingUpload = 0
+	} else if err != nil {
+		return Assessment{}, fmt.Errorf("read newcomer opening traffic: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO newcomer.assessment_assignments (
+    id, user_id, policy_revision_id, reason, actor_id,
+    authorization_decision_id, occurred_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7)`, command.AssignmentID, command.UserID,
+		policyID, command.Reason, command.ActorID, command.Authorization.ID, command.OccurredAt); err != nil {
+		return Assessment{}, classifyDatabaseError("insert newcomer assignment", err)
+	}
+	assessmentID := uuid.New()
+	deadline := command.OccurredAt.Add(time.Duration(durationSeconds) * time.Second)
+	if _, err := tx.Exec(ctx, `
+INSERT INTO newcomer.assessments (
+    id, registration_id, assignment_id, user_id, policy_revision_id, status,
+    started_at, deadline_at, opening_credited_uploaded_bytes,
+    current_credited_upload_bytes, current_seeding_active_seconds,
+    version, updated_at
+) VALUES ($1, NULL, $2, $3, $4, 'active', $5, $6, $7, 0, 0, 1, $5)`,
+		assessmentID, command.AssignmentID, command.UserID, policyID, command.OccurredAt, deadline, openingUpload); err != nil {
+		return Assessment{}, classifyDatabaseError("insert assigned newcomer assessment", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO newcomer.assessment_transitions (
+    assessment_id, from_status, to_status, credited_upload_bytes,
+    seeding_active_seconds, reason_code, occurred_at
+) VALUES ($1, NULL, 'active', 0, 0, 'staff_assigned', $2)`, assessmentID, command.OccurredAt); err != nil {
+		return Assessment{}, classifyDatabaseError("append newcomer assignment transition", err)
+	}
+	result, err := scanAssessment(tx.QueryRow(ctx, assessmentSelect+` WHERE assessment.id = $1`, assessmentID))
+	if err != nil {
+		return Assessment{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Assessment{}, classifyDatabaseError("commit newcomer assignment", err)
+	}
+	return result, nil
+}
+
 func (repository *PostgresRepository) Evaluate(ctx context.Context, now time.Time, batch int) (EvaluationResult, error) {
 	if now.IsZero() || batch < 1 || batch > MaximumWorkerBatch {
 		return EvaluationResult{}, ErrInput

@@ -1276,6 +1276,92 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/users/{user_id}/adjustments:
+    post:
+      operationId: adjustManagedUserData
+      summary: 增减一个账户的运营数据
+      description: 调整上传、下载、魔力值、经验、可用邀请或捐赠金额。每次变更都使用 账户版本、幂等键和不可变事件记录；空理由由服务端生成，不会绕过审计。
+      tags:
+        - identity
+      x-audience:
+        - staff
+      x-owner: core-identity
+      x-permission: user.account.adjust
+      x-credential-audience: staff-session
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagedUserAdjustmentRequest'
+      responses:
+        '200':
+          description: 变更已提交，并返回最新账户详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedUserDetail'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/users/{user_id}/network-history:
+    get:
+      operationId: getManagedUserNetworkHistory
+      summary: 读取用户有限保留的登录 IP 聚合历史
+      description: 最多返回最近 180 天的 20 个用户/IP 聚合，不返回逐请求记录、User-Agent、 Tracker peer 端点或其他可持续膨胀的数据。
+      tags:
+        - identity
+      x-audience:
+        - staff
+      x-owner: core-identity
+      x-permission: user.network.read
+      x-credential-audience: staff-session
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 已授权的有限 IP 聚合历史。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedUserNetworkHistory'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/users/{user_id}/tracker-activity:
     get:
       operationId: getManagedUserTrackerActivity
@@ -1414,6 +1500,52 @@ paths:
         '409':
           $ref: '#/components/responses/ProblemResponse'
         '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/users/{user_id}/reactivations:
+    post:
+      operationId: reactivateManagedUser
+      summary: 解除已停用账户的封禁状态
+      description: 同时恢复 Privacy Vault 凭据并将 Core 账户从 disabled 变为 active； 使用账户版本防止覆盖并发处置，且只保存一条最小化的不可变解封证据。
+      tags:
+        - identity
+      x-audience:
+        - staff
+      x-owner: core-identity
+      x-permission: user.account.restriction.revoke
+      x-credential-audience: staff-session
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReactivateManagedUserRequest'
+      responses:
+        '200':
+          description: 已解除封禁并返回最新账户详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedUserDetail'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
@@ -3403,16 +3535,16 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
-  /api/v1/me/moviepilot-credential:
+  /api/v1/me/api-key:
     get:
-      operationId: getMyMoviePilotCredential
-      summary: 查看自己的 MoviePilot API Key 状态
+      operationId: getMyPersonalAPIKey
+      summary: 查看自己的个人 API Key 状态
       tags:
         - integrations
       x-audience:
         - web
       x-owner: core-integrations
-      x-permission: integration.moviepilot.read.self
+      x-permission: integration.apikey.read.self
       x-credential-audience: web-session
       responses:
         '200':
@@ -3420,7 +3552,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoviePilotCredentialStatus'
+                $ref: '#/components/schemas/PersonalAPIKeyStatus'
         '401':
           $ref: '#/components/responses/ProblemResponse'
         '403':
@@ -3428,14 +3560,14 @@ paths:
         default:
           $ref: '#/components/responses/ProblemResponse'
     delete:
-      operationId: revokeMyMoviePilotCredential
-      summary: 撤销自己的 MoviePilot API Key
+      operationId: revokeMyPersonalAPIKey
+      summary: 撤销自己的个人 API Key
       tags:
         - integrations
       x-audience:
         - web
       x-owner: core-integrations
-      x-permission: integration.moviepilot.manage.self
+      x-permission: integration.apikey.manage.self
       x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/WebCSRFHeader'
@@ -3462,16 +3594,16 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
-  /api/v1/me/moviepilot-credential/rotations:
+  /api/v1/me/api-key/rotations:
     post:
-      operationId: rotateMyMoviePilotCredential
-      summary: 创建或轮换自己的 MoviePilot API Key
+      operationId: rotateMyPersonalAPIKey
+      summary: 创建或轮换自己的个人 API Key
       tags:
         - integrations
       x-audience:
         - web
       x-owner: core-integrations
-      x-permission: integration.moviepilot.manage.self
+      x-permission: integration.apikey.manage.self
       x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/WebCSRFHeader'
@@ -3480,14 +3612,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RotateMoviePilotCredentialRequest'
+              $ref: '#/components/schemas/RotatePersonalAPIKeyRequest'
       responses:
         '201':
           description: 原始 API Key 仅在本响应返回一次；旧密钥立即失效。
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IssuedMoviePilotCredential'
+                $ref: '#/components/schemas/IssuedPersonalAPIKey'
         '400':
           $ref: '#/components/responses/ProblemResponse'
         '401':
@@ -4383,6 +4515,45 @@ paths:
         '401':
           $ref: '#/components/responses/ProblemResponse'
         '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    post:
+      operationId: assignNewcomerAssessment
+      summary: 为一个现有用户分配当前新人考核
+      description: 仅可为正常且从未进入新人考核的账户分配；使用当前生效规则， 从分配时刻起计算期限，并保存最小化的不可变分配证据。
+      tags:
+        - newcomer
+      x-audience:
+        - staff
+      x-owner: core-newcomer
+      x-permission: newcomer.assessment.assign
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignNewcomerAssessmentRequest'
+      responses:
+        '201':
+          description: 已创建新人考核。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewcomerAssessment'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
@@ -6083,6 +6254,53 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}:
+    put:
+      operationId: upsertManagedCategoryFacet
+      summary: 创建或以乐观并发更新分类下的发种属性
+      tags:
+        - catalog
+      x-audience:
+        - staff
+      x-owner: core-catalog
+      x-permission: category.update
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/CategoryIDPathParameter'
+        - name: facet_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertManagedCategoryFacetRequest'
+      responses:
+        '200':
+          description: 分类属性和不可变审计记录已经原子提交。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedCategoryFacet'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        '429':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/catalog/categories/{category_id}/facets/{facet_id}/options/{option_key}:
     put:
       operationId: upsertManagedCategoryFacetOption
@@ -7420,9 +7638,17 @@ paths:
             minimum: 0
             maximum: 99999
             default: 0
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            allOf:
+              - $ref: '#/components/schemas/SocialCommentSort'
+            default: newest
       responses:
         '200':
-          description: 动态评论与回复；删除项保留墓碑。
+          description: 按一级评论分页的动态评论与楼中楼回复；删除项保留墓碑。
           content:
             application/json:
               schema:
@@ -11498,9 +11724,9 @@ components:
           maximum: 99
         role_names:
           type: array
-          minItems: 1
           maxItems: 32
           uniqueItems: true
+          description: 当前有效角色；待恢复或尚未完成初始化的账户可为空。
           items:
             type: string
             minLength: 1
@@ -11585,12 +11811,76 @@ components:
         - type: object
           additionalProperties: false
           required:
+            - experience
+            - donation_amount
+            - remaining_invites
+            - submitted_torrent_count
+            - published_torrent_count
+            - pending_review_torrent_count
+            - direct_invite_count
+            - inviter_numeric_id
+            - inviter_username
+            - registration_mode
+            - registration_state
             - active_restrictions
             - manual_download_restriction
             - manual_download_restriction_history
             - vip_state
             - vip_history
           properties:
+            experience:
+              type: string
+              pattern: ^[0-9]+(?:\.[0-9]{1,20})?$
+              description: 当前精确经验值；使用十进制字符串避免精度损失。
+            donation_amount:
+              type: string
+              pattern: ^[0-9]+(?:\.[0-9]{1,2})?$
+              description: 当前累计捐赠金额；由 PtYes 开账值和后续不可变调整记录组成。
+            remaining_invites:
+              type: integer
+              minimum: 0
+              maximum: 1000000
+            submitted_torrent_count:
+              type: integer
+              format: int64
+              minimum: 0
+            published_torrent_count:
+              type: integer
+              format: int64
+              minimum: 0
+            pending_review_torrent_count:
+              type: integer
+              format: int64
+              minimum: 0
+            direct_invite_count:
+              type: integer
+              format: int64
+              minimum: 0
+            inviter_numeric_id:
+              type: integer
+              format: int64
+              minimum: 1
+              nullable: true
+            inviter_username:
+              type: string
+              minLength: 1
+              maxLength: 64
+              nullable: true
+            registration_mode:
+              type: string
+              enum:
+                - open
+                - invite
+              nullable: true
+              description: PeerGo 原生注册方式；迁移用户为空。
+            registration_state:
+              type: string
+              enum:
+                - reserved
+                - credential_provisioned
+                - completed
+              nullable: true
+              description: PeerGo 原生注册事务状态；迁移用户为空。
             active_restrictions:
               type: array
               maxItems: 50
@@ -11610,6 +11900,64 @@ components:
               maxItems: 20
               items:
                 $ref: '#/components/schemas/VIPTransition'
+    ManagedUserAdjustmentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - field
+        - operation
+        - amount
+        - expected_user_version
+      properties:
+        field:
+          type: string
+          enum:
+            - uploaded_bytes
+            - downloaded_bytes
+            - magic_balance
+            - experience
+            - remaining_invites
+            - donation_amount
+        operation:
+          type: string
+          enum:
+            - increase
+            - decrease
+        amount:
+          type: string
+          pattern: ^[0-9]+(?:\.[0-9]{1,20})?$
+          maxLength: 40
+          description: 正数；字段决定整数、两位金额或二十位经验精度。
+        reason:
+          type: string
+          minLength: 0
+          maxLength: 500
+          description: 可留空；服务端会生成字段对应的审计理由。
+        expected_user_version:
+          type: integer
+          format: int64
+          minimum: 1
+    ManagedUserNetworkHistory:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - retention_days
+        - maximum_items
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/ManagedUserNetworkObservation'
+        retention_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+        maximum_items:
+          type: integer
+          minimum: 1
+          maximum: 20
     AccountRestrictionReasonCode:
       type: string
       enum:
@@ -11826,11 +12174,12 @@ components:
         - hnr.policy.issue
         - hnr.policy.read
         - hnr.read.self
-        - integration.moviepilot.manage.self
-        - integration.moviepilot.read.self
+        - integration.apikey.manage.self
+        - integration.apikey.read.self
         - invitation.issue.self
         - invitation.read.self
         - invitation.revoke.self
+        - newcomer.assessment.assign
         - newcomer.assessment.exempt
         - newcomer.assessment.read
         - newcomer.assessment.read.self
@@ -11918,6 +12267,7 @@ components:
         - tracker.seedbox.report.create.self
         - tracker.seedbox.report.decide
         - traffic.read.self
+        - user.account.adjust
         - user.account.appeal.create.restricted
         - user.account.appeal.decide
         - user.account.appeal.read
@@ -11928,6 +12278,7 @@ components:
         - user.downloadrestriction.read.self
         - user.downloadrestriction.restrict
         - user.downloadrestriction.revoke
+        - user.network.read
         - user.vip.manage
         - wiki.page.create
         - wiki.page.manage.read
@@ -12447,6 +12798,8 @@ components:
         - target_value
         - met
         - enforcement_mode
+        - allowed_misses
+        - miss_count
       properties:
         group_kind:
           $ref: '#/components/schemas/WorkgroupKind'
@@ -12483,9 +12836,17 @@ components:
         met:
           type: boolean
         enforcement_mode:
-          type: string
-          enum:
-            - observe
+          $ref: '#/components/schemas/WorkgroupContributionEnforcementMode'
+        allowed_misses:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
+        miss_count:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
     WorkgroupContributionPolicyRevision:
       type: object
       additionalProperties: false
@@ -12496,6 +12857,7 @@ components:
         - period_kind
         - target_value
         - enforcement_mode
+        - allowed_misses
         - effective_from
         - opening
         - reason
@@ -12521,9 +12883,12 @@ components:
           minimum: 1
           maximum: 3153600000
         enforcement_mode:
-          type: string
-          enum:
-            - observe
+          $ref: '#/components/schemas/WorkgroupContributionEnforcementMode'
+        allowed_misses:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
         effective_from:
           type: string
           format: date-time
@@ -12680,7 +13045,9 @@ components:
         - assessment_state
         - explanation_code
         - enforcement_mode
+        - allowed_misses
         - reminder
+        - enforcement
       properties:
         group_kind:
           $ref: '#/components/schemas/WorkgroupKind'
@@ -12723,14 +13090,22 @@ components:
         explanation_code:
           $ref: '#/components/schemas/WorkgroupContributionExplanationCode'
         enforcement_mode:
-          type: string
-          enum:
-            - observe
+          $ref: '#/components/schemas/WorkgroupContributionEnforcementMode'
+        allowed_misses:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
         reminder:
           type: object
           nullable: true
           allOf:
             - $ref: '#/components/schemas/WorkgroupContributionReminder'
+        enforcement:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/WorkgroupContributionEnforcementAssessment'
     WorkgroupContributionReminder:
       type: object
       additionalProperties: false
@@ -13769,7 +14144,7 @@ components:
           type: string
           minLength: 10
           maxLength: 500
-    MoviePilotCredentialStatus:
+    PersonalAPIKeyStatus:
       type: object
       additionalProperties: false
       required:
@@ -13790,11 +14165,12 @@ components:
           maximum: 9007199254740991
         scopes:
           type: array
-          minItems: 5
-          maxItems: 5
+          minItems: 0
+          maxItems: 8
           uniqueItems: true
           items:
-            $ref: '#/components/schemas/MoviePilotCredentialScope'
+            $ref: '#/components/schemas/PersonalAPIKeyScope'
+          description: 当前密钥实际拥有的权限；未创建密钥时为空数组。
         created_at:
           type: string
           format: date-time
@@ -13802,9 +14178,11 @@ components:
           type: string
           format: date-time
           description: 最多每六小时合并更新一次，不构成逐请求活动记录。
-    RotateMoviePilotCredentialRequest:
+    RotatePersonalAPIKeyRequest:
       type: object
       additionalProperties: false
+      required:
+        - scopes
       properties:
         expected_version:
           type: integer
@@ -13812,7 +14190,15 @@ components:
           minimum: 1
           maximum: 9007199254740991
           description: 首次创建时省略；轮换现有密钥时必须与当前版本一致。
-    IssuedMoviePilotCredential:
+        scopes:
+          type: array
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/PersonalAPIKeyScope'
+          description: 新密钥可以调用的最小权限集合。
+    IssuedPersonalAPIKey:
       type: object
       additionalProperties: false
       required:
@@ -13820,7 +14206,7 @@ components:
         - api_key
       properties:
         credential:
-          $ref: '#/components/schemas/MoviePilotCredentialStatus'
+          $ref: '#/components/schemas/PersonalAPIKeyStatus'
         api_key:
           type: string
           minLength: 47
@@ -14542,8 +14928,8 @@ components:
           type: boolean
         reason:
           type: string
-          minLength: 10
           maxLength: 500
+          description: 可留空；服务端会生成明确的审计理由。
     UpdateManagedCategoryRequest:
       type: object
       additionalProperties: false
@@ -14571,8 +14957,8 @@ components:
           maximum: 9007199254740991
         reason:
           type: string
-          minLength: 10
           maxLength: 500
+          description: 可留空；服务端会生成明确的审计理由。
     ManagedCategoryFacet:
       type: object
       required:
@@ -14581,6 +14967,11 @@ components:
         - selection_mode
         - required
         - display_order
+        - enabled
+        - version
+        - torrent_count
+        - created_at
+        - updated_at
         - options
       properties:
         id:
@@ -14601,6 +14992,25 @@ components:
           type: integer
           minimum: 0
           maximum: 1000000
+        enabled:
+          type: boolean
+          description: 停用后不再出现在新发种表单中，历史取值仍然保留。
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+        torrent_count:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
         options:
           type: array
           maxItems: 200
@@ -14681,8 +15091,8 @@ components:
           description: 传 0 表示新增；更新时必须传当前版本。
         reason:
           type: string
-          minLength: 10
           maxLength: 500
+          description: 可留空；服务端会生成明确的审计理由。
     TorrentSummary:
       type: object
       required:
@@ -14875,6 +15285,7 @@ components:
           type: string
           format: date-time
     TorrentPublicDetail:
+      description: 已发布种子的公开详情；待审核时，同一规范 URL 仅向经过会话鉴权的 原发布者返回私密预做种详情，其他访问者仍得到 404。
       type: object
       additionalProperties: false
       required:
@@ -14991,6 +15402,7 @@ components:
         state:
           type: string
           enum:
+            - pending_review
             - published
         submitted_at:
           type: string
@@ -14998,6 +15410,8 @@ components:
         published_at:
           type: string
           format: date-time
+          nullable: true
+          description: 待审核的发布者私密详情中为 null。
     TorrentSwarmOverview:
       type: object
       additionalProperties: false
@@ -15423,6 +15837,18 @@ components:
           type: string
           minLength: 10
           maxLength: 1000
+        workgroup_miss_count:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 120
+        workgroup_allowed_misses:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 120
+        workgroup_disciplinary_action:
+          $ref: '#/components/schemas/WorkgroupContributionDisciplinaryAction'
         member_gift_sender_numeric_id:
           $ref: '#/components/schemas/UnsignedIntegerText'
         member_gift_sender_username:
@@ -15649,6 +16075,18 @@ components:
           type: string
           format: uuid
           nullable: true
+          description: 直接回复的评论，用于保留“回复谁”的精确上下文。
+        root_comment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: 所属一级评论；一级评论自身为空，楼中楼回复均指向同一根楼。
+        reply_to:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/CommentAuthor'
+          description: 直接回复对象的作者；仅回复评论返回。
         author:
           $ref: '#/components/schemas/CommentAuthor'
         body:
@@ -16480,6 +16918,7 @@ components:
         - post_id
         - items
         - total
+        - thread_total
         - limit
         - offset
       properties:
@@ -16494,6 +16933,12 @@ components:
           type: integer
           format: int64
           minimum: 0
+          description: 一级评论与楼中楼回复的总数。
+        thread_total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: 用于分页的一级评论总数。
         limit:
           type: integer
           minimum: 1
@@ -16502,6 +16947,12 @@ components:
           type: integer
           minimum: 0
           maximum: 99999
+    SocialCommentSort:
+      type: string
+      enum:
+        - hot
+        - newest
+        - oldest
     SocialMediaUploadRequest:
       type: object
       additionalProperties: false
@@ -20474,6 +20925,36 @@ components:
           type: string
           minLength: 1
           maxLength: 40
+    ManagedUserNetworkObservation:
+      type: object
+      additionalProperties: false
+      required:
+        - address
+        - first_seen_at
+        - last_seen_at
+        - seen_count
+        - related_user_count
+      properties:
+        address:
+          type: string
+          minLength: 2
+          maxLength: 45
+          description: 规范 IPv4 或 IPv6 地址。
+        first_seen_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        seen_count:
+          type: integer
+          format: int64
+          minimum: 1
+        related_user_count:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 在同一保留窗口内出现此地址的用户数量。
     UserTrackerTask:
       type: object
       additionalProperties: false
@@ -20570,6 +21051,20 @@ components:
           type: string
           format: date-time
           description: Tracker 生成当前瞬时视图的服务端时间。
+    ReactivateManagedUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_user_version
+      properties:
+        expected_user_version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          maxLength: 500
+          description: 可留空；留空时记录为管理员手动解除账户封禁。
     ManualDownloadRestrictionReasonCode:
       type: string
       enum:
@@ -21772,6 +22267,11 @@ components:
         - trusted_torrents_published
         - torrent_review_votes
         - seeding_active_seconds
+    WorkgroupContributionEnforcementMode:
+      type: string
+      enum:
+        - observe
+        - miss_limit
     LegacyReviewerEvidence:
       type: object
       additionalProperties: false
@@ -21824,6 +22324,100 @@ components:
           $ref: '#/components/schemas/WorkgroupApplication'
         eligibility:
           $ref: '#/components/schemas/ReviewerEligibility'
+    WorkgroupContributionDisciplinaryAction:
+      type: string
+      enum:
+        - none
+        - marked
+        - membership_ended
+    WorkgroupContributionEnforcementAssessment:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - group_kind
+        - metric
+        - policy_revision
+        - period_starts_at
+        - period_ends_at
+        - observed_at
+        - evidence_through
+        - evidence_state
+        - current_value
+        - target_value
+        - assessment_state
+        - explanation_code
+        - miss_count
+        - allowed_misses
+        - disciplinary_action
+        - reason
+        - assessed_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        group_kind:
+          $ref: '#/components/schemas/WorkgroupKind'
+        metric:
+          $ref: '#/components/schemas/WorkgroupContributionMetric'
+        policy_revision:
+          type: integer
+          format: int64
+          minimum: 1
+        period_starts_at:
+          type: string
+          format: date-time
+        period_ends_at:
+          type: string
+          format: date-time
+        observed_at:
+          type: string
+          format: date-time
+        evidence_through:
+          type: string
+          format: date-time
+        evidence_state:
+          type: string
+          enum:
+            - complete
+        current_value:
+          type: integer
+          format: int64
+          minimum: 0
+        target_value:
+          type: integer
+          format: int64
+          minimum: 1
+        assessment_state:
+          type: string
+          enum:
+            - met
+            - not_met
+        explanation_code:
+          type: string
+          enum:
+            - target_met
+            - below_target
+            - no_contribution
+        miss_count:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 120
+        allowed_misses:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 120
+        disciplinary_action:
+          $ref: '#/components/schemas/WorkgroupContributionDisciplinaryAction'
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        assessed_at:
+          type: string
+          format: date-time
     HNRAppealStatus:
       type: string
       enum:
@@ -22415,12 +23009,16 @@ components:
         - all
         - free
         - paid
-    MoviePilotCredentialScope:
+    PersonalAPIKeyScope:
       type: string
+      description: 可授予个人 API Key 的最小权限范围；所有适配器共享同一套范围。
       enum:
         - profile:read
         - torrent:read
         - torrent:download
+        - torrent:upload
+        - torrent:purchase:read
+        - torrent:purchase:write
         - attendance:read
         - attendance:claim
     TorrentPurchaseHistoryItem:
@@ -22853,6 +23451,19 @@ components:
           type: integer
           minimum: 0
           maximum: 1000000
+    AssignNewcomerAssessmentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          maxLength: 1000
+          description: 可留空；留空时记录为管理员手动分配。
     ExemptNewcomerAssessmentRequest:
       type: object
       additionalProperties: false
@@ -23324,6 +23935,46 @@ components:
       maxItems: 20
       items:
         $ref: '#/components/schemas/CategoryFacet'
+    UpsertManagedCategoryFacetRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - selection_mode
+        - required
+        - display_order
+        - enabled
+        - expected_version
+        - reason
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        selection_mode:
+          $ref: '#/components/schemas/CategoryFacetSelectionMode'
+        required:
+          type: boolean
+        requirement_group:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+          description: 非必填属性可加入同一组，表示组内至少选择一个；直接必填时省略。
+        display_order:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        enabled:
+          type: boolean
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          description: 传 0 表示创建分类属性；更新时必须传当前版本。
+        reason:
+          type: string
+          maxLength: 500
+          description: 可留空；服务端会生成明确的审计理由。
     TorrentFacetSelectionInput:
       type: object
       additionalProperties: false

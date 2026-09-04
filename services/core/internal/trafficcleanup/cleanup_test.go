@@ -36,7 +36,8 @@ func TestWorkerUsesTwelveHourDetailBoundary(t *testing.T) {
 	}
 	if result.Entries != 100 || repository.batchSize != 100 ||
 		!repository.cutoffs.DetailBefore.Equal(now.Add(-12*time.Hour)) ||
-		!repository.cutoffs.HistoryBefore.Equal(now.Add(-30*24*time.Hour)) {
+		!repository.cutoffs.HistoryBefore.Equal(now.Add(-30*24*time.Hour)) ||
+		!repository.cutoffs.NetworkBefore.Equal(now.Add(-NetworkObservationRetention)) {
 		t.Fatalf("RunOnce() result = %+v, cutoffs = %+v, batch = %d", result, repository.cutoffs, repository.batchSize)
 	}
 }

@@ -92,6 +92,9 @@ func (repository *PostgresRepository) Purchase(ctx context.Context, command Purc
 	if status.State != AccessPurchaseRequired || status.Price <= 0 || status.SellerID == command.UserID {
 		return Receipt{}, ErrInvariant
 	}
+	if command.ExpectedPrice != nil && status.Price != *command.ExpectedPrice {
+		return Receipt{}, ErrPriceChanged
+	}
 	var purchaseSequence int64
 	if err := tx.QueryRow(ctx, `
 SELECT COALESCE(max(purchase_sequence), 0)::bigint + 1
@@ -858,6 +861,9 @@ func readReceiptByRequest(ctx context.Context, tx pgx.Tx, command PurchaseComman
 		return Receipt{}, true, err
 	}
 	if receipt.UserID != command.UserID || receipt.TorrentID != command.TorrentID {
+		return Receipt{}, true, ErrIdempotencyConflict
+	}
+	if command.ExpectedPrice != nil && receipt.Price != *command.ExpectedPrice {
 		return Receipt{}, true, ErrIdempotencyConflict
 	}
 	return receipt, true, nil

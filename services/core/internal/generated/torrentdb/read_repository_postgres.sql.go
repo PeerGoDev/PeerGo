@@ -1028,3 +1028,25 @@ func (q *Queries) ListUserTorrentSubmissions(ctx context.Context, arg ListUserTo
 	}
 	return items, nil
 }
+
+const pendingReviewTorrentOwnedBy = `-- name: PendingReviewTorrentOwnedBy :one
+SELECT EXISTS (
+    SELECT 1
+    FROM torrents.torrents AS torrent
+    WHERE torrent.id = $1::bigint
+      AND torrent.uploader_id = $2::uuid
+      AND torrent.state = 'pending_review'
+)
+`
+
+type PendingReviewTorrentOwnedByParams struct {
+	TorrentID  int64
+	UploaderID uuid.UUID
+}
+
+func (q *Queries) PendingReviewTorrentOwnedBy(ctx context.Context, arg PendingReviewTorrentOwnedByParams) (bool, error) {
+	row := q.db.QueryRow(ctx, pendingReviewTorrentOwnedBy, arg.TorrentID, arg.UploaderID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}

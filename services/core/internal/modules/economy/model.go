@@ -35,13 +35,14 @@ const (
 )
 
 var (
-	rousiMigrationAccountID = uuid.MustParse("00000000-0000-7000-8000-000000000001")
-	seedingMintAccountID    = uuid.MustParse("00000000-0000-7000-8000-000000000002")
-	activityMintAccountID   = uuid.MustParse("00000000-0000-7000-8000-000000000003")
-	torrentPurchaseSinkID   = uuid.MustParse("00000000-0000-7000-8000-000000000004")
-	feeSinkAccountID        = uuid.MustParse("00000000-0000-7000-8000-000000000005")
-	promotionProductSinkID  = uuid.MustParse("00000000-0000-7000-8000-000000000006")
-	medalPurchaseSinkID     = uuid.MustParse("00000000-0000-7000-8000-000000000007")
+	rousiMigrationAccountID          = uuid.MustParse("00000000-0000-7000-8000-000000000001")
+	seedingMintAccountID             = uuid.MustParse("00000000-0000-7000-8000-000000000002")
+	activityMintAccountID            = uuid.MustParse("00000000-0000-7000-8000-000000000003")
+	torrentPurchaseSinkID            = uuid.MustParse("00000000-0000-7000-8000-000000000004")
+	feeSinkAccountID                 = uuid.MustParse("00000000-0000-7000-8000-000000000005")
+	promotionProductSinkID           = uuid.MustParse("00000000-0000-7000-8000-000000000006")
+	medalPurchaseSinkID              = uuid.MustParse("00000000-0000-7000-8000-000000000007")
+	administratorAdjustmentAccountID = uuid.MustParse("00000000-0000-7000-8000-000000000009")
 )
 
 // RousiMigrationAccountID returns the immutable opening-balance counterparty.
@@ -64,6 +65,10 @@ func PromotionProductSinkID() uuid.UUID { return promotionProductSinkID }
 
 // MedalPurchaseSinkID returns the site-side medal shop account.
 func MedalPurchaseSinkID() uuid.UUID { return medalPurchaseSinkID }
+
+// AdministratorAdjustmentAccountID returns the explicit counterparty for
+// audited staff-issued magic adjustments.
+func AdministratorAdjustmentAccountID() uuid.UUID { return administratorAdjustmentAccountID }
 
 type PostingInput struct {
 	// Member account IDs equal their identity user UUID. System account IDs are

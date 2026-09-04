@@ -15,6 +15,27 @@ WHERE torrent.id = sqlc.arg(torrent_id)::bigint
   AND torrent.state = 'published'
   AND site.singleton = true;
 
+-- name: GetPendingReviewUploaderDownloadObject :one
+-- A pending object is private to its uploader. Reviewers inspect immutable
+-- evidence through the review surface; ordinary members must not be able to
+-- probe or download another uploader's pre-release swarm.
+SELECT
+    torrent.id AS torrent_id,
+    torrent.title,
+    site.torrent_filename_prefix,
+    object.id AS object_id,
+    object.content_sha256,
+    object.byte_length,
+    object.info_offset,
+    object.info_length
+FROM torrents.torrents AS torrent
+JOIN torrents.torrent_objects AS object ON object.id = torrent.object_id
+CROSS JOIN catalog.site_profile AS site
+WHERE torrent.id = sqlc.arg(torrent_id)::bigint
+  AND torrent.uploader_id = sqlc.arg(uploader_id)::uuid
+  AND torrent.state = 'pending_review'
+  AND site.singleton = true;
+
 -- name: ListReadableTorrentObjectLocations :many
 SELECT
     location.id,

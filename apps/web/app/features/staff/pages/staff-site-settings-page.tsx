@@ -57,6 +57,7 @@ import { Input } from "~/components/ui/input"
 import { Skeleton } from "~/components/ui/skeleton"
 import { Spinner } from "~/components/ui/spinner"
 import { Switch } from "~/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs"
 import { Textarea } from "~/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group"
 import {
@@ -82,6 +83,7 @@ import { formatDateTime } from "~/shared/formatters/date-time"
 
 type CapabilityList = components["schemas"]["CapabilityList"]
 type FormErrors = Partial<Record<SiteDisplaySettingsFormField | "form", string>>
+type SettingsTab = "basic" | "homepage" | "navigation" | "audit"
 
 export function StaffSiteSettingsPage() {
   return (
@@ -185,6 +187,7 @@ function SiteDisplaySettingsForm({
     React.useState<SiteDisplaySettingsFormValues>()
   const [confirmationOpen, setConfirmationOpen] = React.useState(false)
   const [successMessage, setSuccessMessage] = React.useState("")
+  const [activeTab, setActiveTab] = React.useState<SettingsTab>("basic")
 
   React.useEffect(() => {
     if (mutation.isPending || initialSettings.version === baseline.version) {
@@ -249,6 +252,7 @@ function SiteDisplaySettingsForm({
     })
     if (!result.success) {
       const nextErrors: FormErrors = {}
+      let firstInvalidField: SiteDisplaySettingsFormField | undefined
       for (const issue of result.error.issues) {
         const field = issue.path[0]
         if (
@@ -256,11 +260,19 @@ function SiteDisplaySettingsForm({
           !nextErrors[field as SiteDisplaySettingsFormField]
         ) {
           nextErrors[field as SiteDisplaySettingsFormField] = issue.message
+          firstInvalidField ??= field as SiteDisplaySettingsFormField
         }
       }
       setErrors(nextErrors)
+      if (firstInvalidField) {
+        setActiveTab(settingsTabForField(firstInvalidField))
+      }
       requestAnimationFrame(() => {
-        formElement.querySelector<HTMLElement>("[aria-invalid='true']")?.focus()
+        requestAnimationFrame(() => {
+          formElement
+            .querySelector<HTMLElement>("[aria-invalid='true']")
+            ?.focus()
+        })
       })
       return
     }
@@ -376,208 +388,249 @@ function SiteDisplaySettingsForm({
           onSubmit={handleReview}
           noValidate
         >
-          <div className="flex flex-col gap-6">
-            <SettingsSection
-              title="站点基本信息"
-              icon={<Globe2Icon className="size-[18px] text-info" />}
-            >
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
-                <Field
-                  data-invalid={Boolean(errors.name)}
-                  data-disabled={disabled}
-                >
-                  <FieldLabel htmlFor="site-name">站点名称</FieldLabel>
-                  <Input
-                    id="site-name"
-                    name="name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    maxLength={80}
-                    disabled={disabled}
-                    aria-invalid={Boolean(errors.name)}
-                  />
-                  <FieldDescription className="text-xs">
-                    用于主站侧栏与页面标题；不会改变 Tracker 域名。
-                  </FieldDescription>
-                  <FieldError
-                    errors={errors.name ? [{ message: errors.name }] : []}
-                  />
-                </Field>
-
-                <Field
-                  data-invalid={Boolean(errors.description)}
-                  data-disabled={disabled}
-                >
-                  <FieldLabel htmlFor="site-description">站点说明</FieldLabel>
-                  <Input
-                    id="site-description"
-                    name="description"
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    maxLength={500}
-                    disabled={disabled}
-                    aria-invalid={Boolean(errors.description)}
-                    placeholder="简短说明站点定位…"
-                  />
-                  <FieldDescription className="text-xs">
-                    显示在首页标题下方；允许留空，最多 500 个字符。
-                  </FieldDescription>
-                  <FieldError
-                    errors={
-                      errors.description
-                        ? [{ message: errors.description }]
-                        : []
-                    }
-                  />
-                </Field>
-
-                <Field
-                  data-invalid={Boolean(errors.torrentFilenamePrefix)}
-                  data-disabled={disabled}
-                >
-                  <FieldLabel htmlFor="torrent-filename-prefix">
-                    种子文件名前缀
-                  </FieldLabel>
-                  <Input
-                    id="torrent-filename-prefix"
-                    name="torrentFilenamePrefix"
-                    value={torrentFilenamePrefix}
-                    onChange={(event) =>
-                      setTorrentFilenamePrefix(event.target.value)
-                    }
-                    maxLength={40}
-                    disabled={disabled}
-                    aria-invalid={Boolean(errors.torrentFilenamePrefix)}
-                    placeholder="[ROUSI]"
-                  />
-                  <FieldDescription className="text-xs">
-                    下载文件将命名为“前缀.种子标题.torrent”；留空可关闭前缀，普通下载和
-                    RSS 下载都会立即使用新值。
-                  </FieldDescription>
-                  <FieldError
-                    errors={
-                      errors.torrentFilenamePrefix
-                        ? [{ message: errors.torrentFilenamePrefix }]
-                        : []
-                    }
-                  />
-                </Field>
-              </FieldGroup>
-            </SettingsSection>
-
-            <SettingsSection
-              title="首页展示"
-              icon={<MonitorCogIcon className="size-[18px] text-info" />}
-            >
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
-                <Field data-disabled={disabled}>
-                  <FieldLabel>默认种子视图</FieldLabel>
-                  <ToggleGroup
-                    value={[defaultView]}
-                    onValueChange={(values) => {
-                      const nextView = values[0]
-                      if (nextView === "list" || nextView === "poster") {
-                        setDefaultView(nextView)
-                      }
-                    }}
-                    variant="outline"
-                    spacing={0}
-                    className="w-full"
-                    disabled={disabled}
-                    aria-label="首页默认种子视图"
-                  >
-                    <ToggleGroupItem value="list" className="h-10 flex-1">
-                      <ListIcon data-icon="inline-start" />
-                      列表
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="poster" className="h-10 flex-1">
-                      <Grid2X2Icon data-icon="inline-start" />
-                      海报
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  <FieldDescription className="text-xs">
-                    只决定访客首次进入时的默认布局，访客仍可临时切换。
-                  </FieldDescription>
-                </Field>
-
-                <Field
-                  orientation="horizontal"
-                  data-disabled={disabled}
-                  className="min-h-10 rounded-md border bg-background px-3 py-2"
-                >
-                  <FieldContent>
-                    <FieldLabel htmlFor="show-latest-announcement">
-                      首页显示最新公告
-                    </FieldLabel>
-                    <FieldDescription className="text-xs">
-                      关闭后公共首页和最新公告接口都不再公开当前公告。
-                    </FieldDescription>
-                  </FieldContent>
-                  <Switch
-                    id="show-latest-announcement"
-                    checked={showLatestAnnouncement}
-                    onCheckedChange={setShowLatestAnnouncement}
-                    disabled={disabled}
-                    aria-label="首页显示最新公告"
-                  />
-                </Field>
-              </FieldGroup>
-            </SettingsSection>
-
-            <SettingsSection
-              title="自定义左侧菜单"
-              icon={<ExternalLinkIcon className="size-[18px] text-info" />}
-            >
-              <CustomNavigationItemsEditor
-                items={customNavigationItems}
-                disabled={disabled}
-                error={errors.customNavigationItems}
-                onChange={setCustomNavigationItems}
-              />
-            </SettingsSection>
-
-            {canUpdate ? (
-              <SettingsSection
-                title="变更与审计"
-                icon={
-                  <ClipboardCheckIcon className="size-[18px] text-warning" />
-                }
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as SettingsTab)}
+            className="gap-5"
+          >
+            <div className="overflow-x-auto border-b">
+              <TabsList
+                variant="line"
+                className="h-11 w-max min-w-full justify-start"
+                aria-label="站点设置分区"
               >
-                <FieldGroup>
+                <TabsTrigger value="basic">
+                  <Globe2Icon />
+                  基本信息
+                </TabsTrigger>
+                <TabsTrigger value="homepage">
+                  <MonitorCogIcon />
+                  首页展示
+                </TabsTrigger>
+                <TabsTrigger value="navigation">
+                  <ExternalLinkIcon />
+                  侧栏菜单
+                </TabsTrigger>
+                {canUpdate ? (
+                  <TabsTrigger value="audit">
+                    <ClipboardCheckIcon />
+                    变更与审计
+                  </TabsTrigger>
+                ) : null}
+              </TabsList>
+            </div>
+
+            <TabsContent value="basic">
+              <SettingsSection
+                title="站点基本信息"
+                icon={<Globe2Icon className="size-[18px] text-info" />}
+              >
+                <FieldGroup className="grid gap-4 md:grid-cols-2">
                   <Field
-                    data-invalid={Boolean(errors.reason)}
-                    data-disabled={mutation.isPending}
+                    data-invalid={Boolean(errors.name)}
+                    data-disabled={disabled}
                   >
-                    <FieldLabel htmlFor="site-display-change-reason">
-                      变更理由
-                    </FieldLabel>
-                    <Textarea
-                      id="site-display-change-reason"
-                      name="reason"
-                      value={reason}
-                      onChange={(event) => setReason(event.target.value)}
-                      rows={3}
-                      maxLength={500}
-                      disabled={mutation.isPending}
-                      aria-invalid={Boolean(errors.reason)}
-                      placeholder="可留空；系统会自动记录变更理由"
+                    <FieldLabel htmlFor="site-name">站点名称</FieldLabel>
+                    <Input
+                      id="site-name"
+                      name="name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      maxLength={80}
+                      disabled={disabled}
+                      aria-invalid={Boolean(errors.name)}
                     />
                     <FieldDescription className="text-xs">
-                      完整理由会安全保存，审计记录仅保留必要摘要。
+                      用于主站侧栏与页面标题；不会改变 Tracker 域名。
                     </FieldDescription>
                     <FieldError
-                      errors={errors.reason ? [{ message: errors.reason }] : []}
+                      errors={errors.name ? [{ message: errors.name }] : []}
+                    />
+                  </Field>
+
+                  <Field
+                    data-invalid={Boolean(errors.description)}
+                    data-disabled={disabled}
+                  >
+                    <FieldLabel htmlFor="site-description">站点说明</FieldLabel>
+                    <Input
+                      id="site-description"
+                      name="description"
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      maxLength={500}
+                      disabled={disabled}
+                      aria-invalid={Boolean(errors.description)}
+                      placeholder="简短说明站点定位…"
+                    />
+                    <FieldDescription className="text-xs">
+                      显示在首页标题下方；允许留空，最多 500 个字符。
+                    </FieldDescription>
+                    <FieldError
+                      errors={
+                        errors.description
+                          ? [{ message: errors.description }]
+                          : []
+                      }
+                    />
+                  </Field>
+
+                  <Field
+                    data-invalid={Boolean(errors.torrentFilenamePrefix)}
+                    data-disabled={disabled}
+                  >
+                    <FieldLabel htmlFor="torrent-filename-prefix">
+                      种子文件名前缀
+                    </FieldLabel>
+                    <Input
+                      id="torrent-filename-prefix"
+                      name="torrentFilenamePrefix"
+                      value={torrentFilenamePrefix}
+                      onChange={(event) =>
+                        setTorrentFilenamePrefix(event.target.value)
+                      }
+                      maxLength={40}
+                      disabled={disabled}
+                      aria-invalid={Boolean(errors.torrentFilenamePrefix)}
+                      placeholder="[ROUSI]"
+                    />
+                    <FieldDescription className="text-xs">
+                      下载文件将命名为“前缀.种子标题.torrent”；留空可关闭前缀，普通下载和
+                      RSS 下载都会立即使用新值。
+                    </FieldDescription>
+                    <FieldError
+                      errors={
+                        errors.torrentFilenamePrefix
+                          ? [{ message: errors.torrentFilenamePrefix }]
+                          : []
+                      }
                     />
                   </Field>
                 </FieldGroup>
               </SettingsSection>
+            </TabsContent>
+
+            <TabsContent value="homepage">
+              <SettingsSection
+                title="首页展示"
+                icon={<MonitorCogIcon className="size-[18px] text-info" />}
+              >
+                <FieldGroup className="grid gap-4 md:grid-cols-2">
+                  <Field data-disabled={disabled}>
+                    <FieldLabel>默认种子视图</FieldLabel>
+                    <ToggleGroup
+                      value={[defaultView]}
+                      onValueChange={(values) => {
+                        const nextView = values[0]
+                        if (nextView === "list" || nextView === "poster") {
+                          setDefaultView(nextView)
+                        }
+                      }}
+                      variant="outline"
+                      spacing={0}
+                      className="w-full"
+                      disabled={disabled}
+                      aria-label="首页默认种子视图"
+                    >
+                      <ToggleGroupItem value="list" className="h-10 flex-1">
+                        <ListIcon data-icon="inline-start" />
+                        列表
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="poster" className="h-10 flex-1">
+                        <Grid2X2Icon data-icon="inline-start" />
+                        海报
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    <FieldDescription className="text-xs">
+                      只决定访客首次进入时的默认布局，访客仍可临时切换。
+                    </FieldDescription>
+                  </Field>
+
+                  <Field
+                    orientation="horizontal"
+                    data-disabled={disabled}
+                    className="min-h-10 rounded-md border bg-background px-3 py-2"
+                  >
+                    <FieldContent>
+                      <FieldLabel htmlFor="show-latest-announcement">
+                        首页显示最新公告
+                      </FieldLabel>
+                      <FieldDescription className="text-xs">
+                        关闭后公共首页和最新公告接口都不再公开当前公告。
+                      </FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id="show-latest-announcement"
+                      checked={showLatestAnnouncement}
+                      onCheckedChange={setShowLatestAnnouncement}
+                      disabled={disabled}
+                      aria-label="首页显示最新公告"
+                    />
+                  </Field>
+                </FieldGroup>
+              </SettingsSection>
+            </TabsContent>
+
+            <TabsContent value="navigation">
+              <SettingsSection
+                title="自定义左侧菜单"
+                icon={<ExternalLinkIcon className="size-[18px] text-info" />}
+              >
+                <CustomNavigationItemsEditor
+                  items={customNavigationItems}
+                  disabled={disabled}
+                  error={errors.customNavigationItems}
+                  onChange={setCustomNavigationItems}
+                />
+              </SettingsSection>
+            </TabsContent>
+
+            {canUpdate ? (
+              <TabsContent value="audit">
+                <SettingsSection
+                  title="变更与审计"
+                  icon={
+                    <ClipboardCheckIcon className="size-[18px] text-warning" />
+                  }
+                >
+                  <FieldGroup>
+                    <Field
+                      data-invalid={Boolean(errors.reason)}
+                      data-disabled={mutation.isPending}
+                    >
+                      <FieldLabel htmlFor="site-display-change-reason">
+                        变更理由
+                      </FieldLabel>
+                      <Textarea
+                        id="site-display-change-reason"
+                        name="reason"
+                        value={reason}
+                        onChange={(event) => setReason(event.target.value)}
+                        rows={3}
+                        maxLength={500}
+                        disabled={mutation.isPending}
+                        aria-invalid={Boolean(errors.reason)}
+                        placeholder="可留空；系统会自动记录变更理由"
+                      />
+                      <FieldDescription className="text-xs">
+                        完整理由会安全保存，审计记录仅保留必要摘要。
+                      </FieldDescription>
+                      <FieldError
+                        errors={
+                          errors.reason ? [{ message: errors.reason }] : []
+                        }
+                      />
+                    </Field>
+                  </FieldGroup>
+                </SettingsSection>
+              </TabsContent>
             ) : null}
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>最近生效于 {formatDateTime(baseline.effective_at)}</span>
               <span>低风险设置保存后直接激活</span>
             </div>
-          </div>
+          </Tabs>
         </form>
       </SiteSettingsCard>
 
@@ -832,6 +885,20 @@ function SettingsSection({
       <CardContent>{children}</CardContent>
     </Card>
   )
+}
+
+function settingsTabForField(field: SiteDisplaySettingsFormField): SettingsTab {
+  switch (field) {
+    case "defaultTorrentView":
+    case "showLatestAnnouncement":
+      return "homepage"
+    case "customNavigationItems":
+      return "navigation"
+    case "reason":
+      return "audit"
+    default:
+      return "basic"
+  }
 }
 
 function SettingsConfirmationDialog({

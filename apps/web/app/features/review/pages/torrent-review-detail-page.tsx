@@ -107,7 +107,7 @@ export function TorrentReviewDetailPage() {
   }
   if (!session.data) {
     return (
-      <PageLayout className="max-w-[1280px] gap-5 px-6 py-10">
+      <PageLayout className="max-w-[1280px] gap-5 p-4! sm:px-6! sm:py-10!">
         <ReviewDetailProblem
           title="需要登录"
           description="登录后才能读取待审种子的完整资料。"
@@ -122,7 +122,7 @@ export function TorrentReviewDetailPage() {
   }
   if (voteResult) {
     return (
-      <PageLayout className="max-w-[900px] gap-5 px-6 py-10">
+      <PageLayout className="max-w-[900px] gap-5 p-4! sm:px-6! sm:py-10!">
         <ReviewVoteSuccess result={voteResult} />
       </PageLayout>
     )
@@ -132,7 +132,7 @@ export function TorrentReviewDetailPage() {
       detail.error instanceof ApiProblemError &&
       detail.error.code === "torrent_review_not_found"
     return (
-      <PageLayout className="max-w-[1280px] gap-5 px-6 py-10">
+      <PageLayout className="max-w-[1280px] gap-5 p-4! sm:px-6! sm:py-10!">
         <ReviewDetailProblem
           title={assignmentGone ? "该审核任务已结束" : "审核资料暂时无法读取"}
           description={
@@ -160,7 +160,7 @@ export function TorrentReviewDetailPage() {
   }
 
   return (
-    <PageLayout className="max-w-[1320px] gap-5 px-6 py-8">
+    <PageLayout className="max-w-[1320px] gap-5 p-4! sm:px-6! sm:py-8!">
       <Button
         nativeButton={false}
         variant="ghost"
@@ -213,8 +213,8 @@ function ReviewEvidenceSummary({ detail }: { detail: MyTorrentReviewDetail }) {
           <CardDescription>{detail.subtitle}</CardDescription>
         ) : null}
       </CardHeader>
-      <CardContent className="grid gap-5 p-5 sm:grid-cols-[160px_minmax(0,1fr)]">
-        <div className="relative aspect-[2/3] overflow-hidden rounded-lg border bg-muted">
+      <CardContent className="grid gap-5 p-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:p-5">
+        <div className="relative mx-auto aspect-[2/3] w-36 overflow-hidden rounded-lg border bg-muted sm:mx-0 sm:w-auto">
           {!coverFailed && detail.screenshot_count > 0 ? (
             <img
               src={reviewCoverUrl(detail.id)}
@@ -648,7 +648,7 @@ function ReviewDetailProblem({
 function ReviewDetailSkeleton() {
   return (
     <PageLayout
-      className="max-w-[1320px] gap-5 px-6 py-8"
+      className="max-w-[1320px] gap-5 p-4! sm:px-6! sm:py-8!"
       aria-label="正在加载审核资料"
     >
       <Skeleton className="h-9 w-32" />

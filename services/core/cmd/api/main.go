@@ -16,6 +16,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/contracts/auditevent"
 	"github.com/peergo/peergo/services/core/internal/contracts/objectstorage"
 	"github.com/peergo/peergo/services/core/internal/contracts/trackerevent"
+	"github.com/peergo/peergo/services/core/internal/modules/accountadmin"
 	"github.com/peergo/peergo/services/core/internal/modules/audit"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
@@ -33,6 +34,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/newcomer"
 	"github.com/peergo/peergo/services/core/internal/modules/notifications"
 	"github.com/peergo/peergo/services/core/internal/modules/operations"
+	"github.com/peergo/peergo/services/core/internal/modules/personalapikey"
 	"github.com/peergo/peergo/services/core/internal/modules/progression"
 	"github.com/peergo/peergo/services/core/internal/modules/promotions"
 	"github.com/peergo/peergo/services/core/internal/modules/ratiowatch"
@@ -440,7 +442,14 @@ func main() {
 	}
 	torrentStore := contentStore
 	torrentStores := contentStores
-	torrentUploadRepository, err := torrents.NewPostgresTorrentUploadRepository(pool)
+	torrentUploadRepository, err := torrents.NewPostgresTorrentUploadRepository(
+		pool,
+		torrents.PostgresTorrentUploadRepositoryConfig{
+			NewTrackerAppender: func(tx pgx.Tx) trackerevent.Appender {
+				return trackercontrol.NewPostgresOutbox(tx)
+			},
+		},
+	)
 	if err != nil {
 		logger.Error("compose torrent upload repository", "error", err)
 		os.Exit(1)
@@ -553,23 +562,24 @@ func main() {
 		logger.Error("compose torrent download service", "error", err)
 		os.Exit(1)
 	}
+	personalAPIKeyRepository, err := personalapikey.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose personal API key repository", "error", err)
+		os.Exit(1)
+	}
+	personalAPIKeyService, err := personalapikey.NewService(
+		personalAPIKeyRepository,
+		identityService,
+		authorizationService,
+		personalapikey.ServiceConfig{},
+	)
+	if err != nil {
+		logger.Error("compose personal API key service", "error", err)
+		os.Exit(1)
+	}
 	moviePilotRepository, err := moviepilot.NewPostgresRepository(pool)
 	if err != nil {
 		logger.Error("compose MoviePilot repository", "error", err)
-		os.Exit(1)
-	}
-	moviePilotService, err := moviepilot.NewService(
-		moviePilotRepository,
-		identityService,
-		authorizationService,
-		catalogService,
-		torrentReadService,
-		torrentDownloadService,
-		attendanceService,
-		moviepilot.ServiceConfig{PublicOrigin: settings.PublicOrigin, SigningKey: settings.SessionCSRFKey},
-	)
-	if err != nil {
-		logger.Error("compose MoviePilot service", "error", err)
 		os.Exit(1)
 	}
 	rssRepository, err := rss.NewPostgresRepository(pool)
@@ -614,6 +624,24 @@ func main() {
 		logger.Error("compose torrent upload service", "error", err)
 		os.Exit(1)
 	}
+	moviePilotService, err := moviepilot.NewService(
+		moviePilotRepository,
+		personalAPIKeyService,
+		catalogService,
+		torrentReadService,
+		torrentDownloadService,
+		attendanceService,
+		moviepilot.ServiceConfig{PublicOrigin: settings.PublicOrigin, SigningKey: settings.SessionCSRFKey},
+		moviepilot.LegacyServices{
+			Catalog: catalogService, Torrents: torrentReadService,
+			Bookmarks: torrentBookmarkService, Comments: commentService,
+			Uploads: torrentUploadService, Purchases: torrentPurchaseService,
+		},
+	)
+	if err != nil {
+		logger.Error("compose MoviePilot service", "error", err)
+		os.Exit(1)
+	}
 	torrentReviewService, err := review.NewService(
 		identityService, torrentReviewRepository, authorizationService, workgroupService, time.Now, torrentReadService,
 	)
@@ -621,7 +649,10 @@ func main() {
 		logger.Error("compose torrent review service", "error", err)
 		os.Exit(1)
 	}
-	torrentResubmissionRepository, err := review.NewPostgresResubmissionRepository(pool)
+	torrentResubmissionRepository, err := review.NewPostgresResubmissionRepository(
+		pool,
+		func(tx pgx.Tx) trackerevent.Appender { return trackercontrol.NewPostgresOutbox(tx) },
+	)
 	if err != nil {
 		logger.Error("compose torrent resubmission repository", "error", err)
 		os.Exit(1)
@@ -757,6 +788,24 @@ func main() {
 		logger.Error("registration policy requires Turnstile but PEERGO_TURNSTILE_SECRET_KEY is not configured")
 		os.Exit(1)
 	}
+	registrationRecoveryCtx, cancelRegistrationRecovery := context.WithTimeout(context.Background(), 15*time.Second)
+	registrationRecovery, registrationRecoveryErr := registrationService.RecoverIncompleteRegistrations(registrationRecoveryCtx)
+	cancelRegistrationRecovery()
+	if registrationRecoveryErr != nil {
+		// Recovery is best-effort at startup: the public API must still become
+		// available when Vault is temporarily unavailable, and the next restart
+		// or an unchanged registration retry will resume the same durable saga.
+		logger.Warn("registration recovery incomplete",
+			"released_reservations", registrationRecovery.ReleasedReservations,
+			"completed_registrations", registrationRecovery.CompletedRegistrations,
+			"error", registrationRecoveryErr,
+		)
+	} else if registrationRecovery.ReleasedReservations > 0 || registrationRecovery.CompletedRegistrations > 0 {
+		logger.Info("registration recovery completed",
+			"released_reservations", registrationRecovery.ReleasedReservations,
+			"completed_registrations", registrationRecovery.CompletedRegistrations,
+		)
+	}
 	invitationRepository, err := identity.NewPostgresInvitationRepository(pool)
 	if err != nil {
 		logger.Error("compose invitation repository", "error", err)
@@ -766,6 +815,7 @@ func main() {
 		identityService,
 		authorizationService,
 		invitationRepository,
+		vaultClient,
 		time.Now,
 	)
 	if err != nil {
@@ -869,9 +919,15 @@ func main() {
 		logger.Error("compose account restriction repository", "error", err)
 		os.Exit(1)
 	}
-	userAdministrationService, err := identity.NewUserAdministrationService(
+	userDataAdministrationRepository, err := accountadmin.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose user data administration repository", "error", err)
+		os.Exit(1)
+	}
+	userAdministrationService, err := identity.NewUserAdministrationServiceWithData(
 		identityRepository,
 		accountRestrictionRepository,
+		userDataAdministrationRepository,
 		authorizationService,
 		time.Now,
 		vaultClient,
@@ -1042,6 +1098,7 @@ func main() {
 		TorrentResubmission:         torrentResubmissionService,
 		TorrentMaintenance:          torrentMaintenanceService,
 		PromotionAdministration:     promotionApplication,
+		PersonalAPIKeys:             personalAPIKeyService,
 		MoviePilot:                  moviePilotService,
 		RSS:                         rssService,
 		TorrentUploadMaxBytes:       settings.TorrentUploadMaxBytes,
@@ -1055,7 +1112,8 @@ func main() {
 			Path:   "/api/v1/admin",
 			Secure: settings.CookieSecure,
 		},
-		AllowedOrigins: settings.AllowedOrigins,
+		AllowedOrigins:    settings.AllowedOrigins,
+		TrustedProxyCIDRs: settings.TrustedProxyCIDRs,
 	}, logger)
 	if err != nil {
 		logger.Error("failed to compose core http server", "error", err)

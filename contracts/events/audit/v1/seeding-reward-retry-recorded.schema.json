@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.peergo.invalid/events/audit/v1/seeding-reward-retry-recorded.schema.json",
+  "title": "Seeding reward retry recorded v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "retry_id",
+    "window_start",
+    "user_pseudonym",
+    "pseudonym_key_epoch",
+    "previous_attempts",
+    "previous_error_code",
+    "operator_reference_sha256",
+    "reason_sha256",
+    "result"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_type": { "const": "economy.seeding-reward-retry.recorded" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "retry_id": { "type": "string", "format": "uuid" },
+    "window_start": { "type": "string", "format": "date-time" },
+    "user_pseudonym": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "pseudonym_key_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "previous_attempts": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+    "previous_error_code": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+    "operator_reference_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "reason_sha256": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" },
+    "result": { "const": "requeued" }
+  }
+}

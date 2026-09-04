@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -113,6 +114,45 @@ func TestLoadKeepsTurnstileSecretInRuntimeConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadParsesCanonicalCoreTrustedProxyCIDRs(t *testing.T) {
+	setValidCoreEnvironment(t)
+	t.Setenv("PEERGO_CORE_TRUSTED_PROXY_CIDRS", "172.20.0.4/32,2001:db8::4/128")
+
+	settings, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	want := []netip.Prefix{
+		netip.MustParsePrefix("172.20.0.4/32"),
+		netip.MustParsePrefix("2001:db8::4/128"),
+	}
+	if len(settings.TrustedProxyCIDRs) != len(want) {
+		t.Fatalf("trusted proxy CIDRs = %v", settings.TrustedProxyCIDRs)
+	}
+	for index := range want {
+		if settings.TrustedProxyCIDRs[index] != want[index] {
+			t.Fatalf("trusted proxy CIDRs = %v, want %v", settings.TrustedProxyCIDRs, want)
+		}
+	}
+}
+
+func TestLoadRejectsNonCanonicalOrOverlappingCoreTrustedProxyCIDRs(t *testing.T) {
+	tests := []string{
+		"172.20.0.5/24",
+		"172.20.0.0/24,172.20.0.4/32",
+		"::ffff:192.0.2.8/128",
+	}
+	for _, value := range tests {
+		t.Run(value, func(t *testing.T) {
+			setValidCoreEnvironment(t)
+			t.Setenv("PEERGO_CORE_TRUSTED_PROXY_CIDRS", value)
+			if _, err := Load(); err == nil {
+				t.Fatalf("Load() accepted unsafe trusted proxy CIDRs %q", value)
+			}
+		})
+	}
+}
+
 func TestLoadUsesSecureCookiePrefixesInProduction(t *testing.T) {
 	setValidCoreEnvironment(t)
 	t.Setenv("PEERGO_ENV", "production")
@@ -193,4 +233,6 @@ func setValidCoreEnvironment(t *testing.T) {
 	t.Setenv("PEERGO_TORRENT_UPLOAD_MAX_BYTES", "")
 	t.Setenv("PEERGO_TRACKER_CANONICAL_ORIGIN", "http://tracker.localhost:8083")
 	t.Setenv("PEERGO_TRACKER_OPERATIONS_ORIGIN", "")
+	t.Setenv("PEERGO_CORE_TRUSTED_PROXY_CIDRS", "")
+	t.Setenv("PEERGO_TRACKER_TRUSTED_PROXY_CIDRS", "")
 }

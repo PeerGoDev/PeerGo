@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Link } from "react-router"
+import { Link, useNavigate } from "react-router"
 import {
   CheckIcon,
   CircleAlertIcon,
@@ -87,6 +87,10 @@ import {
   type TorrentUploadProgress,
   useSubmitTorrent,
 } from "~/features/torrent/api/torrent-upload.mutations"
+import {
+  requestTorrentDownload,
+  saveTorrentDownload,
+} from "~/features/torrent/api/torrent.download"
 import {
   type TorrentCategory,
   type TorrentCategoryFacet,
@@ -281,6 +285,7 @@ function TorrentUploadWorkspace({
   categories: TorrentCategory[]
   csrfToken: string
 }) {
+  const navigate = useNavigate()
   const submit = useSubmitTorrent()
   const [categoryId, setCategoryId] = React.useState<string | null>(
     categories[0]?.id ?? null
@@ -475,7 +480,7 @@ function TorrentUploadWorkspace({
     setProgress({ phase: "uploading", percent: 0 })
     idempotencyKey.current ??= globalThis.crypto.randomUUID()
     try {
-      await submit.mutateAsync({
+      const submission = await submit.mutateAsync({
         category_id: result.data.categoryId,
         title: result.data.title,
         subtitle: result.data.subtitle,
@@ -495,6 +500,21 @@ function TorrentUploadWorkspace({
         idempotencyKey: idempotencyKey.current,
         onProgress: setProgress,
       })
+      let automaticDownload: "completed" | "failed" = "completed"
+      try {
+        saveTorrentDownload(await requestTorrentDownload(submission.id))
+      } catch {
+        automaticDownload = "failed"
+      }
+      navigate(`/torrents/${encodeURIComponent(submission.id)}`, {
+        replace: true,
+        state: {
+          torrentSubmission: {
+            id: submission.id,
+            automaticDownload,
+          },
+        },
+      })
     } catch (error) {
       if (
         error instanceof ApiProblemError &&
@@ -504,33 +524,6 @@ function TorrentUploadWorkspace({
         idempotencyKey.current = undefined
       }
     }
-  }
-
-  if (submit.data) {
-    return (
-      <div className="flex flex-col gap-4">
-        <TorrentSubmissionReceipt
-          submission={submit.data}
-          onReset={() => {
-            submit.reset()
-            setCategoryId(categories[0]?.id ?? null)
-            setFacetSelections({})
-            setFacetErrors({})
-            setTorrentFile(undefined)
-            screenshots.forEach((screenshot) =>
-              URL.revokeObjectURL(screenshot.previewUrl)
-            )
-            setScreenshots([])
-            setScreenshotError("")
-            setDescription("")
-            setTitle("")
-            setErrors({})
-            setProgress(undefined)
-            idempotencyKey.current = undefined
-          }}
-        />
-      </div>
-    )
   }
 
   return (
@@ -1626,75 +1619,6 @@ function ExternalIdentifierField({
       </div>
       <FieldError errors={visibleError ? [{ message: visibleError }] : []} />
     </Field>
-  )
-}
-
-function TorrentSubmissionReceipt({
-  submission,
-  onReset,
-}: {
-  submission: TorrentSubmission
-  onReset: () => void
-}) {
-  return (
-    <Card size="sm" aria-labelledby="torrent-submission-receipt-title">
-      <CardHeader>
-        <CardTitle>
-          <h2 id="torrent-submission-receipt-title">已进入审核队列</h2>
-        </CardTitle>
-        <CardDescription>审核通过后，种子会出现在公开列表中。</CardDescription>
-        <CardAction>
-          <Badge>待审核</Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <Alert>
-          <CircleCheckIcon />
-          <AlertTitle>提交成功</AlertTitle>
-          <AlertDescription>
-            种子已保存并等待审核，目前还没有公开发布。
-          </AlertDescription>
-        </Alert>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <ReceiptFact label="内容名称" value={submission.content_name} />
-          <ReceiptFact
-            label="内容大小"
-            value={formatBytes(submission.total_size_bytes)}
-          />
-          <ReceiptFact
-            label="文件数量"
-            value={`${submission.file_count.toLocaleString("zh-CN")} 个`}
-          />
-          <ReceiptFact
-            label="提交时间"
-            value={formatDateTime(submission.submitted_at)}
-          />
-        </dl>
-      </CardContent>
-      <CardFooter className="justify-between gap-3 bg-transparent">
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={<Link to="/account/submissions" />}
-        >
-          <FileCheck2Icon data-icon="inline-start" />
-          查看我的发布
-        </Button>
-        <Button onClick={onReset}>
-          <FileUpIcon data-icon="inline-start" />
-          继续上传
-        </Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
-function ReceiptFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1 font-medium break-words">{value}</dd>
-    </div>
   )
 }
 

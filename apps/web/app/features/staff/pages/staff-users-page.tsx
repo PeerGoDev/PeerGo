@@ -49,8 +49,8 @@ import {
   managedUserListQueryOptions,
   type ManagedUserPage,
 } from "~/features/staff/api/user-administration.queries"
-import { ManagedUserDetailSheet } from "~/features/staff/components/managed-user-detail-sheet"
 import { ManagedUserTable } from "~/features/staff/components/managed-user-table"
+import { ManagedUserDialog } from "~/features/staff/components/managed-user-detail-sheet"
 import { AccountAccessAppealQueue } from "~/features/staff/components/account-access-appeal-queue"
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
@@ -62,7 +62,13 @@ import {
   parseManagedUserFilters,
 } from "~/features/staff/model/user-administration"
 
-export function StaffUsersPage() {
+export function StaffUsersPage({
+  initialSelectedUserId,
+  onDialogClose,
+}: {
+  initialSelectedUserId?: string
+  onDialogClose?: () => void
+} = {}) {
   return (
     <StaffAccessGate
       requiredAction="user.account.read"
@@ -75,6 +81,8 @@ export function StaffUsersPage() {
         <UsersContent
           csrfToken={session.csrf_token}
           currentStaffUserId={session.user.id}
+          initialSelectedUserId={initialSelectedUserId}
+          onDialogClose={onDialogClose}
           canRestrict={hasCapability(capabilities, "user.account.restrict")}
           canRevoke={hasCapability(
             capabilities,
@@ -89,6 +97,15 @@ export function StaffUsersPage() {
             "user.downloadrestriction.revoke"
           )}
           canManageVIP={hasCapability(capabilities, "user.vip.manage")}
+          canAssignAssessment={hasCapability(
+            capabilities,
+            "newcomer.assessment.assign"
+          )}
+          canAdjustData={hasCapability(capabilities, "user.account.adjust")}
+          canReadNetworkHistory={hasCapability(
+            capabilities,
+            "user.network.read"
+          )}
           canReadAppeals={hasCapability(
             capabilities,
             "user.account.appeal.read"
@@ -106,36 +123,52 @@ export function StaffUsersPage() {
 function UsersContent({
   csrfToken,
   currentStaffUserId,
+  initialSelectedUserId,
+  onDialogClose,
   canRestrict,
   canRevoke,
   canDownloadRestrict,
   canDownloadRevoke,
   canManageVIP,
+  canAssignAssessment,
+  canAdjustData,
+  canReadNetworkHistory,
   canReadAppeals,
   canDecideAppeals,
 }: {
   csrfToken: string
   currentStaffUserId: string
+  initialSelectedUserId?: string
+  onDialogClose?: () => void
   canRestrict: boolean
   canRevoke: boolean
   canDownloadRestrict: boolean
   canDownloadRevoke: boolean
   canManageVIP: boolean
+  canAssignAssessment: boolean
+  canAdjustData: boolean
+  canReadNetworkHistory: boolean
   canReadAppeals: boolean
   canDecideAppeals: boolean
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
+  const [selectedUserId, setSelectedUserId] = React.useState(
+    initialSelectedUserId
+  )
   const filters = React.useMemo(
     () => parseManagedUserFilters(searchParams),
     [searchParams]
   )
   const users = useQuery(managedUserListQueryOptions(filters))
   const [queryDraft, setQueryDraft] = React.useState(filters.query)
-  const [selectedUserId, setSelectedUserId] = React.useState<string>()
 
   React.useEffect(() => {
     setQueryDraft(filters.query)
   }, [filters.query])
+
+  React.useEffect(() => {
+    setSelectedUserId(initialSelectedUserId)
+  }, [initialSelectedUserId])
 
   React.useEffect(() => {
     if (!users.data) {
@@ -306,7 +339,13 @@ function UsersContent({
         </CardContent>
       </Card>
 
-      <ManagedUserDetailSheet
+      <ManagedUserDialog
+        open={Boolean(selectedUserId)}
+        onOpenChange={(open) => {
+          if (open) return
+          setSelectedUserId(undefined)
+          onDialogClose?.()
+        }}
         userId={selectedUserId}
         csrfToken={csrfToken}
         currentStaffUserId={currentStaffUserId}
@@ -315,11 +354,9 @@ function UsersContent({
         canDownloadRestrict={canDownloadRestrict}
         canDownloadRevoke={canDownloadRevoke}
         canManageVIP={canManageVIP}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedUserId(undefined)
-          }
-        }}
+        canAssignAssessment={canAssignAssessment}
+        canAdjustData={canAdjustData}
+        canReadNetworkHistory={canReadNetworkHistory}
       />
     </UsersFrame>
   )
@@ -457,11 +494,14 @@ function ManagedUserPagination({
   onPageChange: (page: number) => void
 }) {
   return (
-    <Pagination className="justify-between pt-1" aria-label="用户列表分页">
+    <Pagination
+      className="flex-col gap-2 pt-1 sm:flex-row sm:justify-between"
+      aria-label="用户列表分页"
+    >
       <span className="text-sm text-muted-foreground">
         共 {total.toLocaleString("zh-CN")} 条记录
       </span>
-      <PaginationContent>
+      <PaginationContent className="max-w-full">
         <PaginationItem>
           <Button
             variant="outline"

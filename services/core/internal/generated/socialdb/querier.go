@@ -16,6 +16,7 @@ type Querier interface {
 	BindTorrentCommentThread(ctx context.Context, arg BindTorrentCommentThreadParams) error
 	CommentModerationCaseHasReporter(ctx context.Context, arg CommentModerationCaseHasReporterParams) (bool, error)
 	CountCommentModerationCaseReports(ctx context.Context, caseID int64) (int64, error)
+	CountCommentThreads(ctx context.Context, arg CountCommentThreadsParams) (CountCommentThreadsRow, error)
 	CountComments(ctx context.Context, arg CountCommentsParams) (int64, error)
 	CountOpenCommentModerationCases(ctx context.Context) (int64, error)
 	CountVisiblePosts(ctx context.Context, arg CountVisiblePostsParams) (int64, error)
@@ -48,6 +49,7 @@ type Querier interface {
 	// query returns only the latest evidence summaries per case and never reporter
 	// identity. The limit mirrors MaxModerationReportsPerCase in the social domain.
 	ListCommentReportsForCases(ctx context.Context, caseIds []int64) ([]ListCommentReportsForCasesRow, error)
+	ListCommentThreads(ctx context.Context, arg ListCommentThreadsParams) ([]ListCommentThreadsRow, error)
 	ListComments(ctx context.Context, arg ListCommentsParams) ([]ListCommentsRow, error)
 	ListOpenCommentModerationCases(ctx context.Context, arg ListOpenCommentModerationCasesParams) ([]ListOpenCommentModerationCasesRow, error)
 	ListVisiblePosts(ctx context.Context, arg ListVisiblePostsParams) ([]ListVisiblePostsRow, error)

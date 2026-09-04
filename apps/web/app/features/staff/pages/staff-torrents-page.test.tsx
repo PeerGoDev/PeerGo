@@ -39,6 +39,11 @@ describe("StaffTorrentsPage", () => {
     expect(screen.getAllByText("用户 #327").length).toBeGreaterThan(0)
     expect(screen.getAllByText("2X免费").length).toBeGreaterThan(0)
     expect(screen.getAllByText("已发布").length).toBeGreaterThan(0)
+    expect(screen.getByText(/表格可左右滑动/)).toBeVisible()
+    expect(screen.getByRole("table")).toHaveClass(
+      "min-w-[1160px]",
+      "lg:min-w-[1280px]"
+    )
     expect(
       screen.getAllByRole("link", { name: /演示种子/ })[0]
     ).toHaveAttribute("href", "/torrents/1234")

@@ -103,8 +103,12 @@ func (fixture torrentDownloadAuthenticatorFixture) CurrentSession(context.Contex
 
 type torrentDownloadRepositoryFixture struct {
 	source      TorrentDownloadSource
+	pending     TorrentDownloadSource
 	err         error
+	pendingErr  error
 	id          TorrentID
+	pendingID   TorrentID
+	pendingUser uuid.UUID
 	restricted  bool
 	restrictErr error
 }
@@ -116,6 +120,15 @@ func (fixture *torrentDownloadRepositoryFixture) DownloadRestricted(context.Cont
 func (fixture *torrentDownloadRepositoryFixture) PublishedDownloadSource(_ context.Context, id TorrentID) (TorrentDownloadSource, error) {
 	fixture.id = id
 	return fixture.source, fixture.err
+}
+
+func (fixture *torrentDownloadRepositoryFixture) PendingReviewUploaderDownloadSource(
+	_ context.Context,
+	id TorrentID,
+	userID uuid.UUID,
+) (TorrentDownloadSource, error) {
+	fixture.pendingID, fixture.pendingUser = id, userID
+	return fixture.pending, fixture.pendingErr
 }
 
 type trackerCredentialProviderFixture struct {
@@ -224,6 +237,57 @@ func TestTorrentDownloadUsesVerifiedFallbackAndServerSideCredential(t *testing.T
 	announce, _ := root.get("announce")
 	if string(announce.bytes) != "https://tracker.example/tracker/0123456789abcdef0123456789abcdef/announce" {
 		t.Fatalf("announce = %q", announce.bytes)
+	}
+}
+
+func TestTorrentDownloadAllowsOnlyUploaderPendingReviewFallback(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 27, 12, 0, 0, 0, time.UTC)
+	verifiedAt := now.Add(-time.Hour)
+	user := identity.User{ID: uuid.New(), CredentialRef: uuid.New(), EmailVerifiedAt: &verifiedAt}
+	raw := validSingleFixture("pending.bin", 5, 16*1024)
+	parsed := mustParseV1(t, raw, ValidationProfileStrictUpload)
+	descriptor := StoredObjectDescriptor{
+		SHA256: ObjectSHA256(sha256.Sum256(raw)), ByteLength: int64(len(raw)),
+	}
+	store := newMemoryObjectStore("pending-primary")
+	key := TorrentObjectKey(descriptor.SHA256)
+	store.objects[key] = raw
+	registry, err := NewStoreRegistry(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := &torrentDownloadRepositoryFixture{pending: TorrentDownloadSource{
+		TorrentID: 42, Title: "Pending release", FilenamePrefix: "[ROUSI]", ObjectID: uuid.New(),
+		Descriptor: descriptor, InfoOffset: parsed.InfoOffset, InfoLength: parsed.InfoLength,
+		Locations: []TorrentDownloadLocation{{
+			ID: uuid.New(), BackendID: store.BackendID(), ObjectKey: key,
+			State: StorageLocationVerified, Preferred: true,
+			Descriptor: descriptor, VerifiedAt: verifiedAt,
+		}},
+	}}
+	credentials := &trackerCredentialProviderFixture{credential: identity.TrackerCredential{
+		Passkey: "0123456789abcdef0123456789abcdef", Version: 1, CreatedAt: verifiedAt,
+	}}
+	service, err := NewTorrentDownloadService(
+		torrentDownloadAuthenticatorFixture{session: identity.WebSession{User: user}},
+		&recordingTorrentUploadAuthorizer{now: now}, repository,
+		torrentPurchaseAccessFixture{err: torrentpurchase.ErrNotFound}, credentials,
+		registry,
+		TorrentDownloadServiceConfig{CanonicalTrackerOrigin: "https://tracker.example", Now: func() time.Time { return now }},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := service.Download(context.Background(), "opaque-cookie", 42)
+	if err != nil {
+		t.Fatalf("Download(pending uploader) error = %v", err)
+	}
+	if repository.id != 0 || repository.pendingID != 42 || repository.pendingUser != user.ID ||
+		result.Filename != "[ROUSI].Pending release.torrent" {
+		t.Fatalf("pending download boundary repository=%+v filename=%q", repository, result.Filename)
 	}
 }
 

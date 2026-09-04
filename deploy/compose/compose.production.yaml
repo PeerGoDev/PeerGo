@@ -287,7 +287,16 @@ services:
 
   snapshot-bootstrap:
     <<: *runtime
-    command: ["core-snapshot-publisher"]
+    # Data migrations may append Tracker control events (for example when a
+    # newly supported torrent state becomes eligible). Drain that ordered
+    # projection before signing the startup snapshot so a deployment cannot
+    # deadlock with the compact worker waiting on this one-shot task.
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        core-control-projector --drain --drain-timeout="$${PEERGO_TRACKER_SNAPSHOT_DRAIN_TIMEOUT:-5m}"
+        exec core-snapshot-publisher
     restart: "no"
     environment:
       PEERGO_TRACKER_SNAPSHOT_PUBLISH_INTERVAL: ""

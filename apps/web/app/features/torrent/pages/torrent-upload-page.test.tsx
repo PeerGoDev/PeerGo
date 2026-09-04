@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { MemoryRouter } from "react-router"
+import { MemoryRouter, Route, Routes, useParams } from "react-router"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
@@ -47,6 +47,23 @@ describe("TorrentUploadPage", () => {
       configurable: true,
       value: vi.fn(),
     })
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {})
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          new Uint8Array([100, 52, 58, 105, 110, 102, 111, 100, 101]),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/x-bittorrent",
+              "Content-Disposition":
+                "attachment; filename*=UTF-8''%5BROUSI%5D.Example.torrent",
+            },
+          }
+        )
+      )
+    )
   })
 
   afterEach(() => {
@@ -99,7 +116,7 @@ describe("TorrentUploadPage", () => {
     expect(screen.getByRole("button", { name: "上传种子" })).toHaveClass("w-30")
   })
 
-  it("uploads with progress and renders a pending-review receipt", async () => {
+  it("uploads with progress, downloads the private copy and opens the new detail", async () => {
     const user = userEvent.setup()
     renderPage()
     const torrentFile = new File(["d4:infodee"], "example.torrent", {
@@ -170,14 +187,12 @@ describe("TorrentUploadPage", () => {
       })
     })
 
-    expect(
-      await screen.findByRole("heading", { name: "已进入审核队列" })
-    ).toBeVisible()
-    expect(screen.getByText("4 KB")).toBeVisible()
-    expect(screen.getByText("2 个")).toBeVisible()
-    expect(
-      screen.getByText("种子已保存并等待审核，目前还没有公开发布。")
-    ).toBeVisible()
+    expect(await screen.findByText("新种详情 #42")).toBeVisible()
+    const fetchMock = vi.mocked(fetch)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const downloadRequest = fetchMock.mock.calls[0]?.[0] as Request
+    expect(downloadRequest.url).toContain("/api/v1/torrents/42/download")
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce()
   })
 
   it("previews the current metadata without sending an upload", async () => {
@@ -297,8 +312,16 @@ function renderPage({ canSubmit = true }: { canSubmit?: boolean } = {}) {
   return render(
     <MemoryRouter initialEntries={["/upload"]}>
       <QueryClientProvider client={queryClient}>
-        <TorrentUploadPage />
+        <Routes>
+          <Route path="/upload" element={<TorrentUploadPage />} />
+          <Route path="/torrents/:torrentId" element={<TorrentDetailProbe />} />
+        </Routes>
       </QueryClientProvider>
     </MemoryRouter>
   )
+}
+
+function TorrentDetailProbe() {
+  const { torrentId } = useParams()
+  return <div>新种详情 #{torrentId}</div>
 }

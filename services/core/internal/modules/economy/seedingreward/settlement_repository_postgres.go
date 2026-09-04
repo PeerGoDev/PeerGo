@@ -73,7 +73,7 @@ UPDATE economy.seeding_reward_work_items AS work
 SET status = 'processing',
     attempts = work.attempts + 1,
     lease_token = $3,
-    lease_until = $1 + ($4 * interval '1 microsecond'),
+    lease_until = $1::timestamptz + ($4::bigint * interval '1 microsecond'),
     updated_at = $1
 FROM candidate
 WHERE work.window_start = candidate.window_start
@@ -317,7 +317,9 @@ SELECT evidence.torrent_id, torrent.total_size_bytes, torrent.published_at,
 FROM economy.seeding_reward_evidence_items AS evidence
 JOIN torrents.torrents AS torrent ON torrent.id = evidence.torrent_id
 WHERE evidence.window_start = $1 AND evidence.user_id = $2
-ORDER BY evidence.torrent_id`, window.Start, userID)
+  AND torrent.published_at IS NOT NULL
+  AND torrent.published_at <= $3
+ORDER BY evidence.torrent_id`, window.Start, userID, window.End)
 	if err != nil {
 		return nil, fmt.Errorf("read seeding reward item enrichment: %w", err)
 	}
@@ -350,9 +352,12 @@ ORDER BY evidence.torrent_id`, window.Start, userID)
 		return nil, fmt.Errorf("finish seeding reward item enrichment: %w", err)
 	}
 	rows.Close()
-	if len(items) == 0 {
-		return nil, ErrInvariant
-	}
+	// A user can seed an upload while it is still under review. Tracker evidence
+	// for that hour is valid, but it must not earn rewards before published_at.
+	// When every item is filtered for that reason, Calculate persists a
+	// zero-reward receipt so this user's later hourly work is not blocked. The
+	// evidence table's torrent foreign key still makes a missing aggregate an
+	// invariant violation at ingestion time.
 	for _, item := range items {
 		if err := upsertMetadataSnapshot(ctx, tx, window.Start, item, capturedAt); err != nil {
 			return nil, err

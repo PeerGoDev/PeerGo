@@ -52,8 +52,13 @@ describe("ManagedUserTable", () => {
     expect(screen.getAllByText("1 项有效限制").length).toBeGreaterThan(0)
     expect(screen.getAllByText("下载受限").length).toBeGreaterThan(0)
     expect(screen.getAllByText("未验证").length).toBeGreaterThan(0)
+    expect(screen.getByText(/表格可左右滑动/)).toBeVisible()
+    expect(screen.getByRole("table")).toHaveClass(
+      "min-w-[1120px]",
+      "lg:min-w-[1480px]"
+    )
     await user.click(
-      screen.getByRole("button", { name: "查看账户 demo-target" })
+      screen.getByRole("button", { name: "管理账户 demo-target" })
     )
     expect(onSelect).toHaveBeenCalledWith(
       "0198f20a-6da8-7e51-9c64-666666666666"
@@ -63,5 +68,42 @@ describe("ManagedUserTable", () => {
   it("explains an empty filtered result", () => {
     render(<ManagedUserTable users={[]} hasFilters onSelect={vi.fn()} />)
     expect(screen.getByText("没有匹配账户")).toBeInTheDocument()
+  })
+
+  it("keeps a roleless pending registration visible for recovery", () => {
+    render(
+      <ManagedUserTable
+        users={[
+          {
+            id: "0198f20a-6da8-7e51-9c64-777777777777",
+            numeric_id: 12_328,
+            username: "pending-member",
+            display_name: "待恢复成员",
+            email: "pending@example.com",
+            email_verified: false,
+            banned: false,
+            download_restricted: false,
+            vip_enabled: false,
+            vip_active: false,
+            status: "pending",
+            version: 1,
+            active_restriction_count: 0,
+            uploaded_bytes: "0",
+            downloaded_bytes: "0",
+            magic_balance: "0",
+            level: 1,
+            role_names: [],
+            created_at: "2026-08-27T15:32:22Z",
+            updated_at: "2026-08-27T15:32:22Z",
+          },
+        ]}
+        hasFilters={false}
+        onSelect={vi.fn()}
+      />
+    )
+
+    expect(screen.getAllByText("pending-member").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("未分配").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("待激活").length).toBeGreaterThan(0)
   })
 })

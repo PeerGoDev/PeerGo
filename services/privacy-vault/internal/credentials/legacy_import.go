@@ -188,6 +188,10 @@ func ensureEmailAddressRow(
 	emailAddress string,
 	createdAt time.Time,
 ) error {
+	// PostgreSQL timestamptz values round-trip at microsecond precision. This
+	// helper also serves live registrations, whose time.Time can contain
+	// nanoseconds, so canonicalize before both persistence and comparison.
+	createdAt = createdAt.UTC().Truncate(time.Microsecond)
 	if _, err := tx.Exec(ctx, `
 INSERT INTO vault.email_addresses (
     credential_ref, email_address, created_at, updated_at

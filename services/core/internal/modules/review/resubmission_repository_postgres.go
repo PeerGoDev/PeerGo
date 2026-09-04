@@ -11,26 +11,34 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/peergo/peergo/services/core/internal/contracts/trackerevent"
 	"github.com/peergo/peergo/services/core/internal/generated/reviewdb"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 )
 
 type PostgresResubmissionRepository struct {
-	pool *pgxpool.Pool
+	pool               *pgxpool.Pool
+	newTrackerAppender func(pgx.Tx) trackerevent.Appender
+	newEventID         func() uuid.UUID
 }
 
-func NewPostgresResubmissionRepository(pool *pgxpool.Pool) (*PostgresResubmissionRepository, error) {
-	if pool == nil {
-		return nil, errors.New("torrent resubmission database is required")
+func NewPostgresResubmissionRepository(
+	pool *pgxpool.Pool,
+	newTrackerAppender func(pgx.Tx) trackerevent.Appender,
+) (*PostgresResubmissionRepository, error) {
+	if pool == nil || newTrackerAppender == nil {
+		return nil, errors.New("torrent resubmission database and Tracker outbox are required")
 	}
-	return &PostgresResubmissionRepository{pool: pool}, nil
+	return &PostgresResubmissionRepository{
+		pool: pool, newTrackerAppender: newTrackerAppender, newEventID: uuid.New,
+	}, nil
 }
 
 // Resubmit locks the current aggregate and the selected category, verifies the
 // latest immutable rejection, then changes metadata, reopens review and writes
 // the immutable uploader response in one transaction. There is deliberately no
-// object-store or Tracker call because swarm identity and eligibility do not
-// change during this transition.
+// object-store call. The same transaction re-enables Tracker pre-seeding after
+// the preceding rejection disabled the swarm.
 func (repository *PostgresResubmissionRepository) Resubmit(
 	ctx context.Context,
 	command ResubmitCommand,
@@ -140,6 +148,19 @@ func (repository *PostgresResubmissionRepository) Resubmit(
 	}); err != nil {
 		return ResubmissionResult{}, mapResubmissionWriteError("insert torrent resubmission", err)
 	}
+	var infoHash torrents.InfoHashV1
+	copy(infoHash[:], locked.InfoHashV1)
+	controlEvent, err := trackerevent.NewTorrentEligibilityChanged(trackerevent.TorrentEligibilityInput{
+		EventID: repository.newEventID(), OccurredAt: command.OccurredAt,
+		TorrentID: int64(aggregate.ID), InfoHashV1: infoHash,
+		TotalSizeBytes: locked.TotalSizeBytes, Enabled: true, TorrentVersion: aggregate.Version,
+	})
+	if err != nil {
+		return ResubmissionResult{}, fmt.Errorf("build resubmitted torrent pre-seeding event: %w", err)
+	}
+	if err := repository.newTrackerAppender(tx).Append(ctx, controlEvent); err != nil {
+		return ResubmissionResult{}, fmt.Errorf("append resubmitted torrent pre-seeding event: %w", err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return ResubmissionResult{}, fmt.Errorf("commit torrent resubmission: %w", err)
 	}
@@ -209,7 +230,7 @@ func resumeTorrentResubmission(
 
 func validResubmissionTarget(row reviewdb.GetRejectedTorrentForResubmissionForUpdateRow) bool {
 	return row.ID > 0 && row.UploaderID != uuid.Nil &&
-		row.CategoryID != "" && strings.TrimSpace(row.Title) != "" && row.Version > 1 &&
+		row.CategoryID != "" && strings.TrimSpace(row.Title) != "" && len(row.InfoHashV1) == 20 && row.TotalSizeBytes > 0 && row.Version > 1 &&
 		row.SubmittedAt.Valid && row.PublishedAt.Valid == false && row.StateChangedAt.Valid &&
 		row.DecisionID != uuid.Nil && row.Decision == string(DecisionReject) &&
 		row.ResultingTorrentVersion == row.Version && row.DecisionOccurredAt.Valid &&

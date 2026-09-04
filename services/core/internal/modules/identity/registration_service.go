@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -20,12 +21,25 @@ var (
 	legacyRegistrationInvitationToken = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
+const (
+	registrationCompensationTimeout = 5 * time.Second
+	registrationProvisionTimeout    = 15 * time.Second
+	registrationFinalizationTimeout = 10 * time.Second
+	// Vault keeps provisional registration credentials for 24 hours. Core waits
+	// an additional hour before releasing a reservation whose credential was
+	// never attached, so the two stores cannot disagree at the expiry boundary.
+	registrationStaleReservationAge = 25 * time.Hour
+	registrationRecoveryBatchSize   = 100
+)
+
 type RegistrationRepository interface {
 	PublicRegistrationPolicy(context.Context) (RegistrationPublicPolicy, error)
 	PrepareRegistration(context.Context, PrepareRegistrationCommand) (RegistrationRecord, error)
 	CancelRegistration(context.Context, uuid.UUID) error
 	AttachRegistrationCredential(context.Context, uuid.UUID, uuid.UUID, time.Time) (RegistrationRecord, error)
 	CompleteRegistration(context.Context, uuid.UUID, time.Time) (RegistrationRecord, error)
+	ReleaseStaleRegistrationReservations(context.Context, time.Time, int32) (int64, error)
+	ListIncompleteRegistrations(context.Context, int32) ([]RegistrationRecord, error)
 }
 
 type RegistrationCredentialVault interface {
@@ -46,6 +60,11 @@ type RegistrationService struct {
 	vault               RegistrationCredentialVault
 	policyAdministrator RegistrationPolicyAdministrator
 	now                 func() time.Time
+}
+
+type RegistrationRecoveryResult struct {
+	ReleasedReservations   int64
+	CompletedRegistrations int
 }
 
 func NewRegistrationService(repository RegistrationRepository, vault RegistrationCredentialVault, now func() time.Time, policyAdministrators ...RegistrationPolicyAdministrator) (*RegistrationService, error) {
@@ -105,30 +124,61 @@ func (service *RegistrationService) Register(ctx context.Context, input Registra
 		return RegistrationResult{}, err
 	}
 
-	// Always ask Vault to resume the provision, even for a completed Core row.
-	// Vault's keyed request HMAC prevents the same idempotency key from being
-	// replayed with a different email or password after a network timeout.
-	credentialRef, err := service.vault.ProvisionRegistration(ctx, normalized)
-	if err != nil {
-		if errors.Is(err, ErrRegistrationUnavailable) {
-			if cancelErr := service.repository.CancelRegistration(ctx, record.ID); cancelErr != nil {
-				return RegistrationResult{}, ErrRegistrationStateConflict
+	credentialRef := uuid.Nil
+	if record.CredentialRef != nil {
+		credentialRef = *record.CredentialRef
+	}
+
+	// A credential_provisioned row is already bound to the one exact Vault
+	// request that created it. Re-hashing the password on every retry only makes
+	// the recovery path slow enough for a browser timeout to strand the Core
+	// projection again. A recovery discovered under a new browser idempotency
+	// key is the exception: ask Vault once with the original registration ID so
+	// its keyed request HMAC still proves that all sensitive fields are equal.
+	if credentialRef == uuid.Nil || record.ID != normalized.ID {
+		vaultInput := normalized
+		vaultInput.ID = record.ID
+		// The Core reservation is already durable. Keep the bounded Vault call
+		// alive if the browser closes so a successful provision is never left
+		// behind merely because the HTTP request context was canceled.
+		provisionCtx, cancelProvision := context.WithTimeout(context.WithoutCancel(ctx), registrationProvisionTimeout)
+		credentialRef, err = service.vault.ProvisionRegistration(provisionCtx, vaultInput)
+		cancelProvision()
+		if err != nil {
+			// No Core identity exists yet while the record is still reserved. Release
+			// that reservation for every failed Vault provision, including timeouts
+			// and internal failures, so a browser refresh cannot strand the username
+			// or invitation. Advanced rows remain recoverable through the same key.
+			if record.State == RegistrationStateReserved && record.CredentialRef == nil {
+				if cancelErr := service.cancelPreparedRegistration(ctx, record.ID); cancelErr != nil {
+					return RegistrationResult{}, ErrRegistrationStateConflict
+				}
 			}
+			return RegistrationResult{}, err
 		}
-		return RegistrationResult{}, err
+		if record.CredentialRef != nil && credentialRef != *record.CredentialRef {
+			return RegistrationResult{}, ErrRegistrationStateConflict
+		}
 	}
-	record, err = service.repository.AttachRegistrationCredential(ctx, record.ID, credentialRef, now)
+
+	// Once Vault has durably provisioned a credential, finish both remaining
+	// halves on a short context detached from the client connection. The caller
+	// may close the page after Vault activates; Core must still make the same
+	// account active instead of leaving a permanent pending user behind.
+	finalizationCtx, cancelFinalization := context.WithTimeout(context.WithoutCancel(ctx), registrationFinalizationTimeout)
+	defer cancelFinalization()
+	record, err = service.repository.AttachRegistrationCredential(finalizationCtx, record.ID, credentialRef, now)
 	if err != nil {
 		return RegistrationResult{}, err
 	}
-	activatedRef, err := service.vault.ActivateRegistration(ctx, record.ID)
+	activatedRef, err := service.vault.ActivateRegistration(finalizationCtx, record.ID)
 	if err != nil {
 		return RegistrationResult{}, err
 	}
 	if activatedRef != credentialRef {
 		return RegistrationResult{}, ErrRegistrationStateConflict
 	}
-	record, err = service.repository.CompleteRegistration(ctx, record.ID, now)
+	record, err = service.repository.CompleteRegistration(finalizationCtx, record.ID, now)
 	if err != nil {
 		return RegistrationResult{}, err
 	}
@@ -140,6 +190,65 @@ func (service *RegistrationService) Register(ctx context.Context, input Registra
 		RegistrationMode: record.Mode, EmailVerificationRequired: true,
 		CompletedAt: *record.CompletedAt,
 	}, nil
+}
+
+// RecoverIncompleteRegistrations resumes durable registrations after a Core
+// restart or an HTTP client disconnect. credential_provisioned means Vault
+// already accepted the exact username, email and password and Core already
+// persisted the pending identity, so activating and completing it is the only
+// safe forward transition. Old reserved rows never crossed the Core identity
+// boundary and can be released after Vault's provisional TTL has elapsed.
+func (service *RegistrationService) RecoverIncompleteRegistrations(ctx context.Context) (RegistrationRecoveryResult, error) {
+	now := service.now().UTC()
+	released, err := service.repository.ReleaseStaleRegistrationReservations(
+		ctx,
+		now.Add(-registrationStaleReservationAge),
+		registrationRecoveryBatchSize,
+	)
+	if err != nil {
+		return RegistrationRecoveryResult{}, fmt.Errorf("release stale registration reservations: %w", err)
+	}
+	records, err := service.repository.ListIncompleteRegistrations(ctx, registrationRecoveryBatchSize)
+	if err != nil {
+		return RegistrationRecoveryResult{ReleasedReservations: released}, fmt.Errorf("list incomplete registrations: %w", err)
+	}
+	result := RegistrationRecoveryResult{ReleasedReservations: released}
+	var recoveryErrors []error
+	for _, record := range records {
+		if record.ID == uuid.Nil || record.CredentialRef == nil || record.State != RegistrationStateCredentialProvisioned {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("registration %s: %w", record.ID, ErrRegistrationStateConflict))
+			continue
+		}
+		activatedRef, activateErr := service.vault.ActivateRegistration(ctx, record.ID)
+		if activateErr != nil {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("registration %s activate: %w", record.ID, activateErr))
+			continue
+		}
+		if activatedRef != *record.CredentialRef {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("registration %s credential mismatch: %w", record.ID, ErrRegistrationStateConflict))
+			continue
+		}
+		completed, completeErr := service.repository.CompleteRegistration(ctx, record.ID, now)
+		if completeErr != nil {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("registration %s complete: %w", record.ID, completeErr))
+			continue
+		}
+		if completed.CompletedAt == nil {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("registration %s missing completion: %w", record.ID, ErrRegistrationStateConflict))
+			continue
+		}
+		result.CompletedRegistrations++
+	}
+	return result, errors.Join(recoveryErrors...)
+}
+
+func (service *RegistrationService) cancelPreparedRegistration(ctx context.Context, registrationID uuid.UUID) error {
+	// Request cancellation is a common reason for an ambiguous Vault result.
+	// Preserve request values for tracing but detach cancellation so the bounded
+	// Core compensation can still release an uncommitted invitation claim.
+	compensationCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), registrationCompensationTimeout)
+	defer cancel()
+	return service.repository.CancelRegistration(compensationCtx, registrationID)
 }
 
 func registrationEmailDomain(email string) string {
@@ -211,4 +320,5 @@ var _ interface {
 	Register(context.Context, RegistrationInput) (RegistrationResult, error)
 	Policy(context.Context, authz.StaffActor) (RegistrationPolicy, error)
 	UpdatePolicy(context.Context, authz.StaffActor, UpdateRegistrationPolicyInput) (RegistrationPolicy, error)
+	RecoverIncompleteRegistrations(context.Context) (RegistrationRecoveryResult, error)
 } = (*RegistrationService)(nil)

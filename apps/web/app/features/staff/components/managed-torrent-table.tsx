@@ -11,13 +11,6 @@ import {
 import { Badge } from "~/components/ui/badge"
 import { Button } from "~/components/ui/button"
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card"
-import {
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -71,133 +64,84 @@ export function ManagedTorrentTable({
   }
 
   return (
-    <>
-      <div className="hidden overflow-hidden rounded-lg border md:block">
-        <Table className="min-w-[1280px]">
-          <TableHeader className="bg-muted/50">
-            <TableRow className="h-11">
-              <TableHead className="w-[72px] px-3 text-right">ID</TableHead>
-              <TableHead className="w-[430px]">种子名称</TableHead>
-              <TableHead className="w-[150px]">上传者</TableHead>
-              <TableHead className="w-[90px]">分类</TableHead>
-              <TableHead className="w-[100px] text-right">大小</TableHead>
-              <TableHead className="w-[100px] text-right">价格</TableHead>
-              <TableHead className="w-[90px] text-center">状态</TableHead>
-              <TableHead className="w-[85px] text-center">优惠</TableHead>
-              <TableHead className="w-[110px] text-center">
-                做种 / 下载
-              </TableHead>
-              <TableHead className="w-[130px]">更新时间</TableHead>
-              <TableHead className="text-center">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {torrents.map((torrent) => (
-              <TableRow key={torrent.id} className="h-[58px] hover:bg-muted/30">
-                <TableCell className="px-3 text-right font-mono text-xs text-muted-foreground tabular-nums">
-                  {torrent.id}
-                </TableCell>
-                <TableCell>
-                  <TorrentIdentity torrent={torrent} />
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">
-                      {torrent.uploader_username}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      用户 #{torrent.uploader_numeric_id}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{torrent.category_name}</Badge>
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatBytes(torrent.total_size_bytes)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {torrent.purchase_price === "0"
-                    ? "免费"
-                    : `${torrent.purchase_price} 魔力`}
-                </TableCell>
-                <TableCell className="text-center">
-                  <TorrentStateBadge state={torrent.state} />
-                </TableCell>
-                <TableCell className="text-center">
-                  <PromotionBadge promotion={torrent.promotion} />
-                </TableCell>
-                <TableCell className="text-center">
-                  <SwarmNumbers torrent={torrent} />
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs text-muted-foreground">
-                    {formatCompactDateTime(torrent.updated_at)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-center">
-                  <TorrentActions
-                    torrent={torrent}
-                    canChangeAvailability={canChangeAvailability}
-                    onChangeAvailability={onChangeAvailability}
-                    canManagePurchase={canManagePurchase}
-                    onManagePurchase={onManagePurchase}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="grid gap-3 md:hidden">
-        {torrents.map((torrent) => (
-          <Card key={torrent.id} size="sm">
-            <CardHeader>
-              <CardTitle>
+    <div className="overflow-hidden rounded-lg border">
+      <p className="border-b bg-muted/30 px-3 py-2 text-xs text-muted-foreground md:hidden">
+        表格可左右滑动，操作按钮位于末列
+      </p>
+      <Table className="min-w-[1160px] lg:min-w-[1280px]">
+        <TableHeader className="bg-muted/50">
+          <TableRow className="h-11">
+            <TableHead className="w-[72px] px-3 text-right">ID</TableHead>
+            <TableHead className="w-[430px]">种子名称</TableHead>
+            <TableHead className="w-[150px]">上传者</TableHead>
+            <TableHead className="w-[90px]">分类</TableHead>
+            <TableHead className="w-[100px] text-right">大小</TableHead>
+            <TableHead className="w-[100px] text-right">价格</TableHead>
+            <TableHead className="w-[90px] text-center">状态</TableHead>
+            <TableHead className="w-[85px] text-center">优惠</TableHead>
+            <TableHead className="w-[110px] text-center">做种 / 下载</TableHead>
+            <TableHead className="w-[130px]">更新时间</TableHead>
+            <TableHead className="text-center">操作</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {torrents.map((torrent) => (
+            <TableRow key={torrent.id} className="h-[58px] hover:bg-muted/30">
+              <TableCell className="px-3 text-right font-mono text-xs text-muted-foreground tabular-nums">
+                {torrent.id}
+              </TableCell>
+              <TableCell>
                 <TorrentIdentity torrent={torrent} />
-              </CardTitle>
-              <CardAction>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">
+                    {torrent.uploader_username}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    用户 #{torrent.uploader_numeric_id}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline">{torrent.category_name}</Badge>
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatBytes(torrent.total_size_bytes)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {torrent.purchase_price === "0"
+                  ? "免费"
+                  : `${torrent.purchase_price} 魔力`}
+              </TableCell>
+              <TableCell className="text-center">
                 <TorrentStateBadge state={torrent.state} />
-              </CardAction>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-xs">
-              <div className="grid grid-cols-2 gap-2 border-t pt-3">
-                <Metric
-                  label="上传者"
-                  value={`${torrent.uploader_username} (#${torrent.uploader_numeric_id})`}
+              </TableCell>
+              <TableCell className="text-center">
+                <PromotionBadge promotion={torrent.promotion} />
+              </TableCell>
+              <TableCell className="text-center">
+                <SwarmNumbers torrent={torrent} />
+              </TableCell>
+              <TableCell>
+                <span className="text-xs text-muted-foreground">
+                  {formatCompactDateTime(torrent.updated_at)}
+                </span>
+              </TableCell>
+              <TableCell className="text-center">
+                <TorrentActions
+                  torrent={torrent}
+                  canChangeAvailability={canChangeAvailability}
+                  onChangeAvailability={onChangeAvailability}
+                  canManagePurchase={canManagePurchase}
+                  onManagePurchase={onManagePurchase}
                 />
-                <Metric label="分类" value={torrent.category_name} />
-                <Metric
-                  label="大小"
-                  value={formatBytes(torrent.total_size_bytes)}
-                />
-                <Metric
-                  label="价格"
-                  value={
-                    torrent.purchase_price === "0"
-                      ? "免费"
-                      : `${torrent.purchase_price} 魔力值`
-                  }
-                />
-                <Metric
-                  label="做种 / 下载"
-                  value={`${torrent.seeders} / ${torrent.leechers}`}
-                />
-              </div>
-              <TorrentActions
-                torrent={torrent}
-                canChangeAvailability={canChangeAvailability}
-                onChangeAvailability={onChangeAvailability}
-                canManagePurchase={canManagePurchase}
-                onManagePurchase={onManagePurchase}
-                mobile
-              />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   )
 }
 
@@ -282,67 +226,14 @@ function TorrentActions({
   onChangeAvailability,
   canManagePurchase,
   onManagePurchase,
-  mobile = false,
 }: {
   torrent: ManagedTorrent
   canChangeAvailability: boolean
   onChangeAvailability: (torrent: ManagedTorrent) => void
   canManagePurchase: boolean
   onManagePurchase: (torrent: ManagedTorrent) => void
-  mobile?: boolean
 }) {
   const action = torrent.state === "published" || torrent.state === "disabled"
-  if (mobile) {
-    return (
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {torrent.state === "published" ? (
-          <Button
-            variant="outline"
-            size="sm"
-            nativeButton={false}
-            render={<Link to={`/torrents/${torrent.id}`} />}
-          >
-            <ArrowUpRightIcon data-icon="inline-start" />
-            查看种子
-          </Button>
-        ) : torrent.state === "pending_review" ? (
-          <Button
-            variant="outline"
-            size="sm"
-            nativeButton={false}
-            render={<Link to="/staff/content/torrent-reviews" />}
-          >
-            <ClipboardCheckIcon data-icon="inline-start" />
-            进入审核
-          </Button>
-        ) : null}
-        {action && canChangeAvailability ? (
-          <Button
-            variant={torrent.state === "published" ? "destructive" : "outline"}
-            size="sm"
-            onClick={() => onChangeAvailability(torrent)}
-          >
-            {torrent.state === "published" ? (
-              <BanIcon data-icon="inline-start" />
-            ) : (
-              <RotateCcwIcon data-icon="inline-start" />
-            )}
-            {torrent.state === "published" ? "下架" : "恢复"}
-          </Button>
-        ) : null}
-        {canManagePurchase && torrent.state !== "deleted" ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onManagePurchase(torrent)}
-          >
-            <CoinsIcon data-icon="inline-start" />
-            设置价格
-          </Button>
-        ) : null}
-      </div>
-    )
-  }
   return (
     <div className="flex items-center justify-center gap-1">
       {torrent.state === "published" ? (
@@ -390,15 +281,6 @@ function TorrentActions({
           <CoinsIcon />
         </Button>
       ) : null}
-    </div>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
     </div>
   )
 }

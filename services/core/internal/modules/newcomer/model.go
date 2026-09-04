@@ -170,6 +170,19 @@ type ExemptCommand struct {
 	Authorization authz.Decision
 }
 
+type AssignInput struct {
+	AssignmentID uuid.UUID
+	UserID       uuid.UUID
+	Reason       string
+}
+
+type AssignCommand struct {
+	AssignInput
+	ActorID       uuid.UUID
+	OccurredAt    time.Time
+	Authorization authz.Decision
+}
+
 type EvaluationResult struct {
 	Examined     int64
 	Transitioned int64
@@ -181,6 +194,7 @@ type Repository interface {
 	Policies(context.Context, int, int, time.Time) (PolicyPage, error)
 	Issue(context.Context, IssueCommand) (PolicyRevision, error)
 	Assessments(context.Context, AssessmentQuery) (AssessmentPage, error)
+	Assign(context.Context, AssignCommand) (Assessment, error)
 	Exempt(context.Context, ExemptCommand) (Assessment, error)
 }
 

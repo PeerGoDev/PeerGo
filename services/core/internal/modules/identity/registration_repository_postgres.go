@@ -25,6 +25,8 @@ type PostgresRegistrationRepository struct {
 	newAppender  func(pgx.Tx) auditevent.Appender
 }
 
+var registrationMemberAuthorityNamespace = uuid.MustParse("3b1f2af6-dc90-4b82-a15c-0c7da02191da")
+
 func NewPostgresRegistrationRepository(pool *pgxpool.Pool, eventBuilder RegistrationEventBuilder, newAppender func(pgx.Tx) auditevent.Appender) (*PostgresRegistrationRepository, error) {
 	if pool == nil || eventBuilder == nil || newAppender == nil {
 		return nil, errors.New("registration repository dependencies are required")
@@ -60,6 +62,39 @@ func (repository *PostgresRegistrationRepository) PublicRegistrationPolicy(ctx c
 		HumanVerificationLoginEnabled:            policy.HumanVerificationLoginEnabled,
 		HumanVerificationPasswordRecoveryEnabled: policy.HumanVerificationPasswordRecoveryEnabled,
 	}, nil
+}
+
+func (repository *PostgresRegistrationRepository) ListIncompleteRegistrations(ctx context.Context, resultLimit int32) ([]RegistrationRecord, error) {
+	if resultLimit < 1 || resultLimit > 1000 {
+		return nil, ErrInvalidInput
+	}
+	rows, err := identitydb.New(repository.pool).ListIncompleteRegistrations(ctx, resultLimit)
+	if err != nil {
+		return nil, fmt.Errorf("list incomplete registrations: %w", err)
+	}
+	records := make([]RegistrationRecord, 0, len(rows))
+	for _, row := range rows {
+		record, conversionErr := registrationRecord(row)
+		if conversionErr != nil {
+			return nil, conversionErr
+		}
+		records = append(records, record)
+	}
+	return records, nil
+}
+
+func (repository *PostgresRegistrationRepository) ReleaseStaleRegistrationReservations(ctx context.Context, createdBefore time.Time, resultLimit int32) (int64, error) {
+	if createdBefore.IsZero() || resultLimit < 1 || resultLimit > 1000 {
+		return 0, ErrInvalidInput
+	}
+	count, err := identitydb.New(repository.pool).ReleaseStaleRegistrationReservations(ctx, identitydb.ReleaseStaleRegistrationReservationsParams{
+		CreatedBefore: timestamp(createdBefore),
+		ResultLimit:   resultLimit,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("release stale registration reservations: %w", err)
+	}
+	return count, nil
 }
 
 func (repository *PostgresRegistrationRepository) PrepareRegistration(ctx context.Context, command PrepareRegistrationCommand) (RegistrationRecord, error) {
@@ -123,6 +158,38 @@ func (repository *PostgresRegistrationRepository) PrepareRegistration(ctx contex
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return RegistrationRecord{}, fmt.Errorf("load registration reservation: %w", err)
+	}
+	// A page refresh creates a new browser idempotency key. If the previous
+	// invited attempt already crossed the Vault boundary, recover that exact
+	// saga by username and prove the invitation plus bound email again. The
+	// service subsequently asks Vault to compare the original sensitive request
+	// HMAC before it activates anything, so this lookup never substitutes new
+	// credentials for the provisioned account.
+	if len(command.InvitationDigest) == invitationTokenDigestBytes {
+		recoverable, recoverErr := queries.GetRecoverableInvitationRegistrationForUpdate(ctx, command.Username)
+		if recoverErr == nil {
+			record, conversionErr := registrationRecord(recoverable)
+			if conversionErr != nil {
+				return RegistrationRecord{}, conversionErr
+			}
+			if record.DisplayName != command.DisplayName || record.InvitationID == nil {
+				return RegistrationRecord{}, ErrRegistrationUnavailable
+			}
+			matches, matchErr := queries.RegistrationInvitationMatches(ctx, identitydb.RegistrationInvitationMatchesParams{
+				InvitationID: *record.InvitationID, TokenSha256: command.InvitationDigest,
+				RegistrationID: pgtype.UUID{Bytes: record.ID, Valid: true}, EmailBindingHmac: command.InvitationEmailBinding,
+			})
+			if matchErr != nil {
+				return RegistrationRecord{}, fmt.Errorf("validate recoverable registration invitation: %w", matchErr)
+			}
+			if !matches {
+				return RegistrationRecord{}, ErrRegistrationUnavailable
+			}
+			return record, nil
+		}
+		if !errors.Is(recoverErr, pgx.ErrNoRows) {
+			return RegistrationRecord{}, fmt.Errorf("load recoverable invitation registration: %w", recoverErr)
+		}
 	}
 	admissionMode, err := registrationAdmissionMode(policy.Mode, command.InvitationDigest)
 	if err != nil {
@@ -337,6 +404,12 @@ func (repository *PostgresRegistrationRepository) CompleteRegistration(ctx conte
 		return RegistrationRecord{}, err
 	}
 	if record.State == RegistrationStateCompleted {
+		if err := ensureRegisteredMemberState(ctx, tx, record, occurredAt); err != nil {
+			return RegistrationRecord{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return RegistrationRecord{}, fmt.Errorf("commit completed registration repair: %w", err)
+		}
 		return record, nil
 	}
 	if record.State != RegistrationStateCredentialProvisioned || record.CredentialRef == nil {
@@ -383,6 +456,9 @@ func (repository *PostgresRegistrationRepository) CompleteRegistration(ctx conte
 			return RegistrationRecord{}, ErrRegistrationStateConflict
 		}
 	}
+	if err := ensureRegisteredMemberState(ctx, tx, record, occurredAt); err != nil {
+		return RegistrationRecord{}, err
+	}
 	event, err := repository.eventBuilder.BuildRegistrationCompletedEvent(RegistrationAuditInput{
 		RegistrationID: registrationID, UserID: record.UserID, Mode: record.Mode,
 		InvitationID: record.InvitationID, OccurredAt: occurredAt,
@@ -397,6 +473,149 @@ func (repository *PostgresRegistrationRepository) CompleteRegistration(ctx conte
 		return RegistrationRecord{}, fmt.Errorf("commit registration completion: %w", err)
 	}
 	return record, nil
+}
+
+// ensureRegisteredMemberState installs the small mutable projections every
+// native member needs immediately after registration. IDs derived from the
+// registration make retries safe, while the active-grant predicate avoids a
+// duplicate member authority if an operator repaired the account first.
+func ensureRegisteredMemberState(ctx context.Context, tx pgx.Tx, record RegistrationRecord, occurredAt time.Time) error {
+	if record.ID == uuid.Nil || record.UserID == uuid.Nil || record.CreatedAt.IsZero() {
+		return ErrRegistrationStateConflict
+	}
+	mandateID := uuid.NewSHA1(registrationMemberAuthorityNamespace, []byte("mandate:"+record.ID.String()))
+	grantID := uuid.NewSHA1(registrationMemberAuthorityNamespace, []byte("grant:"+record.ID.String()))
+	startsAt := record.CreatedAt.UTC()
+	endsAt := startsAt.AddDate(100, 0, 0)
+	if _, err := tx.Exec(ctx, `
+INSERT INTO governance.mandates (
+    id, subject_id, source_type, source_reference, scope_type, scope_id,
+    starts_at, ends_at, status, created_at, updated_at
+) VALUES ($1,$2,'bootstrap',$3,'site','peergo',$4,$5,'active',$6,$6)
+ON CONFLICT (id) DO NOTHING`, mandateID, record.UserID,
+		"registration:"+record.ID.String()+":member", startsAt, endsAt, occurredAt); err != nil {
+		return fmt.Errorf("ensure registration member mandate: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO authz.grants (
+    id, subject_id, role_id, mandate_id, scope_type, scope_id,
+    valid_from, valid_until, constraints, created_at, updated_at
+)
+SELECT $1,$2,'member',$3,'site','peergo',$4,$5,'{}'::jsonb,$6,$6
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM authz.grants AS existing
+    JOIN governance.mandates AS existing_mandate
+      ON existing_mandate.id = existing.mandate_id
+     AND existing_mandate.subject_id = existing.subject_id
+    WHERE existing.subject_id = $2
+      AND existing.role_id = 'member'
+      AND existing.scope_type = 'site'
+      AND existing.scope_id = 'peergo'
+      AND existing.revoked_at IS NULL
+      AND existing.valid_from <= $6
+      AND existing.valid_until > $6
+      AND existing_mandate.status = 'active'
+      AND existing_mandate.starts_at <= $6
+      AND existing_mandate.ends_at > $6
+)
+ON CONFLICT (id) DO NOTHING`, grantID, record.UserID, mandateID, startsAt, endsAt, occurredAt); err != nil {
+		return fmt.Errorf("ensure registration member grant: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO identity.invitation_accounts (user_id, remaining_invites, version, updated_at)
+VALUES ($1,0,1,$2)
+ON CONFLICT (user_id) DO NOTHING`, record.UserID, occurredAt); err != nil {
+		return fmt.Errorf("ensure registration invitation account: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO identity.user_activity (user_id, last_active_at, version, updated_at)
+VALUES ($1,NULL,1,$2)
+ON CONFLICT (user_id) DO NOTHING`, record.UserID, occurredAt); err != nil {
+		return fmt.Errorf("ensure registration activity state: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO identity.user_access_states (
+    user_id, download_restricted, vip_enabled, version, updated_at
+) VALUES ($1,false,false,1,$2)
+ON CONFLICT (user_id) DO NOTHING`, record.UserID, occurredAt); err != nil {
+		return fmt.Errorf("ensure registration access state: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO traffic.user_totals (
+    user_id, raw_uploaded, raw_downloaded, credited_uploaded,
+    charged_downloaded, entry_count, version, last_occurred_at, updated_at
+) VALUES ($1,0,0,0,0,0,0,NULL,$2)
+ON CONFLICT (user_id) DO NOTHING`, record.UserID, occurredAt); err != nil {
+		return fmt.Errorf("ensure registration traffic totals: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO economy.magic_accounts (
+    id, user_id, account_kind, account_code, balance, version, updated_at
+) VALUES ($1::uuid,$1::uuid,'member','member:' || ($1::uuid)::text,0,1,$2)
+ON CONFLICT (user_id) DO NOTHING`, record.UserID, occurredAt); err != nil {
+		return fmt.Errorf("ensure registration magic account: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO progression.user_progress (
+    user_id, experience, level, policy_version, version, updated_at
+)
+SELECT $1, 0, initial_level.level, current_policy.policy_version, 1, $2
+FROM LATERAL (
+    SELECT revision.policy_version
+    FROM progression.level_policy_revisions AS revision
+    WHERE revision.effective_at <= $2
+    ORDER BY revision.effective_at DESC, revision.sequence DESC
+    LIMIT 1
+) AS current_policy
+JOIN LATERAL (
+    SELECT definition.level
+    FROM progression.level_definitions AS definition
+    WHERE definition.policy_version = current_policy.policy_version
+      AND definition.minimum_experience <= 0
+    ORDER BY definition.minimum_experience DESC, definition.level DESC
+    LIMIT 1
+) AS initial_level ON true
+ON CONFLICT (user_id) DO NOTHING`, record.UserID, occurredAt); err != nil {
+		return fmt.Errorf("ensure registration progression state: %w", err)
+	}
+	var memberGrantExists bool
+	if err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+    SELECT 1
+    FROM authz.grants AS member_grant
+    JOIN governance.mandates AS mandate
+      ON mandate.id = member_grant.mandate_id
+     AND mandate.subject_id = member_grant.subject_id
+    WHERE member_grant.subject_id = $1
+      AND member_grant.role_id = 'member'
+      AND member_grant.scope_type = 'site'
+      AND member_grant.scope_id = 'peergo'
+      AND member_grant.revoked_at IS NULL
+      AND member_grant.valid_from <= $2
+      AND member_grant.valid_until > $2
+      AND mandate.status = 'active'
+      AND mandate.starts_at <= $2
+      AND mandate.ends_at > $2
+) AND EXISTS (
+    SELECT 1 FROM identity.invitation_accounts WHERE user_id = $1
+) AND EXISTS (
+    SELECT 1 FROM identity.user_activity WHERE user_id = $1
+) AND EXISTS (
+    SELECT 1 FROM identity.user_access_states WHERE user_id = $1
+) AND EXISTS (
+    SELECT 1 FROM traffic.user_totals WHERE user_id = $1
+) AND EXISTS (
+    SELECT 1 FROM economy.magic_accounts WHERE user_id = $1
+) AND EXISTS (
+    SELECT 1 FROM progression.user_progress WHERE user_id = $1
+)`, record.UserID, occurredAt).Scan(&memberGrantExists); err != nil {
+		return fmt.Errorf("verify registration member grant: %w", err)
+	}
+	if !memberGrantExists {
+		return ErrRegistrationStateConflict
+	}
+	return nil
 }
 
 func registrationRecord(row identitydb.IdentityRegistration) (RegistrationRecord, error) {

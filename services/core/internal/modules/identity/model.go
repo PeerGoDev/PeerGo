@@ -6,6 +6,7 @@ package identity
 import (
 	"encoding/json"
 	"errors"
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
@@ -105,10 +106,11 @@ type PublicUserPublishedTorrent struct {
 // SessionRecord contains only the digest of the browser token. Raw tokens must
 // exist only in request memory and the HttpOnly cookie response.
 type SessionRecord struct {
-	TokenHash []byte
-	User      User
-	CreatedAt time.Time
-	ExpiresAt time.Time
+	TokenHash     []byte
+	User          User
+	ClientAddress netip.Addr
+	CreatedAt     time.Time
+	ExpiresAt     time.Time
 }
 
 // WebSessionPolicy is read from the identity-owned singleton immediately
@@ -125,6 +127,7 @@ type LoginInput struct {
 	Password         string
 	SecondFactorCode string
 	RememberMe       bool
+	ClientAddress    netip.Addr
 }
 
 // WebSession is returned by identity use cases. CookieToken is transport-only

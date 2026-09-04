@@ -59,6 +59,7 @@ export default [
   route("staff", "routes/staff.tsx"),
   route("staff/setup", "routes/staff.setup.tsx"),
   route("staff/users", "routes/staff.users.tsx"),
+  route("staff/users/:userId", "routes/staff.users.$userId.tsx"),
   route("staff/assessments", "routes/staff.assessments.tsx"),
   route("staff/workgroups", "routes/staff.workgroups.tsx"),
   route(
@@ -81,6 +82,7 @@ export default [
   route("staff/content/categories", "routes/staff.content.categories.tsx"),
   route("staff/enroll", "routes/staff.enroll.tsx"),
   route("staff/governance", "routes/staff.governance.tsx"),
+  route("staff/settings", "routes/staff.settings.tsx"),
   route("staff/settings/site", "routes/staff.settings.site.tsx"),
   route("staff/settings/storage", "routes/staff.settings.storage.tsx"),
   route("staff/settings/email", "routes/staff.settings.email.tsx"),

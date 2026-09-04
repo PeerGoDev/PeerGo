@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react"
 import { Link, useLocation, useNavigate } from "react-router"
 import {
   BadgeCheckIcon,
+  BellRingIcon,
   ChevronDownIcon,
   ExternalLinkIcon,
   FolderTreeIcon,
@@ -20,20 +21,10 @@ import {
   UsersRoundIcon,
   ClipboardCheckIcon,
   HardDriveIcon,
-  BadgePercentIcon,
-  CoinsIcon,
   RouterIcon,
   ServerCogIcon,
   ShieldAlertIcon,
-  ChartNoAxesColumnIncreasingIcon,
-  ImagesIcon,
-  CrownIcon,
-  MailIcon,
-  CalendarCheck2Icon,
-  WalletCardsIcon,
   ShoppingBagIcon,
-  RssIcon,
-  MedalIcon,
   RocketIcon,
   MessageCircleMoreIcon,
   BookOpenTextIcon,
@@ -66,6 +57,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -91,7 +83,12 @@ import {
   useStaffCapabilities,
   useStaffSession,
 } from "~/features/staff/api/staff-session.mutations"
+import { useStaffPendingOverview } from "~/features/staff/api/staff-pending-overview.queries"
 import { hasCapability } from "~/features/staff/model/capability"
+import {
+  staffSettingsNavigationGroups,
+  type StaffSettingsNavigationItem,
+} from "~/features/staff/model/staff-settings-navigation"
 import { cn } from "~/lib/utils"
 import { UserAvatar } from "~/shared/components/user-avatar"
 
@@ -104,110 +101,15 @@ const enrollmentNavigation = [
   { label: "安全凭据登记", to: "/staff/enroll", icon: KeyRoundIcon },
 ]
 
-const siteSettingsNavigation = [
-  {
-    label: "基础设置",
-    to: "/staff/settings/site",
-    icon: Settings2Icon,
-    action: "site.display.manage.read" as const,
-  },
-  {
-    label: "注册与认证",
-    to: "/staff/settings/registration",
-    icon: UserRoundIcon,
-    action: "site.registration.manage.read" as const,
-  },
-  {
-    label: "邮件设置",
-    to: "/staff/settings/email",
-    icon: MailIcon,
-    action: "operations.monitor.read" as const,
-  },
-  {
-    label: "图片与存储",
-    to: "/staff/settings/storage",
-    icon: ImagesIcon,
-    action: "operations.monitor.read" as const,
-  },
-  {
-    label: "VIP 与用户资料",
-    to: "/staff/settings/vip-profile",
-    icon: CrownIcon,
-    action: "operations.monitor.read" as const,
-  },
-  {
-    label: "RSS 设置",
-    to: "/staff/settings/rss",
-    icon: RssIcon,
-    action: "rss.settings.manage.read" as const,
-  },
-]
-
-const torrentTrackerSettingsNavigation = [
-  {
-    label: "种子规则",
-    to: "/staff/settings/torrents",
-    icon: HardDriveIcon,
-    action: "torrent.manage.read" as const,
-  },
-  {
-    label: "优惠规则",
-    to: "/staff/settings/promotions",
-    icon: BadgePercentIcon,
-    action: "promotion.manage.read" as const,
-  },
-  {
-    label: "Tracker 参数",
-    to: "/staff/settings/tracker",
-    icon: RouterIcon,
-    action: "tracker.policy.read" as const,
-  },
-  {
-    label: "盒子设置",
-    to: "/staff/settings/seedbox",
-    icon: ServerCogIcon,
-    action: "operations.monitor.read" as const,
-  },
-  {
-    label: "分享率与 H&R",
-    to: "/staff/settings/ratio-hnr",
-    icon: ShieldCheckIcon,
-    action: "hnr.policy.read" as const,
-  },
-]
-
-const economySettingsNavigation = [
-  {
-    label: "勋章管理",
-    to: "/staff/settings/medals",
-    icon: MedalIcon,
-    action: "economy.medal.manage.read" as const,
-  },
-  {
-    label: "做种奖励",
-    to: "/staff/settings/seeding-rewards",
-    icon: CoinsIcon,
-    action: "economy.seedingreward.policy.read" as const,
-  },
-  {
-    label: "经验与等级",
-    to: "/staff/settings/progression/levels",
-    icon: ChartNoAxesColumnIncreasingIcon,
-    action: "economy.seedingreward.policy.read" as const,
-  },
-  {
-    label: "签到与活动奖励",
-    to: "/staff/settings/activity-rewards",
-    icon: CalendarCheck2Icon,
-    action: "economy.seedingreward.policy.read" as const,
-  },
-  {
-    label: "魔力值使用规则",
-    to: "/staff/settings/magic-usage",
-    icon: WalletCardsIcon,
-    action: "economy.seedingreward.policy.read" as const,
-  },
-]
+const siteSettingsGroup = staffSettingsNavigationGroups.find(
+  (group) => group.id === "site"
+)!
+const torrentTrackerSettingsGroup = staffSettingsNavigationGroups.find(
+  (group) => group.id === "torrent"
+)!
+const economySettingsGroup = staffSettingsNavigationGroups.find(
+  (group) => group.id === "economy"
+)!
 
 const operationsNavigation = [
   {
@@ -351,6 +253,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
   const visibleStaffCapabilities = staffSession.data
     ? staffCapabilities.data
     : undefined
+  const pending = useStaffPendingOverview(visibleStaffCapabilities)
   const showImplementedStaffAreas = canStartStaffSession && !staffSession.data
   const userItems = userNavigation.filter(
     (item) =>
@@ -362,17 +265,17 @@ export function StaffShell({ children }: { children: ReactNode }) {
       showImplementedStaffAreas ||
       hasCapability(visibleStaffCapabilities, item.action)
   )
-  const siteSettingsItems = siteSettingsNavigation.filter(
+  const siteSettingsItems = siteSettingsGroup.items.filter(
     (item) =>
       showImplementedStaffAreas ||
       hasCapability(visibleStaffCapabilities, item.action)
   )
-  const torrentTrackerSettingsItems = torrentTrackerSettingsNavigation.filter(
+  const torrentTrackerSettingsItems = torrentTrackerSettingsGroup.items.filter(
     (item) =>
       showImplementedStaffAreas ||
       hasCapability(visibleStaffCapabilities, item.action)
   )
-  const economySettingsItems = economySettingsNavigation.filter(
+  const economySettingsItems = economySettingsGroup.items.filter(
     (item) =>
       showImplementedStaffAreas ||
       hasCapability(visibleStaffCapabilities, item.action)
@@ -444,6 +347,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
             label="概览"
             items={overviewNavigation}
             pathname={location.pathname}
+            badges={pending.byRoute}
           />
           {contentItems.length > 0 ? (
             <>
@@ -452,6 +356,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
                 label="内容"
                 items={contentItems}
                 pathname={location.pathname}
+                badges={pending.byRoute}
               />
             </>
           ) : null}
@@ -462,6 +367,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
                 label="用户"
                 items={userItems}
                 pathname={location.pathname}
+                badges={pending.byRoute}
               />
             </>
           ) : null}
@@ -472,6 +378,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
                 label="运营监控"
                 items={operationsItems}
                 pathname={location.pathname}
+                badges={pending.byRoute}
               />
             </>
           ) : null}
@@ -487,6 +394,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
                 economySettingsItems={economySettingsItems}
                 enrollmentItems={enrollmentItems}
                 pathname={location.pathname}
+                badges={pending.byRoute}
               />
             </>
           ) : null}
@@ -555,6 +463,80 @@ export function StaffShell({ children }: { children: ReactNode }) {
                 trafficEnabled={canReadTraffic}
                 economyEnabled={canReadEconomy}
               />
+
+              {staffSession.data ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="relative rounded-full"
+                        aria-label={
+                          pending.total > 0
+                            ? `后台待办，共 ${pending.total} 项`
+                            : "后台待办，无待处理事项"
+                        }
+                      />
+                    }
+                  >
+                    <BellRingIcon />
+                    {pending.total > 0 ? (
+                      <span className="text-destructive-foreground absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-semibold tabular-nums">
+                        {formatPendingCount(pending.total)}
+                      </span>
+                    ) : null}
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80">
+                    <DropdownMenuLabel className="flex items-center justify-between gap-3 px-2 py-2">
+                      <span>后台待办</span>
+                      {pending.total > 0 ? (
+                        <Badge variant="destructiveSolid">
+                          {pending.total} 项
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">已清空</Badge>
+                      )}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {pending.items.length > 0 ? (
+                      <DropdownMenuGroup>
+                        {pending.items.map((item) => (
+                          <DropdownMenuItem
+                            key={item.id}
+                            render={<Link to={item.to} prefetch="intent" />}
+                            className="items-start gap-3 px-2 py-2.5"
+                          >
+                            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <span className="font-medium text-foreground">
+                                {item.label}
+                              </span>
+                              <span className="line-clamp-1 text-xs text-muted-foreground">
+                                {item.description}
+                              </span>
+                            </span>
+                            <Badge
+                              variant="destructive"
+                              className="mt-0.5 shrink-0 tabular-nums"
+                            >
+                              {formatPendingCount(item.count)}
+                            </Badge>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuGroup>
+                    ) : (
+                      <p className="px-3 py-5 text-center text-sm text-muted-foreground">
+                        当前没有需要处理的事项
+                      </p>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem render={<Link to="/staff" />}>
+                      <LayoutDashboardIcon />
+                      前往待办工作台
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
 
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -647,13 +629,17 @@ function StaffSettingsNavigationGroup({
   economySettingsItems,
   enrollmentItems,
   pathname,
+  badges,
 }: {
-  siteSettingsItems: typeof siteSettingsNavigation
-  torrentTrackerSettingsItems: typeof torrentTrackerSettingsNavigation
-  economySettingsItems: typeof economySettingsNavigation
+  siteSettingsItems: StaffSettingsNavigationItem[]
+  torrentTrackerSettingsItems: StaffSettingsNavigationItem[]
+  economySettingsItems: StaffSettingsNavigationItem[]
   enrollmentItems: typeof enrollmentNavigation
   pathname: string
+  badges: Record<string, number>
 }) {
+  const settingsCenterActive = pathname === "/staff/settings"
+
   return (
     <SidebarGroup className="px-2.5 py-0">
       <SidebarGroupLabel className="px-3 text-[10.5px] font-semibold tracking-wider text-muted-foreground group-data-[collapsible=icon]:sr-only">
@@ -661,23 +647,40 @@ function StaffSettingsNavigationGroup({
       </SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu className="gap-0.5">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="设置中心"
+              isActive={settingsCenterActive}
+              variant="classic"
+              render={<Link to="/staff/settings" prefetch="intent" />}
+              className={staffNavigationButtonClass}
+            >
+              <Settings2Icon />
+              <span className="group-data-[collapsible=icon]:hidden">
+                设置中心
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <StaffSettingsNavigationSection
-            label="站点设置"
-            icon={Settings2Icon}
+            label={siteSettingsGroup.label}
+            icon={siteSettingsGroup.icon}
             items={siteSettingsItems}
             pathname={pathname}
+            badges={badges}
           />
           <StaffSettingsNavigationSection
-            label="种子与 Tracker"
-            icon={HardDriveIcon}
+            label={torrentTrackerSettingsGroup.label}
+            icon={torrentTrackerSettingsGroup.icon}
             items={torrentTrackerSettingsItems}
             pathname={pathname}
+            badges={badges}
           />
           <StaffSettingsNavigationSection
-            label="等级与魔力"
-            icon={CoinsIcon}
+            label={economySettingsGroup.label}
+            icon={economySettingsGroup.icon}
             items={economySettingsItems}
             pathname={pathname}
+            badges={badges}
           />
 
           {enrollmentItems.map((item) => {
@@ -706,26 +709,27 @@ function StaffSettingsNavigationGroup({
   )
 }
 
-type StaffSettingsNavigationItem =
-  | (typeof siteSettingsNavigation)[number]
-  | (typeof torrentTrackerSettingsNavigation)[number]
-  | (typeof economySettingsNavigation)[number]
-
 function StaffSettingsNavigationSection({
   label,
   icon: Icon,
   items,
   pathname,
+  badges,
 }: {
   label: string
   icon: typeof ShieldCheckIcon
   items: StaffSettingsNavigationItem[]
   pathname: string
+  badges: Record<string, number>
 }) {
   if (items.length === 0) return null
 
   const active = items.some(
     (item) => pathname === item.to || pathname.startsWith(`${item.to}/`)
+  )
+  const pendingCount = items.reduce(
+    (total, item) => total + (badges[item.to] ?? 0),
+    0
   )
 
   return (
@@ -741,13 +745,24 @@ function StaffSettingsNavigationSection({
       >
         <Icon />
         <span className="group-data-[collapsible=icon]:hidden">{label}</span>
-        <ChevronDownIcon className="ml-auto transition-transform group-data-[collapsible=icon]:hidden in-data-open:rotate-180" />
+        <span className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
+          {pendingCount > 0 ? (
+            <Badge
+              variant="destructive"
+              className="h-5 min-w-5 justify-center px-1 tabular-nums"
+            >
+              {formatPendingCount(pendingCount)}
+            </Badge>
+          ) : null}
+          <ChevronDownIcon className="transition-transform in-data-open:rotate-180" />
+        </span>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <SidebarMenuSub className="mx-0 gap-0.5 border-l-0 px-0 py-0.5">
           {items.map((item) => {
             const itemActive =
               pathname === item.to || pathname.startsWith(`${item.to}/`)
+            const count = badges[item.to] ?? 0
             return (
               <SidebarMenuSubItem key={item.to}>
                 <SidebarMenuSubButton
@@ -757,6 +772,14 @@ function StaffSettingsNavigationSection({
                 >
                   <item.icon />
                   <span>{item.label}</span>
+                  {count > 0 ? (
+                    <Badge
+                      variant="destructive"
+                      className="ml-auto h-5 min-w-5 justify-center px-1 tabular-nums"
+                    >
+                      {formatPendingCount(count)}
+                    </Badge>
+                  ) : null}
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
             )
@@ -771,6 +794,7 @@ function StaffNavigationGroup({
   label,
   items,
   pathname,
+  badges,
 }: {
   label?: string
   items: Array<{
@@ -779,6 +803,7 @@ function StaffNavigationGroup({
     icon: typeof ShieldCheckIcon
   }>
   pathname: string
+  badges: Record<string, number>
 }) {
   return (
     <SidebarGroup className="px-2.5 py-0">
@@ -794,10 +819,15 @@ function StaffNavigationGroup({
               item.to === "/staff"
                 ? pathname === item.to
                 : pathname === item.to || pathname.startsWith(`${item.to}/`)
+            const pendingCount = badges[item.to] ?? 0
             return (
               <SidebarMenuItem key={item.to}>
                 <SidebarMenuButton
-                  tooltip={item.label}
+                  tooltip={
+                    pendingCount > 0
+                      ? `${item.label}，${pendingCount} 项待处理`
+                      : item.label
+                  }
                   isActive={active}
                   variant="classic"
                   render={<Link to={item.to} prefetch="intent" />}
@@ -808,6 +838,11 @@ function StaffNavigationGroup({
                     {item.label}
                   </span>
                 </SidebarMenuButton>
+                {pendingCount > 0 ? (
+                  <SidebarMenuBadge className="text-destructive-foreground right-auto left-3 bg-destructive">
+                    {formatPendingCount(pendingCount)}
+                  </SidebarMenuBadge>
+                ) : null}
               </SidebarMenuItem>
             )
           })}
@@ -815,4 +850,8 @@ function StaffNavigationGroup({
       </SidebarGroupContent>
     </SidebarGroup>
   )
+}
+
+function formatPendingCount(count: number) {
+  return count > 99 ? "99+" : count.toString()
 }

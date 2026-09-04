@@ -15,9 +15,11 @@ type categoryAdministrationRepositoryStub struct {
 	listed        []ManagedCategory
 	created       ManagedCategory
 	updated       ManagedCategory
+	upsertedFacet ManagedCategoryFacet
 	upserted      ManagedCategoryFacetOption
 	createCommand CreateCategoryCommand
 	updateCommand UpdateCategoryCommand
+	facetCommand  UpsertCategoryFacetCommand
 	upsertCommand UpsertCategoryFacetOptionCommand
 	listCalls     int
 }
@@ -35,6 +37,11 @@ func (stub *categoryAdministrationRepositoryStub) CreateCategory(_ context.Conte
 func (stub *categoryAdministrationRepositoryStub) UpdateCategory(_ context.Context, command UpdateCategoryCommand) (ManagedCategory, error) {
 	stub.updateCommand = command
 	return stub.updated, nil
+}
+
+func (stub *categoryAdministrationRepositoryStub) UpsertCategoryFacet(_ context.Context, command UpsertCategoryFacetCommand) (ManagedCategoryFacet, error) {
+	stub.facetCommand = command
+	return stub.upsertedFacet, nil
 }
 
 func (stub *categoryAdministrationRepositoryStub) UpsertCategoryFacetOption(_ context.Context, command UpsertCategoryFacetOptionCommand) (ManagedCategoryFacetOption, error) {
@@ -154,6 +161,35 @@ func TestCategoryAdministrationUpsertFacetOptionNormalizesAndAudits(t *testing.T
 		repository.upsertCommand.Label != "动作" || repository.upsertCommand.ChangeID == uuid.Nil ||
 		repository.upsertCommand.Authorization.ID != authorizer.decision.ID {
 		t.Fatalf("result=%+v command=%+v", result, repository.upsertCommand)
+	}
+	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionCategoryUpdate {
+		t.Fatalf("authorization requests = %+v", authorizer.requests)
+	}
+}
+
+func TestCategoryAdministrationUpsertFacetNormalizesAndDefaultsReason(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 27, 16, 0, 0, 0, time.UTC)
+	repository := &categoryAdministrationRepositoryStub{upsertedFacet: ManagedCategoryFacet{ID: "resolution", Name: "分辨率", Version: 1}}
+	authorizer := &categoryAuthorizerStub{decision: categoryAllowedDecision(now)}
+	service, err := NewCategoryAdministrationService(repository, authorizer, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.UpsertFacet(context.Background(), categoryTestActor(now), UpsertCategoryFacetInput{
+		CategoryID: " movies ", FacetID: " resolution ", Name: " 分辨率 ",
+		SelectionMode: FacetSelectionSingle, Required: true,
+		DisplayOrder: 20, Enabled: true, ExpectedVersion: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertFacet() error = %v", err)
+	}
+	if result.ID != "resolution" || repository.facetCommand.CategoryID != "movies" ||
+		repository.facetCommand.Name != "分辨率" || repository.facetCommand.ChangeID == uuid.Nil ||
+		repository.facetCommand.Reason != defaultCategoryFacetReason ||
+		repository.facetCommand.Authorization.ID != authorizer.decision.ID {
+		t.Fatalf("result=%+v command=%+v", result, repository.facetCommand)
 	}
 	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionCategoryUpdate {
 		t.Fatalf("authorization requests = %+v", authorizer.requests)
