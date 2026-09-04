@@ -59,7 +59,8 @@ WITH bounds AS (
         AT TIME ZONE 'UTC'
     ) - interval '1 month' AS latest_closed_month
 ), active_memberships AS (
-    SELECT membership.id, membership.user_id, membership.version,
+    SELECT membership.id AS membership_id,
+           membership.user_id, membership.version,
            tenure.id AS tenure_transition_id,
            tenure.occurred_at AS tenure_started_at
     FROM workgroups.memberships AS membership
