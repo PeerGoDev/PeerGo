@@ -142,15 +142,15 @@ describe("NotificationPage", () => {
     expect(messageCards[0]).toHaveClass(
       "gap-0",
       "py-0",
-      "rounded-lg",
+      "rounded-3xl",
       "text-base",
-      "shadow",
+      "shadow-soft",
       "md:min-h-[640px]"
     )
     expect(messageCards[1]).toHaveClass(
       "md:col-span-2",
       "text-base",
-      "shadow",
+      "shadow-soft",
       "md:min-h-[640px]"
     )
     expect(screen.getByLabelText("未读")).toHaveClass("bg-primary")
@@ -162,7 +162,7 @@ describe("NotificationPage", () => {
     )
     expect(screen.getByRole("button", { name: "仅未读" })).toHaveClass(
       "border-0",
-      "text-foreground"
+      "bg-sidebar-accent"
     )
     expect(screen.getByText(/Release Needs Details/)).toBeVisible()
     expect(screen.getByText(/审核通过：Approved Release/)).toBeVisible()

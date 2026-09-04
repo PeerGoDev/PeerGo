@@ -52,7 +52,8 @@ describe("AlertDialog", () => {
       "max-h-[calc(100dvh-1rem)]",
       "max-w-[calc(100%-1rem)]",
       "data-[size=default]:sm:max-w-[425px]",
-      "rounded-lg",
+      "rounded-3xl",
+      "shadow-soft",
       "p-4",
       "sm:p-6"
     )

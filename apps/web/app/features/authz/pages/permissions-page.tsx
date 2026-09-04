@@ -163,7 +163,7 @@ export function PermissionsPage() {
       )}
 
       {!session.isPending && !session.isError && !session.data && (
-        <Card className="gap-0 py-0 shadow-none">
+        <Card className="gap-0 py-0">
           <CardHeader className="border-b py-4">
             <CardTitle>需要登录</CardTitle>
             <CardDescription>
@@ -242,7 +242,7 @@ function CapabilityOverview({
 
   return (
     <Collapsible>
-      <Card className="min-w-0 gap-0 rounded-lg py-0 shadow-sm ring-0">
+      <Card className="min-w-0 gap-0 py-0">
         <CardHeader className="px-6 pt-6 pb-5">
           <CardTitle>
             <h2 className="text-2xl leading-none font-semibold">可用功能</h2>
@@ -334,7 +334,7 @@ function CapabilityGroupRow({
 
 function CapabilityTable({ items }: { items: Capability[] }) {
   return (
-    <Table aria-label="全部可用功能">
+    <Table aria-label="全部可用功能" containerClassName="px-3">
       <TableHeader className="bg-secondary/70">
         <TableRow>
           <TableHead className="pl-4 text-muted-foreground">功能</TableHead>

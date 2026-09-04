@@ -22,7 +22,7 @@ export function UserPublishedTorrentsCard({
   total: number
 }) {
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-4">
         <CardTitle>
           <h2>已发布种子</h2>
@@ -38,7 +38,7 @@ export function UserPublishedTorrentsCard({
             暂无公开发布记录。
           </p>
         ) : (
-          <div className="divide-y rounded-lg border">
+          <div className="divide-y rounded-lg">
             {items.map((item) => (
               <Link
                 key={item.id}
@@ -46,7 +46,7 @@ export function UserPublishedTorrentsCard({
                 className="grid gap-2 p-3 transition-colors hover:bg-muted/50 sm:grid-cols-[minmax(0,1fr)_auto]"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{item.title}</p>
+                  <p className="truncate font-bold text-title">{item.title}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     {item.subtitle || `种子 #${item.id}`}
                   </p>

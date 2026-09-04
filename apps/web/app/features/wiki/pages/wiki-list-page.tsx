@@ -123,7 +123,7 @@ export function WikiListPage() {
                     to={`/wiki/${encodeURIComponent(page.slug)}`}
                     className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Card className="h-full transition-colors group-hover:border-primary/70">
+                    <Card className="h-full ring-2 ring-transparent transition-shadow group-hover:ring-primary/50">
                       <CardHeader>
                         <div className="flex items-start justify-between gap-3">
                           <CardTitle className="text-xl break-words">

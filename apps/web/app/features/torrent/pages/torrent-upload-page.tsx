@@ -528,7 +528,7 @@ function TorrentUploadWorkspace({
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="gap-0 py-0">
         <CardContent className="flex min-h-[160px] min-w-0 items-center gap-2 p-4 sm:min-h-[60px]">
           <LinkIcon className="size-[18px] shrink-0 text-primary" />
           <span className="text-base font-normal text-muted-foreground">
@@ -557,7 +557,7 @@ function TorrentUploadWorkspace({
           </Alert>
         ) : null}
 
-        <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+        <Card className="gap-0 py-0">
           <CardHeader className="p-6">
             <CardTitle className="text-2xl leading-none font-semibold tracking-tight">
               <h2>种子文件 *</h2>
@@ -635,7 +635,7 @@ function TorrentUploadWorkspace({
           </CardContent>
         </Card>
 
-        <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+        <Card className="gap-0 py-0">
           <CardHeader className="p-6">
             <CardTitle className="text-2xl leading-none font-semibold tracking-tight">
               <h2>基本信息</h2>
@@ -984,7 +984,7 @@ function TorrentUploadWorkspace({
           </CardContent>
         </Card>
 
-        <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+        <Card className="gap-0 py-0">
           <CardContent className="flex flex-col gap-4 p-4">
             <Field orientation="horizontal">
               <Checkbox
@@ -1056,7 +1056,7 @@ function TorrentUploadWorkspace({
           </Button>
         </div>
 
-        <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+        <Card className="gap-0 py-0">
           <CardContent className="p-4 text-sm text-muted-foreground">
             Tracker 地址由 PeerGo 在下载时自动写入。上传失败时可直接重试，
             已填写内容会保留。
@@ -1114,7 +1114,7 @@ function TorrentUploadPreviewDialog({
         </DialogHeader>
         {preview ? (
           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
-            <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+            <Card className="gap-0 py-0">
               <CardHeader className="p-6 pb-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{preview.category}</Badge>

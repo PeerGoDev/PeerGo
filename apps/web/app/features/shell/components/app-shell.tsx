@@ -120,7 +120,10 @@ type NavigationGroup = {
 }
 
 const appNavigationButtonClass =
-  "h-10 justify-end gap-3 rounded-none px-4 group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center [&_svg]:size-5"
+  "h-10 justify-start gap-3 rounded-lg px-3 font-medium group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center [&_svg]:size-5"
+
+const appSubNavigationButtonClass =
+  "h-9 translate-x-0 justify-start gap-3 rounded-lg px-3 text-sidebar-foreground transition-colors hover:bg-muted hover:text-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>svg]:text-current"
 
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -524,27 +527,28 @@ export function AppShell({ children }: { children: ReactNode }) {
       onOpenChange={handleDesktopSidebarOpenChange}
       style={
         {
-          "--sidebar-width": "12.5rem",
+          "--sidebar-width":
+            "calc(var(--shell-sidebar-width) + 2 * var(--shell-gap))",
           "--sidebar-width-icon": "3.75rem",
         } as CSSProperties
       }
     >
-      <Sidebar collapsible="icon">
-        <SidebarHeader className="h-[60px] justify-center gap-0 border-b px-4 py-0">
+      <Sidebar variant="floating" collapsible="icon">
+        <SidebarHeader className="h-(--shell-header-height) shrink-0 justify-center gap-0 border-b px-5 py-0">
           <Link
             to="/"
-            className="flex w-full min-w-0 items-baseline justify-end gap-1 outline-none group-data-[collapsible=icon]:justify-center focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            className="flex w-full min-w-0 items-baseline gap-1.5 outline-none group-data-[collapsible=icon]:justify-center focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
-            <span className="font-heading text-xl font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            <span className="font-heading text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">
               {siteName}
             </span>
             <Badge
               variant="outline"
-              className="h-4 border-warning/40 bg-warning/10 px-1 text-[9px] text-warning-foreground uppercase group-data-[collapsible=icon]:hidden"
+              className="h-4 border-transparent bg-sidebar-accent px-1 text-[9px] tracking-wider text-sidebar-accent-foreground uppercase group-data-[collapsible=icon]:hidden"
             >
               beta
             </Badge>
-            <span className="hidden font-heading text-sm font-semibold group-data-[collapsible=icon]:inline">
+            <span className="hidden font-heading text-sm font-bold group-data-[collapsible=icon]:inline">
               {siteName.slice(0, 2)}
             </span>
           </Link>
@@ -569,7 +573,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <SidebarFooter className="gap-0 p-0">
           <SidebarCollapseControl />
           <Separator className="hidden group-data-[collapsible=icon]:hidden lg:block" />
-          <div className="hidden p-3 text-right text-xs text-muted-foreground group-data-[collapsible=icon]:hidden lg:block">
+          <div className="hidden px-5 py-3 text-left text-xs text-muted-foreground group-data-[collapsible=icon]:hidden lg:block">
             Powered by {siteName}
           </div>
         </SidebarFooter>
@@ -577,8 +581,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-20 h-[60px] shrink-0 border-b bg-background">
-          <div className="mx-auto flex size-full max-w-[1248px] items-center gap-2 px-4 lg:px-6">
+        <header className="sticky top-0 z-20 shrink-0 px-4 pt-(--shell-gap) lg:px-6">
+          <div className="mx-auto flex h-(--shell-header-height) w-full max-w-[1200px] items-center gap-2 rounded-lg bg-glass px-4 shadow-soft backdrop-blur-[7px]">
             <SidebarTrigger
               aria-label="切换侧栏"
               className="-ml-2 size-10 rounded-lg lg:hidden [&_svg]:size-6"
@@ -778,9 +782,9 @@ function AppNavigationGroup({
     const GroupIcon = group.icon ?? UserIcon
 
     return (
-      <SidebarGroup className="p-0">
+      <SidebarGroup className="px-2.5 py-0">
         <SidebarGroupContent>
-          <SidebarMenu>
+          <SidebarMenu className="gap-0.5">
             <Collapsible defaultOpen={active} render={<SidebarMenuItem />}>
               <CollapsibleTrigger
                 render={
@@ -791,14 +795,14 @@ function AppNavigationGroup({
                   />
                 }
               >
-                <ChevronDownIcon className="transition-transform group-data-[collapsible=icon]:hidden in-data-open:rotate-180" />
+                <GroupIcon />
                 <span className="group-data-[collapsible=icon]:hidden">
                   {group.label}
                 </span>
-                <GroupIcon />
+                <ChevronDownIcon className="ml-auto transition-transform group-data-[collapsible=icon]:hidden in-data-open:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <SidebarMenuSub className="mx-0 gap-0 border-l-0 px-0 py-0">
+                <SidebarMenuSub className="mx-0 gap-0.5 border-l-0 px-0 py-0.5">
                   {group.items.map((item) => {
                     const itemActive = navigationItemIsActive(
                       item.to,
@@ -816,18 +820,18 @@ function AppNavigationGroup({
                             />
                           }
                           isActive={itemActive}
-                          className="h-9 translate-x-0 justify-end rounded-none border-r-2 border-transparent px-4 text-muted-foreground transition-colors data-active:border-primary data-active:bg-primary/10 data-active:text-primary"
+                          className={appSubNavigationButtonClass}
                         >
+                          <item.icon />
                           <span>{item.label}</span>
                           {item.badge ? (
                             <Badge
                               variant="secondary"
-                              className="min-w-5 justify-center px-1.5"
+                              className="ml-auto min-w-5 justify-center px-1.5"
                             >
                               {item.badge}
                             </Badge>
                           ) : null}
-                          <item.icon />
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     )
@@ -842,12 +846,12 @@ function AppNavigationGroup({
   }
 
   return (
-    <SidebarGroup className="p-0">
-      <SidebarGroupLabel className="px-5 text-right group-data-[collapsible=icon]:sr-only">
+    <SidebarGroup className="px-2.5 py-0">
+      <SidebarGroupLabel className="px-3 text-[10.5px] font-semibold tracking-wider text-muted-foreground group-data-[collapsible=icon]:sr-only">
         {group.label}
       </SidebarGroupLabel>
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="gap-0.5">
           {group.items.map((item) => {
             const active = navigationItemIsActive(item.to, pathname, hash)
             return (
@@ -865,15 +869,15 @@ function AppNavigationGroup({
                   }
                   className={appNavigationButtonClass}
                 >
+                  <item.icon />
                   <span className="group-data-[collapsible=icon]:hidden">
                     {item.label}
                   </span>
                   {item.badge ? (
-                    <Badge className="min-w-5 justify-center px-1.5 group-data-[collapsible=icon]:hidden">
+                    <Badge className="ml-auto min-w-5 justify-center px-1.5 group-data-[collapsible=icon]:hidden">
                       {item.badge}
                     </Badge>
                   ) : null}
-                  <item.icon />
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )

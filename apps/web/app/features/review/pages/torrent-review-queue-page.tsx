@@ -108,11 +108,11 @@ export function TorrentReviewQueuePage() {
               }}
               spacing={0}
               aria-label="切换种审记录"
-              className="max-w-full rounded-none"
+              className="max-w-full gap-0.5"
             >
               <ToggleGroupItem
                 value="pending"
-                className="h-10 rounded-none border-b-2 border-transparent px-4 data-pressed:border-primary data-pressed:text-primary"
+                className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-pressed:bg-primary data-pressed:text-primary-foreground"
               >
                 <Clock3Icon data-icon="inline-start" />
                 待审核
@@ -124,7 +124,7 @@ export function TorrentReviewQueuePage() {
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="reviewed"
-                className="h-10 rounded-none border-b-2 border-transparent px-4 data-pressed:border-primary data-pressed:text-primary"
+                className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-pressed:bg-primary data-pressed:text-primary-foreground"
               >
                 <HistoryIcon data-icon="inline-start" />
                 已审核
@@ -165,7 +165,7 @@ export function TorrentReviewQueuePage() {
           {view === "pending" && reviews.data ? (
             <section aria-label="种审任务" className="flex flex-col gap-6">
               {reviews.data.items.length === 0 ? (
-                <Card className="gap-0 rounded-lg py-0 shadow-sm">
+                <Card className="gap-0 py-0">
                   <CardContent className="p-0">
                     <Empty className="min-h-60 border-0 py-12">
                       <EmptyHeader>
@@ -212,7 +212,7 @@ function ReviewAssignmentCard({
   torrent: MyTorrentReviewAssignment
 }) {
   return (
-    <Card className="min-h-[130px] gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="min-h-[130px] gap-0 py-0">
       <CardContent className="h-full p-4">
         <article className="flex h-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1">
@@ -275,7 +275,7 @@ function ReviewedTorrentList({ items }: { items: ReviewedTorrentReview[] }) {
   return (
     <section aria-label="已审核种子" className="flex flex-col gap-4">
       {items.map((torrent) => (
-        <Card key={torrent.vote_id} className="gap-0 rounded-lg py-0 shadow-sm">
+        <Card key={torrent.vote_id} className="gap-0 py-0">
           <CardContent className="p-4">
             <article className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">

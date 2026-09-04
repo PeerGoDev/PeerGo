@@ -82,15 +82,15 @@ export function TorrentTable({
   }
 
   return (
-    <Card className="hidden gap-0 rounded-lg border py-0 shadow-none ring-0 md:flex">
+    <Card className="hidden gap-0 py-0 md:flex">
       <CardHeader className="sr-only">
         <CardTitle>最新种子列表</CardTitle>
         <CardDescription>按上传时间从新到旧排列。</CardDescription>
       </CardHeader>
-      <CardContent className="px-0">
-        <Table className="block min-w-0">
-          <TableHeader className="block bg-muted [&_tr]:border-b-0">
-            <TableRow className="grid grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px] items-center gap-2 px-4 py-3">
+      <CardContent className="px-0 py-3">
+        <Table className="block min-w-0 px-3">
+          <TableHeader className="block">
+            <TableRow className="grid grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px] items-center gap-2 rounded-lg bg-muted px-3.5 py-3">
               <TableHead className="h-auto p-0">
                 <span className="sr-only">封面</span>
               </TableHead>
@@ -201,7 +201,7 @@ export function TorrentTable({
             {torrents.map((torrent) => (
               <TableRow
                 key={torrent.id}
-                className="relative grid grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px] items-center gap-2 overflow-hidden border-t! border-b-0! px-4 py-2 hover:bg-accent/70"
+                className="relative grid grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px] items-center gap-2 overflow-hidden px-3.5 py-2.5"
               >
                 <TableCell className="p-0">
                   <TorrentCoverPreview
@@ -231,12 +231,12 @@ export function TorrentTable({
                       <TorrentTitleLink
                         torrentId={torrent.id}
                         title={torrent.name}
-                        className="truncate font-normal"
+                        className="truncate"
                       />
                       <TorrentSticky
                         stickyUntil={torrent.sticky_until}
                         iconOnly
-                        className="h-auto shrink-0 border-0 bg-transparent p-0 text-destructive shadow-none [&_svg]:size-3.5!"
+                        className="h-auto shrink-0 border-0 bg-transparent p-0 text-title shadow-none [&_svg]:size-3.5!"
                       />
                       <TorrentPromotion promotion={torrent.promotion} />
                     </div>
@@ -251,7 +251,7 @@ export function TorrentTable({
                 <TableCell className="p-0 text-right">
                   <TorrentSize bytes={torrent.size_bytes} />
                 </TableCell>
-                <TableCell className="p-0 text-center tabular-nums">
+                <TableCell className="p-0 text-center font-mono text-xs tabular-nums">
                   <TorrentSwarmNumbers torrent={torrent} />
                 </TableCell>
                 <TableCell className="p-0 text-right text-xs text-muted-foreground">
@@ -311,15 +311,15 @@ function TorrentBookmarkTable({
   activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
 }) {
   return (
-    <Card className="hidden gap-0 rounded-lg border py-0 shadow-none ring-0 md:flex">
+    <Card className="hidden gap-0 py-0 md:flex">
       <CardHeader className="sr-only">
         <CardTitle>我的收藏</CardTitle>
         <CardDescription>按最近收藏时间排列。</CardDescription>
       </CardHeader>
-      <CardContent className="px-0">
-        <Table className="block min-w-0">
-          <TableHeader className="block bg-muted [&_tr]:border-b-0">
-            <TableRow className="grid grid-cols-[48px_minmax(0,1fr)_100px_70px_70px_70px_110px_40px] items-center gap-3 px-4 py-3">
+      <CardContent className="px-0 py-3">
+        <Table className="block min-w-0 px-3">
+          <TableHeader className="block">
+            <TableRow className="grid grid-cols-[48px_minmax(0,1fr)_100px_70px_70px_70px_110px_40px] items-center gap-3 rounded-lg bg-muted px-3.5 py-3">
               <TableHead className="h-auto p-0">
                 <span className="sr-only">封面</span>
               </TableHead>
@@ -348,7 +348,7 @@ function TorrentBookmarkTable({
             {torrents.map((torrent) => (
               <TableRow
                 key={torrent.id}
-                className="relative grid grid-cols-[48px_minmax(0,1fr)_100px_70px_70px_70px_110px_40px] items-center gap-3 overflow-hidden border-t! border-b-0! px-4 py-2 hover:bg-accent/70"
+                className="relative grid grid-cols-[48px_minmax(0,1fr)_100px_70px_70px_70px_110px_40px] items-center gap-3 overflow-hidden px-3.5 py-2.5"
               >
                 <TableCell className="p-0">
                   <TorrentCoverPreview
@@ -378,7 +378,7 @@ function TorrentBookmarkTable({
                       <TorrentTitleLink
                         torrentId={torrent.id}
                         title={torrent.name}
-                        className="truncate text-base font-normal"
+                        className="truncate"
                       />
                       <TorrentSticky stickyUntil={torrent.sticky_until} />
                       <TorrentPromotion promotion={torrent.promotion} />
@@ -391,15 +391,15 @@ function TorrentBookmarkTable({
                 <TableCell className="p-0 text-sm text-muted-foreground">
                   {torrent.category.name}
                 </TableCell>
-                <TableCell className="flex items-center justify-end gap-1 p-0 text-right tabular-nums">
+                <TableCell className="flex items-center justify-end gap-1 p-0 text-right font-mono tabular-nums">
                   <UploadIcon className="size-3.5 text-success-foreground" />
                   <span>{torrent.seeders.toLocaleString("zh-CN")}</span>
                 </TableCell>
-                <TableCell className="flex items-center justify-end gap-1 p-0 text-right tabular-nums">
+                <TableCell className="flex items-center justify-end gap-1 p-0 text-right font-mono tabular-nums">
                   <DownloadIcon className="size-3.5 text-destructive" />
                   <span>{torrent.leechers.toLocaleString("zh-CN")}</span>
                 </TableCell>
-                <TableCell className="flex items-center justify-end gap-1 p-0 text-right tabular-nums">
+                <TableCell className="flex items-center justify-end gap-1 p-0 text-right font-mono tabular-nums">
                   <FileIcon className="size-3.5" />
                   <span>{torrent.completed.toLocaleString("zh-CN")}</span>
                 </TableCell>

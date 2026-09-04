@@ -20,7 +20,7 @@ export function TorrentTitleLink({
     <Link
       to={`/torrents/${torrentId}`}
       className={cn(
-        "rounded-sm underline-offset-4 hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        "rounded-sm font-bold text-title underline-offset-4 transition-colors hover:text-title-hover hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         className
       )}
     >

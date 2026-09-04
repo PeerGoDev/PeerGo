@@ -108,10 +108,17 @@ export function AccountAccessPage() {
   }
 
   return (
-    <AuthEntryCard className="max-w-xl" aria-labelledby="restriction-title">
+    <AuthEntryCard
+      viewport="shell"
+      className="max-w-xl"
+      aria-labelledby="restriction-title"
+    >
       <CardHeader className="gap-2 px-6">
         <CardTitle>
-          <h1 id="restriction-title" className="text-2xl font-semibold">
+          <h1
+            id="restriction-title"
+            className="text-[22px] leading-none font-semibold tracking-tight"
+          >
             封禁记录与申诉
           </h1>
         </CardTitle>

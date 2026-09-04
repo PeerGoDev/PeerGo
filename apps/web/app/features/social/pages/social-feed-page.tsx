@@ -337,7 +337,7 @@ export function SocialFeedPage() {
                     setBoardId(board.id === boardId ? "" : board.id)
                   }
                   className={cn(
-                    "flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted",
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm hover:bg-muted",
                     board.id === boardId && "bg-muted font-medium"
                   )}
                 >
@@ -367,7 +367,7 @@ export function SocialFeedPage() {
                         setTopic(item.name === topic ? "" : item.name)
                       }
                       className={cn(
-                        "flex w-full items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-muted",
+                        "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm hover:bg-muted",
                         item.name === topic && "bg-muted font-medium"
                       )}
                     >

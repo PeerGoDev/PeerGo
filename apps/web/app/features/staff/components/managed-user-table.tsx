@@ -53,7 +53,7 @@ export function ManagedUserTable({
 
   return (
     <div className="overflow-hidden rounded-lg border">
-      <p className="border-b bg-muted/30 px-3 py-2 text-xs text-muted-foreground md:hidden">
+      <p className="border-b bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground md:hidden">
         表格可左右滑动，点击末列设置按钮管理账户
       </p>
       <Table className="min-w-[1120px] lg:min-w-[1480px]">
@@ -77,32 +77,32 @@ export function ManagedUserTable({
         <TableBody>
           {users.map((user) => (
             <TableRow key={user.id} className="h-[53px] hover:bg-muted/30">
-              <TableCell className="px-3 py-2 text-right font-mono text-xs text-muted-foreground tabular-nums">
+              <TableCell className="px-3 py-2.5 text-right font-mono text-xs text-muted-foreground tabular-nums">
                 {user.numeric_id}
               </TableCell>
-              <TableCell className="hidden px-2 py-2 lg:table-cell">
+              <TableCell className="hidden px-2 py-2.5 lg:table-cell">
                 <code className="font-mono text-[11px] whitespace-nowrap text-muted-foreground">
                   {user.id}
                 </code>
               </TableCell>
-              <TableCell className="px-2 py-2">
+              <TableCell className="px-2 py-2.5">
                 <UserIdentity user={user} />
               </TableCell>
-              <TableCell className="px-2 py-2">
+              <TableCell className="px-2 py-2.5">
                 <RoleBadges roles={user.role_names} />
               </TableCell>
-              <TableCell className="px-2 py-2 text-right">
+              <TableCell className="px-2 py-2.5 text-right">
                 <TransferAmounts user={user} />
               </TableCell>
-              <TableCell className="px-2 py-2 text-sm font-medium text-warning-foreground tabular-nums">
+              <TableCell className="px-2 py-2.5 text-sm font-medium text-warning-foreground tabular-nums">
                 {formatInteger(user.magic_balance)}
               </TableCell>
-              <TableCell className="px-2 py-2 text-center">
+              <TableCell className="px-2 py-2.5 text-center">
                 <Badge variant="outline" className="tabular-nums">
                   Lv.{user.level}
                 </Badge>
               </TableCell>
-              <TableCell className="px-2 py-2">
+              <TableCell className="px-2 py-2.5">
                 {user.last_active_at ? (
                   <UserTime value={user.last_active_at} />
                 ) : (
@@ -111,10 +111,10 @@ export function ManagedUserTable({
                   </span>
                 )}
               </TableCell>
-              <TableCell className="px-2 py-2">
+              <TableCell className="px-2 py-2.5">
                 <UserTime value={user.created_at} />
               </TableCell>
-              <TableCell className="px-2 py-2">
+              <TableCell className="px-2 py-2.5">
                 <div className="flex flex-col items-start gap-1">
                   <ManagedUserStateBadges user={user} />
                   {user.active_restriction_count > 0 ? (
@@ -122,7 +122,7 @@ export function ManagedUserTable({
                   ) : null}
                 </div>
               </TableCell>
-              <TableCell className="px-2 py-2 text-center">
+              <TableCell className="px-2 py-2.5 text-center">
                 <Button
                   variant="ghost"
                   size="icon-sm"

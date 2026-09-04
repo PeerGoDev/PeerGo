@@ -161,11 +161,11 @@ export function TorrentMediaInfoCard({ mediaInfo }: { mediaInfo: string }) {
   )
 
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CardHeader className="p-6 pb-2">
-          <CardTitle className="flex items-center gap-2 text-2xl leading-none font-semibold">
-            <InfoIcon className="size-5" />
+          <CardTitle className="flex items-center gap-2">
+            <InfoIcon className="size-4" />
             MediaInfo/BDInfo
           </CardTitle>
         </CardHeader>
@@ -310,10 +310,10 @@ export function TorrentDescriptionCard({
   shareAction?: React.ReactNode
 }) {
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardHeader className="p-6 pb-2">
-        <CardTitle className="flex items-center gap-2 text-2xl leading-none font-semibold">
-          <FileTextIcon className="size-5" />
+        <CardTitle className="flex items-center gap-2">
+          <FileTextIcon className="size-4" />
           描述
         </CardTitle>
       </CardHeader>

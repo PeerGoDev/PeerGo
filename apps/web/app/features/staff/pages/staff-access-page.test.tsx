@@ -51,7 +51,7 @@ describe("StaffAccessPage", () => {
       screen
         .getByText("快捷操作", { exact: true })
         .closest('[data-slot="card"]')
-    ).toHaveClass("gap-0", "py-0")
+    ).toHaveClass("gap-(--card-spacing)", "py-(--card-spacing)")
     expect(screen.getByRole("link", { name: "用户管理" })).toHaveAttribute(
       "href",
       "/staff/users"

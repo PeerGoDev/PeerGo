@@ -228,7 +228,7 @@ function EconomyDashboard({
 
   return (
     <>
-      <Card className="gap-0 border-warning/25 bg-linear-to-br from-warning/10 via-card to-card py-0">
+      <Card className="gap-0 bg-linear-to-br from-warning/10 via-card to-card py-0">
         <CardContent className="p-5 sm:p-6">
           <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)_15rem] lg:items-center">
             <div className="flex items-center gap-4">
@@ -397,13 +397,13 @@ function EconomySectionNavigation({
         }}
         spacing={0}
         aria-label="切换等级与魔力值内容"
-        className="min-w-max rounded-none"
+        className="min-w-max gap-0.5"
       >
         {economySections.map((section) => (
           <ToggleGroupItem
             key={section.value}
             value={section.value}
-            className="h-11 rounded-none border-b-2 border-transparent px-4 data-pressed:border-primary data-pressed:text-primary"
+            className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-pressed:bg-primary data-pressed:text-primary-foreground"
           >
             <section.icon data-icon="inline-start" />
             {section.label}
@@ -510,7 +510,7 @@ function MagicStatement({
         {entries.length === 0 ? (
           <StatementEmpty description="产生做种或活动奖励后会显示在这里。" />
         ) : (
-          <Table>
+          <Table containerClassName="px-3">
             <TableHeader>
               <TableRow>
                 <TableHead>时间</TableHead>
@@ -569,7 +569,7 @@ function ExperienceStatement({
         {entries.length === 0 ? (
           <StatementEmpty description="首次获得经验后会显示在这里。" />
         ) : (
-          <Table>
+          <Table containerClassName="px-3">
             <TableHeader>
               <TableRow>
                 <TableHead>时间</TableHead>

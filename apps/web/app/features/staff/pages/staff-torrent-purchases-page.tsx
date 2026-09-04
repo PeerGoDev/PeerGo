@@ -417,7 +417,7 @@ function PurchaseTable({
               <TableCell className="max-w-[420px]">
                 <Link
                   to={`/torrents/${item.torrent_id}`}
-                  className="block truncate font-medium hover:text-primary"
+                  className="block truncate font-bold text-title transition-colors hover:text-title-hover"
                 >
                   {item.torrent_title}
                 </Link>

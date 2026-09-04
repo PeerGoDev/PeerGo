@@ -80,11 +80,8 @@ function ResetPasswordContent({ token }: { token: string }) {
 
   if (!validToken) {
     return (
-      <AuthEntryCard
-        className="gap-0 py-0"
-        aria-labelledby="reset-password-invalid-title"
-      >
-        <CardContent className="p-6">
+      <AuthEntryCard aria-labelledby="reset-password-invalid-title">
+        <CardContent className="px-6">
           <div className="flex flex-col gap-4 text-center">
             <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10">
               <CircleXIcon className="size-6 text-destructive" />
@@ -120,11 +117,8 @@ function ResetPasswordContent({ token }: { token: string }) {
 
   if (confirmRecovery.data) {
     return (
-      <AuthEntryCard
-        className="gap-0 py-0"
-        aria-labelledby="reset-password-success-title"
-      >
-        <CardContent className="p-6">
+      <AuthEntryCard aria-labelledby="reset-password-success-title">
+        <CardContent className="px-6">
           <div className="flex flex-col gap-4 text-center">
             <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-success/10">
               <CircleCheckIcon className="size-6 text-success" />
@@ -157,7 +151,7 @@ function ResetPasswordContent({ token }: { token: string }) {
         <CardTitle>
           <h1
             id="reset-password-title"
-            className="flex items-center gap-2 text-2xl leading-none font-semibold tracking-tight"
+            className="flex items-center gap-2 text-[22px] leading-none font-semibold tracking-tight"
           >
             <KeyRoundIcon />
             重置密码

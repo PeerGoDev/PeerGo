@@ -185,7 +185,7 @@ export function LoginPage() {
         <CardTitle>
           <h1
             id="login-title"
-            className="text-2xl leading-none font-semibold tracking-tight"
+            className="text-[22px] leading-none font-semibold tracking-tight"
           >
             登录
           </h1>

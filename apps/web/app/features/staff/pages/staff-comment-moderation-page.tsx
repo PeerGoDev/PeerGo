@@ -298,7 +298,7 @@ function ModerationCaseTable({
         <TableBody>
           {cases.map((item) => (
             <TableRow key={item.id} className="h-[72px]">
-              <TableCell className="px-3 py-2">
+              <TableCell className="px-3 py-2.5">
                 <div className="flex min-w-0 flex-col gap-1">
                   <Link
                     to={moderationTargetPath(item)}
@@ -312,10 +312,10 @@ function ModerationCaseTable({
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="px-3 py-2">
+              <TableCell className="px-3 py-2.5">
                 <ReportReasonBadges moderationCase={item} />
               </TableCell>
-              <TableCell className="px-3 py-2">
+              <TableCell className="px-3 py-2.5">
                 <p className="line-clamp-2 text-sm leading-relaxed break-words">
                   {moderatedCommentBody(item)}
                 </p>
@@ -323,7 +323,7 @@ function ModerationCaseTable({
                   @{item.comment.author.display_name}
                 </p>
               </TableCell>
-              <TableCell className="px-3 py-2">
+              <TableCell className="px-3 py-2.5">
                 <Badge
                   variant="outline"
                   className="border-warning/40 bg-warning/10 text-warning-foreground"
@@ -331,7 +331,7 @@ function ModerationCaseTable({
                   待处理
                 </Badge>
               </TableCell>
-              <TableCell className="px-3 py-2">
+              <TableCell className="px-3 py-2.5">
                 <time
                   dateTime={item.opened_at}
                   className="text-xs text-muted-foreground"
@@ -339,7 +339,7 @@ function ModerationCaseTable({
                   {formatDateTime(item.opened_at)}
                 </time>
               </TableCell>
-              <TableCell className="px-3 py-2 text-center">
+              <TableCell className="px-3 py-2.5 text-center">
                 {canResolve ? (
                   <Button
                     variant="ghost"

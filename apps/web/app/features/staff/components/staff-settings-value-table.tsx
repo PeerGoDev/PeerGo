@@ -22,7 +22,7 @@ export function StaffSettingsValueTable({
   valueHeader?: string
 }) {
   return (
-    <Table>
+    <Table containerClassName="px-3">
       <TableHeader>
         <TableRow>
           <TableHead>项目</TableHead>

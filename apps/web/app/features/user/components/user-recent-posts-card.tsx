@@ -45,7 +45,7 @@ export function UserRecentPostsCard({
   onPageChange: (offset: number) => void
 }) {
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-2">
         <CardTitle className="flex items-center gap-2 text-base leading-6 font-semibold">
           <MessageCircleIcon className="size-4" />

@@ -565,7 +565,7 @@ function MySubmissionsContent({
       rejected: "暂无已拒绝的种子",
     }[filter]
     return (
-      <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="gap-0 py-0">
         <CardContent className="px-0">
           <Empty className="min-h-60 rounded-none border-0 py-12">
             <EmptyHeader>
@@ -641,7 +641,7 @@ function MySubmissionCard({
   onRequestWithdrawal: (submission: MySubmission) => void
 }) {
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="gap-0 py-0">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -825,7 +825,7 @@ function SubmissionTitle({ submission }: { submission: MySubmission }) {
   return (
     <Link
       to={`/torrents/${submission.id}`}
-      className="truncate rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="truncate rounded-sm font-bold text-title underline-offset-4 transition-colors hover:text-title-hover hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       {submission.title}
     </Link>

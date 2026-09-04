@@ -226,11 +226,11 @@ function StaffDashboard({
       />
 
       {canAccessSettings || availableQuickActions.length > 0 ? (
-        <Card className="gap-0 py-0">
-          <CardHeader className="p-6">
+        <Card>
+          <CardHeader>
             <CardTitle className="text-base">快捷操作</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-3 p-6 pt-0">
+          <CardContent className="flex flex-wrap gap-3">
             {canAccessSettings ? (
               <Link
                 to="/staff/settings"
@@ -260,7 +260,7 @@ function StaffDashboard({
         </Card>
       ) : null}
 
-      <Card className="gap-0 py-0">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <ShieldCheckIcon className="size-[18px] text-success" />
@@ -278,7 +278,7 @@ function StaffDashboard({
             </Badge>
           </CardAction>
         </CardHeader>
-        <CardContent className="grid gap-4 px-6 pb-6 text-sm sm:grid-cols-2">
+        <CardContent className="grid gap-x-6 gap-y-5 text-sm sm:grid-cols-2">
           <SessionFact
             icon={UserRoundIcon}
             label="当前后台身份"
@@ -432,7 +432,7 @@ function SessionFact({
       <span className="mt-0.5 text-muted-foreground [&>svg]:size-4">
         <Icon />
       </span>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <span className="font-medium">{label}</span>
         {dateTime ? (
           <time className="text-muted-foreground" dateTime={value}>

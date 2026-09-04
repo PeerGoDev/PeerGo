@@ -159,7 +159,7 @@ export function MyPromotionProductOrdersPage() {
                       <TableCell className="max-w-80">
                         <Link
                           to={`/torrents/${order.torrent_id}`}
-                          className="line-clamp-2 font-medium hover:text-primary"
+                          className="line-clamp-2 font-bold text-title transition-colors hover:text-title-hover"
                         >
                           {order.torrent_title}
                         </Link>

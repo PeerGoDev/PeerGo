@@ -5,20 +5,28 @@ export function AppLoadingSkeleton() {
     <main
       role="status"
       aria-label="加载中"
-      className="grid min-h-svh grid-cols-1 lg:grid-cols-[12.5rem_minmax(0,1fr)]"
+      className="grid min-h-svh grid-cols-1 lg:grid-cols-[calc(var(--shell-sidebar-width)+2*var(--shell-gap))_minmax(0,1fr)]"
     >
       <span className="sr-only">页面加载中</span>
-      <aside className="hidden border-r p-4 lg:flex lg:flex-col lg:gap-5">
-        <Skeleton className="h-7 w-28 self-end" />
-        <div className="flex flex-col gap-3 pt-3">
-          {Array.from({ length: 8 }, (_, index) => (
-            <Skeleton key={index} className="h-10 w-full" aria-hidden="true" />
-          ))}
+      <aside className="hidden p-(--shell-gap) lg:block">
+        <div className="flex h-full flex-col gap-5 rounded-lg bg-sidebar p-4 shadow-soft">
+          <Skeleton className="h-7 w-28" />
+          <div className="flex flex-col gap-3 pt-3">
+            {Array.from({ length: 8 }, (_, index) => (
+              <Skeleton
+                key={index}
+                className="h-10 w-full"
+                aria-hidden="true"
+              />
+            ))}
+          </div>
         </div>
       </aside>
       <div className="min-w-0">
-        <header className="flex h-[60px] items-center justify-end border-b px-4 lg:px-6">
-          <Skeleton className="h-8 w-36" aria-hidden="true" />
+        <header className="px-4 pt-(--shell-gap) lg:px-6">
+          <div className="mx-auto flex h-(--shell-header-height) w-full max-w-[1200px] items-center justify-end rounded-lg bg-glass px-4 shadow-soft backdrop-blur-[7px]">
+            <Skeleton className="h-8 w-36" aria-hidden="true" />
+          </div>
         </header>
         <RouteLoadingSkeleton embedded />
       </div>

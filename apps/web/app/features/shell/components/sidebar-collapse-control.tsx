@@ -12,11 +12,11 @@ export function SidebarCollapseControl() {
     <Button
       variant="ghost"
       onClick={toggleSidebar}
-      className="h-11 w-full justify-end rounded-none px-5 text-muted-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+      className="h-11 w-full justify-start rounded-none px-5 text-muted-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
       aria-label={label}
     >
-      <span className="group-data-[collapsible=icon]:hidden">收起</span>
       {collapsed && !isMobile ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+      <span className="group-data-[collapsible=icon]:hidden">收起</span>
     </Button>
   )
 }

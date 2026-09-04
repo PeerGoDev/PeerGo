@@ -167,7 +167,7 @@ describe("TorrentDetailPage", () => {
     ).toHaveClass("px-6", "pb-6")
     expect(
       screen.getByText("用户列表").closest("[data-slot=card-title]")
-    ).toHaveClass("font-semibold")
+    ).toHaveClass("font-bold")
     const rawMediaInfoButton = screen.getByRole("button", {
       name: "查看原始信息",
     })
@@ -219,7 +219,7 @@ describe("TorrentDetailPage", () => {
     expect(screen.getByText(/2 个文件/)).toBeVisible()
     expect(
       screen.getByText(/2 个文件/).closest("[data-slot='card-title']")
-    ).toHaveClass("text-base", "font-semibold")
+    ).toHaveClass("text-sm", "font-bold")
     expect(screen.getByText("Final.Release.2026/movie.mkv")).toBeVisible()
     expect(screen.getByText("填充")).toBeVisible()
     const downloadButton = screen.getByRole("button", {

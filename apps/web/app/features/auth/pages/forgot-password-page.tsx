@@ -137,7 +137,7 @@ export function ForgotPasswordPage() {
         <CardTitle>
           <h1
             id="forgot-password-title"
-            className="flex items-center gap-2 text-2xl leading-none font-semibold tracking-tight"
+            className="flex items-center gap-2 text-[22px] leading-none font-semibold tracking-tight"
           >
             <MailIcon />
             找回密码

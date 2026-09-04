@@ -10,12 +10,12 @@ import { cn } from "~/lib/utils"
 import { useAvatarRevision } from "~/shared/components/avatar-revision"
 
 const fallbackColors = [
-  "bg-primary text-primary-foreground",
-  "bg-success text-primary-foreground",
-  "bg-warning text-warning-foreground",
-  "bg-chart-3 text-primary-foreground",
-  "bg-chart-5 text-primary-foreground",
-  "bg-destructive text-primary-foreground",
+  "bg-sidebar-accent text-sidebar-accent-foreground",
+  "bg-success/20 text-success-foreground",
+  "bg-warning/20 text-warning-foreground",
+  "bg-info/20 text-info",
+  "bg-primary/25 text-sidebar-accent-foreground",
+  "bg-destructive/15 text-destructive",
 ] as const
 const unavailableAvatarUsernames = new Set<string>()
 
@@ -83,7 +83,7 @@ export function UserAvatar({
       </AvatarFallback>
       {online ? (
         <AvatarBadge
-          className="bg-emerald-500 shadow-[0_0_6px_color-mix(in_oklab,var(--color-emerald-500)_70%,transparent)]"
+          className="bg-success shadow-[0_0_6px_color-mix(in_oklab,var(--color-success)_70%,transparent)]"
           title="在线"
           aria-label={`${identity}在线`}
         />

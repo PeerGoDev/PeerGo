@@ -26,7 +26,7 @@ describe("TorrentViewControls", () => {
       name: "显示成人内容？",
     })
     expect(confirmation).toBeVisible()
-    expect(confirmation).toHaveClass("border", "sm:max-w-[425px]!")
+    expect(confirmation).toHaveClass("p-6", "sm:max-w-[425px]!")
     expect(screen.getByRole("heading", { name: "显示成人内容？" })).toHaveClass(
       "text-lg",
       "leading-none"

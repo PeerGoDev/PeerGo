@@ -62,7 +62,7 @@ export function TwoFactorCard({
   csrfToken: string
 }) {
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-5">
         <CardTitle className="text-2xl leading-none font-semibold">
           两步验证

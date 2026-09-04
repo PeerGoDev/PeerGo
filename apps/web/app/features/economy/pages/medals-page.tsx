@@ -219,7 +219,7 @@ function MedalCenter({
         </div>
       </header>
 
-      <Card className="border-primary/20 bg-linear-to-r from-primary/5 to-card">
+      <Card className="bg-linear-to-r from-primary/5 to-card">
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-3">
             <ZapIcon aria-hidden="true" />
@@ -400,7 +400,7 @@ function MedalTab({
   return (
     <ToggleGroupItem
       value={value}
-      className="h-11 rounded-none border-0 border-b-2 border-transparent px-4 data-[state=on]:border-primary data-[state=on]:bg-transparent data-[state=on]:text-primary"
+      className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
     >
       {Icon ? <Icon data-icon="inline-start" /> : null}
       {label}

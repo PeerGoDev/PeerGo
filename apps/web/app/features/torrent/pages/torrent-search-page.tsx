@@ -150,7 +150,7 @@ export function TorrentSearchPage() {
   if (!session.isPending && !authenticated) {
     return (
       <PageLayout className="items-center justify-center">
-        <Card className="w-full max-w-md shadow-sm">
+        <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
             <SearchIcon className="size-8 text-muted-foreground" />
             <div>
@@ -172,7 +172,7 @@ export function TorrentSearchPage() {
     <PageLayout id="torrent-search" className="gap-6">
       <PageHeader title="搜索种子" />
 
-      <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="gap-0 py-0">
         <CardContent className="p-6">
           <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -472,7 +472,7 @@ function SearchTermsCard({
   tone?: "history" | "popular"
 }) {
   return (
-    <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0 md:min-h-[246px]">
+    <Card className="gap-0 py-0 md:min-h-[246px]">
       <CardHeader className="flex flex-row items-center justify-between p-6 pb-3">
         <CardTitle className="flex items-center gap-2">
           <Icon className="size-4" />

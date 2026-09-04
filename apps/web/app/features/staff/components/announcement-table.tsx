@@ -117,7 +117,7 @@ export function AnnouncementTable({
           <TableBody>
             {announcements.map((announcement) => (
               <TableRow key={announcement.id} className="h-[70px]">
-                <TableCell className="max-w-sm px-4 py-2 whitespace-normal">
+                <TableCell className="max-w-sm px-4 py-2.5 whitespace-normal">
                   <div className="flex min-w-48 flex-col gap-0.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="line-clamp-1 font-medium break-words">
@@ -132,7 +132,7 @@ export function AnnouncementTable({
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="px-4 py-2">
+                <TableCell className="px-4 py-2.5">
                   <div className="flex flex-col gap-0.5">
                     <code className="max-w-44 truncate text-[11px] text-muted-foreground">
                       {announcement.id}
@@ -143,13 +143,13 @@ export function AnnouncementTable({
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="px-4 py-2">
+                <TableCell className="px-4 py-2.5">
                   <AnnouncementStatusBadge status={announcement.status} />
                 </TableCell>
-                <TableCell className="px-4 py-2">
+                <TableCell className="px-4 py-2.5">
                   <AnnouncementTiming announcement={announcement} />
                 </TableCell>
-                <TableCell className="px-4 py-2">
+                <TableCell className="px-4 py-2.5">
                   <time
                     dateTime={announcement.updated_at}
                     className="text-xs text-muted-foreground"
@@ -157,7 +157,7 @@ export function AnnouncementTable({
                     {formatDateTime(announcement.updated_at)}
                   </time>
                 </TableCell>
-                <TableCell className="px-4 py-2 text-right">
+                <TableCell className="px-4 py-2.5 text-right">
                   <AnnouncementActions
                     announcement={announcement}
                     canUpdate={canUpdate}

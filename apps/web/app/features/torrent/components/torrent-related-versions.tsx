@@ -45,10 +45,10 @@ export function TorrentRelatedVersions({ torrentId }: { torrentId: number }) {
     : related.data.items.slice(0, 3)
 
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="gap-0 py-0">
       <CardHeader className="p-6 pb-2">
-        <CardTitle className="flex items-center gap-2 text-2xl leading-none font-semibold">
-          <LayersIcon className="size-5" />
+        <CardTitle className="flex items-center gap-2">
+          <LayersIcon className="size-4" />
           其它版本 ({related.data.items.length.toLocaleString("zh-CN")})
         </CardTitle>
       </CardHeader>
@@ -62,7 +62,7 @@ export function TorrentRelatedVersions({ torrentId }: { torrentId: number }) {
               <Link
                 to={`/torrents/${torrent.id}`}
                 title={torrent.name}
-                className="block truncate font-medium text-primary hover:underline"
+                className="block truncate font-bold text-title transition-colors hover:text-title-hover hover:underline"
               >
                 {torrent.name}
               </Link>
@@ -78,13 +78,18 @@ export function TorrentRelatedVersions({ torrentId }: { torrentId: number }) {
                 </span>
                 <Badge variant="secondary">{torrent.category.name}</Badge>
                 {torrent.promotion === "free" ? (
-                  <Badge variant="destructive">免费</Badge>
+                  <Badge
+                    variant="outline"
+                    className="border-transparent bg-success/10 text-success-foreground"
+                  >
+                    免费
+                  </Badge>
                 ) : null}
-                <span className="flex items-center gap-1 text-success-foreground">
+                <span className="flex items-center gap-1 font-mono text-success-foreground tabular-nums">
                   <UploadIcon className="size-3.5" />
                   {swarmValue(torrent, torrent.seeders)}
                 </span>
-                <span className="flex items-center gap-1 text-primary">
+                <span className="flex items-center gap-1 font-mono text-destructive tabular-nums">
                   <DownloadIcon className="size-3.5" />
                   {swarmValue(torrent, torrent.leechers)}
                 </span>

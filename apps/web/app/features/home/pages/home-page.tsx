@@ -186,7 +186,7 @@ function CommunityWelcome({
 }) {
   return (
     <PageLayout
-      className="min-h-[calc(100svh-3.75rem)] items-center justify-center"
+      className="min-h-[calc(100svh-var(--shell-header-height)-var(--shell-gap))] items-center justify-center"
       aria-labelledby="community-welcome-title"
     >
       <div className="flex max-w-xl flex-col items-center gap-6 text-center">
@@ -241,7 +241,7 @@ function AnnouncementState({
   if (loading) {
     return (
       <Card
-        className="min-h-[122px] gap-0 rounded-lg border py-0 shadow-sm ring-0"
+        className="min-h-[122px] gap-0 py-0"
         aria-label="正在加载最新公告"
         aria-busy="true"
       >
@@ -274,7 +274,7 @@ function AnnouncementState({
 
   if (!data) {
     return (
-      <Card className="min-h-[122px] gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="min-h-[122px] gap-0 py-0">
         <CardHeader className="px-4 pt-4 pb-3">
           <CardTitle className="flex items-center gap-2 text-sm leading-5 font-semibold text-muted-foreground [&_svg]:size-4">
             <NewspaperIcon className="text-primary" />
@@ -291,7 +291,7 @@ function AnnouncementState({
   }
 
   return (
-    <Card className="min-h-[122px] gap-0 rounded-lg border py-0 shadow-sm ring-0">
+    <Card className="min-h-[122px] gap-0 py-0">
       <CardHeader className="px-4 pt-4 pb-3">
         <CardTitle className="flex items-center gap-2 text-sm leading-5 font-semibold text-muted-foreground [&_svg]:size-4">
           <NewspaperIcon className="text-primary" />

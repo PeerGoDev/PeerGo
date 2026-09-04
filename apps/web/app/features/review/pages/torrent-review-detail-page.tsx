@@ -202,7 +202,7 @@ export function TorrentReviewDetailPage() {
 function ReviewEvidenceSummary({ detail }: { detail: MyTorrentReviewDetail }) {
   const [coverFailed, setCoverFailed] = React.useState(false)
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="gap-0 py-0">
       <CardHeader className="border-b p-5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{detail.category_name}</Badge>
@@ -333,7 +333,7 @@ function ReviewFilesCard({
     myTorrentReviewFilesQueryOptions(torrentId, filePageSize, offset)
   )
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="gap-0 py-0">
       <CardHeader className="border-b p-5">
         <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
           <span className="inline-flex items-center gap-2">
@@ -448,7 +448,7 @@ function ReviewVotePanel({
   }
 
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="gap-0 py-0">
       <CardHeader className="border-b p-5">
         <CardTitle className="flex items-center gap-2 text-lg">
           <ShieldCheckIcon data-icon="inline-start" />
@@ -592,7 +592,7 @@ function ReviewVotePanel({
 
 function ReviewVoteSuccess({ result }: { result: TorrentReviewVoteResult }) {
   return (
-    <Card className="gap-0 rounded-lg py-0 shadow-sm">
+    <Card className="gap-0 py-0">
       <CardContent className="flex min-h-80 flex-col items-center justify-center gap-5 p-8 text-center">
         <div className="rounded-full bg-primary/10 p-4 text-primary">
           <CircleCheckIcon className="size-10" />

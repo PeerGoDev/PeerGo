@@ -94,7 +94,7 @@ export function TorrentViewControls({
       </ToggleGroup>
 
       <AlertDialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
-        <AlertDialogContent className="gap-4 rounded-lg border p-6 sm:max-w-[425px]!">
+        <AlertDialogContent className="gap-4 p-6 sm:max-w-[425px]!">
           <AlertDialogHeader className="place-items-start text-left">
             <AlertDialogTitle className="flex items-center gap-2 text-lg leading-none font-semibold">
               <TriangleAlertIcon className="size-5 text-warning" />

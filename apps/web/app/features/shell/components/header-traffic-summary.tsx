@@ -62,7 +62,7 @@ export function HeaderTrafficSummary({
   return (
     <div className="hidden items-start gap-5 text-xs leading-4 md:flex">
       {traffic.data ? (
-        <dl className="flex w-[118px] flex-col gap-1">
+        <dl className="flex w-[126px] flex-col gap-1">
           <HeaderMetric
             icon={<TrendingUpIcon className="text-muted-foreground" />}
             label="分享率"
@@ -92,7 +92,7 @@ export function HeaderTrafficSummary({
       ) : null}
 
       {economy.data ? (
-        <dl className="flex w-[110px] flex-col gap-1">
+        <dl className="flex w-[118px] flex-col gap-1">
           <HeaderMetric
             icon={<StarIcon className="text-warning-foreground" />}
             label="等级"
@@ -142,7 +142,7 @@ function HeaderMetric({
         </span>
         <span>{label}</span>
       </dt>
-      <dd className="ml-auto min-w-0 text-right font-medium text-foreground tabular-nums">
+      <dd className="ml-auto min-w-0 text-right font-mono font-medium text-foreground tabular-nums">
         {fullValue ? (
           <Tooltip>
             <TooltipTrigger render={valueContent} />

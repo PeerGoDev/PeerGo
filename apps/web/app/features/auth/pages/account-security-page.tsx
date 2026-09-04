@@ -89,7 +89,7 @@ export function AccountSecurityPage() {
   if (!session.data) {
     return (
       <AccountSecurityFrame>
-        <Card className="rounded-lg border ring-0">
+        <Card>
           <CardHeader>
             <CardTitle>需要登录</CardTitle>
             <CardDescription>
@@ -154,7 +154,7 @@ export function AccountSecurityPage() {
       {overview.isPending ? (
         <SecurityStatusSkeleton />
       ) : overview.data ? (
-        <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+        <Card className="gap-0 py-0">
           <CardHeader className="px-6 pt-6 pb-4">
             <CardTitle>
               <h2 className="text-2xl leading-none font-semibold">修改密码</h2>
@@ -188,7 +188,7 @@ export function AccountSecurityPage() {
         />
       ) : null}
 
-      <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="gap-0 py-0">
         <CardHeader className="border-b px-6 py-5">
           <CardTitle>
             <h2 className="text-2xl leading-none font-semibold">设备会话</h2>

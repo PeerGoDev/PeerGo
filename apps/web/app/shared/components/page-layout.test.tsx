@@ -15,12 +15,13 @@ describe("PageLayout", () => {
     )
   })
 
-  it("uses a compact heading before the desktop breakpoint", () => {
+  it("renders the title in the glass subheader strip", () => {
     render(<PageHeader title="页面标题" />)
 
     expect(screen.getByRole("heading", { name: "页面标题" })).toHaveClass(
-      "text-2xl",
-      "sm:text-3xl"
+      "font-heading",
+      "text-[15px]",
+      "font-semibold"
     )
   })
 })

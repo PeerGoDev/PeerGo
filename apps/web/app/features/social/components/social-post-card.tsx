@@ -467,7 +467,7 @@ export function SocialPostCard({
             "relative mt-3 overflow-hidden rounded-xl text-white shadow-sm",
             post.red_packet.remaining_claims === 0
               ? "bg-gradient-to-br from-slate-400 to-slate-500"
-              : "bg-gradient-to-br from-[#f15b45] via-[#e94738] to-[#d7322f]"
+              : "bg-gradient-to-br from-[#FFB25E] to-[#F5762C]"
           )}
         >
           <span className="pointer-events-none absolute -top-14 -right-10 size-40 rounded-full border-[24px] border-white/5" />
@@ -578,7 +578,10 @@ export function SocialPostCard({
       {post.pinned || post.featured ? (
         <div className="mt-2 flex gap-1">
           {post.pinned ? (
-            <Badge variant="outline">
+            <Badge
+              variant="outline"
+              className="border-transparent bg-destructive/10 text-title"
+            >
               <PinIcon />
               置顶
             </Badge>
@@ -750,7 +753,7 @@ function SharedTorrentCard({
           </div>
         ) : null}
         <div className="min-w-0 flex-1 p-3">
-          <div className="line-clamp-1 font-medium transition-colors group-hover:text-primary">
+          <div className="line-clamp-1 font-bold text-title transition-colors group-hover:text-title-hover">
             {torrent.title}
           </div>
           {torrent.subtitle ? (

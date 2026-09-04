@@ -57,7 +57,7 @@ export function TorrentCards({
               <TorrentCoverPreview
                 torrentId={torrent.id}
                 title={torrent.name}
-                triggerClassName="relative flex aspect-[2/3] items-center justify-center overflow-hidden rounded-lg bg-muted shadow-sm transition-shadow group-hover:shadow-lg"
+                triggerClassName="relative flex aspect-[2/3] items-center justify-center overflow-hidden rounded-2xl bg-muted shadow-soft-sm transition-shadow group-hover:shadow-soft"
                 disabled={
                   !adultCoversVisible &&
                   torrentCoverRequiresAdultConfirmation(torrent.category)
@@ -113,7 +113,7 @@ export function TorrentCards({
 
               <div className="mt-2 px-0.5">
                 <h3
-                  className="line-clamp-2 text-sm leading-snug font-medium transition-colors group-hover:text-primary"
+                  className="line-clamp-2 text-sm leading-snug font-bold text-title transition-colors group-hover:text-title-hover"
                   title={torrent.name}
                 >
                   {torrent.name}
@@ -138,12 +138,12 @@ export function TorrentCards({
                   to={`/torrents/${torrent.id}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="group block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {posterContent}
                 </Link>
               ) : (
-                <div className="block rounded-lg">{posterContent}</div>
+                <div className="block rounded-2xl">{posterContent}</div>
               )}
             </article>
           )
@@ -153,7 +153,7 @@ export function TorrentCards({
   }
 
   return (
-    <Card className="grid grid-cols-1 gap-0 py-0 shadow-none md:hidden">
+    <Card className="grid grid-cols-1 gap-0 py-0 md:hidden">
       {torrents.map((torrent) => {
         const timestamp =
           timestampByTorrentId?.get(torrent.id) ?? torrent.uploaded_at

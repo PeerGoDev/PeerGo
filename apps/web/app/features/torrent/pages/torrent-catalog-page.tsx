@@ -166,7 +166,7 @@ export function TorrentCatalogPage() {
   if (!session.isPending && !authenticated) {
     return (
       <PageLayout className="items-center justify-center">
-        <Card className="w-full max-w-md shadow-none">
+        <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
             <SearchIcon className="size-8 text-muted-foreground" />
             <div>
@@ -188,7 +188,7 @@ export function TorrentCatalogPage() {
     <PageLayout id="torrent-catalog" className="gap-3 sm:gap-4">
       <h1 className="sr-only">种子</h1>
 
-      <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="gap-0 py-0">
         <CardContent className="-mx-2 flex [scrollbar-width:none] flex-nowrap gap-1.5 overflow-x-auto p-2 sm:mx-0 sm:flex-wrap sm:gap-2 sm:p-4 [&::-webkit-scrollbar]:hidden">
           <CategoryFilterButton
             label="全部"
@@ -220,7 +220,7 @@ export function TorrentCatalogPage() {
         </CardContent>
       </Card>
 
-      <Card className="gap-0 rounded-lg border py-0 shadow-sm ring-0">
+      <Card className="gap-0 py-0">
         <CardContent className="p-3 sm:p-4">
           <form
             role="search"
@@ -394,9 +394,7 @@ function CategoryFilterButton({
         variant="secondary"
         className={cn(
           "ml-0.5 h-5 px-1 text-[10px] sm:ml-1 sm:h-6 sm:px-2 sm:text-xs",
-          active
-            ? "bg-chart-3 text-white"
-            : "bg-muted-foreground text-background"
+          active ? "bg-white/25 text-white" : "bg-muted text-muted-foreground"
         )}
       >
         {count}
