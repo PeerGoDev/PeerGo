@@ -32,7 +32,8 @@ export function UserSocialPostsPage() {
     "newest",
     pageSize,
     username,
-    Boolean(session.data?.user && profile.data)
+    Boolean(session.data?.user && profile.data),
+    session.data?.user.id
   )
   const pages = posts.data?.pages ?? []
   const items = pages.flatMap((page) => page.items)

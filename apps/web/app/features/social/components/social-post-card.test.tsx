@@ -163,6 +163,76 @@ describe("SocialPostCard", () => {
     expect(screen.getByRole("button", { name: "评论" })).toHaveClass("border-0")
   })
 
+  it("shows internally consistent poll totals and rounded percentages", () => {
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <SocialPostCard
+            post={{
+              id: "0198f20a-6da8-7e51-9c64-222222222222",
+              author: {
+                id: "0198f20a-6da8-7e51-9c64-111111111111",
+                username: "demo",
+                display_name: "演示用户",
+                followed_by_me: false,
+                online: false,
+                vip: false,
+                administrator: false,
+                medals: [],
+              },
+              board: {
+                id: "general",
+                name: "生活茶馆",
+                description: "",
+                icon: "coffee",
+                tone: "coral",
+                display_order: 10,
+                enabled: true,
+                allow_member_posts: true,
+                post_count: 1,
+                version: 1,
+              },
+              content: "选一个选项",
+              version: 1,
+              comment_count: 0,
+              like_count: 0,
+              repost_count: 0,
+              liked_by_me: false,
+              reposted_by_me: false,
+              pinned: false,
+              featured: false,
+              hidden: false,
+              topics: [],
+              media: [],
+              poll: {
+                question: "测试投票",
+                options: [
+                  { id: "option-a", label: "选项 A", vote_count: 1 },
+                  { id: "option-b", label: "选项 B", vote_count: 1 },
+                  { id: "option-c", label: "选项 C", vote_count: 1 },
+                ],
+                // A stale or inconsistent aggregate must not corrupt the UI.
+                total_votes: 99,
+                closed: false,
+              },
+              created_at: "2026-08-13T06:00:00Z",
+              updated_at: "2026-08-13T06:00:00Z",
+            }}
+          />
+        </QueryClientProvider>
+      </MemoryRouter>
+    )
+
+    expect(screen.getByText("3 人参与")).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: /选项 A.*1 票.*34%/ })
+    ).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: /选项 B.*1 票.*33%/ })
+    ).toBeVisible()
+    expect(screen.queryByText("99 人参与")).not.toBeInTheDocument()
+  })
+
   it("lets the red packet sender claim one share like PtYes", () => {
     const authorId = "0198f20a-6da8-7e51-9c64-111111111111"
     const queryClient = new QueryClient()

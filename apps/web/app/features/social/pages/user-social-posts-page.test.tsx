@@ -31,32 +31,35 @@ describe("UserSocialPostsPage", () => {
       joined_at: "2026-08-01T08:00:00Z",
       published_torrent_count: 0,
     })
-    queryClient.setQueryData(socialPostKeys.infinite("newest", 20, "demo"), {
-      pages: [
-        {
-          items: [
-            {
-              id: "0198f20a-6da8-7e51-9c64-222222222222",
-              author: {
-                id: userId,
-                username: "demo",
-                display_name: "演示用户",
+    queryClient.setQueryData(
+      socialPostKeys.infinite("newest", 20, "demo", userId),
+      {
+        pages: [
+          {
+            items: [
+              {
+                id: "0198f20a-6da8-7e51-9c64-222222222222",
+                author: {
+                  id: userId,
+                  username: "demo",
+                  display_name: "演示用户",
+                },
+                content: "用户动态页面布局测试",
+                version: 1,
+                comment_count: 0,
+                created_at: "2026-08-13T06:00:00Z",
+                updated_at: "2026-08-13T06:00:00Z",
               },
-              content: "用户动态页面布局测试",
-              version: 1,
-              comment_count: 0,
-              created_at: "2026-08-13T06:00:00Z",
-              updated_at: "2026-08-13T06:00:00Z",
-            },
-          ],
-          total: 1,
-          limit: 20,
-          offset: 0,
-          sort: "newest",
-        },
-      ],
-      pageParams: [0],
-    })
+            ],
+            total: 1,
+            limit: 20,
+            offset: 0,
+            sort: "newest",
+          },
+        ],
+        pageParams: [0],
+      }
+    )
 
     render(
       <MemoryRouter initialEntries={["/social/user/demo"]}>

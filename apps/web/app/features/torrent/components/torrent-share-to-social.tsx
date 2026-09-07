@@ -46,7 +46,7 @@ export function TorrentShareToSocial({
   const session = useWebSession()
   const capabilities = useCapabilities(session.data?.user.id)
   const swarm = useTorrentSwarm(torrentId)
-  const createPost = useCreateSocialPost()
+  const createPost = useCreateSocialPost(session.data?.user.id)
   const actions = React.useMemo(
     () => new Set(capabilities.data?.items.map((item) => item.action) ?? []),
     [capabilities.data?.items]

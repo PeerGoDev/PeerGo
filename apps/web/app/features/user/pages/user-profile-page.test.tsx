@@ -349,11 +349,17 @@ function profileTestClient() {
     items: [],
   })
   queryClient.setQueryData(
-    socialPostKeys.page("newest", 3, 0, "legacy-user"),
+    socialPostKeys.page("newest", 3, 0, {
+      authorUsername: "legacy-user",
+      viewerId: userId,
+    }),
     socialPostPage("legacy-user", "迁移用户", "迁移后的首条动态")
   )
   queryClient.setQueryData(
-    socialPostKeys.page("newest", 3, 0, "someone-else"),
+    socialPostKeys.page("newest", 3, 0, {
+      authorUsername: "someone-else",
+      viewerId: userId,
+    }),
     socialPostPage("someone-else", "另一位成员", "另一位成员的公开动态")
   )
   return queryClient

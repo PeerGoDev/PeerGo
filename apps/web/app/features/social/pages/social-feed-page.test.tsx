@@ -12,6 +12,35 @@ import { SocialFeedPage } from "~/features/social/pages/social-feed-page"
 const userId = "0198f20a-6da8-7e51-9c64-111111111111"
 
 describe("SocialFeedPage", () => {
+  it("waits for a valid session instead of caching a premature 401", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    })
+    queryClient.setQueryData(sessionKeys.current(), null)
+
+    render(
+      <MemoryRouter initialEntries={["/social"]}>
+        <QueryClientProvider client={queryClient}>
+          <SocialFeedPage />
+        </QueryClientProvider>
+      </MemoryRouter>
+    )
+
+    expect(screen.getByText("登录后查看动态圈")).toBeVisible()
+    expect(screen.getByRole("button", { name: "前往登录" })).toHaveAttribute(
+      "href",
+      "/login"
+    )
+    expect(
+      queryClient.getQueryState(
+        socialPostKeys.page("newest", 20, 0, { viewerId: "anonymous" })
+      )?.fetchStatus
+    ).toBe("idle")
+    expect(
+      queryClient.getQueryState(socialPostKeys.overview())?.fetchStatus
+    ).toBe("idle")
+  })
+
   it("renders the PtYes-compatible feed frame and lets administrators select restricted boards", async () => {
     const user = userEvent.setup()
     const queryClient = new QueryClient({
@@ -73,27 +102,30 @@ describe("SocialFeedPage", () => {
       ],
       hot_topics: [],
     })
-    queryClient.setQueryData(socialPostKeys.page("newest", 20, 0), {
-      items: [
-        {
-          id: "0198f20a-6da8-7e51-9c64-222222222222",
-          author: {
-            id: userId,
-            username: "demo",
-            display_name: "演示用户",
+    queryClient.setQueryData(
+      socialPostKeys.page("newest", 20, 0, { viewerId: userId }),
+      {
+        items: [
+          {
+            id: "0198f20a-6da8-7e51-9c64-222222222222",
+            author: {
+              id: userId,
+              username: "demo",
+              display_name: "演示用户",
+            },
+            content: "欢迎来到 #PeerGo 动态圈",
+            version: 1,
+            comment_count: 2,
+            created_at: "2026-08-13T06:00:00Z",
+            updated_at: "2026-08-13T06:00:00Z",
           },
-          content: "欢迎来到 #PeerGo 动态圈",
-          version: 1,
-          comment_count: 2,
-          created_at: "2026-08-13T06:00:00Z",
-          updated_at: "2026-08-13T06:00:00Z",
-        },
-      ],
-      total: 1,
-      limit: 20,
-      offset: 0,
-      sort: "newest",
-    })
+        ],
+        total: 1,
+        limit: 20,
+        offset: 0,
+        sort: "newest",
+      }
+    )
 
     render(
       <MemoryRouter initialEntries={["/social"]}>

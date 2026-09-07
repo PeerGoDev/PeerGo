@@ -9,6 +9,7 @@ import {
   UsersIcon,
   LayoutGridIcon,
   CheckIcon,
+  LogInIcon,
 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
@@ -47,13 +48,16 @@ export function SocialFeedPage() {
   const [topic, setTopic] = React.useState("")
   const [offset, setOffset] = React.useState(0)
   const session = useWebSession()
+  const authenticated = Boolean(session.data?.user.id)
   const capabilities = useCapabilities(session.data?.user.id)
-  const overview = useSocialCommunityOverview()
+  const overview = useSocialCommunityOverview(authenticated)
   const posts = useSocialPosts(sort, pageSize, offset, {
     feed,
     boardId: boardId || undefined,
     featuredOnly,
     topic: topic || undefined,
+    viewerId: session.data?.user.id,
+    enabled: authenticated,
   })
   const actions = React.useMemo(
     () => new Set(capabilities.data?.items.map((item) => item.action) ?? []),
@@ -69,6 +73,16 @@ export function SocialFeedPage() {
     canReadNotifications
   )
   const unreadNotifications = notificationSummary.data?.unread_count ?? 0
+  const postsSessionExpired =
+    posts.error instanceof ApiProblemError && posts.error.status === 401
+
+  async function retryPosts() {
+    if (postsSessionExpired) {
+      const refreshedSession = await session.refetch()
+      if (!refreshedSession.data) return
+    }
+    await posts.refetch()
+  }
 
   React.useEffect(
     () => setOffset(0),
@@ -106,7 +120,7 @@ export function SocialFeedPage() {
             size="icon"
             aria-label="刷新动态"
             onClick={() => void posts.refetch()}
-            disabled={posts.isFetching}
+            disabled={!authenticated || posts.isFetching}
           >
             <RefreshCwIcon
               className={cn(posts.isFetching && "animate-spin")}
@@ -121,6 +135,7 @@ export function SocialFeedPage() {
           {session.data ? (
             <PostComposer
               csrfToken={session.data.csrf_token}
+              currentUserId={session.data.user.id}
               canPost={canPost}
               canPostRestrictedBoards={canPostRestrictedBoards}
               boards={overview.data?.boards ?? []}
@@ -263,15 +278,61 @@ export function SocialFeedPage() {
               </DropdownMenu>
             </div>
 
-            {posts.isPending ? (
+            {session.isPending ? (
+              <FeedSkeleton />
+            ) : session.isError ? (
+              <Alert variant="destructive">
+                <AlertTitle>无法确认登录状态</AlertTitle>
+                <AlertDescription className="flex flex-wrap items-center gap-3">
+                  <span>会话请求未能完成，请稍后重试。</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void session.refetch()}
+                  >
+                    重试
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : !session.data ? (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+                  <LogInIcon className="size-8 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">登录后查看动态圈</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      动态、投票和互动只向已登录成员开放。
+                    </p>
+                  </div>
+                  <Button nativeButton={false} render={<Link to="/login" />}>
+                    前往登录
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : posts.isPending ? (
               <FeedSkeleton />
             ) : posts.isError ? (
               <Alert variant="destructive">
-                <AlertTitle>动态暂时不可用</AlertTitle>
-                <AlertDescription>
-                  {posts.error instanceof ApiProblemError
-                    ? posts.error.message
-                    : "无法读取动态，请稍后重试。"}
+                <AlertTitle>
+                  {postsSessionExpired ? "登录状态已失效" : "动态暂时不可用"}
+                </AlertTitle>
+                <AlertDescription className="flex flex-wrap items-center gap-3">
+                  <span>
+                    {postsSessionExpired
+                      ? "请重新确认登录状态后再读取动态。"
+                      : posts.error instanceof ApiProblemError
+                        ? posts.error.message
+                        : "无法读取动态，请稍后重试。"}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void retryPosts()}
+                  >
+                    {postsSessionExpired ? "检查登录状态" : "重试"}
+                  </Button>
                 </AlertDescription>
               </Alert>
             ) : posts.data.items.length === 0 ? (

@@ -174,6 +174,7 @@ export function UserProfilePage() {
 
   const recentPosts = useSocialPosts("newest", 3, recentPostsOffset, {
     authorUsername: username,
+    viewerId: user?.id,
     enabled: Boolean(user && profile.data),
   })
 

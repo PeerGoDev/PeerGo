@@ -66,7 +66,7 @@ describe("SocialPostDetailPage", () => {
         },
       ],
     })
-    queryClient.setQueryData(socialPostKeys.detail(postId), {
+    queryClient.setQueryData(socialPostKeys.detail(postId, userId), {
       id: postId,
       author: {
         id: userId,
@@ -234,7 +234,7 @@ describe("SocialPostDetailPage", () => {
       policy_version: "test",
       items: [],
     })
-    queryClient.setQueryData(socialPostKeys.detail(postId), {
+    queryClient.setQueryData(socialPostKeys.detail(postId, userId), {
       id: postId,
       author: {
         id: userId,

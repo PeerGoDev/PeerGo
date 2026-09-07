@@ -43,11 +43,13 @@ type LocalMedia = { id: string; url: string; previewUrl: string }
 
 export function PostComposer({
   csrfToken,
+  currentUserId,
   canPost,
   canPostRestrictedBoards,
   boards,
 }: {
   csrfToken: string
+  currentUserId?: string
   canPost: boolean
   canPostRestrictedBoards: boolean
   boards: SocialBoard[]
@@ -67,7 +69,7 @@ export function PostComposer({
   const [draftSaved, setDraftSaved] = React.useState(false)
   const requestId = React.useRef<string>(undefined)
   const fileInput = React.useRef<HTMLInputElement>(null)
-  const createPost = useCreateSocialPost()
+  const createPost = useCreateSocialPost(currentUserId)
   const uploadMedia = useUploadSocialMedia()
   const count = Array.from(content).length
   const poll = buildPoll(pollOpen, pollQuestion, pollOptions)

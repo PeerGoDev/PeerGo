@@ -53,6 +53,7 @@ import {
   useUpdateSocialPost,
 } from "~/features/social/api/posts.queries"
 import { useModerateSocialPost } from "~/features/staff/api/social-administration.queries"
+import { calculatePollStatistics } from "~/features/social/model/poll-statistics"
 import {
   useStaffCapabilities,
   useStaffSession,
@@ -92,7 +93,7 @@ export function SocialPostCard({
   const [editing, setEditing] = React.useState(false)
   const [draft, setDraft] = React.useState(visiblePostContent)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
-  const updatePost = useUpdateSocialPost(post.id)
+  const updatePost = useUpdateSocialPost(post.id, currentUserId)
   const deletePost = useDeleteSocialPost()
   const likePost = useSocialPostLike()
   const repostPost = useSocialPostRepost()
@@ -111,6 +112,9 @@ export function SocialPostCard({
   const removalError = deletePost.error ?? moderatePost.error
   const topics = post.topics ?? []
   const media = post.media ?? []
+  const pollStatistics = post.poll
+    ? calculatePollStatistics(post.poll.options)
+    : null
 
   async function saveEdit() {
     if (!csrfToken || (!draft.trim() && !post.torrent)) return
@@ -422,11 +426,11 @@ export function SocialPostCard({
       {post.poll ? (
         <div className="mt-3 space-y-2 rounded-md border bg-muted/20 p-3">
           <p className="text-sm font-medium">{post.poll.question}</p>
-          {post.poll.options.map((option) => {
-            const percent =
-              post.poll && post.poll.total_votes > 0
-                ? Math.round((option.vote_count * 100) / post.poll.total_votes)
-                : 0
+          {post.poll.options.map((option, index) => {
+            const statistic = pollStatistics?.options[index] ?? {
+              voteCount: 0,
+              percent: 0,
+            }
             const selected = post.poll?.selected_option_id === option.id
             return (
               <Button
@@ -446,17 +450,18 @@ export function SocialPostCard({
               >
                 <span
                   className="absolute inset-y-0 left-0 bg-primary/10"
-                  style={{ width: `${percent}%` }}
+                  style={{ width: `${statistic.percent}%` }}
                 />
                 <span className="relative">{option.label}</span>
                 <span className="relative text-muted-foreground">
-                  {percent}%
+                  {statistic.voteCount} 票 · {statistic.percent}%
                 </span>
               </Button>
             )
           })}
           <p className="text-xs text-muted-foreground">
-            {post.poll.total_votes} 人参与{post.poll.closed ? " · 已结束" : ""}
+            {pollStatistics?.totalVotes ?? 0} 人参与
+            {post.poll.closed ? " · 已结束" : ""}
           </p>
         </div>
       ) : null}

@@ -429,7 +429,7 @@ func readPoll(ctx context.Context, db communityDB, postID, viewerID uuid.UUID, n
 		value := uuid.UUID(selected.Bytes)
 		poll.SelectedOptionID = &value
 	}
-	rows, err := db.Query(ctx, `SELECT option.id,option.label,count(vote.voter_id)::bigint FROM social.post_poll_options AS option JOIN social.posts AS post ON post.id=option.post_id LEFT JOIN social.post_poll_votes AS vote ON vote.option_id=option.id WHERE post.public_id=$1 GROUP BY option.id,option.label,option.position ORDER BY option.position`, postID)
+	rows, err := db.Query(ctx, `SELECT option.id,option.label,count(vote.voter_id)::bigint FROM social.post_poll_options AS option JOIN social.posts AS post ON post.id=option.post_id LEFT JOIN social.post_poll_votes AS vote ON vote.post_id=option.post_id AND vote.option_id=option.id WHERE post.public_id=$1 GROUP BY option.id,option.label,option.position ORDER BY option.position`, postID)
 	if err != nil {
 		return Poll{}, err
 	}

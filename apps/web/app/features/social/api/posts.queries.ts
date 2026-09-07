@@ -28,6 +28,7 @@ export type SocialFeedFilters = {
   boardId?: string
   featuredOnly?: boolean
   topic?: string
+  viewerId?: string
   enabled?: boolean
 }
 
@@ -58,19 +59,28 @@ export const socialPostKeys = {
         ? { authorUsername: filtersOrAuthor }
         : filtersOrAuthor
     const filters = normalizeSocialFilters(rawFilters)
+    const viewerId =
+      typeof filtersOrAuthor === "string"
+        ? "anonymous"
+        : (filtersOrAuthor.viewerId ?? "anonymous")
     return [
       ...socialPostKeys.all,
       "page",
-      { sort, limit, offset, ...filters },
+      { sort, limit, offset, viewerId, ...filters },
     ] as const
   },
-  detail: (postId: string) =>
-    [...socialPostKeys.all, "detail", postId] as const,
-  infinite: (sort: SocialPostSort, limit: number, authorUsername: string) =>
+  detail: (postId: string, viewerId = "anonymous") =>
+    [...socialPostKeys.all, "detail", postId, { viewerId }] as const,
+  infinite: (
+    sort: SocialPostSort,
+    limit: number,
+    authorUsername: string,
+    viewerId = "anonymous"
+  ) =>
     [
       ...socialPostKeys.all,
       "infinite",
-      { sort, limit, authorUsername },
+      { sort, limit, authorUsername, viewerId },
     ] as const,
   overview: () => ["social", "overview"] as const,
 }
@@ -115,19 +125,18 @@ export function socialPostsQueryOptions(
     typeof filtersOrAuthor === "string"
       ? { authorUsername: filtersOrAuthor }
       : filtersOrAuthor
-  const filters = normalizeSocialFilters(rawFilters)
   return queryOptions({
-    queryKey: socialPostKeys.page(sort, limit, offset, filters),
-    queryFn: () => fetchSocialPosts(sort, limit, offset, filters),
+    queryKey: socialPostKeys.page(sort, limit, offset, rawFilters),
+    queryFn: () => fetchSocialPosts(sort, limit, offset, rawFilters),
     staleTime: 15_000,
     refetchInterval: 60_000,
     retry: false,
   })
 }
 
-export function socialPostQueryOptions(postId: string) {
+export function socialPostQueryOptions(postId: string, viewerId = "anonymous") {
   return queryOptions({
-    queryKey: socialPostKeys.detail(postId),
+    queryKey: socialPostKeys.detail(postId, viewerId),
     queryFn: async (): Promise<SocialPost> => {
       const { data, error, response } = await apiClient.GET(
         "/api/v1/social/posts/{post_id}",
@@ -160,18 +169,26 @@ export function useSocialPosts(
   })
 }
 
-export function useSocialPost(postId: string) {
-  return useQuery(socialPostQueryOptions(postId))
+export function useSocialPost(
+  postId: string,
+  viewerId?: string,
+  enabled = true
+) {
+  return useQuery({
+    ...socialPostQueryOptions(postId, viewerId),
+    enabled: Boolean(postId && viewerId) && enabled,
+  })
 }
 
 export function useInfiniteSocialPosts(
   sort: SocialPostSort,
   limit: number,
   authorUsername: string,
-  enabled = true
+  enabled = true,
+  viewerId?: string
 ) {
   return useInfiniteQuery({
-    queryKey: socialPostKeys.infinite(sort, limit, authorUsername),
+    queryKey: socialPostKeys.infinite(sort, limit, authorUsername, viewerId),
     queryFn: ({ pageParam }) =>
       fetchSocialPosts(sort, limit, pageParam, { authorUsername }),
     initialPageParam: 0,
@@ -182,11 +199,11 @@ export function useInfiniteSocialPosts(
     staleTime: 15_000,
     refetchInterval: 60_000,
     retry: false,
-    enabled,
+    enabled: Boolean(viewerId) && enabled,
   })
 }
 
-export function useCreateSocialPost() {
+export function useCreateSocialPost(viewerId?: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: {
@@ -224,13 +241,13 @@ export function useCreateSocialPost() {
       return data
     },
     onSuccess: async (post) => {
-      queryClient.setQueryData(socialPostKeys.detail(post.id), post)
+      queryClient.setQueryData(socialPostKeys.detail(post.id, viewerId), post)
       await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
     },
   })
 }
 
-export function useSocialCommunityOverview() {
+export function useSocialCommunityOverview(enabled = true) {
   return useQuery({
     queryKey: socialPostKeys.overview(),
     queryFn: async (): Promise<SocialCommunityOverview> => {
@@ -244,6 +261,7 @@ export function useSocialCommunityOverview() {
     },
     staleTime: 30_000,
     retry: false,
+    enabled,
   })
 }
 
@@ -399,7 +417,7 @@ export function useClaimSocialRedPacket() {
   })
 }
 
-export function useUpdateSocialPost(postId: string) {
+export function useUpdateSocialPost(postId: string, viewerId?: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: {
@@ -426,7 +444,7 @@ export function useUpdateSocialPost(postId: string) {
       return data
     },
     onSuccess: async (post) => {
-      queryClient.setQueryData(socialPostKeys.detail(postId), post)
+      queryClient.setQueryData(socialPostKeys.detail(postId, viewerId), post)
       await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
     },
   })
@@ -456,7 +474,7 @@ export function useDeleteSocialPost() {
     },
     onSuccess: async (_, input) => {
       queryClient.removeQueries({
-        queryKey: socialPostKeys.detail(input.postId),
+        queryKey: [...socialPostKeys.all, "detail", input.postId],
       })
       await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
     },
