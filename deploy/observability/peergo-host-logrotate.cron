@@ -1,0 +1,6 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# The normal Debian logrotate timer is daily. Check this bounded policy hourly
+# so a sudden traffic spike cannot fill the PostgreSQL filesystem first.
+17 * * * * root /usr/sbin/logrotate /etc/logrotate.d/peergo-host

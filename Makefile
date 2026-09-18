@@ -1,5 +1,5 @@
 .PHONY: generate format test check check-postgres-time-parameters test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-storage-maintenance dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-storage-maintenance dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
-.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-up production-prune-one-shots production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-seeding-reward-retry production-seeding-reward-compensation-preview production-seeding-reward-compensation-apply production-hnr-work-reconcile production-traffic-pipeline-reconfigure
+.PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-log-rotation production-up production-prune-one-shots production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-seeding-reward-retry production-seeding-reward-compensation-preview production-seeding-reward-compensation-apply production-hnr-work-reconcile production-traffic-pipeline-reconfigure
 
 # These values are synthetic and limited to the loopback-only local Compose
 # environment. Production processes require explicit secret-backed variables.
@@ -1020,7 +1020,7 @@ production-build: production-config
 	# service avoids Docker Compose 5 exporting that tag concurrently per service.
 	./scripts/production-compose.sh build peergo-api web-release
 
-production-up: production-ready production-build
+production-up: production-ready production-build production-log-rotation
 	# Start the full dependency graph first so migrations, stream initialization
 	# and the atomic Web release must complete successfully before dependents.
 	# Compose 5 treats a successful one-shot exit as a --wait failure, so the
@@ -1029,6 +1029,11 @@ production-up: production-ready production-build
 	./scripts/production-compose.sh up -d --no-deps --wait \
 		peergo-nats audit-sink vault-api tracker peergo-api peergo-worker
 	$(MAKE) production-prune-one-shots
+
+# OpenResty/1Panel and the legacy PtYes service write host-owned logs outside
+# Compose. Install the bounded rotation policy before bringing the stack up.
+production-log-rotation:
+	./scripts/install-production-log-rotation.sh
 
 # Migration and stream/bootstrap containers are disposable after their state is
 # committed to PostgreSQL/NATS. Keep `docker ps -a` aligned with the six
