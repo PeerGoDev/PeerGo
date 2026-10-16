@@ -19,6 +19,14 @@ import (
 )
 
 func TestIntegrationIncrementalHNRSustainsProgressAfterRawRetirementAndRestart(t *testing.T) {
+	for _, version := range []struct {
+		name      string
+		sequenced bool
+	}{{"v1_inbox_coordinates", false}, {"v2_raw_coordinates", true}} {
+		t.Run(version.name, func(t *testing.T) { runIntegrationIncrementalHNRProgress(t, version.sequenced) })
+	}
+}
+func runIntegrationIncrementalHNRProgress(t *testing.T, sequencedProtocol bool) {
 	url := strings.TrimSpace(os.Getenv("PEERGO_TEST_TRACKER_DATABASE_URL"))
 	if url == "" {
 		t.Skip("PEERGO_TEST_TRACKER_DATABASE_URL is required")
@@ -62,11 +70,17 @@ func TestIntegrationIncrementalHNRSustainsProgressAfterRawRetirementAndRestart(t
 	producerEpoch := uuid.Must(uuid.NewV7()).String()
 	appendEvent := func(sequence uint64, event trackerannouncev1.Event) {
 		t.Helper()
-		sequenced, e := trackerannouncev2.FromV1(event, "incremental-hnr-test", producerEpoch, int64(sequence))
-		if e != nil {
-			t.Fatal(e)
+		var payload []byte
+		var e error
+		if sequencedProtocol {
+			sequenced, err := trackerannouncev2.FromV1(event, "incremental-hnr-test", producerEpoch, int64(sequence))
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload, e = trackerannouncev2.Encode(sequenced)
+		} else {
+			payload, e = trackerannouncev1.Encode(event)
 		}
-		payload, e := trackerannouncev2.Encode(sequenced)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -93,6 +107,17 @@ func TestIntegrationIncrementalHNRSustainsProgressAfterRawRetirementAndRestart(t
 	}
 	if required || !compacted {
 		t.Fatalf("checkpoint did not release represented raw dependency: hnr=%t seeding=%t", required, compacted)
+	}
+	var unknownRequired, unknownCompacted bool
+	if err = pool.QueryRow(ctx, `SELECT ledger.raw_hnr_is_required(unknown),ledger.raw_seeding_is_compacted(unknown)
+      FROM ledger.raw_session_intervals raw,
+      LATERAL(SELECT jsonb_populate_record(NULL::ledger.raw_session_intervals,
+         to_jsonb(raw)||jsonb_build_object('event_id',$2::uuid,'source_stream',NULL,'source_sequence',NULL)) unknown) absent
+      WHERE raw.event_id=$1`, uuid.MustParse(one.EventID), uuid.New()).Scan(&unknownRequired, &unknownCompacted); err != nil {
+		t.Fatal(err)
+	}
+	if !unknownRequired || unknownCompacted {
+		t.Fatalf("unknown legacy source lost its retention pin: %t %t", unknownRequired, unknownCompacted)
 	}
 	if _, err = pool.Exec(ctx, "UPDATE settlement.policy_work SET settled_at=$2 WHERE interval_event_id=$1", uuid.MustParse(one.EventID), clock); err != nil {
 		t.Fatal(err)
