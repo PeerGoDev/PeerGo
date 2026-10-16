@@ -579,6 +579,7 @@ WITH candidate AS (
     SELECT payload.snapshot_id,payload.chunk_index
     FROM (
         SELECT snapshot_id,observed_at FROM ledger.seeding_swarm_snapshots
+        WHERE status='complete'
         ORDER BY observed_at,snapshot_id OFFSET 0
     ) snapshot
     JOIN LATERAL (
