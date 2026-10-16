@@ -48,7 +48,7 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("compose Settlement storage repository: %w", err)
 	}
 	worker, err := storagecleanup.NewWorker(repository, storagecleanup.WorkerConfig{
-		RunInterval: settings.RunInterval, TerminalRetention: settings.TerminalRetention,
+		RunInterval: settings.RunInterval, CatchupBudget: settings.CatchupBudget, TerminalRetention: settings.TerminalRetention,
 		SessionRetention: settings.SessionRetention, DetailRetention: settings.DetailRetention,
 		AnomalyRetention: settings.AnomalyRetention, BatchSize: settings.BatchSize,
 	}, time.Now, logger)
@@ -56,7 +56,7 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("compose Settlement storage worker: %w", err)
 	}
 	logger.Info("Settlement bounded storage maintenance started",
-		"interval", settings.RunInterval, "batch_size", settings.BatchSize,
+		"interval", settings.RunInterval, "batch_size", settings.BatchSize, "catchup_budget", settings.CatchupBudget,
 		"terminal_retention", settings.TerminalRetention, "session_retention", settings.SessionRetention,
 		"detail_retention", settings.DetailRetention, "anomaly_retention", settings.AnomalyRetention)
 	return worker.Run(rootCtx)

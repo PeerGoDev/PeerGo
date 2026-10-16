@@ -18,6 +18,7 @@ const (
 	MinimumDetailRetention      = 12 * time.Hour
 	MinimumAnomalyRetention     = 30 * 24 * time.Hour
 	minimumBacklogRetryInterval = 30 * time.Second
+	maximumCatchupPasses        = 16
 )
 
 var (
@@ -87,6 +88,7 @@ type Repository interface {
 
 type WorkerConfig struct {
 	RunInterval       time.Duration
+	CatchupBudget     time.Duration
 	TerminalRetention time.Duration
 	SessionRetention  time.Duration
 	DetailRetention   time.Duration
@@ -102,7 +104,7 @@ type Worker struct {
 }
 
 func NewWorker(repository Repository, config WorkerConfig, now func() time.Time, logger *slog.Logger) (*Worker, error) {
-	if repository == nil || config.RunInterval < 10*time.Second || config.RunInterval > time.Hour ||
+	if repository == nil || config.CatchupBudget < 0 || config.CatchupBudget > 30*time.Second || config.RunInterval < 10*time.Second || config.RunInterval > time.Hour ||
 		config.TerminalRetention < MinimumTerminalRetention || config.TerminalRetention > 30*24*time.Hour ||
 		config.SessionRetention < MinimumSessionRetention || config.SessionRetention > 30*24*time.Hour ||
 		config.DetailRetention < MinimumDetailRetention || config.DetailRetention > 90*24*time.Hour ||
@@ -120,6 +122,7 @@ func NewWorker(repository Repository, config WorkerConfig, now func() time.Time,
 }
 
 func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
+	started := time.Now()
 	now := worker.now().UTC().Truncate(time.Microsecond)
 	if now.IsZero() {
 		return Result{}, ErrInput
@@ -144,6 +147,7 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 		worker.logger.Log(ctx, level, message,
 			"rows", result.Total(),
 			"batch_size", worker.config.BatchSize,
+			"duration_ms", time.Since(started).Milliseconds(),
 			"raw_intervals", result.RawIntervals,
 			"raw_gc_queued", result.RawQueued,
 			"traffic_gc_queued", result.TrafficQueued,
@@ -167,15 +171,25 @@ func (worker *Worker) Run(ctx context.Context) error {
 			return nil
 		case <-timer.C:
 		}
-		result, err := worker.RunOnce(ctx)
+		started := time.Now()
+		result, passes, err := runCatchupCycle(ctx, worker.config.CatchupBudget,
+			int64(worker.config.BatchSize), time.Now, worker.RunOnce)
+		if passes > 1 {
+			worker.logger.InfoContext(ctx, "Settlement storage catch-up cycle yielded",
+				"passes", passes, "duration_ms", time.Since(started).Milliseconds(),
+				"catchup_budget", worker.config.CatchupBudget)
+		}
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
 			return err
 		}
 		nextRun := worker.config.RunInterval
 		if result.Saturated(int64(worker.config.BatchSize)) {
-			// Backlog catch-up must yield to foreground traffic. Never poll more
-			// frequently than configured, and keep at least thirty seconds
-			// between saturated batches so autovacuum can make progress.
+			// Yield after every bounded catch-up cycle, including when the pass
+			// quota or time budget leaves a saturated backlog. Each pass keeps
+			// the same transactions and retention guards as RunOnce.
 			nextRun = backlogRetryDelay(worker.config.RunInterval)
 		}
 		timer.Reset(nextRun)
@@ -187,4 +201,28 @@ func backlogRetryDelay(runInterval time.Duration) time.Duration {
 		return minimumBacklogRetryInterval
 	}
 	return runInterval
+}
+
+// runCatchupCycle amortizes idle waits over a bounded sequence of complete
+// passes. Budget is checked between passes; no transaction or retention limit
+// is enlarged. Zero preserves one-pass scheduling. The quota also bounds a
+// fast queue while its oldest records remain pinned by another consumer.
+func runCatchupCycle(ctx context.Context, budget time.Duration, batchSize int64,
+	now func() time.Time, run func(context.Context) (Result, error)) (Result, int, error) {
+	started := now()
+	var result Result
+	for pass := 1; pass <= maximumCatchupPasses; pass++ {
+		if err := ctx.Err(); err != nil {
+			return result, pass - 1, err
+		}
+		var err error
+		result, err = run(ctx)
+		if err != nil {
+			return result, pass, err
+		}
+		if !result.Saturated(batchSize) || budget == 0 || now().Sub(started) >= budget {
+			return result, pass, nil
+		}
+	}
+	return result, maximumCatchupPasses, nil
 }

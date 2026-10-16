@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"strings"
 	"time"
 
 	"github.com/peergo/peergo/services/settlement/internal/storagecleanup"
@@ -9,6 +11,7 @@ import (
 type StorageCleanupConfig struct {
 	TrackerLedgerProcessConfig
 	RunInterval       time.Duration
+	CatchupBudget     time.Duration
 	TerminalRetention time.Duration
 	SessionRetention  time.Duration
 	DetailRetention   time.Duration
@@ -50,7 +53,15 @@ func LoadStorageCleanup() (StorageCleanupConfig, error) {
 	if err != nil {
 		return StorageCleanupConfig{}, err
 	}
+	catchupBudget := time.Duration(0)
+	if strings.TrimSpace(os.Getenv("PEERGO_SETTLEMENT_STORAGE_CATCHUP_BUDGET")) != "" {
+		catchupBudget, err = duration("PEERGO_SETTLEMENT_STORAGE_CATCHUP_BUDGET", 0, 30*time.Second)
+		if err != nil {
+			return StorageCleanupConfig{}, err
+		}
+	}
 	return StorageCleanupConfig{
+		CatchupBudget:              catchupBudget,
 		TrackerLedgerProcessConfig: database,
 		RunInterval:                runInterval,
 		TerminalRetention:          terminalRetention,
