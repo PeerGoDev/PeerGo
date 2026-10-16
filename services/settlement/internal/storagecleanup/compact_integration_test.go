@@ -436,6 +436,20 @@ func TestIntegrationUnclosedActivityWaitsForCoverage(t *testing.T) {
 		t.Fatalf("zero traffic seed seconds=%d: %v", seconds, err)
 	}
 	q := ledgerdb.New(pool)
+	// A later completed hour must not cause cleanup to select legacy detail
+	// that the database still protects behind an earlier unresolved hole.
+	if _, err := pool.Exec(ctx, `INSERT INTO settlement.seeding_window_retries
+      (source_stream,window_start,retry_after,first_seen_at,last_seen_at,reason_code)
+      VALUES($1,$2,$3,$3,$3,'source_coverage_pending')`, stream, hour.Add(-time.Hour), now); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := q.StorageCleanupDeleteSnapshotEntries(ctx, ledgerdb.StorageCleanupDeleteSnapshotEntriesParams{
+		DetailBefore: cleanupTimestamp(now.Add(-12 * time.Hour)), BatchSize: 100}); err != nil || n != 0 {
+		t.Fatalf("protected selected legacy frame interrupted cleanup: %d %v", n, err)
+	}
+	if _, err := pool.Exec(ctx, "DELETE FROM settlement.seeding_window_retries WHERE source_stream=$1 AND window_start=$2", stream, hour.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	// The historical cursor can already be past this older fixture. Closing a
 	// window must register an independent range so its heartbeat remains reachable.
 	if n, err := q.StorageCleanupBackfillRawRangeJobs(ctx, ledgerdb.StorageCleanupBackfillRawRangeJobsParams{DetailBefore: cleanupTimestamp(now.Add(-12 * time.Hour)), BatchSize: 100}); err != nil || n != 1 {

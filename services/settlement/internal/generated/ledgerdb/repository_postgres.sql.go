@@ -4636,6 +4636,12 @@ WITH eligible_snapshot AS MATERIALIZED (
         OR
         (
             snapshot.observed_at < $1::timestamptz
+            -- Legacy entry guards retain selected frames after a coverage
+            -- hole. Match that guard instead of repeatedly failing the pass.
+            AND snapshot.observed_at < coalesce(
+                (SELECT ledger.seeding_closed_through()),
+                '-infinity'::timestamptz
+            )
             AND EXISTS (
                 SELECT 1
                 FROM ledger.seeding_evidence_windows AS retained_window
