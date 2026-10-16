@@ -33,6 +33,10 @@ type Cutoffs struct {
 }
 
 type Result struct {
+	SnapshotPayloads      int64
+	ActivityHours         int64
+	HNRCheckpoints        int64
+	RawRangeQueued        int64
 	TrafficOutbox         int64
 	HNROutbox             int64
 	SeedingEvidenceOutbox int64
@@ -55,7 +59,7 @@ type Result struct {
 }
 
 func (result Result) Total() int64 {
-	return result.TrafficOutbox + result.HNROutbox + result.SeedingEvidenceOutbox +
+	return result.SnapshotPayloads + result.ActivityHours + result.HNRCheckpoints + result.RawRangeQueued + result.TrafficOutbox + result.HNROutbox + result.SeedingEvidenceOutbox +
 		result.PolicyWork + result.HNRWork + result.TrafficSettlements +
 		result.TrafficSegments + result.SeedingSources + result.SnapshotEntries +
 		result.SnapshotChunks + result.SnapshotInbox + result.SnapshotRuns +
@@ -67,7 +71,7 @@ func (result Result) Saturated(batchSize int64) bool {
 	if batchSize < 1 {
 		return false
 	}
-	return result.TrafficOutbox >= batchSize || result.HNROutbox >= batchSize ||
+	return result.SnapshotPayloads >= 128 || result.RawRangeQueued >= batchSize || result.ActivityHours >= batchSize || result.HNRCheckpoints >= batchSize || result.TrafficOutbox >= batchSize || result.HNROutbox >= batchSize ||
 		result.SeedingEvidenceOutbox >= batchSize || result.PolicyWork >= batchSize ||
 		result.HNRWork >= batchSize || result.TrafficSettlements >= batchSize ||
 		result.SeedingSources >= batchSize || result.SnapshotEntries >= batchSize ||
@@ -145,6 +149,9 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 			"traffic_gc_queued", result.TrafficQueued,
 			"traffic_details", result.TrafficSettlements+result.TrafficSegments,
 			"snapshot_entries", result.SnapshotEntries,
+			"snapshot_payloads", result.SnapshotPayloads,
+			"activity_hours", result.ActivityHours,
+			"hnr_checkpoints", result.HNRCheckpoints,
 			"snapshot_transport", result.SnapshotChunks+result.SnapshotInbox+result.SnapshotRuns,
 			"legacy_inbox", result.LegacyInbox)
 	}

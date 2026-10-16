@@ -60,7 +60,8 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	repository, err := seedingevidence.NewPostgresRepository(pool, seedingevidence.PostgresRepositoryConfig{
-		AnnounceStream: settings.AnnounceStream, SnapshotStream: settings.Stream,
+		CompactSnapshots: true,
+		AnnounceStream:   settings.AnnounceStream, SnapshotStream: settings.Stream,
 		SnapshotSubject: settings.Subject, MaxFutureSkew: settings.MaxFutureSkew,
 		MaximumSnapshotClosureDelay: settings.ClosureDelay,
 	}, time.Now)

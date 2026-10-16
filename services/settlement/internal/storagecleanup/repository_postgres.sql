@@ -147,6 +147,8 @@ WITH eligible_window AS MATERIALIZED (
     SELECT evidence_window.window_start
     FROM ledger.seeding_evidence_windows AS evidence_window
     WHERE evidence_window.window_start < sqlc.arg(detail_before)::timestamptz
+      AND NOT EXISTS(SELECT 1 FROM settlement.seeding_reconciliation_work r
+                     WHERE r.window_start=evidence_window.window_start AND r.resolved_at IS NULL)
       AND EXISTS (
           SELECT 1
           FROM ledger.seeding_evidence_sources AS existing_source
@@ -204,6 +206,8 @@ WITH candidate AS (
     SELECT anomaly.id
     FROM ledger.seeding_evidence_anomalies AS anomaly
     WHERE anomaly.detected_at < sqlc.arg(anomaly_before)::timestamptz
+      AND NOT EXISTS(SELECT 1 FROM settlement.seeding_reconciliation_work r
+                     WHERE r.window_start=anomaly.window_start AND r.resolved_at IS NULL)
     ORDER BY anomaly.detected_at, anomaly.id
     LIMIT sqlc.arg(batch_size)::integer
     FOR UPDATE SKIP LOCKED
@@ -233,10 +237,12 @@ WITH eligible_snapshot AS MATERIALIZED (
         WHERE gc.snapshot_id = snapshot.snapshot_id LIMIT 1 OFFSET 0
     ) IS NULL
       AND snapshot.status IN ('collecting', 'complete')
+      AND NOT EXISTS (SELECT 1 FROM ledger.seeding_evidence_windows w JOIN settlement.seeding_reconciliation_work r USING(window_start)
+                      WHERE r.resolved_at IS NULL AND (w.selected_snapshot_id=snapshot.snapshot_id OR w.snapshot_fence_id=snapshot.snapshot_id))
       AND (
         (
             snapshot.observed_at < coalesce(
-                (SELECT max(evidence_window.window_end) FROM ledger.seeding_evidence_windows AS evidence_window),
+                (SELECT ledger.seeding_closed_through()),
                 '-infinity'::timestamptz
             )
             AND NOT EXISTS (
@@ -299,10 +305,12 @@ WITH candidate AS (
     FROM ledger.seeding_swarm_snapshot_chunks AS chunk
     INNER JOIN ledger.seeding_swarm_snapshots AS snapshot
         ON snapshot.snapshot_id = chunk.snapshot_id
-    WHERE snapshot.status IN ('collecting', 'complete')
+    WHERE NOT EXISTS(SELECT 1 FROM ledger.seeding_snapshot_payloads p
+                     WHERE p.snapshot_id=chunk.snapshot_id AND p.chunk_index=chunk.chunk_index)
+      AND snapshot.status IN ('collecting', 'complete')
       AND snapshot.observed_at < sqlc.arg(detail_before)::timestamptz
       AND snapshot.observed_at < coalesce(
-          (SELECT max(evidence_window.window_end) FROM ledger.seeding_evidence_windows AS evidence_window),
+          (SELECT ledger.seeding_closed_through()),
           '-infinity'::timestamptz
       )
     ORDER BY snapshot.observed_at, chunk.snapshot_id, chunk.chunk_index
@@ -323,7 +331,7 @@ WITH candidate AS (
     WHERE inbox.received_at < sqlc.arg(detail_before)::timestamptz
       AND snapshot.status IN ('collecting', 'complete')
       AND snapshot.observed_at < coalesce(
-          (SELECT max(evidence_window.window_end) FROM ledger.seeding_evidence_windows AS evidence_window),
+          (SELECT ledger.seeding_closed_through()),
           '-infinity'::timestamptz
       )
       AND NOT EXISTS (
@@ -346,7 +354,7 @@ WITH candidate AS (
     WHERE snapshot.status IN ('collecting', 'complete')
       AND snapshot.observed_at < sqlc.arg(detail_before)::timestamptz
       AND snapshot.observed_at < coalesce(
-          (SELECT max(evidence_window.window_end) FROM ledger.seeding_evidence_windows AS evidence_window),
+          (SELECT ledger.seeding_closed_through()),
           '-infinity'::timestamptz
       )
       AND NOT EXISTS (
@@ -389,11 +397,8 @@ WITH candidate AS (
       AND (
           raw.previous_left <> 0
           OR raw.current_left <> 0
-          OR raw.ends_at <= coalesce(
-              (SELECT max(evidence_window.window_end)
-               FROM ledger.seeding_evidence_windows AS evidence_window),
-              '-infinity'::timestamptz
-          )
+          OR ledger.seeding_interval_is_closed(raw.starts_at,raw.ends_at)
+          OR ledger.raw_seeding_is_compacted(raw)
       )
       AND (
           SELECT true FROM settlement.policy_work AS work
@@ -425,17 +430,7 @@ WITH candidate AS (
           WHERE anomaly.interval_event_id = raw.event_id
           LIMIT 1 OFFSET 0
       ) IS NULL
-      AND (
-          SELECT true
-          FROM ledger.hnr_obligations AS obligation
-          INNER JOIN ledger.hnr_completion_assessments AS assessment
-              ON assessment.id = obligation.assessment_id
-          WHERE obligation.state = 'tracking'
-            AND assessment.user_id = raw.user_id
-            AND assessment.torrent_id = raw.torrent_id
-            AND raw.ends_at > assessment.completed_at
-          LIMIT 1 OFFSET 0
-      ) IS NULL
+      AND NOT ledger.raw_hnr_is_required(raw)
     ORDER BY raw.ends_at, raw.event_id
     LIMIT sqlc.arg(batch_size)::integer
     FOR UPDATE SKIP LOCKED
@@ -471,13 +466,16 @@ WITH cursor AS MATERIALIZED (
     FROM ledger.raw_session_intervals AS raw, cursor
     WHERE (raw.ends_at, raw.event_id) > (cursor.ends_at, cursor.event_id)
       AND raw.ends_at < sqlc.arg(detail_before)::timestamptz
-      AND raw.ends_at <= coalesce(
-          (SELECT max(window_end) FROM ledger.seeding_evidence_windows), '-infinity'::timestamptz)
     ORDER BY raw.ends_at, raw.event_id
     LIMIT sqlc.arg(batch_size)::integer
 ), queued AS (
     INSERT INTO settlement.raw_interval_gc (event_id, retry_after)
-    SELECT event_id, statement_timestamp() FROM candidate ORDER BY event_id
+    SELECT c.event_id,statement_timestamp() FROM candidate c
+    JOIN ledger.raw_session_intervals raw USING(event_id)
+    WHERE raw.previous_left<>0 OR raw.current_left<>0
+       OR ledger.seeding_interval_is_closed(raw.starts_at,raw.ends_at)
+       OR ledger.raw_seeding_is_compacted(raw)
+    ORDER BY c.event_id
     ON CONFLICT (event_id) DO NOTHING RETURNING event_id
 ), advanced AS (
     UPDATE settlement.raw_interval_gc_backfill AS target
@@ -538,3 +536,84 @@ WITH candidate AS (
 DELETE FROM settlement.event_inbox AS inbox
 USING candidate
 WHERE inbox.event_id = candidate.event_id;
+
+-- name: StorageCleanupBackfillRawRangeJobs :one
+WITH chosen AS MATERIALIZED (
+    SELECT r.window_start,r.cursor_ends_at,r.cursor_event_id
+    FROM settlement.raw_interval_gc_ranges r
+    WHERE r.retry_after<=statement_timestamp()
+      AND (EXISTS(SELECT 1 FROM ledger.seeding_evidence_windows w WHERE w.window_start=r.window_start)
+           OR EXISTS(SELECT 1 FROM settlement.activity_projection_profiles p
+                     WHERE p.activates_at<=r.window_start AND p.shadow_verified_windows>=p.required_shadow_windows))
+    ORDER BY r.retry_after,r.window_start LIMIT 1 FOR UPDATE SKIP LOCKED
+), candidate AS MATERIALIZED (
+    SELECT raw.event_id,raw.ends_at
+    FROM chosen,ledger.raw_session_intervals raw
+    WHERE (raw.ends_at,raw.event_id)>(chosen.cursor_ends_at,chosen.cursor_event_id)
+      AND raw.ends_at<=chosen.window_start+interval '2 hours'
+      AND raw.ends_at<sqlc.arg(detail_before)::timestamptz
+    ORDER BY raw.ends_at,raw.event_id LIMIT sqlc.arg(batch_size)::integer
+), queued AS (
+    INSERT INTO settlement.raw_interval_gc(event_id,retry_after)
+    SELECT event_id,statement_timestamp() FROM candidate ORDER BY event_id
+    ON CONFLICT(event_id) DO NOTHING RETURNING event_id
+), advanced AS (
+    UPDATE settlement.raw_interval_gc_ranges r
+    SET cursor_ends_at=last.ends_at,cursor_event_id=last.event_id,retry_after=statement_timestamp()
+    FROM chosen,(SELECT ends_at,event_id FROM candidate ORDER BY ends_at DESC,event_id DESC LIMIT 1) last
+    WHERE r.window_start=chosen.window_start
+), deferred AS (
+    UPDATE settlement.raw_interval_gc_ranges r
+    SET retry_after=r.window_start+interval '50 hours'
+    FROM chosen WHERE r.window_start=chosen.window_start AND NOT EXISTS(SELECT 1 FROM candidate)
+      AND r.window_start+interval '50 hours'>=statement_timestamp()
+), finished AS (
+    DELETE FROM settlement.raw_interval_gc_ranges r USING chosen
+    WHERE r.window_start=chosen.window_start AND NOT EXISTS(SELECT 1 FROM candidate)
+      AND r.window_start+interval '50 hours'<statement_timestamp()
+)
+SELECT count(*) FROM queued;
+
+-- name: StorageCleanupDeleteSnapshotPayloads :execrows
+WITH candidate AS (
+    SELECT payload.snapshot_id,payload.chunk_index
+    FROM (
+        SELECT snapshot_id,observed_at FROM ledger.seeding_swarm_snapshots
+        ORDER BY observed_at,snapshot_id OFFSET 0
+    ) snapshot
+    JOIN LATERAL (
+        SELECT p.snapshot_id,p.chunk_index FROM ledger.seeding_snapshot_payloads p
+        WHERE p.snapshot_id=snapshot.snapshot_id
+          AND ledger.snapshot_payload_can_expire(snapshot.snapshot_id)
+        ORDER BY p.chunk_index LIMIT 128 FOR UPDATE SKIP LOCKED
+    ) payload ON true
+    ORDER BY snapshot.observed_at,snapshot.snapshot_id,payload.chunk_index LIMIT 128
+)
+DELETE FROM ledger.seeding_snapshot_payloads p USING candidate c
+WHERE p.snapshot_id=c.snapshot_id AND p.chunk_index=c.chunk_index;
+
+-- name: StorageCleanupDeleteActivityHours :execrows
+WITH candidate AS (
+    SELECT a.source_stream,a.window_start,a.user_id,a.torrent_id
+    FROM settlement.seeding_activity_hours a
+    JOIN ledger.seeding_evidence_windows w USING(window_start)
+    WHERE w.schema_version='seeding.evidence.v3'
+      AND NOT EXISTS(SELECT 1 FROM settlement.seeding_reconciliation_work r
+                     WHERE r.window_start=w.window_start AND r.resolved_at IS NULL)
+      AND w.window_end<sqlc.arg(detail_before)::timestamptz
+      AND NOT EXISTS(SELECT 1 FROM ledger.seeding_evidence_anomalies e WHERE e.window_start=a.window_start)
+    ORDER BY a.window_start,a.user_id,a.torrent_id LIMIT sqlc.arg(batch_size)::integer
+    FOR UPDATE OF a SKIP LOCKED
+)
+DELETE FROM settlement.seeding_activity_hours a USING candidate c
+WHERE (a.source_stream,a.window_start,a.user_id,a.torrent_id)=(c.source_stream,c.window_start,c.user_id,c.torrent_id);
+
+-- name: StorageCleanupDeleteHNRCheckpoints :execrows
+WITH candidate AS (
+    SELECT p.obligation_id FROM settlement.hnr_progress_accumulators p
+    JOIN ledger.hnr_obligations o ON o.id=p.obligation_id
+    WHERE o.state<>'tracking' AND o.updated_at<sqlc.arg(detail_before)::timestamptz
+    ORDER BY o.updated_at,p.obligation_id LIMIT sqlc.arg(batch_size)::integer
+    FOR UPDATE OF p SKIP LOCKED
+)
+DELETE FROM settlement.hnr_progress_accumulators p USING candidate c WHERE p.obligation_id=c.obligation_id;

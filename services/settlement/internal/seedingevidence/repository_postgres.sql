@@ -93,12 +93,14 @@ INSERT INTO ledger.seeding_swarm_snapshot_chunks (
     snapshot_id,
     chunk_index,
     event_id,
-    payload_sha256
+    payload_sha256,
+    compact_payload
 ) VALUES (
     sqlc.arg(snapshot_id)::uuid,
     sqlc.arg(chunk_index)::integer,
     sqlc.arg(event_id)::uuid,
-    sqlc.arg(payload_sha256)::bytea
+    sqlc.arg(payload_sha256)::bytea,
+    sqlc.arg(compact_payload)::boolean
 )
 ON CONFLICT (snapshot_id, chunk_index) DO NOTHING
 RETURNING event_id;
@@ -228,6 +230,8 @@ WHERE coalesce(raw.source_stream, inbox.source_stream) = sqlc.arg(source_stream)
   AND coalesce(raw.source_sequence, inbox.source_sequence) <= sqlc.arg(announce_fence_sequence)::bigint
   AND raw.starts_at < sqlc.arg(window_end)::timestamptz
   AND raw.ends_at > sqlc.arg(window_start)::timestamptz
+  AND raw.ends_at <= sqlc.arg(window_end)::timestamptz
+      + (sqlc.arg(max_interval_credit_seconds)::bigint * interval '1 second')
   AND raw.previous_left = 0
   AND raw.current_left = 0
   -- An interval proves activity only while adjacent Tracker updates remain
@@ -265,7 +269,7 @@ INSERT INTO ledger.seeding_evidence_windows (
 ) VALUES (
     sqlc.arg(window_start)::timestamptz,
     sqlc.arg(window_end)::timestamptz,
-    'seeding.evidence.v2',
+    sqlc.arg(schema_version)::text,
     sqlc.arg(closure_delay_seconds)::integer,
     sqlc.arg(max_interval_credit_seconds)::integer,
     sqlc.arg(announce_source_stream)::text,
@@ -425,3 +429,7 @@ SET
 WHERE event_id = sqlc.arg(event_id)::uuid
   AND lease_token = sqlc.arg(lease_token)::uuid
   AND published_at IS NULL;
+
+-- name: HasSeedingReconciliation :one
+SELECT EXISTS(SELECT 1 FROM settlement.seeding_reconciliation_work
+              WHERE window_start=sqlc.arg(window_start)::timestamptz)::boolean;

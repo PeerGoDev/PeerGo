@@ -33,6 +33,10 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	terminal := cleanupTimestamp(cutoffs.TerminalBefore)
 	session := cleanupTimestamp(cutoffs.SessionBefore)
 	detail := cleanupTimestamp(cutoffs.DetailBefore)
+	rawDetail := detail
+	if limit := time.Now().UTC().Add(-48 * time.Hour); rawDetail.Time.After(limit) {
+		rawDetail = cleanupTimestamp(limit)
+	}
 	anomaly := cleanupTimestamp(cutoffs.AnomalyBefore)
 	batch := int32(batchSize)
 	var result Result
@@ -72,6 +76,15 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 		return result, cleanupError("delete old seeding source links", err)
 	}
 	result.SeedingSources = int64(len(seedingSourceCandidates))
+	if result.SnapshotPayloads, err = queries.StorageCleanupDeleteSnapshotPayloads(ctx); err != nil {
+		return result, cleanupError("expire redundant compressed snapshots", err)
+	}
+	if result.ActivityHours, err = queries.StorageCleanupDeleteActivityHours(ctx, ledgerdb.StorageCleanupDeleteActivityHoursParams{DetailBefore: rawDetail, BatchSize: batch}); err != nil {
+		return result, cleanupError("expire sealed activity checkpoints", err)
+	}
+	if result.HNRCheckpoints, err = queries.StorageCleanupDeleteHNRCheckpoints(ctx, ledgerdb.StorageCleanupDeleteHNRCheckpointsParams{DetailBefore: rawDetail, BatchSize: batch}); err != nil {
+		return result, cleanupError("expire terminal H&R checkpoints", err)
+	}
 	result.SnapshotEntries, err = drainSnapshotEntryBacklog(ctx, func(ctx context.Context) (int64, error) {
 		return queries.StorageCleanupDeleteSnapshotEntries(ctx, ledgerdb.StorageCleanupDeleteSnapshotEntriesParams{DetailBefore: detail, BatchSize: batch})
 	})
@@ -99,11 +112,15 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 		return result, cleanupError("delete old seeding anomalies", err)
 	}
 	result.SeedingAnomalies = int64(len(seedingAnomalyCandidates))
-	result.RawQueued, err = queries.StorageCleanupBackfillRawIntervalJobs(ctx, ledgerdb.StorageCleanupBackfillRawIntervalJobsParams{DetailBefore: detail, BatchSize: batch})
+	result.RawRangeQueued, err = queries.StorageCleanupBackfillRawRangeJobs(ctx, ledgerdb.StorageCleanupBackfillRawRangeJobsParams{DetailBefore: rawDetail, BatchSize: batch})
+	if err != nil {
+		return result, cleanupError("recover completed activity range cleanup", err)
+	}
+	result.RawQueued, err = queries.StorageCleanupBackfillRawIntervalJobs(ctx, ledgerdb.StorageCleanupBackfillRawIntervalJobsParams{DetailBefore: rawDetail, BatchSize: batch})
 	if err != nil {
 		return result, cleanupError("backfill historical raw cleanup jobs", err)
 	}
-	result.RawIntervals, err = repository.cleanupQueuedRawIntervals(ctx, detail, batch)
+	result.RawIntervals, err = repository.cleanupQueuedRawIntervals(ctx, rawDetail, batch)
 	if err != nil {
 		return result, err
 	}

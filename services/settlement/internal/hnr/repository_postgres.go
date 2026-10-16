@@ -100,11 +100,7 @@ func (repository *PostgresRepository) Process(ctx context.Context, pending Pendi
 		if err != nil {
 			return err
 		}
-		intervals, err := listRawIntervals(ctx, queries, record.Assessment)
-		if err != nil {
-			return err
-		}
-		progress, err := Evaluate(record.progressInput(), intervals)
+		progress, err := incrementalProgress(ctx, tx, queries, record, processedAt)
 		if err != nil {
 			return fmt.Errorf("%w: evaluate H&R progress: %v", ErrInvariant, err)
 		}

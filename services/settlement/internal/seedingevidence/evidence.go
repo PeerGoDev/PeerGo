@@ -29,16 +29,20 @@ type snapshotCounts struct {
 }
 
 type evidenceItem struct {
-	UserID         uuid.UUID
-	TorrentID      int64
-	InfoHashV1     [20]byte
-	ActiveSeconds  int64
-	RawUploaded    int64
-	FirstActiveAt  time.Time
-	LastActiveAt   time.Time
-	Snapshot       snapshotCounts
-	Sources        []intervalFact
-	EvidenceSHA256 [sha256.Size]byte
+	Compact          bool
+	SourceCount      int32
+	SourceCommitment [32]byte
+	Ranges           []compactRange
+	UserID           uuid.UUID
+	TorrentID        int64
+	InfoHashV1       [20]byte
+	ActiveSeconds    int64
+	RawUploaded      int64
+	FirstActiveAt    time.Time
+	LastActiveAt     time.Time
+	Snapshot         snapshotCounts
+	Sources          []intervalFact
+	EvidenceSHA256   [sha256.Size]byte
 }
 
 type itemDigestSource struct {

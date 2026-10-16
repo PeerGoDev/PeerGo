@@ -40,6 +40,7 @@ type SnapshotApplyResult struct {
 }
 
 type BuildResult struct {
+	Reconciliation           bool
 	SchemaVersion            string
 	WindowStart              time.Time
 	WindowEnd                time.Time

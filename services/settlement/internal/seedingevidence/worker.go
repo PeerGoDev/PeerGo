@@ -47,6 +47,13 @@ func (worker *Worker) RunOnce(ctx context.Context) (bool, error) {
 	}
 	result, err := worker.repository.BuildHour(ctx, windowStart, now)
 	if errors.Is(err, ErrCoveragePending) {
+		if recorder, ok := worker.repository.(interface {
+			DeferWindow(context.Context, time.Time, time.Time) error
+		}); ok {
+			if saveErr := recorder.DeferWindow(ctx, windowStart, now); saveErr != nil {
+				return false, saveErr
+			}
+		}
 		worker.logger.Debug("seeding evidence window is waiting for source watermarks", "window_start", windowStart)
 		return false, nil
 	}
@@ -57,7 +64,7 @@ func (worker *Worker) RunOnce(ctx context.Context) (bool, error) {
 		"window_start", result.WindowStart, "items", result.ItemCount,
 		"announce_fence_sequence", result.AnnounceFenceSequence,
 		"snapshot_sequence", result.SelectedSnapshotSequence,
-		"duplicate", result.Duplicate)
+		"duplicate", result.Duplicate, "reconciliation_required", result.Reconciliation)
 	return true, nil
 }
 

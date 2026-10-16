@@ -48,6 +48,7 @@ type Querier interface {
 	GetSeedingSnapshotRunForUpdate(ctx context.Context, snapshotID uuid.UUID) (GetSeedingSnapshotRunForUpdateRow, error)
 	GetSelectedSeedingSnapshot(ctx context.Context, arg GetSelectedSeedingSnapshotParams) (GetSelectedSeedingSnapshotRow, error)
 	GetSettlementSessionForUpdate(ctx context.Context, arg GetSettlementSessionForUpdateParams) (GetSettlementSessionForUpdateRow, error)
+	HasSeedingReconciliation(ctx context.Context, windowStart pgtype.Timestamptz) (bool, error)
 	IncrementSeedingSnapshotReceivedChunks(ctx context.Context, snapshotID uuid.UUID) (IncrementSeedingSnapshotReceivedChunksRow, error)
 	InsertHNRCompletionAssessment(ctx context.Context, arg InsertHNRCompletionAssessmentParams) error
 	InsertHNRObligation(ctx context.Context, arg InsertHNRObligationParams) error
@@ -106,11 +107,14 @@ type Querier interface {
 	ReleaseSeedingEvidenceOutboxEvent(ctx context.Context, arg ReleaseSeedingEvidenceOutboxEventParams) (int64, error)
 	ReleaseTrafficOutboxEvent(ctx context.Context, arg ReleaseTrafficOutboxEventParams) (int64, error)
 	StorageCleanupBackfillRawIntervalJobs(ctx context.Context, arg StorageCleanupBackfillRawIntervalJobsParams) (int64, error)
+	StorageCleanupBackfillRawRangeJobs(ctx context.Context, arg StorageCleanupBackfillRawRangeJobsParams) (int64, error)
 	StorageCleanupBackfillTrafficDetailJobs(ctx context.Context, arg StorageCleanupBackfillTrafficDetailJobsParams) (int64, error)
 	StorageCleanupCompleteRawIntervalJobs(ctx context.Context, eventIds []uuid.UUID) error
 	StorageCleanupCompleteTrafficDetailJobs(ctx context.Context, settlementIds []uuid.UUID) error
 	StorageCleanupDeferRawIntervalJobs(ctx context.Context, eventIds []uuid.UUID) error
 	StorageCleanupDeferTrafficDetailJobs(ctx context.Context, settlementIds []uuid.UUID) error
+	StorageCleanupDeleteActivityHours(ctx context.Context, arg StorageCleanupDeleteActivityHoursParams) (int64, error)
+	StorageCleanupDeleteHNRCheckpoints(ctx context.Context, arg StorageCleanupDeleteHNRCheckpointsParams) (int64, error)
 	StorageCleanupDeleteHNROutbox(ctx context.Context, arg StorageCleanupDeleteHNROutboxParams) (int64, error)
 	StorageCleanupDeleteHNRWork(ctx context.Context, arg StorageCleanupDeleteHNRWorkParams) ([]uuid.UUID, error)
 	StorageCleanupDeleteLegacyInbox(ctx context.Context, arg StorageCleanupDeleteLegacyInboxParams) (int64, error)
@@ -123,6 +127,7 @@ type Querier interface {
 	StorageCleanupDeleteSnapshotChunks(ctx context.Context, arg StorageCleanupDeleteSnapshotChunksParams) (int64, error)
 	StorageCleanupDeleteSnapshotEntries(ctx context.Context, arg StorageCleanupDeleteSnapshotEntriesParams) (int64, error)
 	StorageCleanupDeleteSnapshotInbox(ctx context.Context, arg StorageCleanupDeleteSnapshotInboxParams) (int64, error)
+	StorageCleanupDeleteSnapshotPayloads(ctx context.Context) (int64, error)
 	StorageCleanupDeleteSnapshotRuns(ctx context.Context, arg StorageCleanupDeleteSnapshotRunsParams) (int64, error)
 	StorageCleanupDeleteSpeedObservations(ctx context.Context, arg StorageCleanupDeleteSpeedObservationsParams) ([]uuid.UUID, error)
 	StorageCleanupDeleteTrafficOutbox(ctx context.Context, arg StorageCleanupDeleteTrafficOutboxParams) (int64, error)

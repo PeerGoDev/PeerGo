@@ -27,6 +27,7 @@ const snapshotSourceSequenceConstraint = "seeding_swarm_snapshot_inbox_source_st
 var seedingEvidenceEventNamespace = uuid.MustParse("df34c07b-2342-5f03-a9a4-4ba9a1792ab8")
 
 type PostgresRepositoryConfig struct {
+	CompactSnapshots            bool
 	AnnounceStream              string
 	SnapshotStream              string
 	SnapshotSubject             string
@@ -73,7 +74,7 @@ func validEvidenceTimingConfig(closureDelay, maxIntervalCredit time.Duration) bo
 // ApplySnapshot stores one canonical full-snapshot chunk. It shares the
 // trackerswarmv1 contract with Core; a snapshot becomes eligible to close
 // evidence only after every chunk commits. Redundant entry detail is pruned
-// after closure, while selected detail has a 30-day reconciliation window.
+// after its replay grace; unresolved exceptions keep their evidence pinned.
 func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, delivery SnapshotDelivery) (SnapshotApplyResult, error) {
 	if delivery.Stream != repository.config.SnapshotStream || delivery.Subject != repository.config.SnapshotSubject ||
 		delivery.Sequence == 0 || delivery.Sequence > math.MaxInt64 ||
@@ -172,6 +173,7 @@ func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, deliver
 	}
 	_, err = queries.InsertSeedingSnapshotChunk(ctx, ledgerdb.InsertSeedingSnapshotChunkParams{
 		SnapshotID: snapshotID, ChunkIndex: chunk.ChunkIndex, EventID: eventID, PayloadSha256: payloadDigest[:],
+		CompactPayload: repository.config.CompactSnapshots,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		existing, getErr := queries.GetSeedingSnapshotChunk(ctx, ledgerdb.GetSeedingSnapshotChunkParams{
@@ -188,18 +190,24 @@ func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, deliver
 	if err != nil {
 		return SnapshotApplyResult{}, databaseError("insert seeding snapshot chunk", err)
 	}
-	for _, entry := range chunk.Entries {
-		infoHash, decodeErr := hex.DecodeString(entry.InfoHashV1)
-		if decodeErr != nil || len(infoHash) != 20 {
-			return SnapshotApplyResult{}, ErrInput
+	if repository.config.CompactSnapshots {
+		if err := storeSnapshotPayload(ctx, tx, snapshotID, chunk.ChunkIndex, delivery.Payload, payloadDigest[:]); err != nil {
+			return SnapshotApplyResult{}, err
 		}
-		if err := queries.InsertSeedingSnapshotEntry(ctx, ledgerdb.InsertSeedingSnapshotEntryParams{
-			SnapshotID: snapshotID, InfoHashV1: infoHash, Seeders: entry.Seeders, Leechers: entry.Leechers,
-		}); err != nil {
-			if isConstraintError(err) {
-				return SnapshotApplyResult{}, ErrConflict
+	} else {
+		for _, entry := range chunk.Entries {
+			infoHash, decodeErr := hex.DecodeString(entry.InfoHashV1)
+			if decodeErr != nil || len(infoHash) != 20 {
+				return SnapshotApplyResult{}, ErrInput
 			}
-			return SnapshotApplyResult{}, databaseError("insert seeding snapshot entry", err)
+			if err := queries.InsertSeedingSnapshotEntry(ctx, ledgerdb.InsertSeedingSnapshotEntryParams{
+				SnapshotID: snapshotID, InfoHashV1: infoHash, Seeders: entry.Seeders, Leechers: entry.Leechers,
+			}); err != nil {
+				if isConstraintError(err) {
+					return SnapshotApplyResult{}, ErrConflict
+				}
+				return SnapshotApplyResult{}, databaseError("insert seeding snapshot entry", err)
+			}
 		}
 	}
 	progress, err := queries.IncrementSeedingSnapshotReceivedChunks(ctx, snapshotID)
@@ -211,6 +219,11 @@ func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, deliver
 		return SnapshotApplyResult{}, ErrInvariant
 	}
 	if complete {
+		if repository.config.CompactSnapshots {
+			if _, err := readSnapshotCounts(ctx, tx, queries, snapshotID); err != nil {
+				return SnapshotApplyResult{}, err
+			}
+		}
 		rows, completeErr := queries.CompleteSeedingSnapshot(ctx, ledgerdb.CompleteSeedingSnapshotParams{
 			CompletedAt: timestamp(receivedAt), SnapshotID: snapshotID,
 		})
@@ -225,14 +238,7 @@ func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, deliver
 }
 
 func (repository *PostgresRepository) NextWindowStart(ctx context.Context, initial time.Time) (time.Time, error) {
-	if !validWindowStart(initial) {
-		return time.Time{}, ErrInput
-	}
-	value, err := ledgerdb.New(repository.pool).GetNextSeedingEvidenceWindowStart(ctx, timestamp(initial))
-	if err != nil || !value.Valid {
-		return time.Time{}, databaseError("read next seeding evidence window", err)
-	}
-	return value.Time.UTC().Round(0), nil
+	return repository.nextWindowStart(ctx, initial)
 }
 
 // BuildHour closes one UTC hour against two independent watermarks: a terminal
@@ -266,6 +272,10 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 			return BuildResult{}, convertErr
 		}
 		result.Duplicate = true
+		result.Reconciliation, err = queries.HasSeedingReconciliation(ctx, timestamp(windowStart))
+		if err != nil {
+			return BuildResult{}, err
+		}
 		result.AnomalyCount, err = queries.CountSeedingEvidenceAnomalies(ctx, timestamp(windowStart))
 		if err != nil {
 			return BuildResult{}, databaseError("count seeding evidence anomalies", err)
@@ -274,6 +284,9 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 			if err := repository.ensureEvidenceOutbox(ctx, queries, result); err != nil {
 				return BuildResult{}, err
 			}
+		}
+		if err := finishEvidenceWindow(ctx, tx, repository.config.AnnounceStream, windowStart); err != nil {
+			return BuildResult{}, err
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return BuildResult{}, databaseError("commit duplicate seeding evidence window", err)
@@ -320,28 +333,56 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 	if err != nil || !selected.ObservedAt.Valid {
 		return BuildResult{}, databaseError("select closing seeding snapshot", err)
 	}
-	rows, err := queries.ListSeedingIntervalsForWindow(ctx, ledgerdb.ListSeedingIntervalsForWindowParams{
-		WindowStart: timestamp(windowStart), WindowEnd: timestamp(windowEnd),
-		SourceStream: repository.config.AnnounceStream, AnnounceFenceSequence: announceFence.SourceSequence,
-		MaxIntervalCreditSeconds: int64(repository.config.MaxIntervalCredit / time.Second),
-	})
-	if err != nil {
-		return BuildResult{}, databaseError("list seeding intervals", err)
-	}
-	facts, err := intervalFactsFromRows(rows)
+	profile, registered, err := loadActivityProfile(ctx, tx, repository.config.AnnounceStream)
 	if err != nil {
 		return BuildResult{}, err
 	}
-	snapshotRows, err := queries.ListSeedingSnapshotEntries(ctx, selected.SnapshotID)
-	if err != nil {
-		return BuildResult{}, databaseError("list selected seeding snapshot entries", err)
+	compact := registered && !windowStart.Before(profile.ActivatesAt)
+	if compact && profile.CreditSeconds != int32(repository.config.MaxIntervalCredit/time.Second) {
+		return BuildResult{}, ErrConflict
 	}
-	snapshot, err := snapshotCountsFromRows(snapshotRows)
+	shadow := compact && profile.Verified < profile.Required
+	var facts []intervalFact
+	if !compact || shadow {
+		rows, err := queries.ListSeedingIntervalsForWindow(ctx, ledgerdb.ListSeedingIntervalsForWindowParams{
+			WindowStart: timestamp(windowStart), WindowEnd: timestamp(windowEnd),
+			SourceStream: repository.config.AnnounceStream, AnnounceFenceSequence: announceFence.SourceSequence,
+			MaxIntervalCreditSeconds: int64(repository.config.MaxIntervalCredit / time.Second),
+		})
+		if err != nil {
+			return BuildResult{}, databaseError("list seeding intervals", err)
+		}
+		facts, err = intervalFactsFromRows(rows)
+		if err != nil {
+			return BuildResult{}, err
+		}
+	}
+	snapshot, err := readSnapshotCounts(ctx, tx, queries, selected.SnapshotID)
 	if err != nil {
 		return BuildResult{}, err
 	}
-	items, err := assembleItems(facts, snapshot)
-	if err != nil || len(items) > math.MaxInt32 {
+	var items []evidenceItem
+	schemaVersion := SchemaVersion
+	if compact {
+		schemaVersion = SchemaVersionV3
+		items, err = loadCompactActivity(ctx, tx, repository.config.AnnounceStream, windowStart, announceFence.SourceSequence, snapshot)
+		if err == nil && shadow {
+			var legacy []evidenceItem
+			legacy, err = assembleItems(facts, snapshot)
+			if err == nil {
+				err = verifyCompactActivity(items, legacy)
+			}
+			if err == nil && len(items) > 0 {
+				_, err = tx.Exec(ctx, "UPDATE settlement.activity_projection_profiles SET shadow_verified_windows=shadow_verified_windows+1 WHERE source_stream=$1", repository.config.AnnounceStream)
+			}
+		}
+	} else {
+		items, err = assembleItems(facts, snapshot)
+	}
+	if err != nil {
+		return BuildResult{}, err
+	}
+	if len(items) > math.MaxInt32 {
 		return BuildResult{}, ErrInvariant
 	}
 	digestItems := make([]windowDigestItem, len(items))
@@ -352,7 +393,7 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 		}
 	}
 	document := windowDigestDocument{
-		SchemaVersion: SchemaVersion, WindowStart: windowStart, WindowEnd: windowEnd,
+		SchemaVersion: schemaVersion, WindowStart: windowStart, WindowEnd: windowEnd,
 		ClosureDelaySeconds:      int32(repository.config.ClosureDelay / time.Second),
 		MaxIntervalCreditSeconds: int32(repository.config.MaxIntervalCredit / time.Second),
 		AnnounceSourceStream:     repository.config.AnnounceStream,
@@ -368,7 +409,8 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 		return BuildResult{}, fmt.Errorf("encode seeding window evidence: %w", err)
 	}
 	if err := queries.InsertSeedingEvidenceWindow(ctx, ledgerdb.InsertSeedingEvidenceWindowParams{
-		WindowStart: timestamp(windowStart), WindowEnd: timestamp(windowEnd),
+		SchemaVersion: schemaVersion,
+		WindowStart:   timestamp(windowStart), WindowEnd: timestamp(windowEnd),
 		ClosureDelaySeconds:      int32(repository.config.ClosureDelay / time.Second),
 		MaxIntervalCreditSeconds: int32(repository.config.MaxIntervalCredit / time.Second),
 		AnnounceSourceStream:     repository.config.AnnounceStream,
@@ -382,12 +424,17 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 		return BuildResult{}, databaseError("insert seeding evidence window", err)
 	}
 	for _, item := range items {
-		if err := insertEvidenceItem(ctx, queries, windowStart, item); err != nil {
+		if item.Compact {
+			err = insertCompactEvidenceItem(ctx, tx, windowStart, item)
+		} else {
+			err = insertEvidenceItem(ctx, queries, windowStart, item)
+		}
+		if err != nil {
 			return BuildResult{}, err
 		}
 	}
 	result := BuildResult{
-		SchemaVersion: SchemaVersion,
+		SchemaVersion: schemaVersion,
 		WindowStart:   windowStart, WindowEnd: windowEnd,
 		ClosureDelaySeconds:      int32(repository.config.ClosureDelay / time.Second),
 		MaxIntervalCreditSeconds: int32(repository.config.MaxIntervalCredit / time.Second),
@@ -396,7 +443,18 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 		SnapshotFenceID: snapshotFence.SnapshotID, SnapshotFenceSequence: snapshotFence.SnapshotSequence,
 		ItemCount: int32(len(items)), EvidenceSHA256: windowDigest, BuiltAt: builtAt,
 	}
-	if err := enqueueEvidenceProjection(ctx, queries, result, selected.ObservedAt.Time, transportItems(items)); err != nil {
+	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ledger.seeding_evidence_windows WHERE announce_source_stream=$1 AND window_start>$2)", repository.config.AnnounceStream, windowStart).Scan(&result.Reconciliation); err != nil {
+		return BuildResult{}, err
+	}
+	if result.Reconciliation {
+		_, err = tx.Exec(ctx, "INSERT INTO settlement.seeding_reconciliation_work(window_start,reason_code,detected_at) VALUES($1,'historical_coverage_recovered',$2)", windowStart, builtAt)
+	} else {
+		err = enqueueEvidenceProjection(ctx, queries, result, selected.ObservedAt.Time, transportItems(items))
+	}
+	if err != nil {
+		return BuildResult{}, err
+	}
+	if err := finishEvidenceWindow(ctx, tx, repository.config.AnnounceStream, windowStart); err != nil {
 		return BuildResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -410,6 +468,14 @@ func (repository *PostgresRepository) BuildHour(ctx context.Context, windowStart
 // only the privacy-minimized projection from immutable closed rows. A partial
 // existing chunk set is an invariant violation and is never silently filled.
 func (repository *PostgresRepository) ensureEvidenceOutbox(ctx context.Context, queries *ledgerdb.Queries, result BuildResult) error {
+	historical, err := queries.HasSeedingReconciliation(ctx, timestamp(result.WindowStart))
+	if err != nil {
+		return err
+	}
+	if historical {
+		return nil
+	}
+
 	count, err := queries.CountSeedingEvidenceOutboxEvents(ctx, timestamp(result.WindowStart))
 	if err != nil {
 		return databaseError("count seeding evidence outbox events", err)
@@ -572,7 +638,7 @@ func existingWindowResult(row ledgerdb.GetSeedingEvidenceWindowRow) (BuildResult
 		if row.ClosureDelaySeconds.Valid || row.MaxIntervalCreditSeconds.Valid {
 			return BuildResult{}, ErrInvariant
 		}
-	case SchemaVersion:
+	case SchemaVersion, SchemaVersionV3:
 		if !row.ClosureDelaySeconds.Valid || !row.MaxIntervalCreditSeconds.Valid ||
 			row.ClosureDelaySeconds.Int32 < 60 || row.ClosureDelaySeconds.Int32 > 3600 ||
 			row.MaxIntervalCreditSeconds.Int32 < 60 || row.MaxIntervalCreditSeconds.Int32 > 3600 ||

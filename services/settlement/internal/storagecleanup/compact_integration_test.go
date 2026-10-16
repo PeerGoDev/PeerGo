@@ -140,7 +140,7 @@ func TestIntegrationRawCleanupRetriesDurablyAndRollsBack(t *testing.T) {
 	ctx, pool := compactTestDatabase(t)
 	q := ledgerdb.New(pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	old := now.Add(-48 * time.Hour)
+	old := now.Add(-72 * time.Hour)
 	stream := "COMPACT_RAW_" + strings.ToUpper(strings.ReplaceAll(uuid.NewString(), "-", ""))
 	subject := "peergo.compact.raw"
 	repo, err := ingest.NewPostgresRepository(pool, stream, subject, func() time.Time { return old.Add(time.Hour) })
@@ -233,7 +233,7 @@ func TestIntegrationTrafficCleanupBackfillAndDelayedPublication(t *testing.T) {
 	ctx, pool := compactTestDatabase(t)
 	q := ledgerdb.New(pool)
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	old := now.Add(-48 * time.Hour)
+	old := now.Add(-72 * time.Hour)
 	stream := "COMPACT_TRAFFIC_" + strings.ToUpper(strings.ReplaceAll(uuid.NewString(), "-", ""))
 	subject := "peergo.compact.traffic"
 	userID := uuid.New()
@@ -357,7 +357,7 @@ func TestIntegrationTrafficCleanupBackfillAndDelayedPublication(t *testing.T) {
 func TestIntegrationUnclosedActivityWaitsForCoverage(t *testing.T) {
 	ctx, pool := compactTestDatabase(t)
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	hour := now.Add(-36 * time.Hour).Truncate(time.Hour)
+	hour := now.Add(-84 * time.Hour).Truncate(time.Hour)
 	suffix := strings.ToUpper(strings.ReplaceAll(uuid.NewString(), "-", ""))
 	stream, subject := "COMPACT_ACTIVITY_"+suffix, "peergo.compact.activity"
 	snapshotStream, snapshotSubject := "COMPACT_SWARM_"+suffix, "peergo.compact.swarm"
@@ -436,10 +436,10 @@ func TestIntegrationUnclosedActivityWaitsForCoverage(t *testing.T) {
 		t.Fatalf("zero traffic seed seconds=%d: %v", seconds, err)
 	}
 	q := ledgerdb.New(pool)
-	// Closing a window makes the bounded cursor discover the heartbeat even
-	// though its last policy-work dependency disappeared while it was blocked.
-	if n, err := q.StorageCleanupBackfillRawIntervalJobs(ctx, ledgerdb.StorageCleanupBackfillRawIntervalJobsParams{DetailBefore: cleanupTimestamp(now.Add(-12 * time.Hour)), BatchSize: 100}); err != nil || n != 1 {
-		t.Fatalf("closed backfill jobs=%d: %v", n, err)
+	// The historical cursor can already be past this older fixture. Closing a
+	// window must register an independent range so its heartbeat remains reachable.
+	if n, err := q.StorageCleanupBackfillRawRangeJobs(ctx, ledgerdb.StorageCleanupBackfillRawRangeJobsParams{DetailBefore: cleanupTimestamp(now.Add(-12 * time.Hour)), BatchSize: 100}); err != nil || n != 1 {
+		t.Fatalf("closed range jobs=%d: %v", n, err)
 	}
 	if n, err := cleanup.cleanupQueuedRawIntervals(ctx, cleanupTimestamp(now.Add(-12*time.Hour)), 100); err != nil || n != 0 {
 		t.Fatalf("referenced evidence raw removed=%d: %v", n, err)
