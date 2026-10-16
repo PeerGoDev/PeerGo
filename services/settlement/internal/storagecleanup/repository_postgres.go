@@ -36,10 +36,6 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	anomaly := cleanupTimestamp(cutoffs.AnomalyBefore)
 	batch := int32(batchSize)
 	var result Result
-	// A dependency deletion is the bounded signal that its raw interval may
-	// have become unreferenced. Carry those exact IDs through this pass so raw
-	// cleanup never searches the full interval ledger for possible orphans.
-	var rawIntervalCandidates []uuid.UUID
 	var err error
 
 	if result.TrafficOutbox, err = queries.StorageCleanupDeleteTrafficOutbox(ctx, ledgerdb.StorageCleanupDeleteTrafficOutboxParams{TerminalBefore: terminal, BatchSize: batch}); err != nil {
@@ -56,26 +52,26 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 		return result, cleanupError("delete settled policy work", err)
 	}
 	result.PolicyWork = int64(len(policyWorkCandidates))
-	rawIntervalCandidates = append(rawIntervalCandidates, policyWorkCandidates...)
 	hnrWorkCandidates, err := queries.StorageCleanupDeleteHNRWork(ctx, ledgerdb.StorageCleanupDeleteHNRWorkParams{TerminalBefore: terminal, BatchSize: batch})
 	if err != nil {
 		return result, cleanupError("delete processed H&R work", err)
 	}
 	result.HNRWork = int64(len(hnrWorkCandidates))
-	rawIntervalCandidates = append(rawIntervalCandidates, hnrWorkCandidates...)
+	result.TrafficQueued, err = queries.StorageCleanupBackfillTrafficDetailJobs(ctx, ledgerdb.StorageCleanupBackfillTrafficDetailJobsParams{DetailBefore: detail, BatchSize: batch})
+	if err != nil {
+		return result, cleanupError("backfill historical traffic cleanup jobs", err)
+	}
 	trafficCandidates, trafficSegments, err := repository.cleanupTrafficDetails(ctx, detail, batch)
 	if err != nil {
 		return result, err
 	}
 	result.TrafficSettlements = int64(len(trafficCandidates))
 	result.TrafficSegments = trafficSegments
-	rawIntervalCandidates = append(rawIntervalCandidates, trafficCandidates...)
 	seedingSourceCandidates, err := queries.StorageCleanupDeleteSeedingSources(ctx, ledgerdb.StorageCleanupDeleteSeedingSourcesParams{DetailBefore: detail, BatchSize: batch})
 	if err != nil {
 		return result, cleanupError("delete old seeding source links", err)
 	}
 	result.SeedingSources = int64(len(seedingSourceCandidates))
-	rawIntervalCandidates = append(rawIntervalCandidates, seedingSourceCandidates...)
 	result.SnapshotEntries, err = drainSnapshotEntryBacklog(ctx, func(ctx context.Context) (int64, error) {
 		return queries.StorageCleanupDeleteSnapshotEntries(ctx, ledgerdb.StorageCleanupDeleteSnapshotEntriesParams{DetailBefore: detail, BatchSize: batch})
 	})
@@ -98,20 +94,18 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 		return result, cleanupError("delete old speed observations", err)
 	}
 	result.SpeedObservations = int64(len(speedObservationCandidates))
-	rawIntervalCandidates = append(rawIntervalCandidates, speedObservationCandidates...)
 	seedingAnomalyCandidates, err := queries.StorageCleanupDeleteSeedingAnomalies(ctx, ledgerdb.StorageCleanupDeleteSeedingAnomaliesParams{AnomalyBefore: anomaly, BatchSize: batch})
 	if err != nil {
 		return result, cleanupError("delete old seeding anomalies", err)
 	}
 	result.SeedingAnomalies = int64(len(seedingAnomalyCandidates))
-	rawIntervalCandidates = append(rawIntervalCandidates, seedingAnomalyCandidates...)
-	if len(rawIntervalCandidates) > 0 {
-		result.RawIntervals, err = queries.StorageCleanupDeleteRawIntervals(ctx, ledgerdb.StorageCleanupDeleteRawIntervalsParams{
-			CandidateEventIds: rawIntervalCandidates, DetailBefore: detail, BatchSize: batch,
-		})
-		if err != nil {
-			return result, cleanupError("delete unreferenced raw intervals", err)
-		}
+	result.RawQueued, err = queries.StorageCleanupBackfillRawIntervalJobs(ctx, ledgerdb.StorageCleanupBackfillRawIntervalJobsParams{DetailBefore: detail, BatchSize: batch})
+	if err != nil {
+		return result, cleanupError("backfill historical raw cleanup jobs", err)
+	}
+	result.RawIntervals, err = repository.cleanupQueuedRawIntervals(ctx, detail, batch)
+	if err != nil {
+		return result, err
 	}
 	if result.Sessions, err = queries.StorageCleanupDeleteSessions(ctx, ledgerdb.StorageCleanupDeleteSessionsParams{SessionBefore: session, BatchSize: batch}); err != nil {
 		return result, cleanupError("delete stale session baselines", err)
@@ -120,6 +114,36 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 		return result, cleanupError("delete unreferenced legacy inbox payloads", err)
 	}
 	return result, nil
+}
+
+func (repository *PostgresRepository) cleanupQueuedRawIntervals(ctx context.Context, detailBefore pgtype.Timestamptz, batchSize int32) (int64, error) {
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return 0, cleanupError("begin durable raw cleanup", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := ledgerdb.New(tx)
+	ids, err := queries.StorageCleanupListDueRawIntervals(ctx, batchSize)
+	if err != nil {
+		return 0, cleanupError("claim durable raw cleanup", err)
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	rows, err := queries.StorageCleanupDeleteRawIntervals(ctx, ledgerdb.StorageCleanupDeleteRawIntervalsParams{CandidateEventIds: ids, DetailBefore: detailBefore, BatchSize: batchSize})
+	if err != nil {
+		return 0, cleanupError("delete queued raw intervals", err)
+	}
+	if err := queries.StorageCleanupCompleteRawIntervalJobs(ctx, ids); err != nil {
+		return 0, cleanupError("complete raw cleanup jobs", err)
+	}
+	if err := queries.StorageCleanupDeferRawIntervalJobs(ctx, ids); err != nil {
+		return 0, cleanupError("defer retained raw cleanup jobs", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, cleanupError("commit durable raw cleanup", err)
+	}
+	return rows, nil
 }
 
 // drainSnapshotEntryBacklog gives the high-volume full-swarm snapshot ledger
@@ -149,14 +173,18 @@ func (repository *PostgresRepository) cleanupTrafficDetails(ctx context.Context,
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := ledgerdb.New(tx)
+	jobs, err := queries.StorageCleanupListDueTrafficDetails(ctx, batchSize)
+	if err != nil {
+		return nil, 0, cleanupError("claim traffic detail jobs", err)
+	}
+	if len(jobs) == 0 {
+		return nil, 0, nil
+	}
 	ids, err := queries.StorageCleanupListTrafficSettlements(ctx, ledgerdb.StorageCleanupListTrafficSettlementsParams{
-		DetailBefore: detailBefore, BatchSize: batchSize,
+		DetailBefore: detailBefore, BatchSize: batchSize, SettlementIds: jobs,
 	})
 	if err != nil {
 		return nil, 0, cleanupError("select traffic detail cleanup batch", err)
-	}
-	if len(ids) == 0 {
-		return nil, 0, nil
 	}
 	segments, err := queries.StorageCleanupDeleteTrafficSettlementSegments(ctx, ids)
 	if err != nil {
@@ -168,6 +196,12 @@ func (repository *PostgresRepository) cleanupTrafficDetails(ctx context.Context,
 	}
 	if settlements != int64(len(ids)) {
 		return nil, 0, fmt.Errorf("%w: selected %d traffic settlements but deleted %d", ErrInvariant, len(ids), settlements)
+	}
+	if err := queries.StorageCleanupCompleteTrafficDetailJobs(ctx, jobs); err != nil {
+		return nil, 0, cleanupError("complete traffic detail jobs", err)
+	}
+	if err := queries.StorageCleanupDeferTrafficDetailJobs(ctx, jobs); err != nil {
+		return nil, 0, cleanupError("defer traffic detail jobs", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, 0, cleanupError("commit traffic detail cleanup", err)

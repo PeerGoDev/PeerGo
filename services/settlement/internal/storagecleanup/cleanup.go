@@ -48,6 +48,8 @@ type Result struct {
 	SpeedObservations     int64
 	SeedingAnomalies      int64
 	RawIntervals          int64
+	RawQueued             int64
+	TrafficQueued         int64
 	Sessions              int64
 	LegacyInbox           int64
 }
@@ -58,7 +60,7 @@ func (result Result) Total() int64 {
 		result.TrafficSegments + result.SeedingSources + result.SnapshotEntries +
 		result.SnapshotChunks + result.SnapshotInbox + result.SnapshotRuns +
 		result.SpeedObservations + result.SeedingAnomalies + result.RawIntervals +
-		result.Sessions + result.LegacyInbox
+		result.Sessions + result.LegacyInbox + result.RawQueued + result.TrafficQueued
 }
 
 func (result Result) Saturated(batchSize int64) bool {
@@ -71,7 +73,7 @@ func (result Result) Saturated(batchSize int64) bool {
 		result.SeedingSources >= batchSize || result.SnapshotEntries >= batchSize ||
 		result.SnapshotChunks >= batchSize || result.SnapshotInbox >= batchSize ||
 		result.SnapshotRuns >= batchSize || result.SpeedObservations >= batchSize ||
-		result.SeedingAnomalies >= batchSize || result.RawIntervals >= batchSize ||
+		result.SeedingAnomalies >= batchSize || result.RawIntervals >= batchSize || result.RawQueued >= batchSize || result.TrafficQueued >= batchSize ||
 		result.Sessions >= batchSize || result.LegacyInbox >= batchSize
 }
 
@@ -139,6 +141,8 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 			"rows", result.Total(),
 			"batch_size", worker.config.BatchSize,
 			"raw_intervals", result.RawIntervals,
+			"raw_gc_queued", result.RawQueued,
+			"traffic_gc_queued", result.TrafficQueued,
 			"traffic_details", result.TrafficSettlements+result.TrafficSegments,
 			"snapshot_entries", result.SnapshotEntries,
 			"snapshot_transport", result.SnapshotChunks+result.SnapshotInbox+result.SnapshotRuns,

@@ -105,6 +105,12 @@ type Querier interface {
 	ReleasePolicyWork(ctx context.Context, arg ReleasePolicyWorkParams) (int64, error)
 	ReleaseSeedingEvidenceOutboxEvent(ctx context.Context, arg ReleaseSeedingEvidenceOutboxEventParams) (int64, error)
 	ReleaseTrafficOutboxEvent(ctx context.Context, arg ReleaseTrafficOutboxEventParams) (int64, error)
+	StorageCleanupBackfillRawIntervalJobs(ctx context.Context, arg StorageCleanupBackfillRawIntervalJobsParams) (int64, error)
+	StorageCleanupBackfillTrafficDetailJobs(ctx context.Context, arg StorageCleanupBackfillTrafficDetailJobsParams) (int64, error)
+	StorageCleanupCompleteRawIntervalJobs(ctx context.Context, eventIds []uuid.UUID) error
+	StorageCleanupCompleteTrafficDetailJobs(ctx context.Context, settlementIds []uuid.UUID) error
+	StorageCleanupDeferRawIntervalJobs(ctx context.Context, eventIds []uuid.UUID) error
+	StorageCleanupDeferTrafficDetailJobs(ctx context.Context, settlementIds []uuid.UUID) error
 	StorageCleanupDeleteHNROutbox(ctx context.Context, arg StorageCleanupDeleteHNROutboxParams) (int64, error)
 	StorageCleanupDeleteHNRWork(ctx context.Context, arg StorageCleanupDeleteHNRWorkParams) ([]uuid.UUID, error)
 	StorageCleanupDeleteLegacyInbox(ctx context.Context, arg StorageCleanupDeleteLegacyInboxParams) (int64, error)
@@ -122,6 +128,8 @@ type Querier interface {
 	StorageCleanupDeleteTrafficOutbox(ctx context.Context, arg StorageCleanupDeleteTrafficOutboxParams) (int64, error)
 	StorageCleanupDeleteTrafficSettlementSegments(ctx context.Context, settlementIds []uuid.UUID) (int64, error)
 	StorageCleanupDeleteTrafficSettlements(ctx context.Context, settlementIds []uuid.UUID) (int64, error)
+	StorageCleanupListDueRawIntervals(ctx context.Context, batchSize int32) ([]uuid.UUID, error)
+	StorageCleanupListDueTrafficDetails(ctx context.Context, batchSize int32) ([]uuid.UUID, error)
 	StorageCleanupListTrafficSettlements(ctx context.Context, arg StorageCleanupListTrafficSettlementsParams) ([]uuid.UUID, error)
 	UpdateHNRObligationProgress(ctx context.Context, arg UpdateHNRObligationProgressParams) (int64, error)
 	UpdateIngestProducerCursor(ctx context.Context, arg UpdateIngestProducerCursorParams) (int64, error)

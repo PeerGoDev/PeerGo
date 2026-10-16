@@ -151,15 +151,23 @@ func (repository *PostgresRepository) Settle(ctx context.Context, pending Pendin
 			return classifyDatabaseError("insert immutable speed observation", err)
 		}
 	}
-	final, err := finalize(raw, slices, result, settledAt)
-	if err != nil {
-		return err
-	}
-	if err := insertFinalSettlement(ctx, queries, final); err != nil {
-		return err
+	// A heartbeat still proves seeding activity and can advance H&R, so its
+	// raw interval and session transition remain durable. Zero byte deltas do
+	// not change traffic balances: avoid multiplying them into settlement,
+	// segment, outbox and Core history rows. Resolve/validate policy and speed
+	// evidence first, and terminalize the leased work in this same transaction
+	// so a retry cannot later emit another accounting event.
+	if raw.RawUploaded != 0 || raw.RawDownloaded != 0 {
+		final, err := finalize(raw, slices, result, settledAt)
+		if err != nil {
+			return err
+		}
+		if err := insertFinalSettlement(ctx, queries, final); err != nil {
+			return err
+		}
 	}
 	rows, err := queries.MarkPolicyWorkSettled(ctx, ledgerdb.MarkPolicyWorkSettledParams{
-		SettledAt: ledgerTimestamp(final.SettledAt), IntervalEventID: pending.IntervalEventID, LeaseToken: pending.LeaseToken,
+		SettledAt: ledgerTimestamp(settledAt), IntervalEventID: pending.IntervalEventID, LeaseToken: pending.LeaseToken,
 	})
 	if err != nil {
 		return classifyDatabaseError("mark policy work settled", err)
@@ -474,7 +482,9 @@ func timelineAppendParams(revision timeline.Revision, snapshotJSON []byte, diges
 }
 
 func sameRevision(row ledgerdb.SettlementPolicyTimelineRevision, revision timeline.Revision, snapshotJSON []byte, digest [sha256.Size]byte) bool {
-	if row.ID != revision.ID || !row.EffectiveAt.Valid || !row.EffectiveAt.Time.Equal(revision.EffectiveAt) ||
+	// pgx persists timestamptz at microsecond precision. Compare retries at
+	// that same precision while retaining the exact snapshot bytes and digest.
+	if row.ID != revision.ID || !row.EffectiveAt.Valid || !row.EffectiveAt.Time.Equal(revision.EffectiveAt.UTC().Truncate(time.Microsecond)) ||
 		row.RevisionSource != string(revision.Snapshot.Revision.Source) || row.RevisionID != revision.Snapshot.Revision.ID ||
 		row.RevisionVersion != int64(revision.Snapshot.Revision.Version) || row.Profile != string(revision.Snapshot.Profile) ||
 		row.SnapshotJson != string(snapshotJSON) || !bytes.Equal(row.SnapshotSha256, digest[:]) {

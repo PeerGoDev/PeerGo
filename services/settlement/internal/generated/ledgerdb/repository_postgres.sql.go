@@ -3915,6 +3915,130 @@ func (q *Queries) ReleaseTrafficOutboxEvent(ctx context.Context, arg ReleaseTraf
 	return result.RowsAffected(), nil
 }
 
+const storageCleanupBackfillRawIntervalJobs = `-- name: StorageCleanupBackfillRawIntervalJobs :one
+WITH cursor AS MATERIALIZED (
+    SELECT ends_at, event_id FROM settlement.raw_interval_gc_backfill
+    WHERE singleton FOR UPDATE
+), candidate AS MATERIALIZED (
+    SELECT raw.event_id, raw.ends_at
+    FROM ledger.raw_session_intervals AS raw, cursor
+    WHERE (raw.ends_at, raw.event_id) > (cursor.ends_at, cursor.event_id)
+      AND raw.ends_at < $1::timestamptz
+      AND raw.ends_at <= coalesce(
+          (SELECT max(window_end) FROM ledger.seeding_evidence_windows), '-infinity'::timestamptz)
+    ORDER BY raw.ends_at, raw.event_id
+    LIMIT $2::integer
+), queued AS (
+    INSERT INTO settlement.raw_interval_gc (event_id, retry_after)
+    SELECT event_id, statement_timestamp() FROM candidate ORDER BY event_id
+    ON CONFLICT (event_id) DO NOTHING RETURNING event_id
+), advanced AS (
+    UPDATE settlement.raw_interval_gc_backfill AS target
+    SET ends_at = last.ends_at, event_id = last.event_id
+    FROM (SELECT ends_at,event_id FROM candidate ORDER BY ends_at DESC,event_id DESC LIMIT 1) AS last
+    WHERE target.singleton
+)
+SELECT count(*) FROM queued
+`
+
+type StorageCleanupBackfillRawIntervalJobsParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupBackfillRawIntervalJobs(ctx context.Context, arg StorageCleanupBackfillRawIntervalJobsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, storageCleanupBackfillRawIntervalJobs, arg.DetailBefore, arg.BatchSize)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const storageCleanupBackfillTrafficDetailJobs = `-- name: StorageCleanupBackfillTrafficDetailJobs :one
+WITH cursor AS MATERIALIZED (
+    SELECT ends_at,settlement_id FROM settlement.traffic_detail_gc_backfill
+    WHERE singleton FOR UPDATE
+), candidate AS MATERIALIZED (
+    SELECT s.settlement_id,s.interval_ends_at
+    FROM ledger.traffic_settlements AS s,cursor
+    WHERE (s.interval_ends_at,s.settlement_id)>(cursor.ends_at,cursor.settlement_id)
+      AND s.interval_ends_at<$1::timestamptz
+    ORDER BY s.interval_ends_at,s.settlement_id
+    LIMIT $2::integer
+), queued AS (
+    INSERT INTO settlement.traffic_detail_gc (settlement_id,retry_after)
+    SELECT c.settlement_id,statement_timestamp() FROM candidate AS c
+    WHERE (SELECT true FROM settlement.traffic_outbox AS o
+           WHERE o.settlement_id=c.settlement_id LIMIT 1 OFFSET 0) IS NULL
+    ORDER BY c.settlement_id
+    ON CONFLICT (settlement_id) DO NOTHING RETURNING settlement_id
+), advanced AS (
+    UPDATE settlement.traffic_detail_gc_backfill AS target
+    SET ends_at=last.interval_ends_at,settlement_id=last.settlement_id
+    FROM (SELECT interval_ends_at,settlement_id FROM candidate
+          ORDER BY interval_ends_at DESC,settlement_id DESC LIMIT 1) AS last
+    WHERE target.singleton
+)
+SELECT count(*) FROM queued
+`
+
+type StorageCleanupBackfillTrafficDetailJobsParams struct {
+	DetailBefore pgtype.Timestamptz
+	BatchSize    int32
+}
+
+func (q *Queries) StorageCleanupBackfillTrafficDetailJobs(ctx context.Context, arg StorageCleanupBackfillTrafficDetailJobsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, storageCleanupBackfillTrafficDetailJobs, arg.DetailBefore, arg.BatchSize)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const storageCleanupCompleteRawIntervalJobs = `-- name: StorageCleanupCompleteRawIntervalJobs :exec
+DELETE FROM settlement.raw_interval_gc AS job
+WHERE job.event_id = ANY($1::uuid[])
+  AND (SELECT true FROM ledger.raw_session_intervals AS raw
+       WHERE raw.event_id = job.event_id LIMIT 1 OFFSET 0) IS NULL
+`
+
+func (q *Queries) StorageCleanupCompleteRawIntervalJobs(ctx context.Context, eventIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, storageCleanupCompleteRawIntervalJobs, eventIds)
+	return err
+}
+
+const storageCleanupCompleteTrafficDetailJobs = `-- name: StorageCleanupCompleteTrafficDetailJobs :exec
+DELETE FROM settlement.traffic_detail_gc AS job
+WHERE job.settlement_id = ANY($1::uuid[])
+  AND (SELECT true FROM ledger.traffic_settlements AS s
+       WHERE s.settlement_id=job.settlement_id LIMIT 1 OFFSET 0) IS NULL
+`
+
+func (q *Queries) StorageCleanupCompleteTrafficDetailJobs(ctx context.Context, settlementIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, storageCleanupCompleteTrafficDetailJobs, settlementIds)
+	return err
+}
+
+const storageCleanupDeferRawIntervalJobs = `-- name: StorageCleanupDeferRawIntervalJobs :exec
+UPDATE settlement.raw_interval_gc
+SET retry_after = statement_timestamp() + interval '5 minutes'
+WHERE event_id = ANY($1::uuid[])
+`
+
+func (q *Queries) StorageCleanupDeferRawIntervalJobs(ctx context.Context, eventIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, storageCleanupDeferRawIntervalJobs, eventIds)
+	return err
+}
+
+const storageCleanupDeferTrafficDetailJobs = `-- name: StorageCleanupDeferTrafficDetailJobs :exec
+UPDATE settlement.traffic_detail_gc
+SET retry_after=statement_timestamp()+interval '5 minutes'
+WHERE settlement_id=ANY($1::uuid[])
+`
+
+func (q *Queries) StorageCleanupDeferTrafficDetailJobs(ctx context.Context, settlementIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, storageCleanupDeferTrafficDetailJobs, settlementIds)
+	return err
+}
+
 const storageCleanupDeleteHNROutbox = `-- name: StorageCleanupDeleteHNROutbox :execrows
 WITH candidate AS (
     SELECT outbox.event_id
@@ -4357,7 +4481,9 @@ WITH eligible_snapshot AS MATERIALIZED (
     -- instead of sorting every retained entry on each cleanup pass.
     SELECT snapshot.snapshot_id
     FROM ledger.seeding_swarm_snapshots AS snapshot
-    WHERE snapshot.status IN ('collecting', 'complete')
+    LEFT JOIN settlement.snapshot_entry_gc_progress AS gc USING (snapshot_id)
+    WHERE gc.snapshot_id IS NULL
+      AND snapshot.status IN ('collecting', 'complete')
       AND (
         (
             snapshot.observed_at < coalesce(
@@ -4369,6 +4495,11 @@ WITH eligible_snapshot AS MATERIALIZED (
                 FROM ledger.seeding_evidence_windows AS evidence_window
                 WHERE evidence_window.selected_snapshot_id = snapshot.snapshot_id
             )
+        )
+        OR
+        (
+            snapshot.observed_at < $1::timestamptz
+            AND ledger.is_redundant_hourly_snapshot(snapshot.snapshot_id)
         )
         OR
         (
@@ -4388,11 +4519,12 @@ WITH eligible_snapshot AS MATERIALIZED (
             )
         )
       )
-      AND EXISTS (
-          SELECT 1
+      AND (
+          SELECT true
           FROM ledger.seeding_swarm_snapshot_entries AS existing_entry
           WHERE existing_entry.snapshot_id = snapshot.snapshot_id
-      )
+          LIMIT 1 OFFSET 0
+      ) IS TRUE
     ORDER BY snapshot.observed_at, snapshot.snapshot_id
     LIMIT 1
 ), candidate AS (
@@ -4620,6 +4752,62 @@ func (q *Queries) StorageCleanupDeleteTrafficSettlements(ctx context.Context, se
 	return result.RowsAffected(), nil
 }
 
+const storageCleanupListDueRawIntervals = `-- name: StorageCleanupListDueRawIntervals :many
+SELECT event_id FROM settlement.raw_interval_gc
+WHERE retry_after <= statement_timestamp()
+ORDER BY retry_after, event_id
+LIMIT $1::integer
+FOR UPDATE SKIP LOCKED
+`
+
+func (q *Queries) StorageCleanupListDueRawIntervals(ctx context.Context, batchSize int32) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, storageCleanupListDueRawIntervals, batchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var event_id uuid.UUID
+		if err := rows.Scan(&event_id); err != nil {
+			return nil, err
+		}
+		items = append(items, event_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const storageCleanupListDueTrafficDetails = `-- name: StorageCleanupListDueTrafficDetails :many
+SELECT settlement_id FROM settlement.traffic_detail_gc
+WHERE retry_after <= statement_timestamp()
+ORDER BY retry_after,settlement_id
+LIMIT $1::integer
+FOR UPDATE SKIP LOCKED
+`
+
+func (q *Queries) StorageCleanupListDueTrafficDetails(ctx context.Context, batchSize int32) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, storageCleanupListDueTrafficDetails, batchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var settlement_id uuid.UUID
+		if err := rows.Scan(&settlement_id); err != nil {
+			return nil, err
+		}
+		items = append(items, settlement_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const storageCleanupListTrafficSettlements = `-- name: StorageCleanupListTrafficSettlements :many
 SELECT settlement.settlement_id
 FROM ledger.traffic_settlements AS settlement
@@ -4633,20 +4821,22 @@ LEFT JOIN LATERAL (
     WHERE outbox.settlement_id = settlement.settlement_id
     OFFSET 0
 ) AS retained_outbox ON true
-WHERE settlement.interval_ends_at < $1::timestamptz
+WHERE settlement.settlement_id = ANY($1::uuid[])
+  AND settlement.interval_ends_at < $2::timestamptz
   AND retained_outbox.settlement_id IS NULL
 ORDER BY settlement.interval_ends_at, settlement.settlement_id
-LIMIT $2::integer
+LIMIT $3::integer
 FOR UPDATE OF settlement SKIP LOCKED
 `
 
 type StorageCleanupListTrafficSettlementsParams struct {
-	DetailBefore pgtype.Timestamptz
-	BatchSize    int32
+	SettlementIds []uuid.UUID
+	DetailBefore  pgtype.Timestamptz
+	BatchSize     int32
 }
 
 func (q *Queries) StorageCleanupListTrafficSettlements(ctx context.Context, arg StorageCleanupListTrafficSettlementsParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, storageCleanupListTrafficSettlements, arg.DetailBefore, arg.BatchSize)
+	rows, err := q.db.Query(ctx, storageCleanupListTrafficSettlements, arg.SettlementIds, arg.DetailBefore, arg.BatchSize)
 	if err != nil {
 		return nil, err
 	}
