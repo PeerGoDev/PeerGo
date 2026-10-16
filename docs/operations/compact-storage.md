@@ -53,3 +53,28 @@ Tracker 用增量活动状态、压缩快照和有界原始记录代替逐心跳
 ingest、settler、hnr、seedingevidence、storagecleanup 分别使用独立数据库。另验证 Core preflight 与做种奖励消费兼容。重点检查随机迟到/重复活动与旧算法一致、事务回滚、清理后重启、跨小时重叠、历史缺口隔离、压缩破损与边界保护。
 
 发布前在服务器保存可恢复备份，协调迁移和依赖版本的服务。迁移在数据压缩和回收后不能安全 Down；故意拒绝向下回滚，恢复用备份或向前修复。上线后激活点及 3 个非空小时校验需要真实时间，校验完成前不会提前启用原始数据减量。历史大表不会因新版本上线立刻缩小；先追平有证据的清理，再评估物理重整的锁与临时空间。
+
+
+## 旧行格式快照的一次性物理缩容
+
+新投影器已经停止向 `ledger.seeding_swarm_snapshot_entries` 写入逐种子明细。历史表可能仍有数亿行；常规分批 DELETE 会产生大量 WAL，且不能立即缩小文件。`scripts/storage/snapshot-compact-prepare.sql` 和 `snapshot-compact-apply.sql` 用于经过单独授权的维护窗口，不加入日常定时任务。
+
+这两个脚本只淘汰超过 12 小时、且现有 `ledger.is_redundant_hourly_snapshot` 返回 true 的完整中间帧。保留所有其他帧的当前记录，包括小时首末帧、整点、各路由和各消费流的首帧、已被窗口引用的帧及异常所需证据；未完成帧和新帧也保留。原始 announce、账本、奖励、H&R、压缩 payload、备份及 Docker 卷均不属于这个工具的淘汰范围。
+
+操作前必须暂停所有旧表写入及后台清理；当前单机部署暂停 `peergo-worker`，保持 API 和旧站运行。评估 NATS 的磁盘余量和消息保留期。准备阶段锁定元数据及原表写入，登记全部帧、复制必须保留的行，并以每帧的有序 info hash、seeders 和 leechers 计算 SHA-256 和行数。目标表没有传入外键时才能执行。
+
+准备完成后，将整个 `storage_snapshot_rewrite` schema 在原服务器备份为 custom archive；在隔离 PostgreSQL 中完整恢复，重新计算每一帧的数量和 SHA-256，与 manifest 全部匹配后才能将生产 control 的 `backup_verified` 标记为 true。记录备份文件 SHA-256、恢复结果和保留行数；不能仅用 TOC 校验代替恢复。运行前明确授权的范围需包括生产表的事务性 TRUNCATE/恢复及后台暂停。
+
+应用阶段重新锁定相关元数据及原表，重新验证冗余条件、源数据和副本的逐帧摘要、计划与 manifest 的完整性以及没有新的旧格式帧。随后在一个事务内 TRUNCATE 原表、插回保留记录、再次逐帧验证，并登记已淘汰帧的清理进度。任一步失败均回滚。原表 OID 不变，原有 owner、授权、约束、索引和保护触发器不替换、不禁用；维护编排还应比较执行前后的完整 schema 定义。提交后 ANALYZE，恢复 worker，检查组件就绪、采集追赶及网站 HTTP。
+
+隔离验证使用完整迁移后的空模板库：
+
+```sh
+python3 scripts/storage/test_snapshot_compaction.py \
+  --container peergo-storage-rewrite-test-20261016 \
+  --template rewrite_test_template
+```
+
+测试覆盖完整保留及原保护触发器、TRUNCATE 后故意报错的事务回滚、副本损坏、新旧格式记录出现、保留源数据变化、消费流首帧保护变化、未完成备份恢复验证的拒绝执行。测试容器必须隔离；不要对业务库运行测试夹具。
+
+保留副本只作为本次维护的暂存数据。应用成功、服务恢复和备份恢复验证全部完成后可回收暂存行，保留压缩备份及 manifest。这个一次性重写不改变常规保留语义，也不替代原始记录的依赖检查和历史结算追赶。
