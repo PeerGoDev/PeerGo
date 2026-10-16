@@ -107,6 +107,8 @@ type Querier interface {
 	ReleaseSeedingEvidenceOutboxEvent(ctx context.Context, arg ReleaseSeedingEvidenceOutboxEventParams) (int64, error)
 	ReleaseTrafficOutboxEvent(ctx context.Context, arg ReleaseTrafficOutboxEventParams) (int64, error)
 	StorageCleanupBackfillRawIntervalJobs(ctx context.Context, arg StorageCleanupBackfillRawIntervalJobsParams) (int64, error)
+	// Each inner LIMIT is a lateral fence: start the index at the claimed cursor.
+	// A top-level ordered join can instead walk the entire old index prefix.
 	StorageCleanupBackfillRawRangeJobs(ctx context.Context, arg StorageCleanupBackfillRawRangeJobsParams) (int64, error)
 	StorageCleanupBackfillTrafficDetailJobs(ctx context.Context, arg StorageCleanupBackfillTrafficDetailJobsParams) (int64, error)
 	StorageCleanupCompleteRawIntervalJobs(ctx context.Context, eventIds []uuid.UUID) error

@@ -109,11 +109,15 @@ WITH cursor AS MATERIALIZED (
     WHERE singleton FOR UPDATE
 ), candidate AS MATERIALIZED (
     SELECT s.settlement_id,s.interval_ends_at
-    FROM ledger.traffic_settlements AS s,cursor
-    WHERE (s.interval_ends_at,s.settlement_id)>(cursor.ends_at,cursor.settlement_id)
-      AND s.interval_ends_at<sqlc.arg(detail_before)::timestamptz
-    ORDER BY s.interval_ends_at,s.settlement_id
-    LIMIT sqlc.arg(batch_size)::integer
+    FROM cursor
+    CROSS JOIN LATERAL (
+        SELECT s.settlement_id,s.interval_ends_at
+        FROM ledger.traffic_settlements AS s
+        WHERE (s.interval_ends_at,s.settlement_id)>(cursor.ends_at,cursor.settlement_id)
+          AND s.interval_ends_at<sqlc.arg(detail_before)::timestamptz
+        ORDER BY s.interval_ends_at,s.settlement_id
+        LIMIT sqlc.arg(batch_size)::integer
+    ) AS s
 ), queued AS (
     INSERT INTO settlement.traffic_detail_gc (settlement_id,retry_after)
     SELECT c.settlement_id,statement_timestamp() FROM candidate AS c
@@ -468,12 +472,16 @@ WITH cursor AS MATERIALIZED (
     SELECT ends_at, event_id FROM settlement.raw_interval_gc_backfill
     WHERE singleton FOR UPDATE
 ), candidate AS MATERIALIZED (
-    SELECT raw.event_id, raw.ends_at
-    FROM ledger.raw_session_intervals AS raw, cursor
-    WHERE (raw.ends_at, raw.event_id) > (cursor.ends_at, cursor.event_id)
-      AND raw.ends_at < sqlc.arg(detail_before)::timestamptz
-    ORDER BY raw.ends_at, raw.event_id
-    LIMIT sqlc.arg(batch_size)::integer
+    SELECT raw.event_id,raw.ends_at
+    FROM cursor
+    CROSS JOIN LATERAL (
+        SELECT raw.event_id,raw.ends_at
+        FROM ledger.raw_session_intervals AS raw
+        WHERE (raw.ends_at,raw.event_id)>(cursor.ends_at,cursor.event_id)
+          AND raw.ends_at<sqlc.arg(detail_before)::timestamptz
+        ORDER BY raw.ends_at,raw.event_id
+        LIMIT sqlc.arg(batch_size)::integer
+    ) AS raw
 ), queued AS (
     INSERT INTO settlement.raw_interval_gc (event_id, retry_after)
     SELECT c.event_id,statement_timestamp() FROM candidate c
@@ -543,6 +551,8 @@ DELETE FROM settlement.event_inbox AS inbox
 USING candidate
 WHERE inbox.event_id = candidate.event_id;
 
+-- Each inner LIMIT is a lateral fence: start the index at the claimed cursor.
+-- A top-level ordered join can instead walk the entire old index prefix.
 -- name: StorageCleanupBackfillRawRangeJobs :one
 WITH chosen AS MATERIALIZED (
     SELECT r.window_start,r.cursor_ends_at,r.cursor_event_id
@@ -554,11 +564,16 @@ WITH chosen AS MATERIALIZED (
     ORDER BY r.retry_after,r.window_start LIMIT 1 FOR UPDATE SKIP LOCKED
 ), candidate AS MATERIALIZED (
     SELECT raw.event_id,raw.ends_at
-    FROM chosen,ledger.raw_session_intervals raw
-    WHERE (raw.ends_at,raw.event_id)>(chosen.cursor_ends_at,chosen.cursor_event_id)
-      AND raw.ends_at<=chosen.window_start+interval '2 hours'
-      AND raw.ends_at<sqlc.arg(detail_before)::timestamptz
-    ORDER BY raw.ends_at,raw.event_id LIMIT sqlc.arg(batch_size)::integer
+    FROM chosen
+    CROSS JOIN LATERAL (
+        SELECT raw.event_id,raw.ends_at
+        FROM ledger.raw_session_intervals raw
+        WHERE (raw.ends_at,raw.event_id)>(chosen.cursor_ends_at,chosen.cursor_event_id)
+          AND raw.ends_at<=chosen.window_start+interval '2 hours'
+          AND raw.ends_at<sqlc.arg(detail_before)::timestamptz
+        ORDER BY raw.ends_at,raw.event_id
+        LIMIT sqlc.arg(batch_size)::integer
+    ) AS raw
 ), queued AS (
     INSERT INTO settlement.raw_interval_gc(event_id,retry_after)
     SELECT event_id,statement_timestamp() FROM candidate ORDER BY event_id
