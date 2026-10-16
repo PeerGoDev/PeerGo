@@ -219,9 +219,19 @@ WITH eligible_snapshot AS MATERIALIZED (
     -- from the compact snapshot ledger first, then walk that primary-key prefix
     -- instead of sorting every retained entry on each cleanup pass.
     SELECT snapshot.snapshot_id
-    FROM ledger.seeding_swarm_snapshots AS snapshot
-    LEFT JOIN settlement.snapshot_entry_gc_progress AS gc USING (snapshot_id)
-    WHERE gc.snapshot_id IS NULL
+    -- Keep ordering before the expensive evidence and entry probes. Without
+    -- this fence PostgreSQL can test every retained snapshot, then sort all
+    -- qualifying rows merely to return the first cleanup candidate.
+    FROM (
+        SELECT snapshot_id, observed_at, status
+        FROM ledger.seeding_swarm_snapshots
+        ORDER BY observed_at, snapshot_id
+        OFFSET 0
+    ) AS snapshot
+    WHERE (
+        SELECT true FROM settlement.snapshot_entry_gc_progress AS gc
+        WHERE gc.snapshot_id = snapshot.snapshot_id LIMIT 1 OFFSET 0
+    ) IS NULL
       AND snapshot.status IN ('collecting', 'complete')
       AND (
         (
