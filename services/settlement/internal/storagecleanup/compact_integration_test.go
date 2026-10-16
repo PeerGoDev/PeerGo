@@ -468,3 +468,29 @@ func TestIntegrationUnclosedActivityWaitsForCoverage(t *testing.T) {
 		t.Fatalf("consumed raw removed=%d: %v", n, err)
 	}
 }
+
+// An almost-empty payload ledger must not evaluate expiry across the much
+// larger legacy header ledger. Roll back the synthetic headers after the test.
+func TestIntegrationSnapshotPayloadCleanupWithSparseLegacyHeaders(t *testing.T) {
+	ctx, pool := compactTestDatabase(t)
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	source := "payload-sparse-" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
+	_, err = tx.Exec(ctx, `INSERT INTO ledger.seeding_swarm_snapshots
+ (snapshot_id,source_id,routing_epoch,snapshot_sequence,observed_at,chunk_count,received_chunk_count,status,created_at,completed_at)
+ SELECT md5($1||n::text)::uuid,$1,1,n,
+ date_trunc('hour',now()-interval '72 hours')+n*interval '1 millisecond',
+ 1,1,'complete',now()-interval '72 hours',now()-interval '72 hours'
+ FROM generate_series(1,60000) n`, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if _, err := ledgerdb.New(tx).StorageCleanupDeleteSnapshotPayloads(bounded); err != nil {
+		t.Fatalf("sparse-payload cleanup exceeded bounded execution: %v", err)
+	}
+}

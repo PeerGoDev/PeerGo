@@ -4751,12 +4751,20 @@ func (q *Queries) StorageCleanupDeleteSnapshotInbox(ctx context.Context, arg Sto
 }
 
 const storageCleanupDeleteSnapshotPayloads = `-- name: StorageCleanupDeleteSnapshotPayloads :execrows
-WITH candidate AS (
+WITH payload_snapshots AS MATERIALIZED (
+    -- Legacy headers can outnumber actual payloads by orders of magnitude.
+    -- Establish payload presence before evaluating the retention function;
+    -- otherwise an empty cleanup pass can run that function for every header.
+    SELECT DISTINCT snapshot_id FROM ledger.seeding_snapshot_payloads
+), candidate AS (
     SELECT payload.snapshot_id,payload.chunk_index
     FROM (
-        SELECT snapshot_id,observed_at FROM ledger.seeding_swarm_snapshots
-        WHERE status='complete'
-        ORDER BY observed_at,snapshot_id OFFSET 0
+        SELECT snapshot.snapshot_id,snapshot.observed_at
+        FROM payload_snapshots stored
+        JOIN ledger.seeding_swarm_snapshots snapshot USING(snapshot_id)
+        WHERE snapshot.status='complete'
+          AND snapshot.observed_at<statement_timestamp()-interval '12 hours'
+        ORDER BY snapshot.observed_at,snapshot.snapshot_id OFFSET 0
     ) snapshot
     JOIN LATERAL (
         SELECT p.snapshot_id,p.chunk_index FROM ledger.seeding_snapshot_payloads p
