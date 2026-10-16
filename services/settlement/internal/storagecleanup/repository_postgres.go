@@ -147,6 +147,13 @@ func (repository *PostgresRepository) cleanupQueuedRawIntervals(ctx context.Cont
 	if len(ids) == 0 {
 		return 0, nil
 	}
+	// The nested SQL retention function can cache a time-index plan based on
+	// one very old row, then rescan that index prefix for every subsequent row.
+	// Generic plans keep its user/torrent completion probe parameterized. Scope
+	// this choice to the already-claimed raw batch, including its delete guards.
+	if _, err := tx.Exec(ctx, "SET LOCAL plan_cache_mode='force_generic_plan'"); err != nil {
+		return 0, cleanupError("select bounded raw retention plans", err)
+	}
 	rows, err := queries.StorageCleanupDeleteRawIntervals(ctx, ledgerdb.StorageCleanupDeleteRawIntervalsParams{CandidateEventIds: ids, DetailBefore: detailBefore, BatchSize: batchSize})
 	if err != nil {
 		return 0, cleanupError("delete queued raw intervals", err)
