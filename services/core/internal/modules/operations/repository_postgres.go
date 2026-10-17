@@ -242,6 +242,21 @@ func evidenceWindowHealth(coverageStart, expectedThrough time.Time, expected, co
 	return EvidenceHealthHealthy
 }
 
+// Read live queue state through the pending index. Exact completed counts use a
+// compact constant-key partial index, without reading historical event payloads.
+const auditQueueStatusSQL = `
+SELECT
+    count(*) FILTER (WHERE attempts = 0 AND (lease_until IS NULL OR lease_until <= $1)),
+    count(*) FILTER (WHERE lease_until > $1),
+    count(*) FILTER (WHERE attempts > 0 AND (lease_until IS NULL OR lease_until <= $1)),
+    0,
+    (SELECT count(*) FROM audit.outbox WHERE delivered_at IS NOT NULL),
+    min(created_at),
+    (SELECT left(last_error, 64) FROM audit.outbox WHERE last_error IS NOT NULL ORDER BY available_at DESC LIMIT 1),
+    NULL::timestamptz
+FROM audit.outbox
+WHERE delivered_at IS NULL`
+
 func (repository *PostgresRepository) Workers(ctx context.Context, now time.Time) (WorkerOverview, error) {
 	if now.IsZero() {
 		return WorkerOverview{}, ErrInput
@@ -412,17 +427,7 @@ LEFT JOIN progression.level_policy_activation_runs AS run
 	}
 	result.Queues = append(result.Queues, levelPolicyActivation)
 
-	auditQueue, err := readQueue(ctx, tx, `
-SELECT
-    count(*) FILTER (WHERE delivered_at IS NULL AND attempts = 0 AND (lease_until IS NULL OR lease_until <= $1)),
-    count(*) FILTER (WHERE delivered_at IS NULL AND lease_until > $1),
-    count(*) FILTER (WHERE delivered_at IS NULL AND attempts > 0 AND (lease_until IS NULL OR lease_until <= $1)),
-    0,
-    count(*) FILTER (WHERE delivered_at IS NOT NULL),
-    min(created_at) FILTER (WHERE delivered_at IS NULL),
-    (SELECT left(last_error, 64) FROM audit.outbox WHERE last_error IS NOT NULL ORDER BY available_at DESC LIMIT 1),
-    NULL::timestamptz
-FROM audit.outbox`, "audit_delivery", "审计事件投递", now)
+	auditQueue, err := readQueue(ctx, tx, auditQueueStatusSQL, "audit_delivery", "审计事件投递", now)
 	if err != nil {
 		return WorkerOverview{}, fmt.Errorf("read audit delivery queue: %w", err)
 	}

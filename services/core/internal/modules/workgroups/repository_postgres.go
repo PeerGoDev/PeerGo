@@ -1130,6 +1130,38 @@ func (repository *PostgresRepository) contributionValues(ctx context.Context, me
 	return repository.contributionValuesWith(ctx, repository.pool, metric, membershipIDs, startsAt, endsAt)
 }
 
+// Resolve historical membership before reading evidence for that user/hour.
+// The latest transition must be considered even when it suspends membership.
+const seedingContributionValuesSQL = `
+SELECT membership.id, COALESCE(sum(item.active_seconds), 0)::bigint
+FROM workgroups.memberships AS membership
+JOIN economy.seeding_reward_evidence_windows AS evidence_window
+  ON evidence_window.status = 'complete'
+ AND evidence_window.window_start >= $2
+ AND evidence_window.window_end <= $3
+JOIN LATERAL (
+    SELECT transition.membership_id, transition.to_status
+    FROM workgroups.membership_transitions AS transition
+    WHERE transition.user_id = membership.user_id
+      AND transition.group_kind = 'retention'
+      AND transition.occurred_at <= evidence_window.window_start
+    ORDER BY transition.occurred_at DESC, transition.state_version DESC, transition.id DESC
+    LIMIT 1
+) AS active_membership
+  ON active_membership.membership_id = membership.id
+ AND active_membership.to_status = 'active'
+JOIN LATERAL (
+    SELECT user_hour.active_seconds
+    FROM economy.seeding_reward_evidence_user_hours AS user_hour
+    WHERE user_hour.user_id = membership.user_id
+      AND user_hour.window_start = evidence_window.window_start
+    -- Keep both equality keys inside the grouped hot/packed view. Flattening
+    -- this join can aggregate the entire evidence history before filtering.
+    OFFSET 0
+) AS item ON true
+WHERE membership.id = ANY($1::uuid[])
+GROUP BY membership.id`
+
 func (repository *PostgresRepository) contributionValuesWith(ctx context.Context, querier workgroupQuerier, metric ContributionMetric, membershipIDs []uuid.UUID, startsAt, endsAt time.Time) (map[uuid.UUID]int64, *time.Time, error) {
 	values := make(map[uuid.UUID]int64, len(membershipIDs))
 	var rows pgx.Rows
@@ -1155,26 +1187,7 @@ WHERE transition.membership_id = ANY($1::uuid[])
   AND vote.occurred_at >= $2 AND vote.occurred_at < $3
 GROUP BY transition.membership_id`, membershipIDs, startsAt, endsAt)
 	case MetricSeedingActiveSeconds:
-		rows, err = querier.Query(ctx, `
-SELECT active_membership.membership_id,
-       COALESCE(sum(item.active_seconds), 0)::bigint
-FROM economy.seeding_reward_evidence_user_hours AS item
-JOIN economy.seeding_reward_evidence_windows AS evidence_window
-  ON evidence_window.window_start = item.window_start
- AND evidence_window.status = 'complete'
-JOIN LATERAL (
-    SELECT transition.membership_id, transition.to_status
-    FROM workgroups.membership_transitions AS transition
-    WHERE transition.user_id = item.user_id
-      AND transition.group_kind = 'retention'
-      AND transition.occurred_at <= evidence_window.window_start
-    ORDER BY transition.occurred_at DESC, transition.state_version DESC, transition.id DESC
-    LIMIT 1
-) AS active_membership ON active_membership.to_status = 'active'
-WHERE active_membership.membership_id = ANY($1::uuid[])
-  AND evidence_window.window_start >= $2
-  AND evidence_window.window_end <= $3
-GROUP BY active_membership.membership_id`, membershipIDs, startsAt, endsAt)
+		rows, err = querier.Query(ctx, seedingContributionValuesSQL, membershipIDs, startsAt, endsAt)
 	default:
 		return nil, nil, errors.New("unknown workgroup contribution metric")
 	}
