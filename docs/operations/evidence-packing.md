@@ -38,6 +38,25 @@ unresolved reconciliation, and no unpublished evidence outbox. Core requires a
 complete projection. The original source, raw, H&R and coverage retention rules
 are unchanged.
 
+## Keeping Tracker available during maintenance
+
+The compact `peergo-worker` also owns `core-control-projector` and
+`core-snapshot-publisher`. Stopping that whole container stops admission snapshot
+refreshes; the configured subject snapshot lifetime can be only one minute.
+Before a maintenance pause, run the existing split-runtime control projector and
+snapshot publisher independently with the same deployed image, configuration,
+network and shared snapshot volume. The publisher uses file locks and rejects
+regressing snapshots. Confirm a fresh snapshot from the independent publisher
+**after** the main worker stops, then check Tracker readiness and snapshot age
+throughout maintenance. Preserve the configured freshness limits.
+
+Check that incoming announces still advance in JetStream, consumers have enough
+retention and capacity for the pause, and the database transaction has a bounded
+runtime. Abort and roll back the dedicated maintenance transaction if snapshot
+freshness or Tracker readiness fails; always restore the main worker, including
+when the operator connection is lost. After the worker is healthy and its own
+publisher has resumed, stop and remove only the temporary control containers.
+
 ## Integrity and recovery
 
 An insertion guard locks the parent hour and compares every packed value and
