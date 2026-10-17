@@ -14,7 +14,14 @@ of hot items and unpacked history. No rounding, reward formula or H&R rule chang
    disabled; migration alone retires no rows. Both schema contracts become
    `202610170001`, so rebuild all Core and Settlement startup consumers, including
    preflight. Deploy compatible API, workers and operator/replay binaries together.
-2. Verify recent ingest, reward projection, duplicate replay and historical reads.
+2. Run `scripts/storage/evidence_pack_vacuum.sql` with `psql` as an administrator
+   able to maintain both databases. It performs ordinary online vacuum (heap truncation disabled)
+   and tunes the two hot item tables to vacuum/analyze after 1% plus 50,000
+   changes. The default 20% threshold can leave millions of dead index entries
+   after packing; oldest-hour discovery then repeatedly scans those entries and
+   reaches its deadline. This physical maintenance changes no live evidence or
+   archive guards. Verify recent ingest, reward projection, duplicate replay
+   and historical reads after it completes.
 3. Enable `ledger.seeding_evidence_packing_control.enabled` on Tracker and
    `economy.seeding_reward_evidence_packing_control.enabled` on Core. Each existing
    maintenance pass moves up to 64 user groups, with a 10 second client deadline
