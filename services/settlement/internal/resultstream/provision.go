@@ -56,8 +56,8 @@ func (manager *NATSManager) Update(ctx context.Context, config jetstream.StreamC
 	return err
 }
 
-// Ensure creates a missing stream and permits only an in-place MaxAge change.
-// All other stream drift remains fail-closed.
+// Ensure permits the existing MaxAge adjustment and a lossless none-to-S2
+// storage upgrade. Other drift, including compression downgrades, fails closed.
 func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig) (bool, error) {
 	if manager == nil || validate(desired) != nil {
 		return false, ErrInput
@@ -65,11 +65,11 @@ func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig
 	current, err := manager.Get(ctx, desired.Name)
 	if err == nil {
 		if !equivalent(current, desired) {
-			if !maxAgeOnlyDrift(current, desired) {
+			if !allowedStorageDrift(current, desired) {
 				return false, ErrDrift
 			}
 			if err := manager.Update(ctx, desired); err != nil {
-				return false, fmt.Errorf("update Settlement result stream MaxAge: %w", err)
+				return false, fmt.Errorf("update Settlement result stream storage settings: %w", err)
 			}
 		}
 		return false, nil
@@ -83,8 +83,15 @@ func Ensure(ctx context.Context, manager Manager, desired jetstream.StreamConfig
 	return true, nil
 }
 
-func maxAgeOnlyDrift(current, desired jetstream.StreamConfig) bool {
-	current.MaxAge = desired.MaxAge
+func allowedStorageDrift(current, desired jetstream.StreamConfig) bool {
+	if current.Compression != desired.Compression {
+		if current.Compression != jetstream.NoCompression || desired.Compression != jetstream.S2Compression || current.MaxAge != desired.MaxAge {
+			return false
+		}
+		current.Compression = desired.Compression
+	} else {
+		current.MaxAge = desired.MaxAge
+	}
 	return equivalent(current, desired)
 }
 

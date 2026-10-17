@@ -86,7 +86,8 @@ func loadResultStreamProvisioner(prefix, credentialName string, identity func() 
 			Retention: jetstream.LimitsPolicy, MaxConsumers: 4, MaxMsgs: -1, MaxBytes: maxBytes,
 			Discard: jetstream.DiscardNew, MaxAge: maxAge, MaxMsgsPerSubject: -1,
 			MaxMsgSize: maxMessageBytes, Storage: jetstream.FileStorage, Replicas: replicas, Duplicates: duplicates,
-			Metadata: map[string]string{"peergo.owner": "settlement", "peergo.schema": schema},
+			Compression: jetstream.S2Compression,
+			Metadata:    map[string]string{"peergo.owner": "settlement", "peergo.schema": schema},
 		},
 	}, nil
 }

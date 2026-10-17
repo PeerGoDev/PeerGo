@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats.go/jetstream"
+
 	"github.com/peergo/peergo/contracts/go/settlementseedingv1"
 )
 
@@ -20,6 +22,7 @@ func TestLoadSeedingEvidenceTransportUsesIndependentBoundedStream(t *testing.T) 
 	if dispatcher.Stream != settlementseedingv1.DefaultStream || dispatcher.Subject != settlementseedingv1.DefaultSubject ||
 		dispatcher.LeaseDuration != 30*time.Second || provisioner.Stream.Name != dispatcher.Stream ||
 		provisioner.Stream.MaxMsgSize != settlementseedingv1.MaxEventBytes ||
+		provisioner.Stream.Compression != jetstream.S2Compression ||
 		provisioner.Stream.Metadata["peergo.schema"] != settlementseedingv1.SchemaVersion {
 		t.Fatalf("dispatcher=%+v stream=%+v", dispatcher, provisioner.Stream)
 	}

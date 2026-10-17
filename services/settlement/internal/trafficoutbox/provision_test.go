@@ -63,3 +63,30 @@ func testStreamConfig() jetstream.StreamConfig {
 		Replicas: 1, Duplicates: 10 * time.Minute, Metadata: map[string]string{"peergo.owner": "settlement", "peergo.schema": settlementtrafficv1.SchemaVersion},
 	}
 }
+
+func TestEnsureStreamAllowsOnlyLosslessCompressionUpgrade(t *testing.T) {
+	desired := testStreamConfig()
+	desired.Compression = jetstream.S2Compression
+	manager := &fakeStreamManager{current: testStreamConfig()}
+	if _, err := EnsureStream(context.Background(), manager, desired); err != nil || manager.updated.Compression != jetstream.S2Compression {
+		t.Fatalf("compression upgrade err=%v", err)
+	}
+	if manager.updated.MaxAge != manager.current.MaxAge || manager.updated.Retention != manager.current.Retention {
+		t.Fatal("compression upgrade changed retention")
+	}
+	manager = &fakeStreamManager{current: testStreamConfig()}
+	manager.current.MaxBytes++
+	if _, err := EnsureStream(context.Background(), manager, desired); !errors.Is(err, ErrStreamDrift) || manager.updated.Name != "" {
+		t.Fatalf("capacity drift was not rejected: %v", err)
+	}
+	manager = &fakeStreamManager{current: testStreamConfig()}
+	manager.current.MaxAge += time.Hour
+	if _, err := EnsureStream(context.Background(), manager, desired); !errors.Is(err, ErrStreamDrift) || manager.updated.Name != "" {
+		t.Fatalf("compression upgrade must not also change retention: %v", err)
+	}
+	manager = &fakeStreamManager{current: desired}
+	desired.Compression = jetstream.NoCompression
+	if _, err := EnsureStream(context.Background(), manager, desired); !errors.Is(err, ErrStreamDrift) || manager.updated.Name != "" {
+		t.Fatalf("compression downgrade was not rejected: %v", err)
+	}
+}
