@@ -7,6 +7,19 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const nextEvidenceWindowSQL = `SELECT CASE
+  WHEN scan.next_window+interval '1 hour'+($2::bigint*interval '1 second')<=$3 THEN scan.next_window
+  ELSE coalesce((
+    SELECT r.window_start FROM settlement.seeding_window_retries r
+    WHERE r.source_stream=scan.source_stream AND r.retry_after<=$3
+      AND NOT EXISTS(SELECT 1 FROM ledger.seeding_evidence_windows w WHERE w.window_start=r.window_start)
+    -- Retry recent evidence while its detailed source data is still available.
+    -- Backoff remains mandatory; old gaps continue when recent retries are not due.
+    ORDER BY (r.window_start >= $3::timestamptz-interval '48 hours') DESC,
+             r.retry_after,r.window_start LIMIT 1
+  ),scan.next_window) END
+  FROM settlement.seeding_window_scan scan WHERE source_stream=$1`
+
 func (repository *PostgresRepository) nextWindowStart(ctx context.Context, initial time.Time) (time.Time, error) {
 	if !validWindowStart(initial) {
 		return time.Time{}, ErrInput
@@ -27,15 +40,7 @@ func (repository *PostgresRepository) nextWindowStart(ctx context.Context, initi
 	var next time.Time
 	// Drain the chronological scan first. Once current, retry old gaps without
 	// allowing one permanently missing fence to stop every subsequent hour.
-	err = repository.pool.QueryRow(ctx, `SELECT CASE
-  WHEN scan.next_window+interval '1 hour'+($2::bigint*interval '1 second')<=$3 THEN scan.next_window
-  ELSE coalesce((
-    SELECT r.window_start FROM settlement.seeding_window_retries r
-    WHERE r.source_stream=scan.source_stream AND r.retry_after<=$3
-      AND NOT EXISTS(SELECT 1 FROM ledger.seeding_evidence_windows w WHERE w.window_start=r.window_start)
-    ORDER BY r.retry_after,r.window_start LIMIT 1
-  ),scan.next_window) END
-  FROM settlement.seeding_window_scan scan WHERE source_stream=$1`,
+	err = repository.pool.QueryRow(ctx, nextEvidenceWindowSQL,
 		repository.config.AnnounceStream, int64(repository.config.ClosureDelay/time.Second), repository.now().UTC()).Scan(&next)
 	if err != nil {
 		return time.Time{}, databaseError("select evidence scan or retry hour", err)

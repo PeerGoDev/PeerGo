@@ -37,3 +37,11 @@ suspension/rejoin ordering, completed-hour boundaries, and empty requests. Its
 reference SQL files are regression oracles, not executable production helpers.
 Verify authenticated Workers, Incidents, Tracker and workgroup pages after
 release; public homepage health alone does not prove admin query performance.
+
+
+Evidence scheduling also prioritizes due retries within the most recent 48
+hours after the chronological scan catches up. Otherwise a new hour deferred
+at its source-watermark boundary can wait behind hundreds of historical gaps.
+The five-minute retry backoff, completeness checks and historical retry records
+remain unchanged; old gaps continue when no recent retry is due. This priority
+does not infer or manufacture missing evidence.
