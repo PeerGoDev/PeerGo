@@ -25,6 +25,7 @@ var (
 )
 
 type Result struct {
+	EvidencePacked      int64
 	Inbox               int64
 	Entries             int64
 	Explanations        int64
@@ -34,11 +35,11 @@ type Result struct {
 }
 
 func (result Result) Total() int64 {
-	return result.Inbox + result.Entries + result.Explanations + result.Segments + result.Rollups + result.NetworkObservations
+	return result.EvidencePacked + result.Inbox + result.Entries + result.Explanations + result.Segments + result.Rollups + result.NetworkObservations
 }
 
 func (result Result) Saturated(batchSize int64) bool {
-	return batchSize > 0 && (result.Entries >= batchSize || result.Rollups >= batchSize || result.NetworkObservations >= batchSize)
+	return batchSize > 0 && (result.EvidencePacked > 0 || result.Entries >= batchSize || result.Rollups >= batchSize || result.NetworkObservations >= batchSize)
 }
 
 type Cutoffs struct {
@@ -105,7 +106,7 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 		worker.logger.Log(ctx, level, message,
 			"rows", result.Total(), "batch_size", worker.config.BatchSize,
 			"entries", result.Entries, "segments", result.Segments, "rollups", result.Rollups,
-			"network_observations", result.NetworkObservations)
+			"network_observations", result.NetworkObservations, "evidence_packed", result.EvidencePacked)
 	}
 	return result, nil
 }

@@ -314,7 +314,7 @@ func (repository *PostgresSettlementRepository) snapshotItems(ctx context.Contex
 SELECT evidence.torrent_id, torrent.total_size_bytes, torrent.published_at,
        evidence.active_seconds, evidence.raw_uploaded_bytes,
        evidence.snapshot_seeders, evidence.tracker_evidence_sha256
-FROM economy.seeding_reward_evidence_items AS evidence
+FROM economy.seeding_reward_evidence_items_read AS evidence
 JOIN torrents.torrents AS torrent ON torrent.id = evidence.torrent_id
 WHERE evidence.window_start = $1 AND evidence.user_id = $2
   AND torrent.published_at IS NOT NULL

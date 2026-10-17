@@ -34,6 +34,7 @@ type Cutoffs struct {
 }
 
 type Result struct {
+	EvidencePacked        int64
 	SnapshotPayloads      int64
 	ActivityHours         int64
 	HNRCheckpoints        int64
@@ -60,7 +61,7 @@ type Result struct {
 }
 
 func (result Result) Total() int64 {
-	return result.SnapshotPayloads + result.ActivityHours + result.HNRCheckpoints + result.RawRangeQueued + result.TrafficOutbox + result.HNROutbox + result.SeedingEvidenceOutbox +
+	return result.EvidencePacked + result.SnapshotPayloads + result.ActivityHours + result.HNRCheckpoints + result.RawRangeQueued + result.TrafficOutbox + result.HNROutbox + result.SeedingEvidenceOutbox +
 		result.PolicyWork + result.HNRWork + result.TrafficSettlements +
 		result.TrafficSegments + result.SeedingSources + result.SnapshotEntries +
 		result.SnapshotChunks + result.SnapshotInbox + result.SnapshotRuns +
@@ -72,7 +73,7 @@ func (result Result) Saturated(batchSize int64) bool {
 	if batchSize < 1 {
 		return false
 	}
-	return result.SnapshotPayloads >= 128 || result.RawRangeQueued >= batchSize || result.ActivityHours >= batchSize || result.HNRCheckpoints >= batchSize || result.TrafficOutbox >= batchSize || result.HNROutbox >= batchSize ||
+	return result.EvidencePacked > 0 || result.SnapshotPayloads >= 128 || result.RawRangeQueued >= batchSize || result.ActivityHours >= batchSize || result.HNRCheckpoints >= batchSize || result.TrafficOutbox >= batchSize || result.HNROutbox >= batchSize ||
 		result.SeedingEvidenceOutbox >= batchSize || result.PolicyWork >= batchSize ||
 		result.HNRWork >= batchSize || result.TrafficSettlements >= batchSize ||
 		result.SeedingSources >= batchSize || result.SnapshotEntries >= batchSize ||
@@ -149,7 +150,7 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 			"batch_size", worker.config.BatchSize,
 			"duration_ms", time.Since(started).Milliseconds(),
 			"raw_intervals", result.RawIntervals,
-			"seeding_sources", result.SeedingSources,
+			"seeding_sources", result.SeedingSources, "evidence_packed", result.EvidencePacked,
 			"policy_work", result.PolicyWork,
 			"raw_gc_queued", result.RawQueued,
 			"traffic_gc_queued", result.TrafficQueued,

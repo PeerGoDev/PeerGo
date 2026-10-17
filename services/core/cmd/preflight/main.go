@@ -22,7 +22,7 @@ import (
 	"github.com/peergo/peergo/contracts/go/schemaversionv1"
 )
 
-const trackerMigrationVersion int64 = 202610160003
+const trackerMigrationVersion int64 = 202610170001
 
 type checkStatus string
 

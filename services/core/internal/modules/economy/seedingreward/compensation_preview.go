@@ -464,7 +464,7 @@ WITH affected_users AS MATERIALIZED (
     LEFT JOIN ledger.seeding_swarm_snapshot_entries AS snapshot
       ON snapshot.snapshot_id = evidence_window.selected_snapshot_id
      AND snapshot.info_hash_v1 = facts.info_hash_v1
-    LEFT JOIN ledger.seeding_evidence_items AS original
+    LEFT JOIN ledger.seeding_evidence_items_read AS original
       ON original.window_start = evidence_window.window_start
      AND original.user_id = facts.user_id
      AND original.torrent_id = facts.torrent_id

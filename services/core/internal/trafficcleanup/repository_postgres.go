@@ -95,6 +95,11 @@ SELECT count(*)::bigint FROM deleted`, cutoffs.NetworkBefore, batchSize).Scan(&r
 	if err := tx.Commit(ctx); err != nil {
 		return result, cleanupError("commit Core traffic cleanup", err)
 	}
+	packCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := repository.pool.QueryRow(packCtx, "SELECT economy.seeding_reward_evidence_pack_batch(64)").Scan(&result.EvidencePacked); err != nil {
+		return result, cleanupError("pack closed seeding evidence", err)
+	}
 	return result, nil
 }
 

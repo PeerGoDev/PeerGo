@@ -131,7 +131,7 @@ SELECT
     snapshot_seeders,
     snapshot_leechers,
     tracker_evidence_sha256
-FROM economy.seeding_reward_evidence_items
+FROM economy.seeding_reward_evidence_items_read
 WHERE window_start = sqlc.arg(window_start)::timestamptz
 ORDER BY user_id, torrent_id;
 

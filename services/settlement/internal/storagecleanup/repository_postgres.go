@@ -140,6 +140,11 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	if result.LegacyInbox, err = queries.StorageCleanupDeleteLegacyInbox(ctx, ledgerdb.StorageCleanupDeleteLegacyInboxParams{DetailBefore: detail, BatchSize: batch}); err != nil {
 		return result, cleanupError("delete unreferenced legacy inbox payloads", err)
 	}
+	packCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := repository.pool.QueryRow(packCtx, "SELECT ledger.seeding_evidence_pack_batch(64)").Scan(&result.EvidencePacked); err != nil {
+		return result, cleanupError("pack closed seeding evidence", err)
+	}
 	return result, nil
 }
 

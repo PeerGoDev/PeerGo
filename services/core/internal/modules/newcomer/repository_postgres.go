@@ -464,7 +464,7 @@ SELECT
         assessment.current_seeding_active_seconds,
         COALESCE((
             SELECT sum(item.active_seconds)::bigint
-            FROM economy.seeding_reward_evidence_items AS item
+            FROM economy.seeding_reward_evidence_user_hours AS item
             JOIN economy.seeding_reward_evidence_windows AS evidence_window
               ON evidence_window.window_start = item.window_start
              AND evidence_window.status = 'complete'

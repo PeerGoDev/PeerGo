@@ -3034,7 +3034,7 @@ SELECT
     snapshot_seeders,
     snapshot_leechers,
     evidence_sha256
-FROM ledger.seeding_evidence_items
+FROM ledger.seeding_evidence_items_read
 WHERE window_start = $1::timestamptz
 ORDER BY user_id, torrent_id
 `
