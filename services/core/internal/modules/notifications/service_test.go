@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/contenttip"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/ratiowatch"
 	"github.com/peergo/peergo/services/core/internal/modules/review"
@@ -393,5 +394,57 @@ func TestServiceRejectsNotificationWithMultipleTypedPayloads(t *testing.T) {
 	}
 	if _, err := service.List(context.Background(), "cookie", ListQuery{Limit: 20}); !errors.Is(err, ErrInvariant) {
 		t.Fatalf("List() error = %v, want ErrInvariant", err)
+	}
+}
+
+func TestServiceAcceptsTypedContentTipNotifications(t *testing.T) {
+	t.Parallel()
+	targets := []contenttip.Target{
+		{Kind: contenttip.TargetTorrent, TorrentID: 42, Title: "Torrent"},
+		{Kind: contenttip.TargetPost, PostID: uuid.New(), Title: "Post"},
+		{Kind: contenttip.TargetComment, CommentID: uuid.New(), Title: "Comment"},
+	}
+	for _, target := range targets {
+		t.Run(string(target.Kind), func(t *testing.T) {
+			t.Parallel()
+			now := time.Date(2026, time.October, 17, 3, 0, 0, 0, time.UTC)
+			auth := &notificationAuthenticatorFixture{session: identity.WebSession{User: identity.User{ID: uuid.New()}}}
+			notification := Notification{ID: uuid.New(), Kind: KindContentTip, CreatedAt: now,
+				ContentTip: &ContentTipNotification{SenderNumericID: 42, SenderUsername: "member42", SenderDisplayName: "Member 42", NetAmount: 9007199254740992, Target: target}}
+			repo := &notificationRepositoryFixture{page: Page{Items: []Notification{notification}, Total: 1, UnreadCount: 1}}
+			service, err := NewService(auth, &notificationAuthorizerFixture{}, repo, func() time.Time { return now })
+			if err != nil {
+				t.Fatal(err)
+			}
+			page, err := service.List(context.Background(), "cookie", ListQuery{Limit: 20})
+			if err != nil {
+				t.Fatalf("content tip notification rejected: %v", err)
+			}
+			if len(page.Items) != 1 || page.Items[0].ContentTip == nil || page.Items[0].ContentTip.NetAmount != notification.ContentTip.NetAmount || page.Items[0].ContentTip.Target != target {
+				t.Fatalf("content tip projection changed: %+v", page)
+			}
+		})
+	}
+}
+
+func TestNotificationRejectsMalformedContentTipAndMixedPayloads(t *testing.T) {
+	t.Parallel()
+	cases := map[string]func(*Notification){
+		"missing payload": func(n *Notification) { n.ContentTip = nil },
+		"zero amount":     func(n *Notification) { n.ContentTip.NetAmount = 0 },
+		"missing target":  func(n *Notification) { n.ContentTip.Target.TorrentID = 0 },
+		"mixed target":    func(n *Notification) { n.ContentTip.Target.PostID = uuid.New() },
+		"mixed payload":   func(n *Notification) { n.MemberGift = &MemberGiftNotification{} },
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			notification := Notification{ID: uuid.New(), Kind: KindContentTip, CreatedAt: time.Now(),
+				ContentTip: &ContentTipNotification{SenderNumericID: 42, SenderUsername: "member42", SenderDisplayName: "Member 42", NetAmount: 100, Target: contenttip.Target{Kind: contenttip.TargetTorrent, TorrentID: 42, Title: "Torrent"}}}
+			mutate(&notification)
+			if validNotification(notification) {
+				t.Fatal("malformed notification accepted")
+			}
+		})
 	}
 }

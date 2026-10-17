@@ -207,6 +207,8 @@ func validNotification(notification Notification) bool {
 		return validWorkgroupContributionPayload(notification.WorkgroupContribution)
 	case KindMemberGift:
 		return validMemberGiftNotification(notification.MemberGift)
+	case KindContentTip:
+		return validContentTipNotification(notification.ContentTip)
 	default:
 		return false
 	}
@@ -221,6 +223,7 @@ func notificationPayloadCount(notification Notification) int {
 		notification.HNR != nil,
 		notification.WorkgroupContribution != nil,
 		notification.MemberGift != nil,
+		notification.ContentTip != nil,
 	} {
 		if present {
 			count++
