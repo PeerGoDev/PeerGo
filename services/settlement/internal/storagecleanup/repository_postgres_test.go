@@ -53,3 +53,44 @@ func TestDrainSnapshotEntryBacklogReturnsCommittedRowsWithFailure(t *testing.T) 
 		t.Fatalf("drainSnapshotEntryBacklog() calls=%d rows=%d error=%v", calls, rows, err)
 	}
 }
+
+func TestDetailBacklogKeepsCommittedProgressOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
+	n, err := drainDetailBacklog(ctx, func(context.Context) (int64, error) {
+		calls++
+		cancel()
+		return 100, nil
+	})
+	if n != 100 || calls != 1 || !errors.Is(err, context.Canceled) {
+		t.Fatalf("rows=%d calls=%d err=%v", n, calls, err)
+	}
+}
+
+func TestDetailBacklogStopsAfterFailureOrNoProgress(t *testing.T) {
+	failure := errors.New("transaction rolled back")
+	for _, secondErr := range []error{nil, failure} {
+		calls := 0
+		n, err := drainDetailBacklog(context.Background(), func(context.Context) (int64, error) {
+			calls++
+			if calls == 1 {
+				return 100, nil
+			}
+			return 0, secondErr
+		})
+		if n != 100 || calls != 2 || !errors.Is(err, secondErr) {
+			t.Fatalf("rows=%d calls=%d err=%v", n, calls, err)
+		}
+	}
+}
+
+func TestDetailBacklogYieldsDespiteRemainingWork(t *testing.T) {
+	calls := 0
+	n, err := drainDetailBacklog(context.Background(), func(context.Context) (int64, error) {
+		calls++
+		return 100, nil
+	})
+	if n != 400 || calls != 4 || err != nil {
+		t.Fatalf("rows=%d calls=%d err=%v", n, calls, err)
+	}
+}

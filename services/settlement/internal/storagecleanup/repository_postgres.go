@@ -16,7 +16,10 @@ type PostgresRepository struct {
 	pool *pgxpool.Pool
 }
 
-const snapshotEntryCleanupPassLimit = 4
+const (
+	snapshotEntryCleanupPassLimit = 4
+	detailCleanupPassLimit        = 4
+)
 
 func NewPostgresRepository(pool *pgxpool.Pool) (*PostgresRepository, error) {
 	if pool == nil {
@@ -71,11 +74,16 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	}
 	result.TrafficSettlements = int64(len(trafficCandidates))
 	result.TrafficSegments = trafficSegments
-	seedingSourceCandidates, err := queries.StorageCleanupDeleteSeedingSources(ctx, ledgerdb.StorageCleanupDeleteSeedingSourcesParams{DetailBefore: detail, BatchSize: batch})
+	result.SeedingSources, err = drainDetailBacklog(ctx, func(ctx context.Context) (int64, error) {
+		ids, err := queries.StorageCleanupDeleteSeedingSources(ctx, ledgerdb.StorageCleanupDeleteSeedingSourcesParams{DetailBefore: detail, BatchSize: batch})
+		if err != nil {
+			return 0, err
+		}
+		return int64(len(ids)), nil
+	})
 	if err != nil {
 		return result, cleanupError("delete old seeding source links", err)
 	}
-	result.SeedingSources = int64(len(seedingSourceCandidates))
 	if result.SnapshotPayloads, err = queries.StorageCleanupDeleteSnapshotPayloads(ctx); err != nil {
 		return result, cleanupError("expire redundant compressed snapshots", err)
 	}
@@ -120,7 +128,9 @@ func (repository *PostgresRepository) Cleanup(ctx context.Context, cutoffs Cutof
 	if err != nil {
 		return result, cleanupError("backfill historical raw cleanup jobs", err)
 	}
-	result.RawIntervals, err = repository.cleanupQueuedRawIntervals(ctx, rawDetail, batch)
+	result.RawIntervals, err = drainDetailBacklog(ctx, func(ctx context.Context) (int64, error) {
+		return repository.cleanupQueuedRawIntervals(ctx, rawDetail, batch)
+	})
 	if err != nil {
 		return result, err
 	}
@@ -168,6 +178,29 @@ func (repository *PostgresRepository) cleanupQueuedRawIntervals(ctx context.Cont
 		return 0, cleanupError("commit durable raw cleanup", err)
 	}
 	return rows, nil
+}
+
+// drainDetailBacklog amortizes a full maintenance pass over a few independent
+// bounded transactions. Source retirement releases raw dependencies; each raw
+// pass still claims its own queue batch, checks every retention guard, and
+// commits retirement with retry bookkeeping. Do not merge these transactions
+// or increase their row limits. Stop on no progress, cancellation, or error.
+func drainDetailBacklog(ctx context.Context, deleteBatch func(context.Context) (int64, error)) (int64, error) {
+	var total int64
+	for range detailCleanupPassLimit {
+		if err := ctx.Err(); err != nil {
+			return total, err
+		}
+		rows, err := deleteBatch(ctx)
+		total += rows
+		if err != nil {
+			return total, err
+		}
+		if rows == 0 {
+			break
+		}
+	}
+	return total, nil
 }
 
 // drainSnapshotEntryBacklog gives the high-volume full-swarm snapshot ledger

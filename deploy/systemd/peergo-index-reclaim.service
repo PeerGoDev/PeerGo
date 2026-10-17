@@ -1,0 +1,10 @@
+[Unit]
+Description=Reclaim sparse PeerGo transport/work indexes online
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/peergo/app/scripts/storage/online_index_reclaim.py --container 1Panel-postgresql-kXaY --execute
+Nice=15
+IOSchedulingClass=idle
+TimeoutStartSec=20min

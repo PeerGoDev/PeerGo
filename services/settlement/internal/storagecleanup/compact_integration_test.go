@@ -217,7 +217,9 @@ func TestIntegrationRawCleanupRetriesDurablyAndRollsBack(t *testing.T) {
 	if _, err := pool.Exec(ctx, `UPDATE settlement.raw_interval_gc SET retry_after=statement_timestamp() WHERE event_id=ANY($1::uuid[])`, ids); err != nil {
 		t.Fatal(err)
 	}
-	if n, err := cleanup.cleanupQueuedRawIntervals(ctx, cleanupTimestamp(now.Add(-12*time.Hour)), 2); err != nil || n != 2 {
+	if n, err := drainDetailBacklog(ctx, func(ctx context.Context) (int64, error) {
+		return cleanup.cleanupQueuedRawIntervals(ctx, cleanupTimestamp(now.Add(-12*time.Hour)), 1)
+	}); err != nil || n != 2 {
 		t.Fatalf("retried rows=%d: %v", n, err)
 	}
 	if due, err := q.StorageCleanupListDueRawIntervals(ctx, 100); err != nil || len(due) != 0 {

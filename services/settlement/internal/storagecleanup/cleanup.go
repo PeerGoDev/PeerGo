@@ -149,6 +149,8 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 			"batch_size", worker.config.BatchSize,
 			"duration_ms", time.Since(started).Milliseconds(),
 			"raw_intervals", result.RawIntervals,
+			"seeding_sources", result.SeedingSources,
+			"policy_work", result.PolicyWork,
 			"raw_gc_queued", result.RawQueued,
 			"traffic_gc_queued", result.TrafficQueued,
 			"traffic_details", result.TrafficSettlements+result.TrafficSegments,
