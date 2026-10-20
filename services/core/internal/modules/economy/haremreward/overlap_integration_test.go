@@ -13,9 +13,9 @@ import (
 )
 
 func TestIntegrationDoesNotPayAcrossAnExistingWindow(t *testing.T) {
-	url := strings.TrimSpace(os.Getenv("PEERGO_TEST_CORE_DATABASE_URL"))
+	url := strings.TrimSpace(os.Getenv("PEERGO_TEST_HAREM_OVERLAP_DATABASE_URL"))
 	if url == "" {
-		t.Skip("PEERGO_TEST_CORE_DATABASE_URL is required")
+		t.Skip("PEERGO_TEST_HAREM_OVERLAP_DATABASE_URL is required")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
