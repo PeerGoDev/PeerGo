@@ -52,6 +52,9 @@ CREATE INDEX evidence_user_idx ON economy.seeding_reward_evidence_items(user_id,
 CREATE TABLE economy.seeding_reward_evidence_packs(window_start timestamptz NOT NULL,
     user_id uuid NOT NULL,active_seconds bigint NOT NULL,PRIMARY KEY(window_start,user_id));
 ''')
+cache_source = (a.root / 'db/core/migrations/202610200001_core_activity_cache.sql').read_text()
+sql('CREATE TABLE economy.seeding_reward_activity_cache(window_start timestamptz,user_id uuid,active_seconds bigint,PRIMARY KEY(window_start,user_id));')
+sql(re.search(r'CREATE FUNCTION economy\.seeding_reward_user_hour_active_seconds[\s\S]+?\$\$;',cache_source).group())
 view = (a.root / 'db/core/migrations/202610170001_core_evidence_packs.sql').read_text()
 view = re.search(r'CREATE VIEW economy\.seeding_reward_evidence_user_hours AS[\s\S]+?;', view).group()
 sql(view)
@@ -137,6 +140,8 @@ for requested, end in [(ids,'2026-10-01T07:00:00Z'),(ids,'2026-10-01T06:30:00Z')
 r = contribution_result(contribution,ids)
 uid = lambda value: str(uuid.UUID(hashlib.md5(value.encode()).hexdigest()))
 assert r == {uid('m1'):189,uid('m2'):35}, r
+sql("INSERT INTO economy.seeding_reward_activity_cache SELECT window_start,user_id,sum(active_seconds)::bigint FROM economy.seeding_reward_evidence_items GROUP BY window_start,user_id")
+assert contribution_result(contribution,ids)==contribution_result(old_contribution,ids)
 print('PASS contribution: hot/packed equality, unrelated users, suspension/rejoin, transition ordering, complete hours, boundaries, empty/null IDs', flush=True)
 # Verify the new compact count index is usable for an exact index-only scan.
 sql('VACUUM ANALYZE audit.outbox')
@@ -150,3 +155,23 @@ for part in up.split(';'):
     if part.strip():
         sql(part + ';')
 print('PASS online index migration up/down/up; compact exact count access path', flush=True)
+
+sql("""CREATE TABLE economy.seeding_reward_work_items(status text,attempts integer,created_at timestamptz,last_error_code text,last_error_at timestamptz);
+INSERT INTO economy.seeding_reward_work_items VALUES
+('pending',0,'2026-10-01Z',NULL,NULL),('pending',2,'2026-10-02Z','retry','2026-10-02Z'),
+('processing',1,'2026-09-29Z',NULL,NULL),('dead',3,'2026-09-01Z','dead','2026-10-03Z'),
+('completed',1,'2026-08-01Z','recovered','2026-10-04Z');""")
+reward = re.search(r'const seedingRewardQueueStatusSQL = `([\s\S]+?)`',
+ (a.root / 'services/core/internal/modules/operations/repository_postgres.go').read_text()).group(1)
+old_reward = (a.references / 'reward-before.sql').read_text()
+def reward_result(q):
+ return json.loads(sql('WITH r(a,b,c,d,e,f,g,h) AS ('+q+') SELECT row_to_json(r) FROM r'))
+assert reward_result(reward)==reward_result(old_reward)
+sql('TRUNCATE economy.seeding_reward_work_items')
+assert reward_result(reward)==reward_result(old_reward)
+reward_migration=(a.root/'db/core/migrations/202610200002_core_reward_monitor_indexes.sql').read_text()
+for direction in ['Up','Down','Up']:
+ part=reward_migration.split('-- +goose '+direction,1)[1].split('-- +goose Down',1)[0]
+ for command in part.split(';'):
+  if command.strip():sql(command+';')
+print('PASS reward exact counters: empty queue, all states, terminal errors; concurrent index up/down/up',flush=True)

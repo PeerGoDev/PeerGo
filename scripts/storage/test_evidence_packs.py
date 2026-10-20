@@ -115,6 +115,24 @@ FROM fixture,objects o JOIN torrents.torrents t ON t.object_id=o.id;
             IF NOT rejected THEN RAISE EXCEPTION 'unsafe operation accepted: {label}'; END IF;
             END $test$;\n'''
         checks = fixture + f'CREATE TEMP TABLE expected AS TABLE {hot};\n'
+        if db == 'core':
+            checks += """
+INSERT INTO workgroups.memberships(id,group_kind,user_id,status,source,started_at,updated_at)
+SELECT gen_random_uuid(),'retention',u,'active','staff',h,h FROM fixture;
+DO $test$ BEGIN
+  IF economy.seeding_reward_user_hour_active_seconds((SELECT u FROM fixture),(SELECT h FROM fixture))<>600 THEN
+    RAISE EXCEPTION 'hot summary fallback changed'; END IF;
+  IF economy.seeding_reward_user_hour_active_seconds(gen_random_uuid(),now()) IS NOT NULL THEN
+    RAISE EXCEPTION 'absent evidence is not NULL'; END IF;
+  IF economy.refresh_seeding_reward_activity_cache(128)<>1 THEN RAISE EXCEPTION 'consumer cache backfill failed'; END IF;
+  IF (SELECT item_count FROM economy.seeding_reward_activity_cache)<>3 OR
+     economy.seeding_reward_user_hour_active_seconds((SELECT u FROM fixture),(SELECT h FROM fixture))<>600 THEN
+    RAISE EXCEPTION 'cache differs from exact evidence'; END IF;
+END $test$;
+"""
+            checks += denied('UPDATE economy.seeding_reward_activity_cache SET active_seconds=599;', 'incorrect cache total')
+            checks += denied('UPDATE economy.seeding_reward_activity_cache SET item_count=2;', 'incorrect cache count')
+            checks += denied('SELECT economy.refresh_seeding_reward_activity_cache(129);', 'unbounded cache batch')
         checks += denied(f'DELETE FROM {hot};', 'delete without pack')
         checks += denied(f'TRUNCATE {hot};', 'truncate hot evidence')
         checks += denied(f'UPDATE {hot} SET active_seconds=0;', 'change hot evidence')
@@ -149,6 +167,15 @@ FROM fixture,objects o JOIN torrents.torrents t ON t.object_id=o.id;
         checks += denied(f'UPDATE {packs} SET items=items;', 'mutate archive')
         if db == 'core':
             checks += '''DO $test$ BEGIN
+            IF EXISTS(SELECT 1 FROM economy.seeding_reward_activity_cache) THEN
+              RAISE EXCEPTION 'packing did not retire derived cache'; END IF;
+            IF economy.seeding_reward_user_hour_active_seconds((SELECT u FROM fixture),(SELECT h FROM fixture))<>600 THEN
+              RAISE EXCEPTION 'packed summary changed'; END IF;
+            IF economy.refresh_seeding_reward_activity_cache(128)<>0 THEN
+              RAISE EXCEPTION 'packed group recreated hot cache'; END IF;
+            END $test$;'''
+        if db == 'core':
+            checks += '''DO $test$ BEGIN
             IF EXISTS((SELECT window_start,user_id,sum(active_seconds)::bigint active_seconds FROM expected GROUP BY window_start,user_id
                        EXCEPT ALL SELECT * FROM economy.seeding_reward_evidence_user_hours)
                       UNION ALL (SELECT * FROM economy.seeding_reward_evidence_user_hours EXCEPT ALL
@@ -159,6 +186,8 @@ FROM fixture,objects o JOIN torrents.torrents t ON t.object_id=o.id;
             END $test$;'''
         # Keep fixture and checks in one session, but not one transaction:
         # constraint triggers are exercised at the real commit boundary.
+        if db == 'core':
+            checks += Path(__file__).with_name('fixtures').joinpath('activity-live-append.sql').read_text()
         result = sql(name, checks)
         print(json.dumps({'database': name, 'migrations': 'passed', 'guards_and_roundtrip': 'passed',
                           'disabled_then_moved': result}), flush=True)

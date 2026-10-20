@@ -464,11 +464,13 @@ SELECT
         assessment.current_seeding_active_seconds,
         COALESCE((
             SELECT sum(item.active_seconds)::bigint
-            FROM economy.seeding_reward_evidence_user_hours AS item
-            JOIN economy.seeding_reward_evidence_windows AS evidence_window
-              ON evidence_window.window_start = item.window_start
-             AND evidence_window.status = 'complete'
-            WHERE item.user_id = assessment.user_id
+            FROM economy.seeding_reward_evidence_windows AS evidence_window
+            CROSS JOIN LATERAL (
+                SELECT economy.seeding_reward_user_hour_active_seconds(
+                    assessment.user_id, evidence_window.window_start) AS active_seconds
+                OFFSET 0
+            ) AS item
+            WHERE evidence_window.status = 'complete'
               AND evidence_window.window_start >= assessment.started_at
               AND evidence_window.window_end <= $1
         ), 0)

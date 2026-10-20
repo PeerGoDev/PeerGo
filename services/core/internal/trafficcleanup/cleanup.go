@@ -26,6 +26,7 @@ var (
 
 type Result struct {
 	EvidencePacked      int64
+	ActivityCached      int64
 	Inbox               int64
 	Entries             int64
 	Explanations        int64
@@ -35,11 +36,11 @@ type Result struct {
 }
 
 func (result Result) Total() int64 {
-	return result.EvidencePacked + result.Inbox + result.Entries + result.Explanations + result.Segments + result.Rollups + result.NetworkObservations
+	return result.ActivityCached + result.EvidencePacked + result.Inbox + result.Entries + result.Explanations + result.Segments + result.Rollups + result.NetworkObservations
 }
 
 func (result Result) Saturated(batchSize int64) bool {
-	return batchSize > 0 && (result.EvidencePacked > 0 || result.Entries >= batchSize || result.Rollups >= batchSize || result.NetworkObservations >= batchSize)
+	return batchSize > 0 && (result.ActivityCached > 0 || result.EvidencePacked > 0 || result.Entries >= batchSize || result.Rollups >= batchSize || result.NetworkObservations >= batchSize)
 }
 
 type Cutoffs struct {
@@ -106,7 +107,7 @@ func (worker *Worker) RunOnce(ctx context.Context) (Result, error) {
 		worker.logger.Log(ctx, level, message,
 			"rows", result.Total(), "batch_size", worker.config.BatchSize,
 			"entries", result.Entries, "segments", result.Segments, "rollups", result.Rollups,
-			"network_observations", result.NetworkObservations, "evidence_packed", result.EvidencePacked)
+			"network_observations", result.NetworkObservations, "evidence_packed", result.EvidencePacked, "activity_cached", result.ActivityCached)
 	}
 	return result, nil
 }
@@ -124,10 +125,7 @@ func (worker *Worker) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		nextRun := worker.config.RunInterval
-		if result.Saturated(int64(worker.config.BatchSize)) {
-			nextRun = backlogRetryDelay(worker.config.RunInterval)
-		}
+		nextRun := nextMaintenanceDelay(worker.config.RunInterval, result, int64(worker.config.BatchSize))
 		timer.Reset(nextRun)
 	}
 }
@@ -137,4 +135,16 @@ func backlogRetryDelay(runInterval time.Duration) time.Duration {
 		return minimumBacklogRetryInterval
 	}
 	return runInterval
+}
+
+// Cache rebuilds and the existing bounded pack function can catch up every
+// ten seconds. Unrelated detail cleanup keeps its configured/backoff cadence.
+func nextMaintenanceDelay(interval time.Duration, result Result, batch int64) time.Duration {
+	if result.ActivityCached > 0 || result.EvidencePacked > 0 {
+		return 10 * time.Second
+	}
+	if result.Saturated(batch) {
+		return backlogRetryDelay(interval)
+	}
+	return interval
 }

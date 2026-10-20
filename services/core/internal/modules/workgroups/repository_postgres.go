@@ -1151,14 +1151,11 @@ JOIN LATERAL (
   ON active_membership.membership_id = membership.id
  AND active_membership.to_status = 'active'
 JOIN LATERAL (
-    SELECT user_hour.active_seconds
-    FROM economy.seeding_reward_evidence_user_hours AS user_hour
-    WHERE user_hour.user_id = membership.user_id
-      AND user_hour.window_start = evidence_window.window_start
-    -- Keep both equality keys inside the grouped hot/packed view. Flattening
-    -- this join can aggregate the entire evidence history before filtering.
+    SELECT economy.seeding_reward_user_hour_active_seconds(
+        membership.user_id, evidence_window.window_start) AS active_seconds
+    -- Evaluate once per eligible user/hour, preserving NULL for absent proof.
     OFFSET 0
-) AS item ON true
+) AS item ON item.active_seconds IS NOT NULL
 WHERE membership.id = ANY($1::uuid[])
 GROUP BY membership.id`
 

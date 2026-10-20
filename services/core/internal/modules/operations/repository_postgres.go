@@ -257,6 +257,20 @@ SELECT
 FROM audit.outbox
 WHERE delivered_at IS NULL`
 
+// Keep exact reward counters on narrow status/error indexes.
+const seedingRewardQueueStatusSQL = `
+SELECT
+    count(*) FILTER (WHERE status = 'pending' AND attempts = 0),
+    count(*) FILTER (WHERE status = 'processing'),
+    count(*) FILTER (WHERE status = 'pending' AND attempts > 0),
+    (SELECT count(*) FROM economy.seeding_reward_work_items WHERE status = 'dead'),
+    (SELECT count(*) FROM economy.seeding_reward_work_items WHERE status = 'completed'),
+    min(created_at),
+    (SELECT last_error_code FROM economy.seeding_reward_work_items WHERE last_error_code IS NOT NULL ORDER BY last_error_at DESC LIMIT 1),
+    (SELECT last_error_at FROM economy.seeding_reward_work_items WHERE last_error_code IS NOT NULL ORDER BY last_error_at DESC LIMIT 1)
+FROM economy.seeding_reward_work_items
+WHERE status IN ('pending', 'processing')`
+
 func (repository *PostgresRepository) Workers(ctx context.Context, now time.Time) (WorkerOverview, error) {
 	if now.IsZero() {
 		return WorkerOverview{}, ErrInput
@@ -268,17 +282,7 @@ func (repository *PostgresRepository) Workers(ctx context.Context, now time.Time
 	defer func() { _ = tx.Rollback(ctx) }()
 	result := WorkerOverview{GeneratedAt: now, Queues: make([]QueueStatus, 0, 8)}
 
-	reward, err := readQueue(ctx, tx, `
-SELECT
-    count(*) FILTER (WHERE status = 'pending' AND attempts = 0),
-    count(*) FILTER (WHERE status = 'processing'),
-    count(*) FILTER (WHERE status = 'pending' AND attempts > 0),
-    count(*) FILTER (WHERE status = 'dead'),
-    count(*) FILTER (WHERE status = 'completed'),
-    min(created_at) FILTER (WHERE status IN ('pending', 'processing')),
-    (SELECT last_error_code FROM economy.seeding_reward_work_items WHERE last_error_code IS NOT NULL ORDER BY last_error_at DESC LIMIT 1),
-    (SELECT last_error_at FROM economy.seeding_reward_work_items WHERE last_error_code IS NOT NULL ORDER BY last_error_at DESC LIMIT 1)
-FROM economy.seeding_reward_work_items`, "seeding_reward", "做种奖励结算")
+	reward, err := readQueue(ctx, tx, seedingRewardQueueStatusSQL, "seeding_reward", "做种奖励结算")
 	if err != nil {
 		return WorkerOverview{}, fmt.Errorf("read seeding reward queue: %w", err)
 	}
