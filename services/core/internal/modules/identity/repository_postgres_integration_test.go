@@ -50,6 +50,7 @@ INSERT INTO identity.user_network_observations (
 		defer cleanupCancel()
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM identity.user_network_observations WHERE user_id = $1`, userID)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM identity.sessions WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM identity.user_activity WHERE user_id = $1`, userID)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM identity.users WHERE id = $1`, userID)
 	})
 

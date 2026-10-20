@@ -881,6 +881,7 @@ WHERE lower(username) = lower(sqlc.arg(username))
 FOR UPDATE;
 
 -- name: CreateWebSession :exec
+WITH observed AS (
 INSERT INTO identity.sessions (
     token_hash,
     user_id,
@@ -895,7 +896,16 @@ INSERT INTO identity.sessions (
     sqlc.arg(created_at),
     sqlc.arg(created_at),
     sqlc.arg(expires_at)
-);
+)
+RETURNING user_id,last_seen_at
+)
+INSERT INTO identity.user_activity AS activity (user_id,last_active_at,version,updated_at)
+SELECT user_id,last_seen_at,1,last_seen_at FROM observed WHERE true
+ON CONFLICT (user_id) DO UPDATE
+SET last_active_at=EXCLUDED.last_active_at,
+    version=activity.version+1,updated_at=GREATEST(activity.updated_at,EXCLUDED.updated_at)
+WHERE activity.last_active_at IS NULL
+   OR activity.last_active_at<=EXCLUDED.last_active_at-interval '5 minutes';
 
 -- name: GetActiveWebSession :one
 SELECT
@@ -926,6 +936,9 @@ WHERE session.token_hash = sqlc.arg(token_hash)
   );
 
 -- name: TouchActiveWebSession :exec
+-- Record real authenticated web activity in the shared current projection.
+-- Both writes are atomic and coalesced; no per-request history is created.
+WITH observed AS (
 -- Activity writes are coalesced to five-minute buckets. This keeps the user
 -- projection useful without turning every authenticated request into a row
 -- update or collecting a detailed browsing timeline.
@@ -935,7 +948,16 @@ WHERE token_hash = sqlc.arg(token_hash)
   AND audience = 'web'
   AND revoked_at IS NULL
   AND expires_at > sqlc.arg(seen_at)
-  AND last_seen_at <= sqlc.arg(seen_at)::timestamptz - interval '5 minutes';
+  AND last_seen_at <= sqlc.arg(seen_at)::timestamptz - interval '5 minutes'
+RETURNING user_id,last_seen_at
+)
+INSERT INTO identity.user_activity AS activity (user_id,last_active_at,version,updated_at)
+SELECT user_id,last_seen_at,1,last_seen_at FROM observed WHERE true
+ON CONFLICT (user_id) DO UPDATE
+SET last_active_at=EXCLUDED.last_active_at,
+    version=activity.version+1,updated_at=GREATEST(activity.updated_at,EXCLUDED.updated_at)
+WHERE activity.last_active_at IS NULL
+   OR activity.last_active_at<=EXCLUDED.last_active_at-interval '5 minutes';
 
 -- name: RevokeWebSession :execrows
 UPDATE identity.sessions

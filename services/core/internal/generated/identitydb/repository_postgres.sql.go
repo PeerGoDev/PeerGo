@@ -525,6 +525,7 @@ func (q *Queries) CreateStaffWebAuthnChallenge(ctx context.Context, arg CreateSt
 }
 
 const createWebSession = `-- name: CreateWebSession :exec
+WITH observed AS (
 INSERT INTO identity.sessions (
     token_hash,
     user_id,
@@ -540,6 +541,15 @@ INSERT INTO identity.sessions (
     $3,
     $4
 )
+RETURNING user_id,last_seen_at
+)
+INSERT INTO identity.user_activity AS activity (user_id,last_active_at,version,updated_at)
+SELECT user_id,last_seen_at,1,last_seen_at FROM observed WHERE true
+ON CONFLICT (user_id) DO UPDATE
+SET last_active_at=EXCLUDED.last_active_at,
+    version=activity.version+1,updated_at=GREATEST(activity.updated_at,EXCLUDED.updated_at)
+WHERE activity.last_active_at IS NULL
+   OR activity.last_active_at<=EXCLUDED.last_active_at-interval '5 minutes'
 `
 
 type CreateWebSessionParams struct {
@@ -4349,6 +4359,7 @@ func (q *Queries) SetRegistrationCredential(ctx context.Context, arg SetRegistra
 }
 
 const touchActiveWebSession = `-- name: TouchActiveWebSession :exec
+WITH observed AS (
 UPDATE identity.sessions
 SET last_seen_at = $1
 WHERE token_hash = $2
@@ -4356,6 +4367,15 @@ WHERE token_hash = $2
   AND revoked_at IS NULL
   AND expires_at > $1
   AND last_seen_at <= $1::timestamptz - interval '5 minutes'
+RETURNING user_id,last_seen_at
+)
+INSERT INTO identity.user_activity AS activity (user_id,last_active_at,version,updated_at)
+SELECT user_id,last_seen_at,1,last_seen_at FROM observed WHERE true
+ON CONFLICT (user_id) DO UPDATE
+SET last_active_at=EXCLUDED.last_active_at,
+    version=activity.version+1,updated_at=GREATEST(activity.updated_at,EXCLUDED.updated_at)
+WHERE activity.last_active_at IS NULL
+   OR activity.last_active_at<=EXCLUDED.last_active_at-interval '5 minutes'
 `
 
 type TouchActiveWebSessionParams struct {
