@@ -43,6 +43,7 @@ type Payout struct {
 
 type Settlement struct {
 	Processed                 bool
+	WaitingForEvidence        bool
 	WindowStart               time.Time
 	WindowEnd                 time.Time
 	PolicyRevision            string

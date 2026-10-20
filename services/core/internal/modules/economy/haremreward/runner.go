@@ -64,6 +64,14 @@ func (runner *Runner) runOnce(ctx context.Context) {
 			return
 		}
 		if !result.Processed {
+			if result.WaitingForEvidence {
+				level := slog.LevelInfo
+				if !result.WindowEnd.Add(2 * time.Hour).After(now) {
+					level = slog.LevelWarn
+				}
+				runner.logger.Log(ctx, level, "harem reward window waiting for complete source evidence",
+					"window_start", result.WindowStart, "window_end", result.WindowEnd)
+			}
 			return
 		}
 		runner.logger.Info("harem reward window settled",

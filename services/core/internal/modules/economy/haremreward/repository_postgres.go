@@ -58,7 +58,7 @@ WHERE singleton = true`, now); err != nil {
 		return Settlement{}, fmt.Errorf("start harem reward heartbeat: %w", err)
 	}
 
-	policy, windowStart, found, err := nextPolicyAndWindow(ctx, tx)
+	policy, windowStart, found, selectedReady, err := nextPolicyAndWindow(ctx, tx, now.Truncate(time.Hour))
 	if err != nil {
 		return Settlement{}, err
 	}
@@ -69,12 +69,15 @@ WHERE singleton = true`, now); err != nil {
 	if windowEnd.After(now.Truncate(time.Hour)) {
 		return repository.finishIdle(ctx, tx, now)
 	}
+	if !selectedReady {
+		return repository.finishWaiting(ctx, tx, now, windowStart, windowEnd)
+	}
 	ready, sourceCalculationCount, err := sourceWindowReady(ctx, tx, windowStart, windowEnd, policy.SettlementHours)
 	if err != nil {
 		return Settlement{}, err
 	}
 	if !ready {
-		return repository.finishIdle(ctx, tx, now)
+		return repository.finishWaiting(ctx, tx, now, windowStart, windowEnd)
 	}
 
 	payouts := []Payout{}
@@ -179,21 +182,87 @@ WHERE singleton = true`, now); err != nil {
 	return Settlement{}, nil
 }
 
-func nextPolicyAndWindow(ctx context.Context, tx pgx.Tx) (Policy, time.Time, bool, error) {
-	var start time.Time
-	err := tx.QueryRow(ctx, `
-SELECT COALESCE(
-    (SELECT max(window_end) FROM economy.harem_reward_windows),
-    (SELECT min(effective_from) FROM economy.harem_reward_policy_revisions)
-)`).Scan(&start)
-	if errors.Is(err, pgx.ErrNoRows) || start.IsZero() {
-		return Policy{}, time.Time{}, false, nil
+// Canonical windows retain the original policy-at-start boundaries. Already
+// settled ends remain authoritative; one missing source never stops later
+// complete windows or removes that gap from future discovery.
+const nextHaremRewardWindowSQL = `WITH RECURSIVE schedule(window_start,window_end,settled) AS (
+    SELECT first_policy.effective_from,
+           COALESCE(done.window_end,first_policy.effective_from+first_policy.settlement_hours*interval '1 hour'),
+           done.window_start IS NOT NULL
+    FROM (SELECT effective_from,settlement_hours FROM economy.harem_reward_policy_revisions
+          ORDER BY effective_from LIMIT 1) first_policy
+    LEFT JOIN economy.harem_reward_windows done ON done.window_start=first_policy.effective_from
+    UNION ALL
+    SELECT previous.window_end,
+           COALESCE(done.window_end,previous.window_end+policy.settlement_hours*interval '1 hour'),
+           done.window_start IS NOT NULL
+    FROM schedule previous
+    CROSS JOIN LATERAL (
+        SELECT settlement_hours FROM economy.harem_reward_policy_revisions
+        WHERE effective_from<=previous.window_end ORDER BY effective_from DESC LIMIT 1
+    ) policy
+    LEFT JOIN economy.harem_reward_windows done ON done.window_start=previous.window_end
+    WHERE previous.window_end<$1::timestamptz
+), pending AS MATERIALIZED (
+    SELECT window_start,window_end FROM schedule
+    WHERE NOT settled AND window_end<=$1::timestamptz
+), checked AS MATERIALIZED (
+    SELECT candidate.*,
+      NOT EXISTS (
+        SELECT 1 FROM generate_series(candidate.window_start,candidate.window_end-interval '1 hour',interval '1 hour') h
+        WHERE NOT EXISTS(SELECT 1 FROM economy.seeding_reward_evidence_windows evidence
+                         WHERE evidence.window_start=h AND evidence.status='complete')
+      )
+      AND NOT EXISTS(SELECT 1 FROM economy.seeding_reward_work_items work
+                     WHERE work.status IN('pending','processing')
+                       AND work.window_start>=candidate.window_start AND work.window_start<candidate.window_end)
+      AND NOT EXISTS(SELECT 1 FROM economy.seeding_reward_work_items work
+                     WHERE work.status='dead'
+                       AND work.window_start>=candidate.window_start AND work.window_start<candidate.window_end)
+      AND NOT EXISTS(SELECT 1 FROM economy.harem_reward_windows done
+                     WHERE done.window_start<candidate.window_end AND done.window_end>candidate.window_start)
+      AS ready
+    FROM pending candidate
+)
+SELECT window_start,window_end,ready FROM checked
+-- Every missing window remains discoverable after later windows settle.
+-- Once sources recover, the oldest ready gap is automatically paid first.
+ORDER BY ready DESC,window_start LIMIT 1`
+
+func nextPolicyAndWindow(ctx context.Context, tx pgx.Tx, through time.Time) (Policy, time.Time, bool, bool, error) {
+	var start, end time.Time
+	var ready bool
+	err := tx.QueryRow(ctx, nextHaremRewardWindowSQL, through).Scan(&start, &end, &ready)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Policy{}, time.Time{}, false, false, nil
 	}
 	if err != nil {
-		return Policy{}, time.Time{}, false, fmt.Errorf("read next harem reward window: %w", err)
+		return Policy{}, time.Time{}, false, false, fmt.Errorf("read next ready harem reward window: %w", err)
 	}
 	policy, found, err := readPolicy(ctx, tx, start)
-	return policy, canonicalTime(start), found, err
+	if err == nil && found && !end.Equal(start.Add(time.Duration(policy.SettlementHours)*time.Hour)) {
+		return Policy{}, time.Time{}, false, false, ErrInvariant
+	}
+	return policy, canonicalTime(start), found, ready, err
+}
+
+func (repository *PostgresRepository) finishWaiting(ctx context.Context, tx pgx.Tx, now, start, end time.Time) (Settlement, error) {
+	// A recently closed hour normally waits for source closure. Surface old
+	// gaps separately from an idle/caught-up runner without manufacturing proof.
+	var code any
+	if !end.Add(2 * time.Hour).After(now) {
+		code = "source_coverage_pending"
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE economy.harem_reward_worker_state
+SET last_completed_at=$1,last_error_code=$2,last_recipient_count=0,
+    last_total_reward=0,run_count=run_count+1 WHERE singleton=true`, now, code); err != nil {
+		return Settlement{}, fmt.Errorf("record harem reward source wait: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Settlement{}, fmt.Errorf("commit harem reward source wait: %w", err)
+	}
+	return Settlement{WaitingForEvidence: true, WindowStart: start, WindowEnd: end}, nil
 }
 
 func readPolicy(ctx context.Context, tx pgx.Tx, at time.Time) (Policy, bool, error) {
@@ -242,10 +311,10 @@ SELECT
         WHERE window_start >= $1 AND window_start < $2
     ), 0),
     COALESCE((
-        SELECT count(*)::bigint
-        FROM economy.seeding_reward_work_items
-        WHERE window_start >= $1 AND window_start < $2
-          AND status <> 'completed'
+        SELECT CASE WHEN EXISTS(SELECT 1 FROM economy.seeding_reward_work_items
+            WHERE window_start >= $1 AND window_start < $2 AND status IN('pending','processing'))
+            OR EXISTS(SELECT 1 FROM economy.seeding_reward_work_items
+            WHERE window_start >= $1 AND window_start < $2 AND status='dead') THEN 1 ELSE 0 END::bigint
     ), 0)
 FROM hours
 LEFT JOIN economy.seeding_reward_evidence_windows AS evidence
