@@ -38,7 +38,6 @@ import { TorrentTitleLink } from "~/features/torrent/components/torrent-title-li
 import { TorrentSwarmNumbers } from "~/features/torrent/components/torrent-swarm-numbers"
 import type { TorrentBookmarkControls } from "~/features/torrent/hooks/use-torrent-bookmark-controls"
 import type { TorrentSort } from "~/features/torrent/api/torrent.queries"
-import { torrentCoverRequiresAdultConfirmation } from "~/features/torrent/model/adult-content"
 import { formatDateTime } from "~/shared/formatters/date-time"
 import { cn } from "~/lib/utils"
 
@@ -64,7 +63,7 @@ export function TorrentTable({
   layout = "catalog",
   sort,
   onSortChange,
-  adultCoversVisible = false,
+  hiddenCoverCategoryIds,
   activityByTorrentId,
   footer,
 }: {
@@ -75,7 +74,7 @@ export function TorrentTable({
   layout?: "catalog" | "bookmarks"
   sort?: TorrentSort
   onSortChange?: (sort: TorrentSort) => void
-  adultCoversVisible?: boolean
+  hiddenCoverCategoryIds?: ReadonlySet<string>
   activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
   footer?: ReactNode
 }) {
@@ -84,7 +83,7 @@ export function TorrentTable({
       <TorrentBookmarkTable
         torrents={torrents}
         bookmarkControls={bookmarkControls}
-        adultCoversVisible={adultCoversVisible}
+        hiddenCoverCategoryIds={hiddenCoverCategoryIds}
         activityByTorrentId={activityByTorrentId}
         footer={footer}
       />
@@ -177,8 +176,7 @@ export function TorrentTable({
             const timestamp =
               timestampByTorrentId?.get(torrent.id) ?? torrent.uploaded_at
             const obscured =
-              !adultCoversVisible &&
-              torrentCoverRequiresAdultConfirmation(torrent.category)
+              hiddenCoverCategoryIds?.has(torrent.category.id) ?? false
             return (
               <TableRow
                 key={torrent.id}
@@ -313,13 +311,13 @@ function SortHeaderButton({
 function TorrentBookmarkTable({
   torrents,
   bookmarkControls,
-  adultCoversVisible,
+  hiddenCoverCategoryIds,
   activityByTorrentId,
   footer,
 }: {
   torrents: Torrent[]
   bookmarkControls?: TorrentBookmarkControls
-  adultCoversVisible: boolean
+  hiddenCoverCategoryIds?: ReadonlySet<string>
   activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
   footer?: ReactNode
 }) {
@@ -350,8 +348,7 @@ function TorrentBookmarkTable({
         <TableBody className="block">
           {torrents.map((torrent) => {
             const obscured =
-              !adultCoversVisible &&
-              torrentCoverRequiresAdultConfirmation(torrent.category)
+              hiddenCoverCategoryIds?.has(torrent.category.id) ?? false
             return (
               <TableRow
                 key={torrent.id}

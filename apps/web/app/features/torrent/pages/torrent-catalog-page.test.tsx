@@ -47,13 +47,15 @@ describe("TorrentCatalogPage", () => {
       show_latest_announcement: true,
     })
     queryClient.setQueryData(torrentKeys.categories(), [
-      { id: "movies", name: "电影", torrent_count: 12 },
-      { id: "tv", name: "电视剧", torrent_count: 30 },
-      { id: "documentaries", name: "纪录片", torrent_count: 0 },
+      { id: "movies", name: "电影", nsfw: false, torrent_count: 12 },
+      { id: "tv", name: "电视剧", nsfw: false, torrent_count: 30 },
+      { id: "documentaries", name: "纪录片", nsfw: false, torrent_count: 0 },
+      { id: "9kg", name: "9KG", nsfw: true, torrent_count: 8 },
     ])
     const filters = {
       query: "release",
       categoryId: "movies",
+      excludeNsfw: true,
       promotion: "free" as const,
       limit: 25,
       offset: 0,
@@ -114,6 +116,14 @@ describe("TorrentCatalogPage", () => {
       "aria-pressed:bg-primary"
     )
     expect(screen.getByRole("button", { name: /纪录片\s*0/ })).toBeVisible()
+    expect(screen.getByRole("button", { name: /全部\s*42/ })).toBeVisible()
+    expect(
+      screen.queryByRole("button", { name: /9KG/ })
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole("switch", { name: "屏蔽 NSFW" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    )
     const resultsHeading = screen.getByRole("heading", {
       name: /搜索结果\s*共\s*60\s*个种子/,
     })

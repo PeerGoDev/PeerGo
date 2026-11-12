@@ -29,48 +29,49 @@ describe("TorrentViewControls", () => {
     expect(list).toHaveAttribute("aria-pressed", "false")
   })
 
-  it("requires an age confirmation before revealing adult covers", async () => {
+  it("hides NSFW by default and asks for an age confirmation before showing it", async () => {
     const user = userEvent.setup()
     render(<ControlledTorrentView />)
 
-    const adultSwitch = screen.getByRole("switch", {
-      name: "显示成人封面（18+）",
-    })
-    expect(adultSwitch).toHaveAttribute("aria-checked", "false")
+    const nsfwSwitch = screen.getByRole("switch", { name: "屏蔽 NSFW" })
+    expect(nsfwSwitch).toHaveAttribute("aria-checked", "true")
 
-    await user.click(adultSwitch)
+    await user.click(nsfwSwitch)
     const confirmation = screen.getByRole("alertdialog", {
-      name: "显示成人内容？",
+      name: "显示 NSFW 内容？",
     })
     expect(confirmation).toBeVisible()
     expect(confirmation).toHaveClass("data-[size=default]:sm:max-w-[425px]")
-    expect(screen.getByRole("heading", { name: "显示成人内容？" })).toHaveClass(
-      "text-md",
-      "font-semibold"
-    )
-    expect(adultSwitch).toHaveAttribute("aria-checked", "false")
+    expect(
+      screen.getByRole("heading", { name: "显示 NSFW 内容？" })
+    ).toHaveClass("text-md", "font-semibold")
+    expect(nsfwSwitch).toHaveAttribute("aria-checked", "true")
 
+    await user.click(screen.getByRole("button", { name: "取消" }))
+    expect(nsfwSwitch).toHaveAttribute("aria-checked", "true")
+
+    await user.click(nsfwSwitch)
     await user.click(
       screen.getByRole("button", { name: "我已年满 18 周岁，确认显示" })
     )
-    expect(adultSwitch).toHaveAttribute("aria-checked", "true")
+    expect(nsfwSwitch).toHaveAttribute("aria-checked", "false")
 
-    await user.click(adultSwitch)
-    expect(adultSwitch).toHaveAttribute("aria-checked", "false")
+    await user.click(nsfwSwitch)
+    expect(nsfwSwitch).toHaveAttribute("aria-checked", "true")
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
   })
 })
 
 function ControlledTorrentView() {
   const [view, setView] = React.useState<TorrentView>("list")
-  const [adultCoversVisible, setAdultCoversVisible] = React.useState(false)
+  const [hideNsfw, setHideNsfw] = React.useState(true)
 
   return (
     <TorrentViewControls
       value={view}
       onValueChange={setView}
-      adultCoversVisible={adultCoversVisible}
-      onAdultCoversVisibleChange={setAdultCoversVisible}
+      hideNsfw={hideNsfw}
+      onHideNsfwChange={setHideNsfw}
     />
   )
 }

@@ -47,7 +47,8 @@ import {
   TorrentListSkeleton,
 } from "~/features/torrent/components/torrent-list-state"
 import { TorrentTable } from "~/features/torrent/components/torrent-table"
-import { useAdultCoverVisibility } from "~/features/torrent/hooks/use-adult-cover-visibility"
+import { useNsfwFilter } from "~/features/torrent/hooks/use-nsfw-filter"
+import { nsfwCategoryIds } from "~/features/torrent/model/nsfw"
 import { useTorrentBookmarkControls } from "~/features/torrent/hooks/use-torrent-bookmark-controls"
 import { OffsetPagination } from "~/shared/components/offset-pagination"
 import { PageHeader, PageLayout } from "~/shared/components/page-layout"
@@ -88,12 +89,14 @@ export function TorrentSearchPage() {
   const session = useWebSession()
   const authenticated = Boolean(session.data)
   const traffic = useTrafficOverview(session.data?.user.id)
+  const [hideNsfw] = useNsfwFilter()
   const categories = useCategoryList(authenticated)
   const torrents = useTorrentList(
     {
       query,
       searchScope,
       categoryId,
+      excludeNsfw: hideNsfw,
       sort,
       limit: PAGE_SIZE,
       offset,
@@ -115,7 +118,14 @@ export function TorrentSearchPage() {
       ),
     [traffic.data?.torrent_activity]
   )
-  const [adultCoversVisible] = useAdultCoverVisibility()
+  const nsfwIds = React.useMemo(
+    () => nsfwCategoryIds(categories.data),
+    [categories.data]
+  )
+  const hiddenCoverCategoryIds = hideNsfw ? nsfwIds : undefined
+  const categoryOptions = (categories.data ?? []).filter(
+    (category) => !hideNsfw || !category.nsfw
+  )
 
   React.useEffect(() => setDraftQuery(query), [query])
   React.useEffect(() => setHistory(readSearchHistory()), [])
@@ -270,10 +280,10 @@ export function TorrentSearchPage() {
                     value={categoryId || "all"}
                     items={[
                       { label: "全部分类", value: "all" },
-                      ...(categories.data?.map((category) => ({
+                      ...categoryOptions.map((category) => ({
                         label: category.name,
                         value: category.id,
-                      })) ?? []),
+                      })),
                     ]}
                     onValueChange={(value) =>
                       updateSearch({
@@ -373,21 +383,24 @@ export function TorrentSearchPage() {
             />
           )}
           {torrents.data?.items.length === 0 && (
-            <TorrentListEmpty query={query} />
+            <TorrentListEmpty
+              query={query}
+              nsfwHidden={hideNsfw && nsfwIds.has(categoryId)}
+            />
           )}
           {torrents.data?.items.length ? (
             <>
               <TorrentTable
                 torrents={torrents.data.items}
                 bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
+                hiddenCoverCategoryIds={hiddenCoverCategoryIds}
                 activityByTorrentId={activityByTorrentId}
               />
               <TorrentCards
                 torrents={torrents.data.items}
                 view="list"
                 bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
+                hiddenCoverCategoryIds={hiddenCoverCategoryIds}
                 activityByTorrentId={activityByTorrentId}
               />
               <OffsetPagination

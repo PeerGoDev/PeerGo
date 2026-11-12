@@ -117,6 +117,40 @@ func TestListTorrentsPaginatesAndFiltersCategoryAndPromotion(t *testing.T) {
 	}
 }
 
+func TestListTorrentsExcludesNSFWCategoriesFromItemsAndTotal(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.November, 12, 12, 0, 0, 0, time.UTC)
+	movies, adult := Category{ID: "movies", Name: "电影"}, Category{ID: "9kg", Name: "9KG"}
+	repository := NewMemoryRepository(MemoryData{
+		Categories:      []Category{movies, adult},
+		NSFWCategoryIDs: []string{"9kg"},
+		Torrents: []Torrent{
+			{ID: 1, Name: "Movie", Category: movies, UploadedAt: now.Add(-time.Hour)},
+			{ID: 2, Name: "Adult", Category: adult, UploadedAt: now.Add(-2 * time.Hour)},
+		},
+	})
+	service := NewService(repository, func() time.Time { return now })
+
+	all, err := service.ListTorrents(context.Background(), TorrentListRequest{})
+	if err != nil || all.Total != 2 || len(all.Items) != 2 {
+		t.Fatalf("unfiltered page = %+v, error = %v", all, err)
+	}
+	safe, err := service.ListTorrents(context.Background(), TorrentListRequest{ExcludeNSFW: true})
+	if err != nil || safe.Total != 1 || len(safe.Items) != 1 || safe.Items[0].ID != 1 {
+		t.Fatalf("NSFW-excluded page = %+v, error = %v", safe, err)
+	}
+	explicit, err := service.ListTorrents(context.Background(), TorrentListRequest{CategoryID: "9kg", ExcludeNSFW: true})
+	if err != nil || explicit.Total != 0 || len(explicit.Items) != 0 {
+		t.Fatalf("explicit NSFW category with exclusion = %+v, error = %v", explicit, err)
+	}
+
+	categories, err := service.ListCategories(context.Background())
+	if err != nil || len(categories) != 2 || categories[0].NSFW || !categories[1].NSFW {
+		t.Fatalf("categories = %+v, error = %v", categories, err)
+	}
+}
+
 func TestListTorrentsSearchScopeAndSort(t *testing.T) {
 	t.Parallel()
 

@@ -73,12 +73,15 @@ describe("HomePage", () => {
       summary: "这是一段需要保持单行显示的公告摘要",
       published_at: "2026-08-09T12:00:00Z",
     })
-    queryClient.setQueryData(torrentListQueryOptions().queryKey, {
-      items: [],
-      total: 0,
-      limit: 20,
-      offset: 0,
-    })
+    queryClient.setQueryData(
+      torrentListQueryOptions({ excludeNsfw: true }).queryKey,
+      {
+        items: [],
+        total: 0,
+        limit: 20,
+        offset: 0,
+      }
+    )
 
     render(
       <MemoryRouter>

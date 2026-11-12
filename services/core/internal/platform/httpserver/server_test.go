@@ -5385,7 +5385,7 @@ func TestCategoryAdministrationUsesStaffAudienceAndOptimisticVersion(t *testing.
 		t.Fatalf("staff token=%q actor=%+v", staffService.currentStaffToken, categoryService.listActor)
 	}
 
-	createRequest := httptest.NewRequest(http.MethodPost, "/api/v1/admin/catalog/categories", strings.NewReader(`{"id":"software","name":"软件","display_order":60,"enabled":true,"reason":"新增软件分类以承载正式内容。"}`))
+	createRequest := httptest.NewRequest(http.MethodPost, "/api/v1/admin/catalog/categories", strings.NewReader(`{"id":"software","name":"软件","display_order":60,"enabled":true,"nsfw":true,"reason":"新增软件分类以承载正式内容。"}`))
 	createRequest.Header.Set("Content-Type", "application/json")
 	createRequest.Header.Set("Origin", "http://peergo.test")
 	createRequest.Header.Set("X-CSRF-Token", staffCSRF)
@@ -5395,11 +5395,12 @@ func TestCategoryAdministrationUsesStaffAudienceAndOptimisticVersion(t *testing.
 	if createResponse.Code != http.StatusCreated {
 		t.Fatalf("create status = %d, body=%s", createResponse.Code, createResponse.Body.String())
 	}
-	if staffService.writeCSRF != staffCSRF || categoryService.createInput.ID != "software" || categoryService.createInput.DisplayOrder != 60 {
+	if staffService.writeCSRF != staffCSRF || categoryService.createInput.ID != "software" || categoryService.createInput.DisplayOrder != 60 ||
+		!categoryService.createInput.NSFW {
 		t.Fatalf("write csrf=%q input=%+v", staffService.writeCSRF, categoryService.createInput)
 	}
 
-	updateRequest := httptest.NewRequest(http.MethodPut, "/api/v1/admin/catalog/categories/movies", strings.NewReader(`{"name":"电影与短片","display_order":10,"enabled":false,"expected_version":3,"reason":"停用分类并核对已有种子的展示影响。"}`))
+	updateRequest := httptest.NewRequest(http.MethodPut, "/api/v1/admin/catalog/categories/movies", strings.NewReader(`{"name":"电影与短片","display_order":10,"enabled":false,"nsfw":true,"expected_version":3,"reason":"停用分类并核对已有种子的展示影响。"}`))
 	updateRequest.Header.Set("Content-Type", "application/json")
 	updateRequest.Header.Set("Origin", "http://peergo.test")
 	updateRequest.Header.Set("X-CSRF-Token", staffCSRF)
@@ -5409,12 +5410,13 @@ func TestCategoryAdministrationUsesStaffAudienceAndOptimisticVersion(t *testing.
 	if updateResponse.Code != http.StatusOK {
 		t.Fatalf("update status = %d, body=%s", updateResponse.Code, updateResponse.Body.String())
 	}
-	if categoryService.updateInput.ID != "movies" || categoryService.updateInput.ExpectedVersion != 3 || categoryService.updateInput.Enabled {
+	if categoryService.updateInput.ID != "movies" || categoryService.updateInput.ExpectedVersion != 3 || categoryService.updateInput.Enabled ||
+		!categoryService.updateInput.NSFW {
 		t.Fatalf("update input = %+v", categoryService.updateInput)
 	}
 
 	categoryService.err = catalog.ErrCategoryVersionConflict
-	conflictRequest := httptest.NewRequest(http.MethodPut, "/api/v1/admin/catalog/categories/movies", strings.NewReader(`{"name":"电影","display_order":10,"enabled":true,"expected_version":3,"reason":"使用旧版本提交以验证冲突响应。"}`))
+	conflictRequest := httptest.NewRequest(http.MethodPut, "/api/v1/admin/catalog/categories/movies", strings.NewReader(`{"name":"电影","display_order":10,"enabled":true,"nsfw":false,"expected_version":3,"reason":"使用旧版本提交以验证冲突响应。"}`))
 	conflictRequest.Header.Set("Content-Type", "application/json")
 	conflictRequest.Header.Set("Origin", "http://peergo.test")
 	conflictRequest.Header.Set("X-CSRF-Token", staffCSRF)

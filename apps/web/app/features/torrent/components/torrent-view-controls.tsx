@@ -37,13 +37,13 @@ const viewOptions: Array<{
 export function TorrentViewControls({
   value,
   onValueChange,
-  adultCoversVisible,
-  onAdultCoversVisibleChange,
+  hideNsfw,
+  onHideNsfwChange,
 }: {
   value: TorrentView
   onValueChange: (value: TorrentView) => void
-  adultCoversVisible: boolean
-  onAdultCoversVisibleChange: (visible: boolean) => void
+  hideNsfw: boolean
+  onHideNsfwChange: (hide: boolean) => void
 }) {
   const [confirmationOpen, setConfirmationOpen] = React.useState(false)
   const switchId = React.useId()
@@ -76,22 +76,19 @@ export function TorrentViewControls({
       </ToggleGroup>
 
       <span className="flex items-center gap-1.5 text-xs text-faint">
-        <label htmlFor={switchId} className="cursor-pointer select-none">
-          <span className="sr-only">显示成人封面（18+）</span>
-          <span aria-hidden="true" className="max-sm:hidden">
-            成人封面
-          </span>
-          <span aria-hidden="true" className="sm:hidden">
-            18+
-          </span>
+        <label
+          htmlFor={switchId}
+          className="cursor-pointer whitespace-nowrap select-none"
+        >
+          屏蔽 NSFW
         </label>
         <Switch
           id={switchId}
-          checked={adultCoversVisible}
-          aria-label="显示成人封面（18+）"
+          checked={hideNsfw}
+          aria-label="屏蔽 NSFW"
           onCheckedChange={(checked) => {
-            if (!checked) {
-              onAdultCoversVisibleChange(false)
+            if (checked) {
+              onHideNsfwChange(true)
             } else {
               setConfirmationOpen(true)
             }
@@ -105,17 +102,17 @@ export function TorrentViewControls({
             <AlertDialogMedia className="text-warning-foreground">
               <TriangleAlertIcon />
             </AlertDialogMedia>
-            <AlertDialogTitle>显示成人内容？</AlertDialogTitle>
+            <AlertDialogTitle>显示 NSFW 内容？</AlertDialogTitle>
             <AlertDialogDescription className="text-left">
-              种子可能包含 18+ 不适宜内容。开启后封面将正常显示，请确认您已年满
-              18 周岁并自愿查看此类内容。
+              关闭屏蔽后，成人分类的种子和封面会正常显示，可能包含 18+
+              不适宜内容。请确认您已年满 18 周岁并自愿查看此类内容。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                onAdultCoversVisibleChange(true)
+                onHideNsfwChange(false)
                 setConfirmationOpen(false)
               }}
             >

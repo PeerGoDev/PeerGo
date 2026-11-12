@@ -10,27 +10,34 @@ import (
 // MemoryData is an explicit fixture boundary for local development and tests.
 // It is not a substitute for the PostgreSQL adapter used by production.
 type MemoryData struct {
-	Site           SiteInfo
-	Announcements  []Announcement
-	Categories     []Category
-	CategoryFacets map[string][]CategoryFacet
-	Torrents       []Torrent
+	Site            SiteInfo
+	Announcements   []Announcement
+	Categories      []Category
+	NSFWCategoryIDs []string
+	CategoryFacets  map[string][]CategoryFacet
+	Torrents        []Torrent
 }
 
 // MemoryRepository is immutable after construction, so concurrent reads need
 // no locks. Every slice/pointer is copied at the boundary to preserve that rule.
 type MemoryRepository struct {
 	data MemoryData
+	nsfw map[string]bool
 }
 
 // NewMemoryRepository returns a read-only repository backed by copied fixtures.
 func NewMemoryRepository(data MemoryData) *MemoryRepository {
 	copyData := MemoryData{
-		Site:           data.Site,
-		Announcements:  append([]Announcement(nil), data.Announcements...),
-		Categories:     append([]Category(nil), data.Categories...),
-		CategoryFacets: cloneCategoryFacets(data.CategoryFacets),
-		Torrents:       append([]Torrent(nil), data.Torrents...),
+		Site:            data.Site,
+		Announcements:   append([]Announcement(nil), data.Announcements...),
+		Categories:      append([]Category(nil), data.Categories...),
+		NSFWCategoryIDs: append([]string(nil), data.NSFWCategoryIDs...),
+		CategoryFacets:  cloneCategoryFacets(data.CategoryFacets),
+		Torrents:        append([]Torrent(nil), data.Torrents...),
+	}
+	nsfw := make(map[string]bool, len(copyData.NSFWCategoryIDs))
+	for _, categoryID := range copyData.NSFWCategoryIDs {
+		nsfw[categoryID] = true
 	}
 	sort.Slice(copyData.Announcements, func(left, right int) bool {
 		if copyData.Announcements[left].PublishedAt.Equal(copyData.Announcements[right].PublishedAt) {
@@ -39,7 +46,7 @@ func NewMemoryRepository(data MemoryData) *MemoryRepository {
 		return copyData.Announcements[left].PublishedAt.After(copyData.Announcements[right].PublishedAt)
 	})
 
-	return &MemoryRepository{data: copyData}
+	return &MemoryRepository{data: copyData, nsfw: nsfw}
 }
 
 func cloneCategoryFacets(values map[string][]CategoryFacet) map[string][]CategoryFacet {
@@ -104,7 +111,7 @@ func (r *MemoryRepository) ListCategories(context.Context) ([]CategorySummary, e
 				count++
 			}
 		}
-		result = append(result, CategorySummary{Category: category, TorrentCount: count})
+		result = append(result, CategorySummary{Category: category, NSFW: r.nsfw[category.ID], TorrentCount: count})
 	}
 	return result, nil
 }
@@ -139,8 +146,9 @@ func (r *MemoryRepository) ListTorrents(_ context.Context, filter TorrentFilter)
 		}
 		queryMatches := normalizedQuery == "" || strings.Contains(haystack, normalizedQuery)
 		categoryMatches := filter.CategoryID == "" || torrent.Category.ID == filter.CategoryID
+		nsfwMatches := !filter.ExcludeNSFW || !r.nsfw[torrent.Category.ID]
 		promotionMatches := filter.Promotion == "" || torrent.Promotion == filter.Promotion
-		if queryMatches && categoryMatches && promotionMatches {
+		if queryMatches && categoryMatches && nsfwMatches && promotionMatches {
 			matches = append(matches, torrent)
 		}
 	}

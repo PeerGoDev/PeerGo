@@ -361,6 +361,7 @@ RETURNING
 SELECT
     category.id,
     category.name,
+    category.nsfw,
     count(torrent.id)::bigint AS torrent_count
 FROM catalog.categories AS category
 LEFT JOIN torrents.torrents AS torrent
@@ -418,6 +419,7 @@ SELECT
     category.name,
     category.display_order,
     category.enabled,
+    category.nsfw,
     category.version,
     category.created_at,
     category.updated_at,
@@ -743,6 +745,7 @@ INSERT INTO catalog.categories (
     name,
     display_order,
     enabled,
+    nsfw,
     created_at,
     updated_at
 ) VALUES (
@@ -750,13 +753,14 @@ INSERT INTO catalog.categories (
     sqlc.arg(category_name)::text,
     sqlc.arg(display_order)::integer,
     sqlc.arg(enabled)::boolean,
+    sqlc.arg(nsfw)::boolean,
     sqlc.arg(occurred_at)::timestamptz,
     sqlc.arg(occurred_at)::timestamptz
 )
-RETURNING id, name, display_order, enabled, version, created_at, updated_at;
+RETURNING id, name, display_order, enabled, nsfw, version, created_at, updated_at;
 
 -- name: GetManagedCategoryForUpdate :one
-SELECT id, name, display_order, enabled, version, created_at, updated_at
+SELECT id, name, display_order, enabled, nsfw, version, created_at, updated_at
 FROM catalog.categories
 WHERE id = sqlc.arg(category_id)::text
 FOR UPDATE;
@@ -767,11 +771,12 @@ SET
     name = sqlc.arg(category_name)::text,
     display_order = sqlc.arg(display_order)::integer,
     enabled = sqlc.arg(enabled)::boolean,
+    nsfw = sqlc.arg(nsfw)::boolean,
     version = version + 1,
     updated_at = sqlc.arg(occurred_at)::timestamptz
 WHERE id = sqlc.arg(category_id)::text
   AND version = sqlc.arg(expected_version)::bigint
-RETURNING id, name, display_order, enabled, version, created_at, updated_at;
+RETURNING id, name, display_order, enabled, nsfw, version, created_at, updated_at;
 
 -- name: CountCategoryTorrents :one
 SELECT count(*)::bigint
@@ -833,6 +838,10 @@ WHERE
         OR torrent.category_id = sqlc.arg(category_id)::text
     )
     AND (
+        NOT sqlc.arg(exclude_nsfw)::boolean
+        OR NOT category.nsfw
+    )
+    AND (
         sqlc.arg(promotion)::text = ''
         OR coalesce(effective.promotion, CASE
             WHEN torrent.promotion_ends_at IS NOT NULL
@@ -875,6 +884,10 @@ WHERE
     AND (
         sqlc.arg(category_id)::text = ''
         OR torrent.category_id = sqlc.arg(category_id)::text
+    )
+    AND (
+        NOT sqlc.arg(exclude_nsfw)::boolean
+        OR NOT category.nsfw
     )
     AND (
         sqlc.arg(promotion)::text = ''

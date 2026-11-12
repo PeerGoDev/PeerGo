@@ -27,12 +27,14 @@ import { useWebSession } from "~/features/auth/api/session.mutations"
 import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import { useTrafficOverview } from "~/features/traffic/api/traffic.queries"
 import { useMyTorrentBookmarks } from "~/features/torrent/api/torrent-bookmarks.queries"
+import { useCategoryList } from "~/features/torrent/api/torrent.queries"
 import { TorrentCards } from "~/features/torrent/components/torrent-cards"
 import { TorrentListSkeleton } from "~/features/torrent/components/torrent-list-state"
 import { OffsetPagination } from "~/shared/components/offset-pagination"
 import { TorrentTable } from "~/features/torrent/components/torrent-table"
 import { useTorrentBookmarkControls } from "~/features/torrent/hooks/use-torrent-bookmark-controls"
-import { useAdultCoverVisibility } from "~/features/torrent/hooks/use-adult-cover-visibility"
+import { useNsfwFilter } from "~/features/torrent/hooks/use-nsfw-filter"
+import { nsfwCategoryIds } from "~/features/torrent/model/nsfw"
 import { PageLayout } from "~/shared/components/page-layout"
 import { requestErrorDescription } from "~/shared/api/problem"
 
@@ -83,7 +85,14 @@ export function MyTorrentBookmarksPage() {
       ),
     [traffic.data?.torrent_activity]
   )
-  const [adultCoversVisible] = useAdultCoverVisibility()
+  const [hideNsfw] = useNsfwFilter()
+  const categories = useCategoryList(canRead)
+  const hiddenCoverCategoryIds = React.useMemo(() => {
+    if (!hideNsfw) return undefined
+    if (categories.data) return nsfwCategoryIds(categories.data)
+    // Until the category classification is known, no bookmarked cover is safe to reveal.
+    return new Set(torrents.map((torrent) => torrent.category.id))
+  }, [categories.data, hideNsfw, torrents])
 
   React.useEffect(() => {
     const total = bookmarks.data?.total
@@ -190,7 +199,7 @@ export function MyTorrentBookmarksPage() {
                 torrents={torrents}
                 bookmarkControls={bookmarkControls}
                 layout="bookmarks"
-                adultCoversVisible={adultCoversVisible}
+                hiddenCoverCategoryIds={hiddenCoverCategoryIds}
                 activityByTorrentId={activityByTorrentId}
               />
               <TorrentCards
@@ -198,7 +207,7 @@ export function MyTorrentBookmarksPage() {
                 view="list"
                 bookmarkControls={bookmarkControls}
                 timestampByTorrentId={bookmarkTimes}
-                adultCoversVisible={adultCoversVisible}
+                hiddenCoverCategoryIds={hiddenCoverCategoryIds}
                 activityByTorrentId={activityByTorrentId}
               />
               <OffsetPagination

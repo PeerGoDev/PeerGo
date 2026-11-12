@@ -36,8 +36,9 @@ import {
 import { TorrentTable } from "~/features/torrent/components/torrent-table"
 import { TorrentViewControls } from "~/features/torrent/components/torrent-view-controls"
 import { useTorrentBookmarkControls } from "~/features/torrent/hooks/use-torrent-bookmark-controls"
-import { useAdultCoverVisibility } from "~/features/torrent/hooks/use-adult-cover-visibility"
+import { useNsfwFilter } from "~/features/torrent/hooks/use-nsfw-filter"
 import { useTorrentView } from "~/features/torrent/hooks/use-torrent-view"
+import { nsfwCategoryIds } from "~/features/torrent/model/nsfw"
 import { NumberedPagination } from "~/shared/components/numbered-pagination"
 import { PageLayout } from "~/shared/components/page-layout"
 
@@ -70,11 +71,13 @@ export function TorrentCatalogPage() {
   const siteInfo = useSiteInfo()
   const traffic = useTrafficOverview(session.data?.user.id)
   const authenticated = Boolean(session.data)
+  const [hideNsfw, setHideNsfw] = useNsfwFilter()
   const categories = useCategoryList(authenticated)
   const torrents = useTorrentList(
     {
       query,
       categoryId,
+      excludeNsfw: hideNsfw,
       promotion,
       sort: sort === "published_desc" ? undefined : sort,
       limit: pageSize,
@@ -98,20 +101,25 @@ export function TorrentCatalogPage() {
   )
   const bookmarkControls = useTorrentBookmarkControls(torrentIds)
   const [view, setView] = useTorrentView(siteInfo.data?.default_torrent_view)
-  const [adultCoversVisible, setAdultCoversVisible] = useAdultCoverVisibility()
   const totalPages = Math.max(
     1,
     Math.ceil((torrents.data?.total ?? 0) / pageSize)
   )
-  const totalCategoryCount =
-    categories.data?.reduce(
-      (total, category) => total + (category.torrent_count ?? 0),
-      0
-    ) ?? 0
+  const nsfwIds = React.useMemo(
+    () => nsfwCategoryIds(categories.data),
+    [categories.data]
+  )
+  const hiddenCoverCategoryIds = hideNsfw ? nsfwIds : undefined
   // Keep enabled empty categories visible. Rousi presents the complete catalog
   // vocabulary, and hiding a zero-count category makes both discovery and the
   // stable display order depend on the current contents of the tracker.
-  const catalogCategories = categories.data ?? []
+  const catalogCategories = (categories.data ?? []).filter(
+    (category) => !hideNsfw || !category.nsfw
+  )
+  const totalCategoryCount = catalogCategories.reduce(
+    (total, category) => total + (category.torrent_count ?? 0),
+    0
+  )
 
   React.useEffect(() => setDraftQuery(query), [query])
 
@@ -307,8 +315,8 @@ export function TorrentCatalogPage() {
           <TorrentViewControls
             value={view}
             onValueChange={setView}
-            adultCoversVisible={adultCoversVisible}
-            onAdultCoversVisibleChange={setAdultCoversVisible}
+            hideNsfw={hideNsfw}
+            onHideNsfwChange={setHideNsfw}
           />
         </div>
 
@@ -320,7 +328,10 @@ export function TorrentCatalogPage() {
           />
         )}
         {torrents.data?.items.length === 0 && (
-          <TorrentListEmpty query={query} />
+          <TorrentListEmpty
+            query={query}
+            nsfwHidden={hideNsfw && nsfwIds.has(categoryId)}
+          />
         )}
         {torrents.data && torrents.data.items.length > 0 ? (
           view === "list" ? (
@@ -328,7 +339,7 @@ export function TorrentCatalogPage() {
               <TorrentTable
                 torrents={torrents.data.items}
                 bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
+                hiddenCoverCategoryIds={hiddenCoverCategoryIds}
                 activityByTorrentId={activityByTorrentId}
                 sort={sort}
                 onSortChange={(nextSort) =>
@@ -342,7 +353,7 @@ export function TorrentCatalogPage() {
                 torrents={torrents.data.items}
                 view="list"
                 bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
+                hiddenCoverCategoryIds={hiddenCoverCategoryIds}
                 activityByTorrentId={activityByTorrentId}
               />
               <div className="md:hidden">{pagination}</div>
@@ -353,7 +364,7 @@ export function TorrentCatalogPage() {
                 torrents={torrents.data.items}
                 view={view}
                 bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
+                hiddenCoverCategoryIds={hiddenCoverCategoryIds}
                 activityByTorrentId={activityByTorrentId}
               />
               {pagination}

@@ -1,4 +1,4 @@
-import { SearchXIcon, TriangleAlertIcon } from "lucide-react"
+import { EyeOffIcon, SearchXIcon, TriangleAlertIcon } from "lucide-react"
 
 import {
   Alert,
@@ -57,15 +57,36 @@ export function TorrentListError({
   )
 }
 
-export function TorrentListEmpty({ query }: { query: string }) {
+export function TorrentListEmpty({
+  query,
+  nsfwHidden = false,
+}: {
+  query: string
+  nsfwHidden?: boolean
+}) {
   return (
-    <Card className="items-center gap-3 py-12 text-center">
+    <Card className="items-center gap-3 px-6 py-12 text-center">
       <span className="flex size-10 items-center justify-center rounded-lg border bg-muted text-faint">
-        <SearchXIcon className="size-5" />
+        {nsfwHidden ? (
+          <EyeOffIcon className="size-5" />
+        ) : (
+          <SearchXIcon className="size-5" />
+        )}
       </span>
-      <p className="text-sm text-muted-foreground">
-        {query ? "没有找到符合条件的种子" : "暂无种子"}
-      </p>
+      {nsfwHidden ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium text-foreground">
+            这是成人分类，当前已屏蔽
+          </p>
+          <p className="text-xs text-muted-foreground">
+            关闭上方的“屏蔽 NSFW”后即可浏览。
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {query ? "没有找到符合条件的种子" : "暂无种子"}
+        </p>
+      )}
     </Card>
   )
 }

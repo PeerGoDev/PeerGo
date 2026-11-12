@@ -2303,7 +2303,7 @@ func (h *Handler) CreateManagedCategory(ctx context.Context, request generated.C
 	}
 	result, err := h.categoryAdministration.Create(ctx, staffActor(session), catalog.CreateCategoryInput{
 		ID: request.Body.Id, Name: request.Body.Name, DisplayOrder: request.Body.DisplayOrder,
-		Enabled: request.Body.Enabled, Reason: request.Body.Reason,
+		Enabled: request.Body.Enabled, NSFW: request.Body.Nsfw, Reason: request.Body.Reason,
 	})
 	if err != nil {
 		problem, handled := categoryAdministrationProblem(ctx, err)
@@ -2345,7 +2345,7 @@ func (h *Handler) UpdateManagedCategory(ctx context.Context, request generated.U
 	}
 	result, err := h.categoryAdministration.Update(ctx, staffActor(session), catalog.UpdateCategoryInput{
 		ID: string(request.CategoryId), Name: request.Body.Name, DisplayOrder: request.Body.DisplayOrder,
-		Enabled: request.Body.Enabled, ExpectedVersion: request.Body.ExpectedVersion,
+		Enabled: request.Body.Enabled, NSFW: request.Body.Nsfw, ExpectedVersion: request.Body.ExpectedVersion,
 		Reason: request.Body.Reason,
 	})
 	if err != nil {
@@ -3277,7 +3277,7 @@ func (h *Handler) ListCategories(ctx context.Context, _ generated.ListCategories
 	response := make(generated.ListCategories200JSONResponse, 0, len(result))
 	for _, category := range result {
 		response = append(response, generated.CategoryWithCount{
-			Id: category.ID, Name: category.Name, TorrentCount: int64(category.TorrentCount),
+			Id: category.ID, Name: category.Name, Nsfw: category.NSFW, TorrentCount: int64(category.TorrentCount),
 		})
 	}
 	return response, nil
@@ -3332,6 +3332,7 @@ func (h *Handler) ListTorrents(ctx context.Context, request generated.ListTorren
 	if request.Params.CategoryId != nil {
 		categoryID = *request.Params.CategoryId
 	}
+	excludeNSFW := request.Params.ExcludeNsfw != nil && *request.Params.ExcludeNsfw
 	var promotion *catalog.Promotion
 	if request.Params.Promotion != nil {
 		value := catalog.Promotion(*request.Params.Promotion)
@@ -3345,8 +3346,8 @@ func (h *Handler) ListTorrents(ctx context.Context, request generated.ListTorren
 
 	result, err := h.catalog.ListTorrents(ctx, catalog.TorrentListRequest{
 		Limit: request.Params.Limit, Offset: request.Params.Offset, Query: query,
-		SearchScope: searchScope, CategoryID: categoryID, Promotion: promotion,
-		Sort: sortOrder,
+		SearchScope: searchScope, CategoryID: categoryID, ExcludeNSFW: excludeNSFW,
+		Promotion: promotion, Sort: sortOrder,
 	})
 	if errors.Is(err, catalog.ErrInvalidLimit) || errors.Is(err, catalog.ErrInvalidQuery) ||
 		errors.Is(err, catalog.ErrInvalidTorrentPage) || errors.Is(err, catalog.ErrInvalidTorrentFilter) {
@@ -3563,8 +3564,9 @@ func managedCategoryDTO(category catalog.ManagedCategory) generated.ManagedCateg
 	}
 	return generated.ManagedCategory{
 		Id: category.ID, Name: category.Name, DisplayOrder: category.DisplayOrder,
-		Enabled: category.Enabled, Version: category.Version, TorrentCount: category.TorrentCount,
-		CreatedAt: category.CreatedAt, UpdatedAt: category.UpdatedAt, Facets: facets,
+		Enabled: category.Enabled, Nsfw: category.NSFW, Version: category.Version,
+		TorrentCount: category.TorrentCount, CreatedAt: category.CreatedAt, UpdatedAt: category.UpdatedAt,
+		Facets: facets,
 	}
 }
 

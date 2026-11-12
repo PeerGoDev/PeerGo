@@ -24,6 +24,7 @@ import {
 import { Button } from "~/components/ui/button"
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -39,6 +40,7 @@ import {
   SheetTitle,
 } from "~/components/ui/sheet"
 import { Spinner } from "~/components/ui/spinner"
+import { Switch } from "~/components/ui/switch"
 import { Textarea } from "~/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group"
 import {
@@ -70,6 +72,7 @@ export function CategoryEditorSheet({
   const createMutation = useCreateManagedCategory()
   const updateMutation = useUpdateManagedCategory()
   const [enabled, setEnabled] = React.useState(category?.enabled ?? true)
+  const [nsfw, setNsfw] = React.useState(category?.nsfw ?? false)
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [confirmationOpen, setConfirmationOpen] = React.useState(false)
   const [pendingValues, setPendingValues] = React.useState<CategoryFormValues>()
@@ -96,6 +99,7 @@ export function CategoryEditorSheet({
       name: String(form.get("name") ?? ""),
       displayOrder: String(form.get("displayOrder") ?? ""),
       enabled,
+      nsfw,
       reason: String(form.get("reason") ?? ""),
     })
     if (!result.success) {
@@ -116,7 +120,9 @@ export function CategoryEditorSheet({
       return
     }
     if (category && !hasCategoryBusinessChanges(category, result.data)) {
-      setErrors({ form: "名称、排序权重和状态均未变化，无需创建空变更。" })
+      setErrors({
+        form: "名称、排序权重、状态和成人分类标记均未变化，无需创建空变更。",
+      })
       return
     }
     setErrors({})
@@ -137,6 +143,7 @@ export function CategoryEditorSheet({
             name: pendingValues.name,
             display_order: pendingValues.displayOrder,
             enabled: pendingValues.enabled,
+            nsfw: pendingValues.nsfw,
             expected_version: category.version,
             reason: pendingValues.reason,
           },
@@ -151,6 +158,7 @@ export function CategoryEditorSheet({
             name: pendingValues.name,
             display_order: pendingValues.displayOrder,
             enabled: pendingValues.enabled,
+            nsfw: pendingValues.nsfw,
             reason: pendingValues.reason,
           },
         })
@@ -171,7 +179,7 @@ export function CategoryEditorSheet({
           <SheetDescription>
             {category
               ? "分类标识不可修改；保存前会重新确认分类状态并记录操作。"
-              : "填写分类标识、显示名称、排序和可用状态。"}
+              : "填写分类标识、显示名称、排序、可用状态和成人分类标记。"}
           </SheetDescription>
         </SheetHeader>
 
@@ -315,6 +323,24 @@ export function CategoryEditorSheet({
                 </Alert>
               ) : null}
 
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="category-nsfw">
+                    成人分类（NSFW）
+                  </FieldLabel>
+                  <FieldDescription>
+                    开启后，该分类的种子默认不出现在首页、种子列表和搜索中，封面也会被遮挡；会员确认年满
+                    18 周岁后可以自行显示。
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="category-nsfw"
+                  checked={nsfw}
+                  onCheckedChange={setNsfw}
+                  disabled={isPending}
+                />
+              </Field>
+
               <Field data-invalid={Boolean(errors.reason)}>
                 <FieldLabel htmlFor="category-change-reason">
                   变更理由
@@ -445,6 +471,10 @@ function CategoryConfirmationDialog({
                 label="状态"
                 value={categoryStatusLabel(values.enabled)}
               />
+              <ConfirmationFact
+                label="成人分类"
+                value={categoryNsfwLabel(values.nsfw)}
+              />
             </>
           )}
         </div>
@@ -498,6 +528,13 @@ function categoryChanges(
           after: categoryStatusLabel(values.enabled),
         }
       : null,
+    category.nsfw !== values.nsfw
+      ? {
+          label: "成人分类",
+          before: categoryNsfwLabel(category.nsfw),
+          after: categoryNsfwLabel(values.nsfw),
+        }
+      : null,
   ].filter((change): change is NonNullable<typeof change> => change !== null)
 }
 
@@ -512,6 +549,10 @@ function ConfirmationFact({ label, value }: { label: string; value: string }) {
 
 function categoryStatusLabel(enabled: boolean) {
   return enabled ? "启用" : "停用"
+}
+
+function categoryNsfwLabel(nsfw: boolean) {
+  return nsfw ? "是（NSFW）" : "否"
 }
 
 function categoryMutationErrorTitle(error: Error) {

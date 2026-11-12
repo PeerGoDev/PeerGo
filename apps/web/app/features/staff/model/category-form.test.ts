@@ -11,6 +11,7 @@ const category: ManagedCategory = {
   name: "纪录片",
   display_order: 30,
   enabled: true,
+  nsfw: false,
   version: 4,
   torrent_count: 12,
   created_at: "2026-08-05T08:00:00Z",
@@ -25,6 +26,7 @@ describe("categoryFormSchema", () => {
       name: " 纪录片 ",
       displayOrder: "30",
       enabled: true,
+      nsfw: false,
       reason: " 调整分类名称并确认公开内容影响。 ",
     })
 
@@ -33,6 +35,7 @@ describe("categoryFormSchema", () => {
       name: "纪录片",
       displayOrder: 30,
       enabled: true,
+      nsfw: false,
       reason: "调整分类名称并确认公开内容影响。",
     })
     expect(hasCategoryBusinessChanges(category, result)).toBe(false)
@@ -47,6 +50,7 @@ describe("categoryFormSchema", () => {
       name: "纪录片",
       displayOrder: "30",
       enabled: true,
+      nsfw: false,
       reason: "调整分类名称并确认公开内容影响。",
       ...override,
     })
@@ -61,6 +65,7 @@ describe("categoryFormSchema", () => {
         name: "纪录片",
         displayOrder: "30",
         enabled: true,
+        nsfw: false,
         reason: "",
       }).success
     ).toBe(true)
@@ -72,7 +77,21 @@ describe("categoryFormSchema", () => {
       name: category.name,
       displayOrder: String(category.display_order),
       enabled: false,
+      nsfw: false,
       reason: "停用当前分类并确认已有种子的公开影响。",
+    })
+
+    expect(hasCategoryBusinessChanges(category, result)).toBe(true)
+  })
+
+  it("treats an NSFW reclassification as a business change", () => {
+    const result = categoryFormSchema.parse({
+      id: category.id,
+      name: category.name,
+      displayOrder: String(category.display_order),
+      enabled: category.enabled,
+      nsfw: true,
+      reason: "",
     })
 
     expect(hasCategoryBusinessChanges(category, result)).toBe(true)

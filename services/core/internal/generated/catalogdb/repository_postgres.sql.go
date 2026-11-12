@@ -171,12 +171,16 @@ WHERE
         OR torrent.category_id = $3::text
     )
     AND (
-        $4::text = ''
+        NOT $4::boolean
+        OR NOT category.nsfw
+    )
+    AND (
+        $5::text = ''
         OR coalesce(effective.promotion, CASE
             WHEN torrent.promotion_ends_at IS NOT NULL
              AND torrent.promotion_ends_at <= CURRENT_TIMESTAMP THEN 'none'
             ELSE torrent.promotion
-        END) = $4::text
+        END) = $5::text
     )
 `
 
@@ -184,6 +188,7 @@ type CountPublishedTorrentsParams struct {
 	SearchText  string
 	SearchScope string
 	CategoryID  string
+	ExcludeNsfw bool
 	Promotion   string
 }
 
@@ -192,6 +197,7 @@ func (q *Queries) CountPublishedTorrents(ctx context.Context, arg CountPublished
 		arg.SearchText,
 		arg.SearchScope,
 		arg.CategoryID,
+		arg.ExcludeNsfw,
 		arg.Promotion,
 	)
 	var column_1 int64
@@ -234,6 +240,7 @@ INSERT INTO catalog.categories (
     name,
     display_order,
     enabled,
+    nsfw,
     created_at,
     updated_at
 ) VALUES (
@@ -241,10 +248,11 @@ INSERT INTO catalog.categories (
     $2::text,
     $3::integer,
     $4::boolean,
-    $5::timestamptz,
-    $5::timestamptz
+    $5::boolean,
+    $6::timestamptz,
+    $6::timestamptz
 )
-RETURNING id, name, display_order, enabled, version, created_at, updated_at
+RETURNING id, name, display_order, enabled, nsfw, version, created_at, updated_at
 `
 
 type CreateManagedCategoryParams struct {
@@ -252,6 +260,7 @@ type CreateManagedCategoryParams struct {
 	CategoryName string
 	DisplayOrder int32
 	Enabled      bool
+	Nsfw         bool
 	OccurredAt   pgtype.Timestamptz
 }
 
@@ -260,6 +269,7 @@ type CreateManagedCategoryRow struct {
 	Name         string
 	DisplayOrder int32
 	Enabled      bool
+	Nsfw         bool
 	Version      int64
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
@@ -271,6 +281,7 @@ func (q *Queries) CreateManagedCategory(ctx context.Context, arg CreateManagedCa
 		arg.CategoryName,
 		arg.DisplayOrder,
 		arg.Enabled,
+		arg.Nsfw,
 		arg.OccurredAt,
 	)
 	var i CreateManagedCategoryRow
@@ -279,6 +290,7 @@ func (q *Queries) CreateManagedCategory(ctx context.Context, arg CreateManagedCa
 		&i.Name,
 		&i.DisplayOrder,
 		&i.Enabled,
+		&i.Nsfw,
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -708,7 +720,7 @@ func (q *Queries) GetManagedCategoryFacetOptionForUpdate(ctx context.Context, ar
 }
 
 const getManagedCategoryForUpdate = `-- name: GetManagedCategoryForUpdate :one
-SELECT id, name, display_order, enabled, version, created_at, updated_at
+SELECT id, name, display_order, enabled, nsfw, version, created_at, updated_at
 FROM catalog.categories
 WHERE id = $1::text
 FOR UPDATE
@@ -719,6 +731,7 @@ type GetManagedCategoryForUpdateRow struct {
 	Name         string
 	DisplayOrder int32
 	Enabled      bool
+	Nsfw         bool
 	Version      int64
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
@@ -732,6 +745,7 @@ func (q *Queries) GetManagedCategoryForUpdate(ctx context.Context, categoryID st
 		&i.Name,
 		&i.DisplayOrder,
 		&i.Enabled,
+		&i.Nsfw,
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -1439,6 +1453,7 @@ const listEnabledCategories = `-- name: ListEnabledCategories :many
 SELECT
     category.id,
     category.name,
+    category.nsfw,
     count(torrent.id)::bigint AS torrent_count
 FROM catalog.categories AS category
 LEFT JOIN torrents.torrents AS torrent
@@ -1452,6 +1467,7 @@ ORDER BY category.display_order, category.id
 type ListEnabledCategoriesRow struct {
 	ID           string
 	Name         string
+	Nsfw         bool
 	TorrentCount int64
 }
 
@@ -1467,7 +1483,12 @@ func (q *Queries) ListEnabledCategories(ctx context.Context) ([]ListEnabledCateg
 	items := []ListEnabledCategoriesRow{}
 	for rows.Next() {
 		var i ListEnabledCategoriesRow
-		if err := rows.Scan(&i.ID, &i.Name, &i.TorrentCount); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Nsfw,
+			&i.TorrentCount,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1639,6 +1660,7 @@ SELECT
     category.name,
     category.display_order,
     category.enabled,
+    category.nsfw,
     category.version,
     category.created_at,
     category.updated_at,
@@ -1654,6 +1676,7 @@ type ListManagedCategoriesRow struct {
 	Name         string
 	DisplayOrder int32
 	Enabled      bool
+	Nsfw         bool
 	Version      int64
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
@@ -1677,6 +1700,7 @@ func (q *Queries) ListManagedCategories(ctx context.Context) ([]ListManagedCateg
 			&i.Name,
 			&i.DisplayOrder,
 			&i.Enabled,
+			&i.Nsfw,
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -1973,31 +1997,36 @@ WHERE
         OR torrent.category_id = $3::text
     )
     AND (
-        $4::text = ''
+        NOT $4::boolean
+        OR NOT category.nsfw
+    )
+    AND (
+        $5::text = ''
         OR coalesce(effective.promotion, CASE
             WHEN torrent.promotion_ends_at IS NOT NULL
              AND torrent.promotion_ends_at <= CURRENT_TIMESTAMP THEN 'none'
             ELSE torrent.promotion
-        END) = $4::text
+        END) = $5::text
     )
 ORDER BY
 	(sticky.sticky_ends_at IS NOT NULL) DESC,
 	sticky.sticky_ends_at DESC,
-    CASE WHEN $5::text = 'published_desc' THEN torrent.published_at END DESC,
-    CASE WHEN $5::text = 'published_asc' THEN torrent.published_at END ASC,
-    CASE WHEN $5::text = 'size_desc' THEN torrent.size_bytes END DESC,
-    CASE WHEN $5::text = 'size_asc' THEN torrent.size_bytes END ASC,
-    CASE WHEN $5::text = 'completed_desc' THEN coalesce(completion.completed, swarm.completed, 0) END DESC,
+    CASE WHEN $6::text = 'published_desc' THEN torrent.published_at END DESC,
+    CASE WHEN $6::text = 'published_asc' THEN torrent.published_at END ASC,
+    CASE WHEN $6::text = 'size_desc' THEN torrent.size_bytes END DESC,
+    CASE WHEN $6::text = 'size_asc' THEN torrent.size_bytes END ASC,
+    CASE WHEN $6::text = 'completed_desc' THEN coalesce(completion.completed, swarm.completed, 0) END DESC,
     torrent.published_at DESC,
     torrent.id DESC
-LIMIT $7::integer
-OFFSET $6::integer
+LIMIT $8::integer
+OFFSET $7::integer
 `
 
 type ListPublishedTorrentsParams struct {
 	SearchText   string
 	SearchScope  string
 	CategoryID   string
+	ExcludeNsfw  bool
 	Promotion    string
 	SortOrder    string
 	ResultOffset int32
@@ -2028,6 +2057,7 @@ func (q *Queries) ListPublishedTorrents(ctx context.Context, arg ListPublishedTo
 		arg.SearchText,
 		arg.SearchScope,
 		arg.CategoryID,
+		arg.ExcludeNsfw,
 		arg.Promotion,
 		arg.SortOrder,
 		arg.ResultOffset,
@@ -2176,17 +2206,19 @@ SET
     name = $1::text,
     display_order = $2::integer,
     enabled = $3::boolean,
+    nsfw = $4::boolean,
     version = version + 1,
-    updated_at = $4::timestamptz
-WHERE id = $5::text
-  AND version = $6::bigint
-RETURNING id, name, display_order, enabled, version, created_at, updated_at
+    updated_at = $5::timestamptz
+WHERE id = $6::text
+  AND version = $7::bigint
+RETURNING id, name, display_order, enabled, nsfw, version, created_at, updated_at
 `
 
 type UpdateManagedCategoryParams struct {
 	CategoryName    string
 	DisplayOrder    int32
 	Enabled         bool
+	Nsfw            bool
 	OccurredAt      pgtype.Timestamptz
 	CategoryID      string
 	ExpectedVersion int64
@@ -2197,6 +2229,7 @@ type UpdateManagedCategoryRow struct {
 	Name         string
 	DisplayOrder int32
 	Enabled      bool
+	Nsfw         bool
 	Version      int64
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
@@ -2207,6 +2240,7 @@ func (q *Queries) UpdateManagedCategory(ctx context.Context, arg UpdateManagedCa
 		arg.CategoryName,
 		arg.DisplayOrder,
 		arg.Enabled,
+		arg.Nsfw,
 		arg.OccurredAt,
 		arg.CategoryID,
 		arg.ExpectedVersion,
@@ -2217,6 +2251,7 @@ func (q *Queries) UpdateManagedCategory(ctx context.Context, arg UpdateManagedCa
 		&i.Name,
 		&i.DisplayOrder,
 		&i.Enabled,
+		&i.Nsfw,
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,

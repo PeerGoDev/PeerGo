@@ -130,6 +130,7 @@ type Category struct {
 // category identity used by the catalog filter bar.
 type CategorySummary struct {
 	Category
+	NSFW         bool
 	TorrentCount int
 }
 
@@ -228,6 +229,7 @@ type TorrentListRequest struct {
 	Query       string
 	SearchScope *TorrentSearchScope
 	CategoryID  string
+	ExcludeNSFW bool
 	Promotion   *Promotion
 	Sort        *TorrentSort
 }
@@ -239,6 +241,7 @@ type TorrentFilter struct {
 	Query       string
 	SearchScope TorrentSearchScope
 	CategoryID  string
+	ExcludeNSFW bool
 	Promotion   Promotion
 	Sort        TorrentSort
 }

@@ -31,7 +31,7 @@ import { TorrentTable } from "~/features/torrent/components/torrent-table"
 import { TorrentViewControls } from "~/features/torrent/components/torrent-view-controls"
 import { useTorrentList } from "~/features/torrent/api/torrent.queries"
 import { useTorrentBookmarkControls } from "~/features/torrent/hooks/use-torrent-bookmark-controls"
-import { useAdultCoverVisibility } from "~/features/torrent/hooks/use-adult-cover-visibility"
+import { useNsfwFilter } from "~/features/torrent/hooks/use-nsfw-filter"
 import { useTorrentView } from "~/features/torrent/hooks/use-torrent-view"
 import { PageHeader, PageLayout } from "~/shared/components/page-layout"
 import { formatLongDate } from "~/shared/formatters/date-time"
@@ -43,14 +43,17 @@ export function HomePage() {
   const session = useWebSession()
   const isAuthenticated = Boolean(session.data)
   const announcement = useLatestAnnouncement(isAuthenticated)
-  const torrents = useTorrentList({ query }, isAuthenticated)
+  const [hideNsfw, setHideNsfw] = useNsfwFilter()
+  const torrents = useTorrentList(
+    { query, excludeNsfw: hideNsfw },
+    isAuthenticated
+  )
   const torrentIds = React.useMemo(
     () => torrents.data?.items.map((torrent) => torrent.id) ?? [],
     [torrents.data?.items]
   )
   const bookmarkControls = useTorrentBookmarkControls(torrentIds)
   const [view, setView] = useTorrentView(siteInfo.data?.default_torrent_view)
-  const [adultCoversVisible, setAdultCoversVisible] = useAdultCoverVisibility()
   const showLatestAnnouncement = siteInfo.data?.show_latest_announcement ?? true
 
   if (!isAuthenticated) {
@@ -138,8 +141,8 @@ export function HomePage() {
           <TorrentViewControls
             value={view}
             onValueChange={setView}
-            adultCoversVisible={adultCoversVisible}
-            onAdultCoversVisibleChange={setAdultCoversVisible}
+            hideNsfw={hideNsfw}
+            onHideNsfwChange={setHideNsfw}
           />
         </div>
 
@@ -159,13 +162,11 @@ export function HomePage() {
               <TorrentTable
                 torrents={torrents.data.items}
                 bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
               />
               <TorrentCards
                 torrents={torrents.data.items}
                 view="list"
                 bookmarkControls={bookmarkControls}
-                adultCoversVisible={adultCoversVisible}
               />
             </>
           ) : (
@@ -173,7 +174,6 @@ export function HomePage() {
               torrents={torrents.data.items}
               view={view}
               bookmarkControls={bookmarkControls}
-              adultCoversVisible={adultCoversVisible}
             />
           )
         ) : null}

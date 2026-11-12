@@ -26,6 +26,7 @@ export const categoryFormSchema = z.object({
     .refine((value) => runeLength(value) <= 40, "分类名称不能超过 40 个字符"),
   displayOrder: displayOrderSchema,
   enabled: z.boolean(),
+  nsfw: z.boolean(),
   reason: z
     .string()
     .trim()
@@ -42,7 +43,8 @@ export function hasCategoryBusinessChanges(
   return (
     category.name !== values.name ||
     category.display_order !== values.displayOrder ||
-    category.enabled !== values.enabled
+    category.enabled !== values.enabled ||
+    category.nsfw !== values.nsfw
   )
 }
 

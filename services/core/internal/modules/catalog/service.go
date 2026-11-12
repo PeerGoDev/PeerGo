@@ -271,7 +271,7 @@ func (s *Service) ListTorrents(ctx context.Context, request TorrentListRequest) 
 	filter := TorrentFilter{
 		Limit: resolvedLimit, Offset: resolvedOffset, Query: normalizedQuery,
 		SearchScope: resolvedSearchScope, CategoryID: normalizedCategoryID,
-		Promotion: resolvedPromotion, Sort: resolvedSort,
+		ExcludeNSFW: request.ExcludeNSFW, Promotion: resolvedPromotion, Sort: resolvedSort,
 	}
 	items, total, err := s.repository.ListTorrents(ctx, filter)
 	if err != nil {

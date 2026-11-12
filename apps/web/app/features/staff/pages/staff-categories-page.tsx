@@ -128,7 +128,7 @@ function CategoriesContent({
       </CategoriesHeader>
 
       <p className="text-sm text-muted-foreground">
-        点击分类可直接展开类型、地区、分辨率、来源等发种属性；使用编辑操作调整分类名称、顺序与状态。
+        点击分类可直接展开类型、地区、分辨率、来源等发种属性；使用编辑操作调整分类名称、顺序、状态与成人分类（NSFW）标记。
       </p>
 
       {successMessage ? (

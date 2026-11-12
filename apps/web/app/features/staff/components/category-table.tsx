@@ -116,6 +116,11 @@ export function CategoryTable({
                     <span className="hidden min-w-20 text-right text-xs text-muted-foreground sm:inline">
                       {category.torrent_count.toLocaleString("zh-CN")} 个种子
                     </span>
+                    {category.nsfw ? (
+                      <Badge variant="warning" title="成人分类">
+                        NSFW
+                      </Badge>
+                    ) : null}
                     <CategoryStatusBadge enabled={category.enabled} />
                     {canUpdate ? (
                       <Button

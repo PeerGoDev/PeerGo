@@ -99,7 +99,7 @@ describe("TorrentCards", () => {
     )
   })
 
-  it("obscures migrated 9kg covers until the local preference is confirmed", () => {
+  it("obscures covers in categories the page asks to hide", () => {
     const queryClient = new QueryClient()
     render(
       <MemoryRouter>
@@ -114,6 +114,7 @@ describe("TorrentCards", () => {
                 },
               ]}
               view="poster"
+              hiddenCoverCategoryIds={new Set(["9kg"])}
             />
           </TooltipProvider>
         </QueryClientProvider>

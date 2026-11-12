@@ -73,13 +73,14 @@ func TestCategoryAdministrationCreateNormalizesAndAuthorizes(t *testing.T) {
 	}
 
 	result, err := service.Create(context.Background(), actor, CreateCategoryInput{
-		ID: " software ", Name: " 软件 ", DisplayOrder: 60, Enabled: true,
+		ID: " software ", Name: " 软件 ", DisplayOrder: 60, Enabled: true, NSFW: true,
 		Reason: " 增加软件分类以承载后续正式内容。 ",
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if result.ID != "software" || repository.createCommand.ID != "software" || repository.createCommand.Name != "软件" {
+	if result.ID != "software" || repository.createCommand.ID != "software" || repository.createCommand.Name != "软件" ||
+		!repository.createCommand.NSFW {
 		t.Fatalf("result=%+v command=%+v", result, repository.createCommand)
 	}
 	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionCategoryCreate || authorizer.requests[0].CredentialAudience != authz.AudienceStaffSession {
@@ -102,13 +103,13 @@ func TestCategoryAdministrationUpdateCarriesExpectedVersion(t *testing.T) {
 	}
 
 	_, err = service.Update(context.Background(), categoryTestActor(now), UpdateCategoryInput{
-		ID: "movies", Name: "电影与短片", DisplayOrder: 10, Enabled: false,
+		ID: "movies", Name: "电影与短片", DisplayOrder: 10, Enabled: false, NSFW: true,
 		ExpectedVersion: 3, Reason: "暂时停用分类并核对其中已有种子影响。",
 	})
 	if err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
-	if repository.updateCommand.ExpectedVersion != 3 || repository.updateCommand.Enabled {
+	if repository.updateCommand.ExpectedVersion != 3 || repository.updateCommand.Enabled || !repository.updateCommand.NSFW {
 		t.Fatalf("update command = %+v", repository.updateCommand)
 	}
 	if len(authorizer.requests) != 1 || authorizer.requests[0].Action != authz.ActionCategoryUpdate {

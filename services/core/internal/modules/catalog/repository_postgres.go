@@ -183,7 +183,7 @@ func (r *PostgresRepository) ListCategories(ctx context.Context) ([]CategorySumm
 			return nil, fmt.Errorf("%w: category %q has an invalid torrent count", errCatalogProjectionInvalid, row.ID)
 		}
 		categories = append(categories, CategorySummary{
-			Category: Category{ID: row.ID, Name: row.Name}, TorrentCount: int(row.TorrentCount),
+			Category: Category{ID: row.ID, Name: row.Name}, NSFW: row.Nsfw, TorrentCount: int(row.TorrentCount),
 		})
 	}
 	return categories, nil
@@ -239,7 +239,7 @@ func (r *PostgresRepository) CategoryFacets(ctx context.Context, categoryID stri
 func (r *PostgresRepository) ListTorrents(ctx context.Context, filter TorrentFilter) ([]Torrent, int, error) {
 	params := catalogdb.CountPublishedTorrentsParams{
 		SearchText: filter.Query, SearchScope: string(filter.SearchScope),
-		CategoryID: filter.CategoryID, Promotion: string(filter.Promotion),
+		CategoryID: filter.CategoryID, ExcludeNsfw: filter.ExcludeNSFW, Promotion: string(filter.Promotion),
 	}
 	totalCount, err := r.queries.CountPublishedTorrents(ctx, params)
 	if err != nil {
@@ -253,7 +253,7 @@ func (r *PostgresRepository) ListTorrents(ctx context.Context, filter TorrentFil
 	}
 	rows, err := r.queries.ListPublishedTorrents(ctx, catalogdb.ListPublishedTorrentsParams{
 		SearchText: filter.Query, SearchScope: string(filter.SearchScope),
-		CategoryID: filter.CategoryID, Promotion: string(filter.Promotion),
+		CategoryID: filter.CategoryID, ExcludeNsfw: filter.ExcludeNSFW, Promotion: string(filter.Promotion),
 		SortOrder:   string(filter.Sort),
 		ResultLimit: int32(filter.Limit), ResultOffset: int32(filter.Offset),
 	})

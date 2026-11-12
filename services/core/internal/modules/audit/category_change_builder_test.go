@@ -57,6 +57,25 @@ func TestCategoryChangeBuilderHashesEditableStateAndReason(t *testing.T) {
 	}
 }
 
+func TestCategoryStateHashCoversNSFWClassification(t *testing.T) {
+	t.Parallel()
+
+	general := catalog.CategoryAuditState{ID: "9kg", Name: "9KG", DisplayOrder: 110, Enabled: true, Version: 2}
+	adult := general
+	adult.NSFW = true
+	generalHash, err := categoryStateHash(general)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adultHash, err := categoryStateHash(adult)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if generalHash == adultHash {
+		t.Fatal("NSFW reclassification left the category state hash unchanged")
+	}
+}
+
 func TestCategoryChangeBuilderRejectsInvalidVersionTransition(t *testing.T) {
 	t.Parallel()
 

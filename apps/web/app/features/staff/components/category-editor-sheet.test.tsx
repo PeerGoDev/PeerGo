@@ -55,4 +55,38 @@ describe("CategoryEditorSheet", () => {
     expect(screen.getByText("软件")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "确认创建" })).toBeEnabled()
   })
+
+  it("reviews an NSFW-only reclassification as a real change", async () => {
+    const user = userEvent.setup()
+    render(
+      <AppProviders>
+        <CategoryEditorSheet
+          category={{
+            id: "9kg",
+            name: "9KG",
+            display_order: 110,
+            enabled: true,
+            nsfw: false,
+            version: 3,
+            torrent_count: 8,
+            created_at: "2026-08-01T00:00:00Z",
+            updated_at: "2026-08-01T00:00:00Z",
+            facets: [],
+          }}
+          csrfToken="test-csrf"
+          onOpenChange={vi.fn()}
+          onSaved={vi.fn()}
+        />
+      </AppProviders>
+    )
+
+    await user.click(screen.getByRole("switch", { name: "成人分类（NSFW）" }))
+    await user.click(screen.getByRole("button", { name: "审阅变更" }))
+
+    expect(
+      screen.getByRole("heading", { name: "确认分类变更" })
+    ).toBeInTheDocument()
+    expect(screen.getByText("成人分类")).toBeInTheDocument()
+    expect(screen.getByText("是（NSFW）", { exact: false })).toBeInTheDocument()
+  })
 })

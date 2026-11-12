@@ -18,7 +18,7 @@ const (
 	minCategoryReasonRunes           = 10
 	maxCategoryReasonRunes           = 500
 	defaultCategoryCreateReason      = "创建分类并记录初始配置。"
-	defaultCategoryUpdateReason      = "更新分类展示与可用状态。"
+	defaultCategoryUpdateReason      = "更新分类展示、成人内容标记与可用状态。"
 	defaultCategoryFacetReason       = "更新分类下的发种属性配置。"
 	defaultCategoryFacetOptionReason = "更新分类属性的可选值配置。"
 )
@@ -111,8 +111,8 @@ func (service *CategoryAdministrationService) Create(ctx context.Context, actor 
 	}
 	result, err := service.repository.CreateCategory(ctx, CreateCategoryCommand{
 		ID: normalized.ID, Name: normalized.Name, DisplayOrder: normalized.DisplayOrder,
-		Enabled: normalized.Enabled, Reason: normalized.Reason, ActorID: actor.Subject.ID,
-		OccurredAt: now, Authorization: decision,
+		Enabled: normalized.Enabled, NSFW: normalized.NSFW, Reason: normalized.Reason,
+		ActorID: actor.Subject.ID, OccurredAt: now, Authorization: decision,
 	})
 	if err != nil {
 		return ManagedCategory{}, fmt.Errorf("create category: %w", err)
@@ -132,7 +132,7 @@ func (service *CategoryAdministrationService) Update(ctx context.Context, actor 
 	}
 	result, err := service.repository.UpdateCategory(ctx, UpdateCategoryCommand{
 		ID: normalized.ID, Name: normalized.Name, DisplayOrder: normalized.DisplayOrder,
-		Enabled: normalized.Enabled, ExpectedVersion: normalized.ExpectedVersion,
+		Enabled: normalized.Enabled, NSFW: normalized.NSFW, ExpectedVersion: normalized.ExpectedVersion,
 		Reason: normalized.Reason, ActorID: actor.Subject.ID, OccurredAt: now,
 		Authorization: decision,
 	})

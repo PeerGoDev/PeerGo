@@ -5349,6 +5349,8 @@ export interface components {
             display_order: number;
             /** @description 停用后不再进入公开分类和种子列表，但不会删除已有引用。 */
             enabled: boolean;
+            /** @description 成人分类。默认不在浏览列表中展示，详情页直接访问不受影响。 */
+            nsfw: boolean;
             /** Format: int64 */
             version: number;
             /** Format: int64 */
@@ -5365,6 +5367,7 @@ export interface components {
             name: string;
             display_order: number;
             enabled: boolean;
+            nsfw: boolean;
             /** @description 可留空；服务端会生成明确的审计理由。 */
             reason: string;
         };
@@ -5372,6 +5375,7 @@ export interface components {
             name: string;
             display_order: number;
             enabled: boolean;
+            nsfw: boolean;
             /** Format: int64 */
             expected_version: number;
             /** @description 可留空；服务端会生成明确的审计理由。 */
@@ -8585,6 +8589,8 @@ export interface components {
         CategoryWithCount: {
             id: string;
             name: string;
+            /** @description 成人分类。浏览列表可通过 exclude_nsfw 排除，封面需观众确认后再显示。 */
+            nsfw: boolean;
             /** Format: int64 */
             torrent_count: number;
         };
@@ -15209,6 +15215,8 @@ export interface operations {
                 offset?: number;
                 /** @description 只返回指定启用分类的种子；省略时返回全部分类。 */
                 category_id?: string;
+                /** @description 为 true 时排除成人分类的种子，匹配总数同样不计入。 */
+                exclude_nsfw?: boolean;
                 /** @description 只返回当前公开展示优惠匹配的种子；历史结算不读取此字段。 */
                 promotion?: "none" | "free" | "double_upload" | "double_upload_free" | "half_download" | "double_upload_half_download" | "thirty_percent_download";
                 /** @description 搜索结果排序；省略时按最新发布时间倒序。 */

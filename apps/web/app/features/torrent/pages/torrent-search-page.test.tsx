@@ -26,6 +26,7 @@ describe("TorrentSearchPage", () => {
         query: "Orbit",
         searchScope: "title_subtitle",
         categoryId: "",
+        excludeNsfw: true,
         sort: "published_desc",
         limit: 25,
         offset: 0,

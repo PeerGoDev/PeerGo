@@ -46,7 +46,7 @@ func (repository *PostgresCategoryAdministrationRepository) ListManagedCategorie
 			return nil, fmt.Errorf("%w: category %q has an invalid timestamp", errCatalogProjectionInvalid, row.ID)
 		}
 		result = append(result, ManagedCategory{
-			ID: row.ID, Name: row.Name, DisplayOrder: int(row.DisplayOrder), Enabled: row.Enabled,
+			ID: row.ID, Name: row.Name, DisplayOrder: int(row.DisplayOrder), Enabled: row.Enabled, NSFW: row.Nsfw,
 			Version: row.Version, TorrentCount: row.TorrentCount, CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time,
 			Facets: make([]ManagedCategoryFacet, 0),
 		})
@@ -381,7 +381,7 @@ func (repository *PostgresCategoryAdministrationRepository) CreateCategory(ctx c
 	queries := catalogdb.New(tx)
 	row, err := queries.CreateManagedCategory(ctx, catalogdb.CreateManagedCategoryParams{
 		CategoryID: command.ID, CategoryName: command.Name, DisplayOrder: int32(command.DisplayOrder),
-		Enabled: command.Enabled, OccurredAt: categoryTimestamp(command.OccurredAt),
+		Enabled: command.Enabled, Nsfw: command.NSFW, OccurredAt: categoryTimestamp(command.OccurredAt),
 	})
 	if isUniqueViolation(err) {
 		return ManagedCategory{}, ErrCategoryAlreadyExists
@@ -429,11 +429,12 @@ func (repository *PostgresCategoryAdministrationRepository) UpdateCategory(ctx c
 	}
 	before := ManagedCategory{
 		ID: locked.ID, Name: locked.Name, DisplayOrder: int(locked.DisplayOrder), Enabled: locked.Enabled,
-		Version: locked.Version, CreatedAt: locked.CreatedAt.Time, UpdatedAt: locked.UpdatedAt.Time,
+		NSFW: locked.Nsfw, Version: locked.Version, CreatedAt: locked.CreatedAt.Time, UpdatedAt: locked.UpdatedAt.Time,
 	}
 	row, err := queries.UpdateManagedCategory(ctx, catalogdb.UpdateManagedCategoryParams{
 		CategoryName: command.Name, DisplayOrder: int32(command.DisplayOrder), Enabled: command.Enabled,
-		OccurredAt: categoryTimestamp(command.OccurredAt), CategoryID: command.ID, ExpectedVersion: command.ExpectedVersion,
+		Nsfw: command.NSFW, OccurredAt: categoryTimestamp(command.OccurredAt), CategoryID: command.ID,
+		ExpectedVersion: command.ExpectedVersion,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ManagedCategory{}, ErrCategoryVersionConflict
@@ -482,7 +483,7 @@ func managedCategoryFromCreatedRow(row catalogdb.CreateManagedCategoryRow) (Mana
 	}
 	return ManagedCategory{
 		ID: row.ID, Name: row.Name, DisplayOrder: int(row.DisplayOrder), Enabled: row.Enabled,
-		Version: row.Version, CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time,
+		NSFW: row.Nsfw, Version: row.Version, CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time,
 	}, nil
 }
 
@@ -492,14 +493,15 @@ func managedCategoryFromUpdatedRow(row catalogdb.UpdateManagedCategoryRow, torre
 	}
 	return ManagedCategory{
 		ID: row.ID, Name: row.Name, DisplayOrder: int(row.DisplayOrder), Enabled: row.Enabled,
-		Version: row.Version, TorrentCount: torrentCount, CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time,
+		NSFW: row.Nsfw, Version: row.Version, TorrentCount: torrentCount, CreatedAt: row.CreatedAt.Time,
+		UpdatedAt: row.UpdatedAt.Time,
 	}, nil
 }
 
 func categoryAuditState(category ManagedCategory) CategoryAuditState {
 	return CategoryAuditState{
 		ID: category.ID, Name: category.Name, DisplayOrder: category.DisplayOrder,
-		Enabled: category.Enabled, Version: category.Version,
+		Enabled: category.Enabled, NSFW: category.NSFW, Version: category.Version,
 	}
 }
 

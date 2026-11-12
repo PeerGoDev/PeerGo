@@ -41,6 +41,7 @@ type ManagedCategory struct {
 	Name         string
 	DisplayOrder int
 	Enabled      bool
+	NSFW         bool
 	Version      int64
 	TorrentCount int64
 	CreatedAt    time.Time
@@ -145,6 +146,7 @@ type CreateCategoryInput struct {
 	Name         string
 	DisplayOrder int
 	Enabled      bool
+	NSFW         bool
 	Reason       string
 }
 
@@ -153,6 +155,7 @@ type UpdateCategoryInput struct {
 	Name            string
 	DisplayOrder    int
 	Enabled         bool
+	NSFW            bool
 	ExpectedVersion int64
 	Reason          string
 }
@@ -162,6 +165,7 @@ type CreateCategoryCommand struct {
 	Name          string
 	DisplayOrder  int
 	Enabled       bool
+	NSFW          bool
 	Reason        string
 	ActorID       uuid.UUID
 	OccurredAt    time.Time
@@ -173,6 +177,7 @@ type UpdateCategoryCommand struct {
 	Name            string
 	DisplayOrder    int
 	Enabled         bool
+	NSFW            bool
 	ExpectedVersion int64
 	Reason          string
 	ActorID         uuid.UUID
@@ -188,6 +193,7 @@ type CategoryAuditState struct {
 	Name         string `json:"name"`
 	DisplayOrder int    `json:"display_order"`
 	Enabled      bool   `json:"enabled"`
+	NSFW         bool   `json:"nsfw"`
 	Version      int64  `json:"version"`
 }
 

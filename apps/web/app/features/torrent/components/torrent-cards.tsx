@@ -26,7 +26,6 @@ import {
   formatRelativeTime,
   getTorrentSwarmFreshness,
 } from "~/features/torrent/model/format"
-import { torrentCoverRequiresAdultConfirmation } from "~/features/torrent/model/adult-content"
 import type { TorrentView } from "~/features/torrent/model/torrent-view"
 import { cn } from "~/lib/utils"
 import { formatDateTime } from "~/shared/formatters/date-time"
@@ -39,7 +38,7 @@ type TorrentCardsProps = {
   view: TorrentView
   bookmarkControls?: TorrentBookmarkControls
   timestampByTorrentId?: ReadonlyMap<number, string>
-  adultCoversVisible?: boolean
+  hiddenCoverCategoryIds?: ReadonlySet<string>
   activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
 }
 
@@ -48,7 +47,7 @@ export function TorrentCards({
   view,
   bookmarkControls,
   timestampByTorrentId,
-  adultCoversVisible = false,
+  hiddenCoverCategoryIds,
   activityByTorrentId,
 }: TorrentCardsProps) {
   if (view === "poster") {
@@ -62,7 +61,7 @@ export function TorrentCards({
             timestamp={
               timestampByTorrentId?.get(torrent.id) ?? torrent.uploaded_at
             }
-            adultCoversVisible={adultCoversVisible}
+            obscured={hiddenCoverCategoryIds?.has(torrent.category.id) ?? false}
             activity={activityByTorrentId?.get(torrent.id)}
           />
         ))}
@@ -75,7 +74,7 @@ export function TorrentCards({
       <TorrentWaterfall
         torrents={torrents}
         timestampByTorrentId={timestampByTorrentId}
-        adultCoversVisible={adultCoversVisible}
+        hiddenCoverCategoryIds={hiddenCoverCategoryIds}
         activityByTorrentId={activityByTorrentId}
       />
     )
@@ -89,8 +88,7 @@ export function TorrentCards({
         const swarmUnavailable =
           getTorrentSwarmFreshness(torrent) === "unavailable"
         const obscured =
-          !adultCoversVisible &&
-          torrentCoverRequiresAdultConfirmation(torrent.category)
+          hiddenCoverCategoryIds?.has(torrent.category.id) ?? false
 
         return (
           <article
@@ -212,18 +210,15 @@ function TorrentPosterCard({
   torrent,
   timestamp,
   fixedAspect,
-  adultCoversVisible,
+  obscured,
   activity,
 }: {
   torrent: Torrent
   timestamp: string
   fixedAspect: boolean
-  adultCoversVisible: boolean
+  obscured: boolean
   activity: TorrentActivity | undefined
 }) {
-  const obscured =
-    !adultCoversVisible &&
-    torrentCoverRequiresAdultConfirmation(torrent.category)
   const swarmUnavailable = getTorrentSwarmFreshness(torrent) === "unavailable"
   const content = (
     <>
@@ -329,7 +324,7 @@ function TorrentPosterCard({
 function TorrentWaterfall({
   torrents,
   timestampByTorrentId,
-  adultCoversVisible,
+  hiddenCoverCategoryIds,
   activityByTorrentId,
 }: Omit<TorrentCardsProps, "view" | "bookmarkControls">) {
   const containerRef = React.useRef<HTMLDivElement>(null)
@@ -356,7 +351,9 @@ function TorrentWaterfall({
               timestamp={
                 timestampByTorrentId?.get(torrent.id) ?? torrent.uploaded_at
               }
-              adultCoversVisible={adultCoversVisible ?? false}
+              obscured={
+                hiddenCoverCategoryIds?.has(torrent.category.id) ?? false
+              }
               activity={activityByTorrentId?.get(torrent.id)}
             />
           ))}

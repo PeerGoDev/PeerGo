@@ -30,6 +30,7 @@ export type TorrentListFilters = {
   query?: string
   searchScope?: TorrentSearchScope
   categoryId?: string
+  excludeNsfw?: boolean
   promotion?: TorrentPromotion
   sort?: TorrentSort
   limit?: number
@@ -158,6 +159,7 @@ export function torrentListQueryOptions(filters: TorrentListFilters = {}) {
     query: filters.query?.trim() ?? "",
     searchScope: filters.searchScope,
     categoryId: filters.categoryId ?? "",
+    excludeNsfw: filters.excludeNsfw ?? false,
     promotion: filters.promotion,
     sort: filters.sort,
     limit: filters.limit ?? 20,
@@ -182,6 +184,7 @@ export function torrentListQueryOptions(filters: TorrentListFilters = {}) {
               ...(normalizedFilters.categoryId
                 ? { category_id: normalizedFilters.categoryId }
                 : {}),
+              ...(normalizedFilters.excludeNsfw ? { exclude_nsfw: true } : {}),
               ...(normalizedFilters.promotion
                 ? { promotion: normalizedFilters.promotion }
                 : {}),

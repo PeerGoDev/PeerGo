@@ -6616,6 +6616,13 @@ paths:
           schema:
             type: string
             pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        - name: exclude_nsfw
+          in: query
+          description: 为 true 时排除成人分类的种子，匹配总数同样不计入。
+          required: false
+          schema:
+            type: boolean
+            default: false
         - name: promotion
           in: query
           description: 只返回当前公开展示优惠匹配的种子；历史结算不读取此字段。
@@ -14980,6 +14987,7 @@ components:
         - name
         - display_order
         - enabled
+        - nsfw
         - version
         - torrent_count
         - created_at
@@ -15002,6 +15010,9 @@ components:
         enabled:
           type: boolean
           description: 停用后不再进入公开分类和种子列表，但不会删除已有引用。
+        nsfw:
+          type: boolean
+          description: 成人分类。默认不在浏览列表中展示，详情页直接访问不受影响。
         version:
           type: integer
           format: int64
@@ -15035,6 +15046,7 @@ components:
         - name
         - display_order
         - enabled
+        - nsfw
         - reason
       properties:
         id:
@@ -15050,6 +15062,8 @@ components:
           maximum: 1000000
         enabled:
           type: boolean
+        nsfw:
+          type: boolean
         reason:
           type: string
           maxLength: 500
@@ -15061,6 +15075,7 @@ components:
         - name
         - display_order
         - enabled
+        - nsfw
         - expected_version
         - reason
       properties:
@@ -15073,6 +15088,8 @@ components:
           minimum: 0
           maximum: 1000000
         enabled:
+          type: boolean
+        nsfw:
           type: boolean
         expected_version:
           type: integer
@@ -24365,6 +24382,7 @@ components:
       required:
         - id
         - name
+        - nsfw
         - torrent_count
       properties:
         id:
@@ -24374,6 +24392,9 @@ components:
           type: string
           minLength: 1
           maxLength: 40
+        nsfw:
+          type: boolean
+          description: 成人分类。浏览列表可通过 exclude_nsfw 排除，封面需观众确认后再显示。
         torrent_count:
           type: integer
           format: int64

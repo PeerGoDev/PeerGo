@@ -210,13 +210,14 @@ describe("TorrentTable", () => {
     )
   })
 
-  it("obscures a migrated 9kg thumbnail without adding a label to the dense row", () => {
+  it("obscures a hidden-category thumbnail without adding a label to the dense row", () => {
     const queryClient = new QueryClient()
     render(
       <MemoryRouter>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <TorrentTable
+              hiddenCoverCategoryIds={new Set(["9kg"])}
               torrents={[
                 {
                   id: 42,

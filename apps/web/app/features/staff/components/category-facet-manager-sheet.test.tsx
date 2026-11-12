@@ -88,6 +88,7 @@ function renderManager(
           name: "电影",
           display_order: 10,
           enabled: true,
+          nsfw: false,
           version: 1,
           torrent_count: 100,
           created_at: "2026-08-01T00:00:00Z",
