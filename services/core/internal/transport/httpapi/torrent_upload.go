@@ -103,34 +103,42 @@ func bindTorrentSubmissionMultipart(reader multipart.Reader) (generated.TorrentS
 	if len(parts) == 0 {
 		return body, cleanup, nil
 	}
-	if len(parts) > 20 {
-		return generated.TorrentSubmissionRequest{}, cleanup, torrents.ErrTorrentInputInvalid
-	}
-	selections := make([]generated.TorrentFacetSelectionInput, 0, len(parts))
-	for _, part := range parts {
-		file, err := part.Open()
-		if err != nil {
-			return generated.TorrentSubmissionRequest{}, cleanup, err
-		}
-		raw, readErr := io.ReadAll(io.LimitReader(file, maxTorrentFacetSelectionPartBytes+1))
-		closeErr := file.Close()
-		if readErr != nil {
-			return generated.TorrentSubmissionRequest{}, cleanup, readErr
-		}
-		if closeErr != nil {
-			return generated.TorrentSubmissionRequest{}, cleanup, closeErr
-		}
-		if len(raw) == 0 || len(raw) > maxTorrentFacetSelectionPartBytes {
-			return generated.TorrentSubmissionRequest{}, cleanup, torrents.ErrTorrentInputInvalid
-		}
-		var selection generated.TorrentFacetSelectionInput
-		if err := json.Unmarshal(raw, &selection); err != nil {
-			return generated.TorrentSubmissionRequest{}, cleanup, err
-		}
-		selections = append(selections, selection)
+	selections, err := decodeJSONMultipartParts[generated.TorrentFacetSelectionInput](parts, 20, maxTorrentFacetSelectionPartBytes, torrents.ErrTorrentInputInvalid)
+	if err != nil {
+		return generated.TorrentSubmissionRequest{}, cleanup, err
 	}
 	body.FacetSelections = &selections
 	return body, cleanup, nil
+}
+
+func decodeJSONMultipartParts[T any](parts []*multipart.FileHeader, maxParts int, maxPartBytes int64, invalid error) ([]T, error) {
+	if len(parts) > maxParts {
+		return nil, invalid
+	}
+	values := make([]T, 0, len(parts))
+	for _, part := range parts {
+		file, err := part.Open()
+		if err != nil {
+			return nil, err
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(file, maxPartBytes+1))
+		closeErr := file.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+		if len(raw) == 0 || int64(len(raw)) > maxPartBytes {
+			return nil, invalid
+		}
+		var value T
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, nil
 }
 
 func torrentUploadScreenshots(body generated.TorrentSubmissionRequest) ([]torrents.TorrentScreenshotInput, error) {

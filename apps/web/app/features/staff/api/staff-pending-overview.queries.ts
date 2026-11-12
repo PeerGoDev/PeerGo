@@ -4,6 +4,7 @@ import { adminSeedboxReportsQueryOptions } from "~/features/seedbox/api/seedbox.
 import { accountAccessAppealListQueryOptions } from "~/features/staff/api/account-access-appeal-administration.queries"
 import { commentModerationCasesQueryOptions } from "~/features/staff/api/comment-moderation.queries"
 import { workerOperationsQueryOptions } from "~/features/staff/api/operations.queries"
+import { postModerationCasesQueryOptions } from "~/features/staff/api/post-moderation.queries"
 import {
   managedPublishedTorrentContentChangesQueryOptions,
   managedPublishedTorrentScreenshotChangesQueryOptions,
@@ -25,6 +26,7 @@ export type StaffPendingItem = {
     | "torrent-reviews"
     | "torrent-changes"
     | "comment-reports"
+    | "post-reports"
     | "account-appeals"
     | "workgroup-applications"
     | "seedbox-reports"
@@ -60,6 +62,8 @@ export function useStaffPendingOverview(
     "torrent.manage.read"
   )
   const canReviewComments = hasCapability(capabilities, "social.report.read")
+  const canReviewPosts =
+    canReviewComments && hasCapability(capabilities, "social.board.manage.read")
   const canReadAccountAppeals = hasCapability(
     capabilities,
     "user.account.appeal.read"
@@ -102,6 +106,11 @@ export function useStaffPendingOverview(
   const commentReports = useQuery({
     ...commentModerationCasesQueryOptions(1, 0),
     enabled: canReviewComments,
+    refetchInterval: pendingRefreshInterval,
+  })
+  const postReports = useQuery({
+    ...postModerationCasesQueryOptions(1, 0),
+    enabled: canReviewPosts,
     refetchInterval: pendingRefreshInterval,
   })
   const accountAppeals = useQuery({
@@ -160,6 +169,13 @@ export function useStaffPendingOverview(
       count: commentReports.data?.total ?? 0,
     },
     {
+      id: "post-reports",
+      label: "动态举报",
+      description: "等待核对和处置的动态案件",
+      to: "/staff/content/social",
+      count: postReports.data?.total ?? 0,
+    },
+    {
       id: "account-appeals",
       label: "账户访问申诉",
       description: "封禁或访问限制的待处理申诉",
@@ -203,6 +219,8 @@ export function useStaffPendingOverview(
         )
       case "comment-reports":
         return canReviewComments
+      case "post-reports":
+        return canReviewPosts
       case "account-appeals":
         return canReadUsers && canReadAccountAppeals
       case "workgroup-applications":
@@ -224,6 +242,7 @@ export function useStaffPendingOverview(
     withdrawals,
     torrentReports,
     commentReports,
+    postReports,
     accountAppeals,
     workgroups,
     seedboxReports,

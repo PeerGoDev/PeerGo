@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"mime/multipart"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -298,8 +299,11 @@ func (h *Handler) SubmitMyPublishedTorrentScreenshotChange(ctx context.Context, 
 	if request.Body == nil {
 		return publishedTorrentScreenshotChangeBadRequest(ctx), nil
 	}
-	var body generated.SubmitPublishedTorrentScreenshotChangeRequest
-	if err := runtime.BindMultipart(&body, *request.Body); err != nil {
+	body, cleanup, err := bindPublishedTorrentScreenshotChangeMultipart(*request.Body)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	if err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
 			problem := newProblemFromContext(ctx, http.StatusRequestEntityTooLarge, "torrent_screenshot_change_too_large", "截图修改过大", "上传内容超过当前站点允许的大小。")
@@ -317,9 +321,11 @@ func (h *Handler) SubmitMyPublishedTorrentScreenshotChange(ctx context.Context, 
 			uploads = append(uploads, torrents.TorrentScreenshotInput{Raw: raw})
 		}
 	}
-	manifest := make([]torrents.ScreenshotManifestItem, 0, len(body.Manifest))
-	for _, item := range body.Manifest {
-		manifest = append(manifest, torrents.ScreenshotManifestItem{Source: torrents.ScreenshotManifestSource(item.Source), Index: item.Index})
+	manifest := make([]torrents.ScreenshotManifestItem, 0, torrents.MaxTorrentScreenshots)
+	if body.Manifest != nil {
+		for _, item := range *body.Manifest {
+			manifest = append(manifest, torrents.ScreenshotManifestItem{Source: torrents.ScreenshotManifestSource(item.Source), Index: item.Index})
+		}
 	}
 	result, err := h.torrentMaintenance.SubmitPublishedScreenshotChange(ctx, sessionTokenFromContext(ctx), string(request.Params.XCSRFToken), torrents.SubmitPublishedScreenshotChangeInput{
 		RequestID: request.Params.IdempotencyKey, TorrentID: torrents.TorrentID(request.TorrentId), ExpectedVersion: body.ExpectedVersion,
@@ -335,6 +341,34 @@ func (h *Handler) SubmitMyPublishedTorrentScreenshotChange(ctx context.Context, 
 		Body:    publishedTorrentScreenshotChangeDTO(result),
 		Headers: generated.SubmitMyPublishedTorrentScreenshotChange201ResponseHeaders{CacheControl: "no-store"},
 	}, nil
+}
+
+const maxScreenshotManifestItemPartBytes = 1 << 10
+
+// bindPublishedTorrentScreenshotChangeMultipart reads manifest items as
+// repeated JSON parts because kin-openapi rejects bracket-expanded names such
+// as manifest[0][source] before Core can bind them.
+func bindPublishedTorrentScreenshotChangeMultipart(reader multipart.Reader) (generated.SubmitPublishedTorrentScreenshotChangeRequest, func(), error) {
+	form, err := reader.ReadForm(32 << 20)
+	if err != nil {
+		return generated.SubmitPublishedTorrentScreenshotChangeRequest{}, nil, err
+	}
+	cleanup := func() { _ = form.RemoveAll() }
+
+	var body generated.SubmitPublishedTorrentScreenshotChangeRequest
+	if err := runtime.BindForm(&body, form.Value, form.File, nil); err != nil {
+		return generated.SubmitPublishedTorrentScreenshotChangeRequest{}, cleanup, err
+	}
+	parts := form.File["manifest"]
+	if len(parts) == 0 {
+		return body, cleanup, nil
+	}
+	manifest, err := decodeJSONMultipartParts[generated.ScreenshotManifestItem](parts, torrents.MaxTorrentScreenshots, maxScreenshotManifestItemPartBytes, torrents.ErrPublishedScreenshotChangeInput)
+	if err != nil {
+		return generated.SubmitPublishedTorrentScreenshotChangeRequest{}, cleanup, err
+	}
+	body.Manifest = &manifest
+	return body, cleanup, nil
 }
 
 func (h *Handler) ListManagedPublishedTorrentScreenshotChanges(ctx context.Context, request generated.ListManagedPublishedTorrentScreenshotChangesRequestObject) (generated.ListManagedPublishedTorrentScreenshotChangesResponseObject, error) {

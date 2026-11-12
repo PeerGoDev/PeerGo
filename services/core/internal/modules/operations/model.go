@@ -292,6 +292,7 @@ type MagicUsageRules struct {
 	MemberGiftConnected      bool
 	ContentTipConnected      bool
 	RefundSupported          bool
+	RefundConnected          bool
 }
 
 type EconomySettingsOverview struct {

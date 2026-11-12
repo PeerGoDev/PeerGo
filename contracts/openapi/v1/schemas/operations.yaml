@@ -517,6 +517,7 @@ MagicUsageRules:
       member_gift_connected,
       content_tip_connected,
       refund_supported,
+      refund_connected,
     ]
   properties:
     currency_name: { type: string, minLength: 1, maxLength: 32 }
@@ -529,6 +530,7 @@ MagicUsageRules:
     member_gift_connected: { type: boolean }
     content_tip_connected: { type: boolean }
     refund_supported: { type: boolean }
+    refund_connected: { type: boolean }
 
 EconomyTransactionCounts:
   type: object

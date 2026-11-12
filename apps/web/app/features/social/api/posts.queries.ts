@@ -21,6 +21,10 @@ export type CreateSocialPollRequest =
   components["schemas"]["CreateSocialPollRequest"]
 export type CreateSocialRedPacketRequest =
   components["schemas"]["CreateSocialRedPacketRequest"]
+export type SocialPostReportReasonCode =
+  components["schemas"]["SocialPostReportReasonCode"]
+export type SocialPostReportReceipt =
+  components["schemas"]["SocialPostReportReceipt"]
 
 export type SocialFeedFilters = {
   authorUsername?: string
@@ -477,6 +481,40 @@ export function useDeleteSocialPost() {
         queryKey: [...socialPostKeys.all, "detail", input.postId],
       })
       await queryClient.invalidateQueries({ queryKey: socialPostKeys.all })
+    },
+  })
+}
+
+export function useCreateSocialPostReport() {
+  return useMutation({
+    mutationFn: async (input: {
+      postId: string
+      csrfToken: string
+      idempotencyKey: string
+      reasonCode: SocialPostReportReasonCode
+      details: string
+    }): Promise<SocialPostReportReceipt> => {
+      const details = input.details.trim()
+      const { data, error, response } = await apiClient.POST(
+        "/api/v1/social/posts/{post_id}/reports",
+        {
+          params: {
+            path: { post_id: input.postId },
+            header: {
+              "X-CSRF-Token": input.csrfToken,
+              "Idempotency-Key": input.idempotencyKey,
+            },
+          },
+          body: {
+            reason_code: input.reasonCode,
+            ...(details ? { details } : {}),
+          },
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
     },
   })
 }

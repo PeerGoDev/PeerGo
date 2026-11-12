@@ -190,7 +190,8 @@ func (service *Service) EconomySettings(ctx context.Context, actor authz.StaffAc
 			CurrencyName: "魔力值", WholeUnitsOnly: true, PTCoinEnabled: false,
 			MemberOverdraftAllowed: false, AppendOnlyLedger: true,
 			TorrentPurchaseSupported: true, TorrentPurchaseConnected: true,
-			MemberGiftConnected: true, ContentTipConnected: true, RefundSupported: true,
+			MemberGiftConnected: true, ContentTipConnected: true,
+			RefundSupported: true, RefundConnected: true,
 		},
 		Transactions: transactions,
 	}, nil

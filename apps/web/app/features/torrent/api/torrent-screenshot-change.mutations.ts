@@ -45,15 +45,20 @@ export function useSubmitPublishedTorrentScreenshotChange(userId: string) {
   })
 }
 
-async function submitPublishedTorrentScreenshotChange(
+export async function submitPublishedTorrentScreenshotChange(
   input: SubmitInput
 ): Promise<PublishedTorrentScreenshotChange> {
   const body = new FormData()
   body.set("expected_version", String(input.expectedVersion))
   body.set("reason", input.reason)
+  // Each item is one JSON part: contract validation rejects bracket-expanded
+  // names such as manifest[0][source], and sending no part means an empty set.
   input.manifest.forEach((item, index) => {
-    body.set(`manifest[${index}][source]`, item.source)
-    body.set(`manifest[${index}][index]`, String(item.index))
+    body.append(
+      "manifest",
+      new Blob([JSON.stringify(item)], { type: "application/json" }),
+      `screenshot-manifest-${index + 1}.json`
+    )
   })
   input.uploads.forEach((file) => body.append("uploads", file, file.name))
 

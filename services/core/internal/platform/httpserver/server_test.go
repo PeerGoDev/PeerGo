@@ -939,6 +939,36 @@ func (service *recordingCommentModerationService) Decide(_ context.Context, acto
 	return service.result, nil
 }
 
+type recordingPostModerationService struct {
+	receipt      social.PostReportReceipt
+	page         social.PostModerationCasePage
+	result       social.PostModerationDecisionResult
+	reportErr    error
+	reportCookie string
+	reportCSRF   string
+	reportInput  social.CreatePostReportInput
+	listActor    authz.StaffActor
+	listLimit    int
+	listOffset   int
+	decideActor  authz.StaffActor
+	decideInput  social.DecidePostModerationCaseInput
+}
+
+func (service *recordingPostModerationService) CreateReport(_ context.Context, cookie, csrf string, input social.CreatePostReportInput) (social.PostReportReceipt, error) {
+	service.reportCookie, service.reportCSRF, service.reportInput = cookie, csrf, input
+	return service.receipt, service.reportErr
+}
+
+func (service *recordingPostModerationService) ListOpenCases(_ context.Context, actor authz.StaffActor, limit, offset int) (social.PostModerationCasePage, error) {
+	service.listActor, service.listLimit, service.listOffset = actor, limit, offset
+	return service.page, nil
+}
+
+func (service *recordingPostModerationService) Decide(_ context.Context, actor authz.StaffActor, input social.DecidePostModerationCaseInput) (social.PostModerationDecisionResult, error) {
+	service.decideActor, service.decideInput = actor, input
+	return service.result, nil
+}
+
 func (service *recordingCommentService) ListTorrentComments(_ context.Context, torrentID int64, limit, offset int) (social.CommentPage, error) {
 	service.listTorrentID, service.listLimit, service.listOffset = torrentID, limit, offset
 	return service.page, nil
@@ -1530,6 +1560,8 @@ type recordingTorrentMaintenanceService struct {
 	contentDecideActor    authz.StaffActor
 	contentDecideInput    torrents.DecidePublishedContentChangeInput
 	contentDecision       torrents.PublishedContentChangeDecisionResult
+	screenshotInput       torrents.SubmitPublishedScreenshotChangeInput
+	screenshotResult      torrents.PublishedScreenshotChange
 	withdrawalInput       torrents.SubmitTorrentWithdrawalInput
 	withdrawalResult      torrents.TorrentWithdrawalRequest
 	withdrawalListActor   authz.StaffActor
@@ -1549,8 +1581,11 @@ type recordingTorrentMaintenanceService struct {
 	err                   error
 }
 
-func (service *recordingTorrentMaintenanceService) SubmitPublishedScreenshotChange(context.Context, string, string, torrents.SubmitPublishedScreenshotChangeInput) (torrents.PublishedScreenshotChange, error) {
-	return torrents.PublishedScreenshotChange{}, service.err
+func (service *recordingTorrentMaintenanceService) SubmitPublishedScreenshotChange(_ context.Context, cookieToken string, csrfToken string, input torrents.SubmitPublishedScreenshotChangeInput) (torrents.PublishedScreenshotChange, error) {
+	service.cookieToken = cookieToken
+	service.csrfToken = csrfToken
+	service.screenshotInput = input
+	return service.screenshotResult, service.err
 }
 
 func (service *recordingTorrentMaintenanceService) ListPublishedScreenshotChanges(context.Context, authz.StaffActor, torrents.PublishedScreenshotChangeQuery) (torrents.ManagedPublishedScreenshotChangePage, error) {
@@ -2596,6 +2631,115 @@ func TestPublishedTorrentContentChangeFreezesCandidateThroughWebSessionBoundary(
 	if strings.Contains(response.Body.String(), "uploader") || strings.Contains(response.Body.String(), "authorization") {
 		t.Fatalf("private identity or authorization evidence leaked: %s", response.Body.String())
 	}
+}
+
+func TestPublishedTorrentScreenshotChangeBindsOrderedJSONManifestParts(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 18, 17, 30, 0, 0, time.UTC)
+	const torrentID int64 = 42
+	requestID := uuid.New()
+	service := &recordingTorrentMaintenanceService{screenshotResult: torrents.PublishedScreenshotChange{
+		ID: requestID, TorrentID: torrents.TorrentID(torrentID), BaseTorrentVersion: 7, BaseSetVersion: 3,
+		BaseCount: 2, CandidateCount: 2, Reason: "替换模糊截图并调整封面顺序。",
+		Status: torrents.PublishedScreenshotChangePending, Version: 1, CreatedAt: now,
+	}}
+	handler := testHandlerWithTorrentMaintenance(t, service)
+	csrf := strings.Repeat("c", 43)
+	request := newPublishedScreenshotChangeRequest(t, torrentID, requestID, csrf,
+		[]string{`{"source":"upload","index":0}`, `{"source":"existing","index":1}`},
+		[][]byte{[]byte("screenshot fixture")},
+	)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated || response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("status=%d cache=%q body=%s", response.Code, response.Header().Get("Cache-Control"), response.Body.String())
+	}
+	var body generated.PublishedTorrentScreenshotChange
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil || body.Id != requestID ||
+		body.TorrentId != torrentID || body.CandidateCount != 2 ||
+		body.Status != generated.PublishedTorrentScreenshotChangeStatusPending {
+		t.Fatalf("response body=%+v error=%v", body, err)
+	}
+	wantManifest := []torrents.ScreenshotManifestItem{
+		{Source: torrents.ScreenshotManifestUpload, Index: 0},
+		{Source: torrents.ScreenshotManifestExisting, Index: 1},
+	}
+	input := service.screenshotInput
+	if service.cookieToken != "web-token" || service.csrfToken != csrf ||
+		input.RequestID != requestID || int64(input.TorrentID) != torrentID || input.ExpectedVersion != 7 ||
+		input.Reason != "替换模糊截图并调整封面顺序。" || !reflect.DeepEqual(input.Manifest, wantManifest) ||
+		len(input.Uploads) != 1 || string(input.Uploads[0].Raw) != "screenshot fixture" {
+		t.Fatalf("screenshot change boundary cookie=%q csrf=%q input=%+v", service.cookieToken, service.csrfToken, input)
+	}
+}
+
+func TestPublishedTorrentScreenshotChangeTreatsOmittedManifestAsEmptySet(t *testing.T) {
+	t.Parallel()
+
+	const torrentID int64 = 42
+	requestID := uuid.New()
+	service := &recordingTorrentMaintenanceService{screenshotResult: torrents.PublishedScreenshotChange{
+		ID: requestID, TorrentID: torrents.TorrentID(torrentID), BaseTorrentVersion: 7, BaseSetVersion: 3,
+		BaseCount: 2, Reason: "替换模糊截图并调整封面顺序。",
+		Status: torrents.PublishedScreenshotChangePending, Version: 1,
+		CreatedAt: time.Date(2026, time.August, 18, 17, 30, 0, 0, time.UTC),
+	}}
+	handler := testHandlerWithTorrentMaintenance(t, service)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, newPublishedScreenshotChangeRequest(t, torrentID, requestID, strings.Repeat("c", 43), nil, nil))
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if service.screenshotInput.RequestID != requestID || len(service.screenshotInput.Manifest) != 0 || len(service.screenshotInput.Uploads) != 0 {
+		t.Fatalf("empty screenshot change input=%+v", service.screenshotInput)
+	}
+}
+
+func newPublishedScreenshotChangeRequest(t *testing.T, torrentID int64, requestID uuid.UUID, csrf string, manifest []string, uploads [][]byte) *http.Request {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for name, value := range map[string]string{"expected_version": "7", "reason": "替换模糊截图并调整封面顺序。"} {
+		if err := writer.WriteField(name, value); err != nil {
+			t.Fatalf("write multipart field %s: %v", name, err)
+		}
+	}
+	for index, item := range manifest {
+		part, err := writer.CreatePart(textproto.MIMEHeader{
+			"Content-Disposition": {fmt.Sprintf(`form-data; name="manifest"; filename="screenshot-manifest-%d.json"`, index+1)},
+			"Content-Type":        {"application/json"},
+		})
+		if err != nil {
+			t.Fatalf("create multipart manifest item: %v", err)
+		}
+		if _, err := part.Write([]byte(item)); err != nil {
+			t.Fatalf("write multipart manifest item: %v", err)
+		}
+	}
+	for index, raw := range uploads {
+		part, err := writer.CreateFormFile("uploads", fmt.Sprintf("upload-%d.png", index+1))
+		if err != nil {
+			t.Fatalf("create multipart upload: %v", err)
+		}
+		if _, err := part.Write(raw); err != nil {
+			t.Fatalf("write multipart upload: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/v1/me/torrent-submissions/%d/screenshot-change", torrentID), &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	request.Header.Set("Origin", "http://peergo.test")
+	request.Header.Set("X-CSRF-Token", csrf)
+	request.Header.Set("Idempotency-Key", requestID.String())
+	request.AddCookie(&http.Cookie{Name: "peergo_session", Value: "web-token"})
+	return request
 }
 
 func TestTorrentWithdrawalUsesWebSessionBoundaryAndReturnsSafeRequest(t *testing.T) {
@@ -4872,6 +5016,147 @@ func TestCommentModerationRoutesKeepWebReportingAndStaffResolutionSeparate(t *te
 	}
 }
 
+func TestPostModerationRoutesKeepWebReportingAndStaffResolutionSeparate(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.November, 12, 18, 0, 0, 0, time.UTC)
+	staffID, authorID := uuid.New(), uuid.New()
+	postID, reportID, caseID, decisionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	webCSRF, staffCSRF := strings.Repeat("w", 43), strings.Repeat("s", 43)
+	service := &recordingPostModerationService{
+		receipt: social.PostReportReceipt{ID: reportID, PostID: postID, ReasonCode: social.PostReportSpam, CreatedAt: now},
+		page: social.PostModerationCasePage{
+			Items: []social.PostModerationCase{{
+				ID: caseID, State: social.PostModerationCaseOpen, Version: 1,
+				Post: social.PostModerationSubject{
+					ID: postID, Author: social.PostModerationAuthor{ID: authorID, Username: "post-author", DisplayName: "动态作者"},
+					BoardID: "general", BoardName: "生活茶馆", Body: "待审核动态正文", State: social.PostVisible,
+					Version: 2, MediaCount: 1, CreatedAt: now.Add(-time.Hour),
+				},
+				ReportCount: 1,
+				Reports:     []social.PostModerationReport{{ReasonCode: social.PostReportSpam, Details: "重复刷屏", CreatedAt: now}},
+				OpenedAt:    now, LatestReportedAt: now,
+			}},
+			Total: 1, Limit: 20, Offset: 0,
+		},
+		result: social.PostModerationDecisionResult{
+			DecisionID: decisionID, CaseID: caseID, PostID: postID,
+			Decision: social.PostModerationHidePost, ReasonCode: social.PostModerationSpam,
+			CaseState: social.PostModerationCasePostHidden, PostState: social.PostModeratorHidden,
+			CaseVersion: 2, PostVersion: 3, DecidedAt: now,
+		},
+	}
+	staffService := &recordingStaffIdentityService{currentResult: identity.StaffSession{
+		User:                    identity.User{ID: staffID, Username: "moderator", DisplayName: "内容审核员"},
+		WebAuthnAuthenticatedAt: now.Add(-time.Minute),
+		CSRFToken:               staffCSRF,
+	}}
+	handler := testHandlerWithSocialModeration(t, staffService, unavailableCommentModerationService{}, service)
+
+	reportRequest := httptest.NewRequest(http.MethodPost, "/api/v1/social/posts/"+postID.String()+"/reports", strings.NewReader(`{"reason_code":"spam","details":"重复刷屏"}`))
+	reportRequest.Header.Set("Content-Type", "application/json")
+	reportRequest.Header.Set("Origin", "http://peergo.test")
+	reportRequest.Header.Set("X-CSRF-Token", webCSRF)
+	reportRequest.Header.Set("Idempotency-Key", reportID.String())
+	reportRequest.AddCookie(&http.Cookie{Name: "peergo_session", Value: "web-post-token"})
+	reportResponse := httptest.NewRecorder()
+	handler.ServeHTTP(reportResponse, reportRequest)
+	if reportResponse.Code != http.StatusCreated ||
+		service.reportCookie != "web-post-token" || service.reportCSRF != webCSRF ||
+		service.reportInput.RequestID != reportID || service.reportInput.PostID != postID ||
+		service.reportInput.ReasonCode != social.PostReportSpam || service.reportInput.Details != "重复刷屏" {
+		t.Fatalf("report status=%d service=%+v body=%s", reportResponse.Code, service, reportResponse.Body.String())
+	}
+	var receipt generated.SocialPostReportReceipt
+	if err := json.NewDecoder(reportResponse.Body).Decode(&receipt); err != nil || receipt.Id != reportID || receipt.PostId != postID {
+		t.Fatalf("report receipt=%+v error=%v", receipt, err)
+	}
+
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/v1/admin/social/post-moderation-cases?limit=20&offset=0", nil)
+	listRequest.AddCookie(&http.Cookie{Name: "peergo_staff_session", Value: "staff-moderation-token"})
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, listRequest)
+	listBody := listResponse.Body.String()
+	if listResponse.Code != http.StatusOK || service.listActor.Subject.ID != staffID ||
+		service.listLimit != 20 || service.listOffset != 0 || strings.Contains(listBody, "reporter") {
+		t.Fatalf("list status=%d service=%+v body=%s", listResponse.Code, service, listBody)
+	}
+	var page generated.SocialPostModerationCasePage
+	if err := json.Unmarshal([]byte(listBody), &page); err != nil || len(page.Items) != 1 ||
+		page.Items[0].Post.Content != "待审核动态正文" || page.Items[0].Post.Author.Username != "post-author" ||
+		page.Items[0].Post.State != generated.SocialPostModerationPostStateVisible {
+		t.Fatalf("list page=%+v error=%v", page, err)
+	}
+
+	decisionRequest := httptest.NewRequest(http.MethodPost, "/api/v1/admin/social/post-moderation-cases/"+caseID.String()+"/decisions", strings.NewReader(`{"expected_case_version":1,"expected_post_version":2,"decision":"hide_post","reason_code":"spam","note":"已核对动态全文，确认为重复刷屏。"}`))
+	decisionRequest.Header.Set("Content-Type", "application/json")
+	decisionRequest.Header.Set("Origin", "http://peergo.test")
+	decisionRequest.Header.Set("X-CSRF-Token", staffCSRF)
+	decisionRequest.Header.Set("Idempotency-Key", decisionID.String())
+	decisionRequest.AddCookie(&http.Cookie{Name: "peergo_staff_session", Value: "staff-moderation-token"})
+	decisionResponse := httptest.NewRecorder()
+	handler.ServeHTTP(decisionResponse, decisionRequest)
+	if decisionResponse.Code != http.StatusCreated ||
+		staffService.writeStaffToken != "staff-moderation-token" || staffService.writeCSRF != staffCSRF ||
+		service.decideActor.Subject.ID != staffID || service.decideInput.DecisionID != decisionID ||
+		service.decideInput.CaseID != caseID || service.decideInput.ExpectedCaseVersion != 1 ||
+		service.decideInput.ExpectedPostVersion != 2 || service.decideInput.Decision != social.PostModerationHidePost ||
+		service.decideInput.ReasonCode != social.PostModerationSpam {
+		t.Fatalf("decision status=%d staff=%+v service=%+v body=%s", decisionResponse.Code, staffService, service, decisionResponse.Body.String())
+	}
+	var result generated.SocialPostModerationDecisionResult
+	if err := json.NewDecoder(decisionResponse.Body).Decode(&result); err != nil ||
+		result.PostState != generated.SocialPostModerationPostStateModeratorHidden || result.PostVersion != 3 {
+		t.Fatalf("decision result=%+v error=%v", result, err)
+	}
+}
+
+func TestPostReportRouteMapsDomainRejectionsToStableProblems(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		err    error
+		status int
+		code   string
+	}{
+		{social.ErrPostReportSelf, http.StatusForbidden, "social_post_report_self_denied"},
+		{social.ErrPostReportTargetNotFound, http.StatusNotFound, "social_post_report_target_not_found"},
+		{social.ErrPostAlreadyReported, http.StatusConflict, "social_post_already_reported"},
+		{social.ErrPostReportIdempotencyConflict, http.StatusConflict, "idempotency_conflict"},
+	} {
+		service := &recordingPostModerationService{reportErr: tc.err}
+		handler := testHandlerWithSocialModeration(t, unavailableStaffIdentityService{}, unavailableCommentModerationService{}, service)
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/social/posts/"+uuid.NewString()+"/reports", strings.NewReader(`{"reason_code":"other"}`))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Origin", "http://peergo.test")
+		request.Header.Set("X-CSRF-Token", strings.Repeat("w", 43))
+		request.Header.Set("Idempotency-Key", uuid.NewString())
+		request.AddCookie(&http.Cookie{Name: "peergo_session", Value: "web-post-token"})
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != tc.status || !strings.Contains(response.Body.String(), `"code":"`+tc.code+`"`) {
+			t.Fatalf("%v: status=%d body=%s", tc.err, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestPostModerationRoutesReportUnavailableWithoutService(t *testing.T) {
+	t.Parallel()
+
+	handler := testHandlerWithCommentModeration(t, unavailableStaffIdentityService{}, unavailableCommentModerationService{})
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/social/posts/"+uuid.NewString()+"/reports", strings.NewReader(`{"reason_code":"spam"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Origin", "http://peergo.test")
+	request.Header.Set("X-CSRF-Token", strings.Repeat("w", 43))
+	request.Header.Set("Idempotency-Key", uuid.NewString())
+	request.AddCookie(&http.Cookie{Name: "peergo_session", Value: "web-post-token"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "social_post_moderation_unavailable") {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestNewRejectsAmbiguousOrWidenedSessionCookieBoundaries(t *testing.T) {
 	t.Parallel()
 
@@ -5583,6 +5868,10 @@ func testHandlerWithComments(t *testing.T, comments httpapi.CommentService) http
 }
 
 func testHandlerWithCommentModeration(t *testing.T, staffIdentity httpapi.StaffIdentityService, moderation httpapi.CommentModerationService) http.Handler {
+	return testHandlerWithSocialModeration(t, staffIdentity, moderation, nil)
+}
+
+func testHandlerWithSocialModeration(t *testing.T, staffIdentity httpapi.StaffIdentityService, commentModeration httpapi.CommentModerationService, postModeration httpapi.PostModerationService) http.Handler {
 	t.Helper()
 	now := time.Date(2026, time.August, 9, 18, 0, 0, 0, time.UTC)
 	handler, err := New(Dependencies{
@@ -5616,7 +5905,8 @@ func testHandlerWithCommentModeration(t *testing.T, staffIdentity httpapi.StaffI
 		TorrentBookmarks:            unavailableTorrentBookmarkService{},
 		Comments:                    unavailableCommentService{},
 		SocialPosts:                 unavailableSocialPostService{},
-		CommentModeration:           moderation,
+		CommentModeration:           commentModeration,
+		PostModeration:              postModeration,
 		TorrentRead:                 unavailableTorrentReadService{},
 		TorrentUpload:               unavailableTorrentUploadService{},
 		TorrentDownload:             unavailableTorrentDownloadService{},

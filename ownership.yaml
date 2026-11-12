@@ -156,6 +156,12 @@ api:
     owners: [core, product, governance, web]
   /api/v1/admin/social/comment-moderation-cases/{case_id}/decisions:
     owners: [core, product, governance, security, web]
+  /api/v1/social/posts/{post_id}/reports:
+    owners: [core, product, governance, web]
+  /api/v1/admin/social/post-moderation-cases:
+    owners: [core, product, governance, web]
+  /api/v1/admin/social/post-moderation-cases/{case_id}/decisions:
+    owners: [core, product, governance, security, web]
 
 high_risk:
   paths:
@@ -184,6 +190,7 @@ high_risk:
     - db/core/migrations/*staff_authority*
     - db/core/migrations/*account_restriction*
     - db/core/migrations/*social_comment_moderation*
+    - db/core/migrations/*social_post_reports*
     - db/core/migrations/202608100001_core_catalog_announcement_discussion.sql
     - db/core/migrations/202608100002_core_catalog_announcement_administration.sql
     - services/core/internal/modules/economy/**

@@ -111,6 +111,7 @@ const (
 	ActionSocialPostManageRead                    Action = "social.post.manage.read"
 	ActionSocialPostModerate                      Action = "social.post.moderate"
 	ActionSocialPostRead                          Action = "social.post.read"
+	ActionSocialPostReportCreateSelf              Action = "social.post.report.create.self"
 	ActionSocialPostRepostSelf                    Action = "social.post.repost.self"
 	ActionSocialPostUpdateSelf                    Action = "social.post.update.self"
 	ActionSocialRedPacketClaimSelf                Action = "social.redpacket.claim.self"
@@ -722,6 +723,11 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
+		Action: ActionSocialPostReportCreateSelf, Description: "举报一条他人可见动态", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
 		Action: ActionSocialPostRepostSelf, Description: "转发或取消转发动态", Risk: RiskLow,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
@@ -737,12 +743,12 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionSocialReportRead, Description: "读取脱敏评论举报审核队列", Risk: RiskMedium,
+		Action: ActionSocialReportRead, Description: "读取脱敏评论与动态举报审核队列", Risk: RiskMedium,
 		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionSocialReportResolve, Description: "关闭举报案件或隐藏违规评论", Risk: RiskHigh,
+		Action: ActionSocialReportResolve, Description: "关闭举报案件或隐藏违规评论与动态", Risk: RiskHigh,
 		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
 		Grantable: true, Discoverable: true,
 	},

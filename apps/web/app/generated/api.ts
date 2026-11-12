@@ -3021,6 +3021,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/social/posts/{post_id}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 举报一条他人可见动态并归入动态专属审核案件 */
+        post: operations["createSocialPostReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/social/boards": {
         parameters: {
             query?: never;
@@ -3121,6 +3138,40 @@ export interface paths {
         put?: never;
         /** 关闭评论举报案件或隐藏当前已复核评论 */
         post: operations["decideCommentModerationCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/social/post-moderation-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 分页读取脱敏的待处理动态举报案件 */
+        get: operations["listOpenSocialPostModerationCases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/social/post-moderation-cases/{case_id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 关闭动态举报案件或隐藏当前已复核动态 */
+        post: operations["decideSocialPostModerationCase"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6099,6 +6150,111 @@ export interface components {
             expected_version: number;
             reason: string;
         };
+        /** @enum {string} */
+        SocialPostReportReasonCode: "spam" | "harassment" | "personal_information" | "off_topic" | "other";
+        CreateSocialPostReportRequest: {
+            reason_code: components["schemas"]["SocialPostReportReasonCode"];
+            /** @description 可选补充说明；只在 Core 的审核案件中保存。 */
+            details?: string;
+        };
+        SocialPostReportReceipt: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            post_id: string;
+            reason_code: components["schemas"]["SocialPostReportReasonCode"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        /** @enum {string} */
+        SocialPostModerationCaseState: "open" | "dismissed" | "post_hidden";
+        SocialPostModerationReport: {
+            reason_code: components["schemas"]["SocialPostReportReasonCode"];
+            details: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        /** @enum {string} */
+        SocialPostModerationPostState: "visible" | "author_deleted" | "moderator_hidden";
+        SocialPostModerationAuthor: {
+            /** Format: uuid */
+            id: string;
+            username: string;
+            display_name: string;
+        };
+        /** @description 审核所需的动态快照；作者删除后 content 为空。 */
+        SocialPostModerationSubject: {
+            /** Format: uuid */
+            id: string;
+            author: components["schemas"]["SocialPostModerationAuthor"];
+            board_id: string;
+            board_name: string;
+            content: string;
+            state: components["schemas"]["SocialPostModerationPostState"];
+            /** Format: int64 */
+            version: number;
+            media_count: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            edited_at?: string | null;
+        };
+        SocialPostModerationCase: {
+            /** Format: uuid */
+            id: string;
+            state: components["schemas"]["SocialPostModerationCaseState"];
+            /** Format: int64 */
+            version: number;
+            post: components["schemas"]["SocialPostModerationSubject"];
+            /**
+             * Format: int64
+             * @description 案件内完整的不可变举报数量；reports 是有界的最近摘要。
+             */
+            report_count: number;
+            reports: components["schemas"]["SocialPostModerationReport"][];
+            /** Format: date-time */
+            opened_at: string;
+            /** Format: date-time */
+            latest_reported_at: string;
+        };
+        SocialPostModerationCasePage: {
+            items: components["schemas"]["SocialPostModerationCase"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        /** @enum {string} */
+        SocialPostModerationDecision: "dismiss" | "hide_post";
+        /** @enum {string} */
+        SocialPostModerationDecisionReasonCode: "no_violation" | "spam" | "harassment" | "personal_information" | "off_topic" | "other";
+        CreateSocialPostModerationDecisionRequest: {
+            /** Format: int64 */
+            expected_case_version: number;
+            /** Format: int64 */
+            expected_post_version: number;
+            decision: components["schemas"]["SocialPostModerationDecision"];
+            reason_code: components["schemas"]["SocialPostModerationDecisionReasonCode"];
+            note: string;
+        };
+        SocialPostModerationDecisionResult: {
+            /** Format: uuid */
+            decision_id: string;
+            /** Format: uuid */
+            case_id: string;
+            /** Format: uuid */
+            post_id: string;
+            decision: components["schemas"]["SocialPostModerationDecision"];
+            reason_code: components["schemas"]["SocialPostModerationDecisionReasonCode"];
+            case_state: components["schemas"]["SocialPostModerationCaseState"];
+            post_state: components["schemas"]["SocialPostModerationPostState"];
+            /** Format: int64 */
+            case_version: number;
+            /** Format: int64 */
+            post_version: number;
+            /** Format: date-time */
+            decided_at: string;
+        };
         PendingTorrentReview: {
             /** Format: int64 */
             id: number;
@@ -8105,7 +8261,8 @@ export interface components {
         SubmitPublishedTorrentScreenshotChangeRequest: {
             /** Format: int64 */
             expected_version: number;
-            manifest: components["schemas"]["ScreenshotManifestItem"][];
+            /** @description 候选图集的有序清单，每项单独作为一个 application/json part 提交；省略表示审核通过后清空截图。 */
+            manifest?: components["schemas"]["ScreenshotManifestItem"][];
             uploads?: string[];
             reason: string;
         };
@@ -9562,6 +9719,7 @@ export interface components {
             member_gift_connected: boolean;
             content_tip_connected: boolean;
             refund_supported: boolean;
+            refund_connected: boolean;
         };
         EconomyTransactionCounts: {
             legacy_opening: components["schemas"]["OperationsCount"];
@@ -9741,6 +9899,8 @@ export interface components {
         CategoryIDPathParameter: string;
         /** @description 评论举报案件的稳定公开 UUID。 */
         CommentModerationCaseIDPathParameter: string;
+        /** @description 动态举报案件的稳定公开 UUID。 */
+        SocialPostModerationCaseIDPathParameter: string;
         /** @description 后台展示和操作使用的用户正整数 ID。 */
         UserNumericIDPathParameter: number;
     };
@@ -16373,6 +16533,44 @@ export interface operations {
             default: components["responses"]["ProblemResponse"];
         };
     };
+    createSocialPostReport: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path: {
+                /** @description 动态的稳定公开 UUID。 */
+                post_id: components["parameters"]["SocialPostIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSocialPostReportRequest"];
+            };
+        };
+        responses: {
+            /** @description 举报已保存；相同幂等键和相同内容重试时返回原回执。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialPostReportReceipt"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
     listManagedSocialBoards: {
         parameters: {
             query?: never;
@@ -16582,6 +16780,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommentModerationDecisionResult"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listOpenSocialPostModerationCases: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 按案件创建时间从早到晚排列的待处理案件；不返回举报人身份。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialPostModerationCasePage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    decideSocialPostModerationCase: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path: {
+                /** @description 动态举报案件的稳定公开 UUID。 */
+                case_id: components["parameters"]["SocialPostModerationCaseIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSocialPostModerationDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description 处置、动态隐藏（如有）和管理记录已在同一事务提交。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialPostModerationDecisionResult"];
                 };
             };
             400: components["responses"]["ProblemResponse"];

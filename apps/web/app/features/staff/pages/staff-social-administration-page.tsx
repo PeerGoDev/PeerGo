@@ -1,6 +1,7 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
+  CheckCircle2Icon,
   CircleAlertIcon,
   MessageSquareTextIcon,
   PlusIcon,
@@ -46,6 +47,7 @@ import {
   useModerateSocialPost,
   useUpdateManagedSocialBoard,
 } from "~/features/staff/api/social-administration.queries"
+import { PostReportReview } from "~/features/staff/components/post-report-review"
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
 import { hasCapability } from "~/features/staff/model/capability"
@@ -94,6 +96,7 @@ function SocialAdministrationContent({
   capabilities: CapabilityList
 }) {
   const [section, setSection] = React.useState<"boards" | "posts">("boards")
+  const [reportMessage, setReportMessage] = React.useState("")
   const boards = useQuery(managedSocialBoardsQueryOptions)
   return (
     <StaffPageFrame className="gap-4">
@@ -116,6 +119,19 @@ function SocialAdministrationContent({
           刷新
         </Button>
       </header>
+      <PostReportReview
+        enabled={hasCapability(capabilities, "social.report.read")}
+        canResolve={hasCapability(capabilities, "social.report.resolve")}
+        csrfToken={csrfToken}
+        onDecided={setReportMessage}
+      />
+      {reportMessage ? (
+        <Alert>
+          <CheckCircle2Icon />
+          <AlertTitle>举报案件已处理</AlertTitle>
+          <AlertDescription>{reportMessage}</AlertDescription>
+        </Alert>
+      ) : null}
       <div className="grid h-10 grid-cols-2 gap-1 rounded-lg border bg-muted p-[3px] text-sm">
         <button
           type="button"

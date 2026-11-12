@@ -887,7 +887,7 @@ ScreenshotManifestItem:
 SubmitPublishedTorrentScreenshotChangeRequest:
   type: object
   additionalProperties: false
-  required: [expected_version, manifest, reason]
+  required: [expected_version, reason]
   properties:
     expected_version:
       type: integer
@@ -897,6 +897,7 @@ SubmitPublishedTorrentScreenshotChangeRequest:
     manifest:
       type: array
       maxItems: 6
+      description: 候选图集的有序清单，每项单独作为一个 application/json part 提交；省略表示审核通过后清空截图。
       items:
         $ref: "#/ScreenshotManifestItem"
     uploads:

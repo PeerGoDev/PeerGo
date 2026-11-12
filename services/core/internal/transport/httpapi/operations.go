@@ -553,6 +553,7 @@ func (h *Handler) GetEconomySettings(ctx context.Context, _ generated.GetEconomy
 			MemberGiftConnected:      settings.Usage.MemberGiftConnected,
 			ContentTipConnected:      settings.Usage.ContentTipConnected,
 			RefundSupported:          settings.Usage.RefundSupported,
+			RefundConnected:          settings.Usage.RefundConnected,
 		},
 		Transactions: generated.EconomyTransactionCounts{
 			LegacyOpening:   strconv.FormatInt(settings.Transactions.LegacyOpening, 10),

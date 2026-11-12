@@ -247,6 +247,16 @@ func main() {
 		logger.Error("compose comment moderation service", "error", err)
 		os.Exit(1)
 	}
+	postModerationRepository, err := social.NewPostgresPostModerationRepository(pool)
+	if err != nil {
+		logger.Error("compose post moderation repository", "error", err)
+		os.Exit(1)
+	}
+	postModerationService, err := social.NewPostModerationService(identityService, authorizationService, postModerationRepository, time.Now)
+	if err != nil {
+		logger.Error("compose post moderation service", "error", err)
+		os.Exit(1)
+	}
 	trafficRepository, err := traffic.NewPostgresRepository(pool, time.Now)
 	if err != nil {
 		logger.Error("compose traffic overview repository", "error", err)
@@ -1091,6 +1101,7 @@ func main() {
 		Comments:                    commentService,
 		SocialPosts:                 socialPostService,
 		CommentModeration:           commentModerationService,
+		PostModeration:              postModerationService,
 		TorrentRead:                 torrentReadService,
 		TorrentUpload:               torrentUploadService,
 		TorrentDownload:             torrentDownloadService,

@@ -74,6 +74,7 @@ export function economySettingsFixture() {
       member_gift_connected: false,
       content_tip_connected: false,
       refund_supported: true,
+      refund_connected: true,
     },
     transactions: {
       legacy_opening: "12327",

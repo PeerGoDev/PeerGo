@@ -303,7 +303,11 @@ function MagicUsageContent({
                 },
                 {
                   label: "退款记录",
-                  value: readinessBadge(usage.refund_supported),
+                  value: usage.refund_connected ? (
+                    <Badge variant="outline">已接通</Badge>
+                  ) : (
+                    readinessBadge(usage.refund_supported)
+                  ),
                 },
               ]}
             />

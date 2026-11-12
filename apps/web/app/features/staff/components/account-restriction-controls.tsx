@@ -758,9 +758,8 @@ function restrictionErrorDescription(error: Error) {
       return "账户已不再是 active 状态，不能新增临时限制。"
     case "account_restriction_self_target":
       return "不能处置自己的账户，请由另一名具备职责的员工操作。"
-    case "staff_csrf_invalid":
-    case "staff_session_expired":
-    case "staff_session_required":
+    case "csrf_invalid":
+    case "session_required":
       return "后台会话已失效或请求校验失败，请重新完成员工身份验证。"
     default:
       return "服务端拒绝了这次操作，请刷新详情并核对职责、版本和输入。"

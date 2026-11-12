@@ -344,6 +344,8 @@ paths:
     $ref: "./domains/social.yaml#/SocialPollVotePath"
   /api/v1/social/posts/{post_id}/red-packet/claims:
     $ref: "./domains/social.yaml#/SocialRedPacketClaimPath"
+  /api/v1/social/posts/{post_id}/reports:
+    $ref: "./domains/social.yaml#/SocialPostReportsPath"
   /api/v1/admin/social/boards:
     $ref: "./domains/social.yaml#/ManagedSocialBoardsPath"
   /api/v1/admin/social/boards/{board_id}:
@@ -356,6 +358,10 @@ paths:
     $ref: "./domains/comments.yaml#/CommentModerationCasesPath"
   /api/v1/admin/social/comment-moderation-cases/{case_id}/decisions:
     $ref: "./domains/comments.yaml#/CommentModerationDecisionPath"
+  /api/v1/admin/social/post-moderation-cases:
+    $ref: "./domains/social.yaml#/ManagedSocialPostModerationCasesPath"
+  /api/v1/admin/social/post-moderation-cases/{case_id}/decisions:
+    $ref: "./domains/social.yaml#/ManagedSocialPostModerationDecisionPath"
   /api/v1/admin/torrent-reviews:
     $ref: "./domains/torrents.yaml#/TorrentReviewsPath"
   /api/v1/me/torrent-reviews:
@@ -866,6 +872,34 @@ components:
       $ref: "./schemas/social.yaml#/UpdateManagedSocialBoardRequest"
     ModerateSocialPostRequest:
       $ref: "./schemas/social.yaml#/ModerateSocialPostRequest"
+    SocialPostReportReasonCode:
+      $ref: "./schemas/social.yaml#/SocialPostReportReasonCode"
+    CreateSocialPostReportRequest:
+      $ref: "./schemas/social.yaml#/CreateSocialPostReportRequest"
+    SocialPostReportReceipt:
+      $ref: "./schemas/social.yaml#/SocialPostReportReceipt"
+    SocialPostModerationCaseState:
+      $ref: "./schemas/social.yaml#/SocialPostModerationCaseState"
+    SocialPostModerationReport:
+      $ref: "./schemas/social.yaml#/SocialPostModerationReport"
+    SocialPostModerationPostState:
+      $ref: "./schemas/social.yaml#/SocialPostModerationPostState"
+    SocialPostModerationAuthor:
+      $ref: "./schemas/social.yaml#/SocialPostModerationAuthor"
+    SocialPostModerationSubject:
+      $ref: "./schemas/social.yaml#/SocialPostModerationSubject"
+    SocialPostModerationCase:
+      $ref: "./schemas/social.yaml#/SocialPostModerationCase"
+    SocialPostModerationCasePage:
+      $ref: "./schemas/social.yaml#/SocialPostModerationCasePage"
+    SocialPostModerationDecision:
+      $ref: "./schemas/social.yaml#/SocialPostModerationDecision"
+    SocialPostModerationDecisionReasonCode:
+      $ref: "./schemas/social.yaml#/SocialPostModerationDecisionReasonCode"
+    CreateSocialPostModerationDecisionRequest:
+      $ref: "./schemas/social.yaml#/CreateSocialPostModerationDecisionRequest"
+    SocialPostModerationDecisionResult:
+      $ref: "./schemas/social.yaml#/SocialPostModerationDecisionResult"
     PendingTorrentReview:
       $ref: "./schemas/torrents.yaml#/PendingTorrentReview"
     PendingTorrentReviewPage:

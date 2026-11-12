@@ -819,3 +819,101 @@ ManagedSocialPostPath:
       "404": { $ref: "../responses.yaml#/ProblemResponse" }
       "409": { $ref: "../responses.yaml#/ProblemResponse" }
       default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialPostReportsPath:
+  post:
+    operationId: createSocialPostReport
+    summary: 举报一条他人可见动态并归入动态专属审核案件
+    tags: [social]
+    x-audience: [web]
+    x-owner: core-social
+    x-permission: social.post.report.create.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/SocialPostIDPathParameter"
+      - $ref: "./identity.yaml#/WebCSRFHeader"
+      - $ref: "./identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/social.yaml#/CreateSocialPostReportRequest" }
+    responses:
+      "201":
+        description: 举报已保存；相同幂等键和相同内容重试时返回原回执。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialPostReportReceipt" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedSocialPostModerationCasesPath:
+  get:
+    operationId: listOpenSocialPostModerationCases
+    summary: 分页读取脱敏的待处理动态举报案件
+    tags: [social]
+    x-audience: [staff]
+    x-owner: core-social
+    x-permission: social.report.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 99999, default: 0 }
+    responses:
+      "200":
+        description: 按案件创建时间从早到晚排列的待处理案件；不返回举报人身份。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialPostModerationCasePage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+ManagedSocialPostModerationDecisionPath:
+  post:
+    operationId: decideSocialPostModerationCase
+    summary: 关闭动态举报案件或隐藏当前已复核动态
+    tags: [social]
+    x-audience: [staff]
+    x-owner: core-social
+    x-permission: social.report.resolve
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/SocialPostModerationCaseIDPathParameter"
+      - $ref: "./authz.yaml#/StaffCSRFHeader"
+      - $ref: "./identity.yaml#/IdempotencyKeyHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/social.yaml#/CreateSocialPostModerationDecisionRequest" }
+    responses:
+      "201":
+        description: 处置、动态隐藏（如有）和管理记录已在同一事务提交。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/social.yaml#/SocialPostModerationDecisionResult" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+SocialPostModerationCaseIDPathParameter:
+  name: case_id
+  in: path
+  required: true
+  description: 动态举报案件的稳定公开 UUID。
+  schema:
+    type: string
+    format: uuid

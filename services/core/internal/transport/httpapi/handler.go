@@ -450,6 +450,12 @@ type CommentModerationService interface {
 	Decide(context.Context, authz.StaffActor, social.DecideCommentModerationCaseInput) (social.CommentModerationDecisionResult, error)
 }
 
+type PostModerationService interface {
+	CreateReport(context.Context, string, string, social.CreatePostReportInput) (social.PostReportReceipt, error)
+	ListOpenCases(context.Context, authz.StaffActor, int, int) (social.PostModerationCasePage, error)
+	Decide(context.Context, authz.StaffActor, social.DecidePostModerationCaseInput) (social.PostModerationDecisionResult, error)
+}
+
 // NotificationService exposes only the current user's private inbox and its
 // monotonic read state. Source creation stays inside the originating business
 // transaction and is not an HTTP command.
@@ -510,6 +516,7 @@ type Handler struct {
 	comments                    CommentService
 	socialPosts                 SocialPostService
 	commentModeration           CommentModerationService
+	postModeration              PostModerationService
 	torrentRead                 TorrentReadService
 	torrentUpload               TorrentUploadService
 	torrentDownload             TorrentDownloadService
@@ -525,7 +532,7 @@ type Handler struct {
 }
 
 // NewHandler creates the Core HTTP adapter.
-func NewHandler(catalogService *catalog.Service, identityService IdentityService, registrationService RegistrationService, humanVerificationService identity.HumanVerificationVerifier, invitationService InvitationService, emailVerificationService EmailVerificationService, passwordRecoveryService PasswordRecoveryService, sessionSecurityService SessionSecurityService, twoFactorService TwoFactorService, staffIdentityService StaffIdentityService, staffEnrollmentService StaffEnrollmentService, authorizationService AuthorizationService, grantAdministrationService GrantAdministrationService, categoryAdministrationService CategoryAdministrationService, announcementAdministrationService AnnouncementAdministrationService, wikiService WikiService, siteDisplaySettingsService SiteDisplaySettingsService, userAdministrationService UserAdministrationService, notificationService NotificationService, trafficOverviewService TrafficOverviewService, economyOverviewService EconomyOverviewService, attendanceService AttendanceService, memberGiftService MemberGiftService, contentTipService ContentTipService, workgroupService WorkgroupService, seedingRewardAdministrationService SeedingRewardAdministrationService, levelPolicyAdministrationService LevelPolicyAdministrationService, contributionExperiencePolicyService ContributionExperiencePolicyService, medalAdministrationService MedalAdministrationService, memberMedalService MemberMedalService, hnrPolicyAdministrationService HNRPolicyAdministrationService, ratioWatchAdministrationService RatioWatchAdministrationService, newcomerAdministrationService NewcomerAdministrationService, operationsService OperationsService, torrentBookmarkService TorrentBookmarkService, commentService CommentService, socialPostService SocialPostService, commentModerationService CommentModerationService, torrentReadService TorrentReadService, torrentUploadService TorrentUploadService, torrentDownloadService TorrentDownloadService, torrentReviewService TorrentReviewService, torrentResubmissionService TorrentResubmissionService, torrentMaintenanceService TorrentMaintenanceService, promotionAdministrationService PromotionAdministrationService, personalAPIKeyService PersonalAPIKeyService, moviePilotService MoviePilotService, rssService RSSService, sessionCookie, staffSessionCookie SessionCookieConfig) *Handler {
+func NewHandler(catalogService *catalog.Service, identityService IdentityService, registrationService RegistrationService, humanVerificationService identity.HumanVerificationVerifier, invitationService InvitationService, emailVerificationService EmailVerificationService, passwordRecoveryService PasswordRecoveryService, sessionSecurityService SessionSecurityService, twoFactorService TwoFactorService, staffIdentityService StaffIdentityService, staffEnrollmentService StaffEnrollmentService, authorizationService AuthorizationService, grantAdministrationService GrantAdministrationService, categoryAdministrationService CategoryAdministrationService, announcementAdministrationService AnnouncementAdministrationService, wikiService WikiService, siteDisplaySettingsService SiteDisplaySettingsService, userAdministrationService UserAdministrationService, notificationService NotificationService, trafficOverviewService TrafficOverviewService, economyOverviewService EconomyOverviewService, attendanceService AttendanceService, memberGiftService MemberGiftService, contentTipService ContentTipService, workgroupService WorkgroupService, seedingRewardAdministrationService SeedingRewardAdministrationService, levelPolicyAdministrationService LevelPolicyAdministrationService, contributionExperiencePolicyService ContributionExperiencePolicyService, medalAdministrationService MedalAdministrationService, memberMedalService MemberMedalService, hnrPolicyAdministrationService HNRPolicyAdministrationService, ratioWatchAdministrationService RatioWatchAdministrationService, newcomerAdministrationService NewcomerAdministrationService, operationsService OperationsService, torrentBookmarkService TorrentBookmarkService, commentService CommentService, socialPostService SocialPostService, commentModerationService CommentModerationService, postModerationService PostModerationService, torrentReadService TorrentReadService, torrentUploadService TorrentUploadService, torrentDownloadService TorrentDownloadService, torrentReviewService TorrentReviewService, torrentResubmissionService TorrentResubmissionService, torrentMaintenanceService TorrentMaintenanceService, promotionAdministrationService PromotionAdministrationService, personalAPIKeyService PersonalAPIKeyService, moviePilotService MoviePilotService, rssService RSSService, sessionCookie, staffSessionCookie SessionCookieConfig) *Handler {
 	return &Handler{
 		catalog:                     catalogService,
 		identity:                    identityService,
@@ -565,6 +572,7 @@ func NewHandler(catalogService *catalog.Service, identityService IdentityService
 		comments:                    commentService,
 		socialPosts:                 socialPostService,
 		commentModeration:           commentModerationService,
+		postModeration:              postModerationService,
 		torrentRead:                 torrentReadService,
 		torrentUpload:               torrentUploadService,
 		torrentDownload:             torrentDownloadService,

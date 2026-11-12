@@ -4,6 +4,7 @@ import {
   CircleAlertIcon,
   CheckCircleIcon,
   ClockIcon,
+  FlagIcon,
   HeartIcon,
   MessageCircleIcon,
   MoreHorizontalIcon,
@@ -52,6 +53,7 @@ import {
   useSocialPostRepost,
   useUpdateSocialPost,
 } from "~/features/social/api/posts.queries"
+import { PostReportDialog } from "~/features/social/components/post-report-dialog"
 import { useModerateSocialPost } from "~/features/staff/api/social-administration.queries"
 import { calculatePollStatistics } from "~/features/social/model/poll-statistics"
 import {
@@ -93,6 +95,7 @@ export function SocialPostCard({
   const [editing, setEditing] = React.useState(false)
   const [draft, setDraft] = React.useState(visiblePostContent)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
+  const [reporting, setReporting] = React.useState(false)
   const updatePost = useUpdateSocialPost(post.id, currentUserId)
   const deletePost = useDeleteSocialPost()
   const likePost = useSocialPostLike()
@@ -679,15 +682,40 @@ export function SocialPostCard({
               />
             ) : null}
           </div>
-          <UnavailablePostAction
-            label="更多互动"
-            title="更多互动尚未开放"
-            iconOnly
-          >
-            <MoreHorizontalIcon data-icon="inline-start" />
-          </UnavailablePostAction>
+          {!isOwner && csrfToken ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="border-0"
+                    aria-label="更多互动"
+                  />
+                }
+              >
+                <MoreHorizontalIcon data-icon="inline-start" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-32">
+                <DropdownMenuItem onClick={() => setReporting(true)}>
+                  <FlagIcon />
+                  举报动态
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
       </div>
+
+      {reporting && csrfToken ? (
+        <PostReportDialog
+          post={post}
+          csrfToken={csrfToken}
+          onOpenChange={(open) => {
+            if (!open) setReporting(false)
+          }}
+        />
+      ) : null}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -824,33 +852,6 @@ function PostContent({
         </Button>
       ) : null}
     </p>
-  )
-}
-
-function UnavailablePostAction({
-  label,
-  title,
-  iconOnly = false,
-  children,
-}: {
-  label: string
-  title: string
-  iconOnly?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size={iconOnly ? "icon-sm" : "default"}
-      className={iconOnly ? "border-0" : "h-9 gap-1.5 border-0 px-3"}
-      aria-label={iconOnly ? label : undefined}
-      title={title}
-      aria-disabled="true"
-    >
-      {children}
-      {iconOnly ? null : label}
-    </Button>
   )
 }
 

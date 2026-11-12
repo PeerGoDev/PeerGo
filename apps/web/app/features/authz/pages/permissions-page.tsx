@@ -123,6 +123,7 @@ const friendlyCapabilityNames: Readonly<Record<string, string>> = {
   "social.post.create.self": "发布动态",
   "social.post.delete.self": "删除自己的动态",
   "social.post.read": "浏览动态圈",
+  "social.post.report.create.self": "举报不当动态",
   "social.post.update.self": "编辑自己的动态",
   "staff.credential.enroll.self": "登记后台安全凭据",
   "staff.session.create.self": "进入管理后台",

@@ -87,5 +87,6 @@ describe("StaffMagicUsageSettingsPage", () => {
     expect(
       screen.getAllByText("账务已准备，入口未开放").length
     ).toBeGreaterThanOrEqual(1)
+    expect(screen.getByRole("row", { name: "退款记录 已接通" })).toBeVisible()
   })
 })

@@ -3286,6 +3286,9 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/SubmitPublishedTorrentScreenshotChangeRequest'
+            encoding:
+              manifest:
+                contentType: application/json
       responses:
         '201':
           description: 候选附件集已冻结并进入审核；当前公开图集保持不变。
@@ -8203,6 +8206,46 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/social/posts/{post_id}/reports:
+    post:
+      operationId: createSocialPostReport
+      summary: 举报一条他人可见动态并归入动态专属审核案件
+      tags:
+        - social
+      x-audience:
+        - web
+      x-owner: core-social
+      x-permission: social.post.report.create.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/SocialPostIDPathParameter'
+        - $ref: '#/components/parameters/WebCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSocialPostReportRequest'
+      responses:
+        '201':
+          description: 举报已保存；相同幂等键和相同内容重试时返回原回执。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialPostReportReceipt'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/social/boards:
     get:
       operationId: listManagedSocialBoards
@@ -8467,6 +8510,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommentModerationDecisionResult'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/social/post-moderation-cases:
+    get:
+      operationId: listOpenSocialPostModerationCases
+      summary: 分页读取脱敏的待处理动态举报案件
+      tags:
+        - social
+      x-audience:
+        - staff
+      x-owner: core-social
+      x-permission: social.report.read
+      x-credential-audience: staff-session
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 99999
+            default: 0
+      responses:
+        '200':
+          description: 按案件创建时间从早到晚排列的待处理案件；不返回举报人身份。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialPostModerationCasePage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/social/post-moderation-cases/{case_id}/decisions:
+    post:
+      operationId: decideSocialPostModerationCase
+      summary: 关闭动态举报案件或隐藏当前已复核动态
+      tags:
+        - social
+      x-audience:
+        - staff
+      x-owner: core-social
+      x-permission: social.report.resolve
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/SocialPostModerationCaseIDPathParameter'
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSocialPostModerationDecisionRequest'
+      responses:
+        '201':
+          description: 处置、动态隐藏（如有）和管理记录已在同一事务提交。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialPostModerationDecisionResult'
         '400':
           $ref: '#/components/responses/ProblemResponse'
         '401':
@@ -17143,6 +17267,289 @@ components:
           type: string
           minLength: 10
           maxLength: 500
+    SocialPostReportReasonCode:
+      type: string
+      enum:
+        - spam
+        - harassment
+        - personal_information
+        - off_topic
+        - other
+    CreateSocialPostReportRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - reason_code
+      properties:
+        reason_code:
+          $ref: '#/components/schemas/SocialPostReportReasonCode'
+        details:
+          type: string
+          maxLength: 500
+          description: 可选补充说明；只在 Core 的审核案件中保存。
+    SocialPostReportReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - post_id
+        - reason_code
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        post_id:
+          type: string
+          format: uuid
+        reason_code:
+          $ref: '#/components/schemas/SocialPostReportReasonCode'
+        created_at:
+          type: string
+          format: date-time
+    SocialPostModerationCaseState:
+      type: string
+      enum:
+        - open
+        - dismissed
+        - post_hidden
+    SocialPostModerationReport:
+      type: object
+      additionalProperties: false
+      required:
+        - reason_code
+        - details
+        - created_at
+      properties:
+        reason_code:
+          $ref: '#/components/schemas/SocialPostReportReasonCode'
+        details:
+          type: string
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+    SocialPostModerationPostState:
+      type: string
+      enum:
+        - visible
+        - author_deleted
+        - moderator_hidden
+    SocialPostModerationAuthor:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - display_name
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+    SocialPostModerationSubject:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - author
+        - board_id
+        - board_name
+        - content
+        - state
+        - version
+        - media_count
+        - created_at
+      description: 审核所需的动态快照；作者删除后 content 为空。
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/SocialPostModerationAuthor'
+        board_id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,63}$
+        board_name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        content:
+          type: string
+          maxLength: 2000
+        state:
+          $ref: '#/components/schemas/SocialPostModerationPostState'
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        media_count:
+          type: integer
+          minimum: 0
+          maximum: 9
+        created_at:
+          type: string
+          format: date-time
+        edited_at:
+          type: string
+          format: date-time
+          nullable: true
+    SocialPostModerationCase:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - state
+        - version
+        - post
+        - report_count
+        - reports
+        - opened_at
+        - latest_reported_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        state:
+          $ref: '#/components/schemas/SocialPostModerationCaseState'
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        post:
+          $ref: '#/components/schemas/SocialPostModerationSubject'
+        report_count:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 案件内完整的不可变举报数量；reports 是有界的最近摘要。
+        reports:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/SocialPostModerationReport'
+        opened_at:
+          type: string
+          format: date-time
+        latest_reported_at:
+          type: string
+          format: date-time
+    SocialPostModerationCasePage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialPostModerationCase'
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 50
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 99999
+    SocialPostModerationDecision:
+      type: string
+      enum:
+        - dismiss
+        - hide_post
+    SocialPostModerationDecisionReasonCode:
+      type: string
+      enum:
+        - no_violation
+        - spam
+        - harassment
+        - personal_information
+        - off_topic
+        - other
+    CreateSocialPostModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_case_version
+        - expected_post_version
+        - decision
+        - reason_code
+        - note
+      properties:
+        expected_case_version:
+          type: integer
+          format: int64
+          minimum: 1
+        expected_post_version:
+          type: integer
+          format: int64
+          minimum: 1
+        decision:
+          $ref: '#/components/schemas/SocialPostModerationDecision'
+        reason_code:
+          $ref: '#/components/schemas/SocialPostModerationDecisionReasonCode'
+        note:
+          type: string
+          minLength: 10
+          maxLength: 500
+    SocialPostModerationDecisionResult:
+      type: object
+      additionalProperties: false
+      required:
+        - decision_id
+        - case_id
+        - post_id
+        - decision
+        - reason_code
+        - case_state
+        - post_state
+        - case_version
+        - post_version
+        - decided_at
+      properties:
+        decision_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        post_id:
+          type: string
+          format: uuid
+        decision:
+          $ref: '#/components/schemas/SocialPostModerationDecision'
+        reason_code:
+          $ref: '#/components/schemas/SocialPostModerationDecisionReasonCode'
+        case_state:
+          $ref: '#/components/schemas/SocialPostModerationCaseState'
+        post_state:
+          $ref: '#/components/schemas/SocialPostModerationPostState'
+        case_version:
+          type: integer
+          format: int64
+          minimum: 2
+        post_version:
+          type: integer
+          format: int64
+          minimum: 1
+        decided_at:
+          type: string
+          format: date-time
     PendingTorrentReview:
       type: object
       additionalProperties: false
@@ -22937,7 +23344,6 @@ components:
       additionalProperties: false
       required:
         - expected_version
-        - manifest
         - reason
       properties:
         expected_version:
@@ -22948,6 +23354,7 @@ components:
         manifest:
           type: array
           maxItems: 6
+          description: 候选图集的有序清单，每项单独作为一个 application/json part 提交；省略表示审核通过后清空截图。
           items:
             $ref: '#/components/schemas/ScreenshotManifestItem'
         uploads:
@@ -27327,6 +27734,7 @@ components:
         - member_gift_connected
         - content_tip_connected
         - refund_supported
+        - refund_connected
       properties:
         currency_name:
           type: string
@@ -27349,6 +27757,8 @@ components:
         content_tip_connected:
           type: boolean
         refund_supported:
+          type: boolean
+        refund_connected:
           type: boolean
     EconomyTransactionCounts:
       type: object
@@ -27972,6 +28382,14 @@ components:
       in: path
       required: true
       description: 评论举报案件的稳定公开 UUID。
+      schema:
+        type: string
+        format: uuid
+    SocialPostModerationCaseIDPathParameter:
+      name: case_id
+      in: path
+      required: true
+      description: 动态举报案件的稳定公开 UUID。
       schema:
         type: string
         format: uuid

@@ -293,8 +293,7 @@ function moderationDecisionErrorMessage(error: Error) {
     return "网络连接异常，请稍后重试。"
   }
   switch (error.code) {
-    case "staff_session_required":
-    case "staff_session_expired":
+    case "session_required":
     case "csrf_invalid":
       return "后台会话已经变化，请重新验证后再处理。"
     case "comment_moderation_conflict_of_interest":

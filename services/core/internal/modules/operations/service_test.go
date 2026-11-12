@@ -176,7 +176,7 @@ func TestServiceUsesOneReadOnlyOperationsCapability(t *testing.T) {
 		t.Fatalf("SettlementSettings() = %+v, error = %v", settlementSettings, err)
 	}
 	economySettings, err := service.EconomySettings(context.Background(), actor)
-	if err != nil || economySettings.Usage.CurrencyName != "魔力值" || !economySettings.Usage.WholeUnitsOnly || economySettings.Usage.PTCoinEnabled || economySettings.Transactions.LegacyOpening != 12_327 {
+	if err != nil || economySettings.Usage.CurrencyName != "魔力值" || !economySettings.Usage.WholeUnitsOnly || economySettings.Usage.PTCoinEnabled || !economySettings.Usage.RefundConnected || economySettings.Transactions.LegacyOpening != 12_327 {
 		t.Fatalf("EconomySettings() = %+v, error = %v", economySettings, err)
 	}
 	if !economySettings.Activity.LedgerSupported || !economySettings.Activity.DailyAttendanceConnected ||

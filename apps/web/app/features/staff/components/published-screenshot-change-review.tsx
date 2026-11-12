@@ -304,7 +304,7 @@ function ScreenshotSet({
             <img
               key={index}
               src={resolveApiUrl(
-                `/api/v1/admin/torrents/screenshot-changes/${requestId}/images/${side}/${index}`
+                `/api/v1/admin/torrents/screenshot-changes/${requestId}/${side}/screenshots/${index}`
               )}
               alt={`${title} ${index + 1}`}
               className="aspect-video w-full rounded-md border bg-muted object-cover"

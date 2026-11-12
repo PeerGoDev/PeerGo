@@ -332,6 +332,9 @@ MyPublishedTorrentScreenshotChangePath:
         multipart/form-data:
           schema:
             $ref: "../schemas/torrents.yaml#/SubmitPublishedTorrentScreenshotChangeRequest"
+          encoding:
+            manifest:
+              contentType: application/json
     responses:
       "201":
         description: 候选附件集已冻结并进入审核；当前公开图集保持不变。

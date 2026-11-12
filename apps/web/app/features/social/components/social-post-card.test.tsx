@@ -1,13 +1,64 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
+import type { SocialPost } from "~/features/social/api/posts.queries"
 import { SocialPostCard } from "~/features/social/components/social-post-card"
 import { staffSessionKeys } from "~/features/staff/api/staff-session.mutations"
 
 describe("SocialPostCard", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("lets a signed-in member report another member's post", async () => {
+    const user = userEvent.setup()
+    const post = reportablePost()
+    const fetchMock = vi.fn(async (request: Request) =>
+      request.url.endsWith(`/api/v1/social/posts/${post.id}/reports`)
+        ? new Response(
+            JSON.stringify({
+              id: "0198f20a-6da8-7e51-9c64-444444444444",
+              post_id: post.id,
+              reason_code: "spam",
+              created_at: "2026-11-12T08:00:00Z",
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } }
+          )
+        : new Response(null, { status: 204 })
+    )
+    vi.stubGlobal("fetch", fetchMock)
+
+    renderSignedInCard(post, "0198f20a-6da8-7e51-9c64-333333333333")
+    await user.click(screen.getByRole("button", { name: "更多互动" }))
+    await user.click(await screen.findByRole("menuitem", { name: "举报动态" }))
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "提交举报",
+      })
+    )
+
+    expect(await screen.findByText("举报已提交")).toBeVisible()
+    const request = fetchMock.mock.calls
+      .map(([call]) => call)
+      .find((call) => call.url.endsWith("/reports"))
+    expect(request?.method).toBe("POST")
+    expect(request?.headers.get("X-CSRF-Token")).toBe("w".repeat(43))
+    expect(request?.headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/)
+    expect(await request?.clone().json()).toEqual({ reason_code: "spam" })
+  })
+
+  it("keeps the report entry away from the post author", () => {
+    const post = reportablePost()
+    renderSignedInCard(post, post.author.id)
+
+    expect(
+      screen.queryByRole("button", { name: "更多互动" })
+    ).not.toBeInTheDocument()
+  })
+
   it("collapses long Unicode content at the PtYes-compatible boundary", async () => {
     const user = userEvent.setup()
     const content = `${"中".repeat(299)}😀结尾`
@@ -397,3 +448,63 @@ describe("SocialPostCard", () => {
     )
   })
 })
+
+function renderSignedInCard(post: SocialPost, currentUserId: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  })
+  queryClient.setQueryData(staffSessionKeys.current(), null)
+  render(
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <SocialPostCard
+          post={post}
+          currentUserId={currentUserId}
+          csrfToken={"w".repeat(43)}
+        />
+      </QueryClientProvider>
+    </MemoryRouter>
+  )
+}
+
+function reportablePost(): SocialPost {
+  return {
+    id: "0198f20a-6da8-7e51-9c64-222222222222",
+    author: {
+      id: "0198f20a-6da8-7e51-9c64-111111111111",
+      username: "member",
+      display_name: "普通成员",
+      followed_by_me: false,
+      online: false,
+      vip: false,
+      administrator: false,
+      medals: [],
+    },
+    board: {
+      id: "general",
+      name: "生活茶馆",
+      description: "",
+      icon: "coffee",
+      tone: "coral",
+      display_order: 10,
+      enabled: true,
+      allow_member_posts: true,
+      post_count: 1,
+      version: 1,
+    },
+    content: "可能需要举报的动态",
+    version: 2,
+    comment_count: 0,
+    like_count: 0,
+    repost_count: 0,
+    liked_by_me: false,
+    reposted_by_me: false,
+    pinned: false,
+    featured: false,
+    hidden: false,
+    topics: [],
+    media: [],
+    created_at: "2026-11-12T06:00:00Z",
+    updated_at: "2026-11-12T06:00:00Z",
+  }
+}
