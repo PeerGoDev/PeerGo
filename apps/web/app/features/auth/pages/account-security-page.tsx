@@ -157,10 +157,12 @@ export function AccountSecurityPage() {
         <Card className="gap-0 py-0">
           <CardHeader className="px-6 pt-6 pb-4">
             <CardTitle>
-              <h2 className="text-2xl leading-none font-semibold">修改密码</h2>
+              <h2 className="text-base leading-none font-semibold tracking-title">
+                修改密码
+              </h2>
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 px-6 pb-6">
+          <CardContent className="flex flex-col gap-4 px-(--card-spacing) pb-(--card-spacing)">
             <div className="flex flex-col gap-1 text-sm">
               <p className="font-medium">当前账户已设置密码</p>
               <p className="text-xs text-muted-foreground">
@@ -191,7 +193,9 @@ export function AccountSecurityPage() {
       <Card className="gap-0 py-0">
         <CardHeader className="border-b px-6 py-5">
           <CardTitle>
-            <h2 className="text-2xl leading-none font-semibold">设备会话</h2>
+            <h2 className="text-base leading-none font-semibold tracking-title">
+              设备会话
+            </h2>
           </CardTitle>
           <CardDescription>查看并撤销仍然有效的浏览器登录。</CardDescription>
           <CardAction>

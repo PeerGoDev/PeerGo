@@ -121,17 +121,11 @@ describe("StaffTorrentReviewsPage", () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByRole("main")).toHaveClass(
-      "max-w-[1172px]",
-      "p-4!",
-      "gap-5",
-      "sm:p-6!",
-      "sm:pt-10!"
-    )
+    expect(screen.getByRole("main")).toHaveClass("max-w-[1120px]", "gap-5")
     expect(screen.getByRole("button", { name: "刷新队列" })).toBeVisible()
     expect(screen.getByRole("heading", { name: "种子审核终审" })).toBeVisible()
     const pendingTab = screen.getByText("待审核")
-    expect(pendingTab).toHaveClass("bg-primary", "text-primary-foreground")
+    expect(pendingTab).toHaveClass("bg-segment", "text-foreground")
     expect(pendingTab?.querySelector("[data-slot=badge]")).toHaveAttribute(
       "data-variant",
       "destructiveSolid"
@@ -141,7 +135,7 @@ describe("StaffTorrentReviewsPage", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument()
     expect(
       screen.getByText("Release 2026").closest("[data-slot=card]")
-    ).toHaveClass("min-h-[130px]")
+    ).toHaveClass("gap-0", "py-0", "shadow-card")
     expect(
       screen
         .getByText("Release 2026")

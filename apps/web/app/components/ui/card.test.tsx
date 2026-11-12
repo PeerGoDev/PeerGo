@@ -4,27 +4,31 @@ import { describe, expect, it } from "vitest"
 import { Card } from "~/components/ui/card"
 
 describe("Card", () => {
-  it("keeps the PtYes reading size while preserving the compact variant", () => {
+  it("reads at the compact Direction H size and tightens spacing on phones", () => {
     const { rerender } = render(<Card>默认卡片</Card>)
 
-    expect(screen.getByText("默认卡片")).toHaveClass("text-base")
+    expect(screen.getByText("默认卡片")).toHaveClass(
+      "text-sm",
+      "[--card-spacing:--spacing(4)]",
+      "sm:[--card-spacing:--spacing(6)]"
+    )
 
     rerender(<Card size="sm">紧凑卡片</Card>)
 
     expect(screen.getByText("紧凑卡片")).toHaveClass(
-      "text-base",
-      "data-[size=sm]:text-sm"
+      "data-[size=sm]:[--card-spacing:--spacing(4)]"
     )
   })
 
-  it("uses the Direction I borderless soft-shadow shell", () => {
-    render(<Card>方向 I 卡片</Card>)
+  it("uses the Direction H bordered, near-flat shell", () => {
+    render(<Card>方向 H 卡片</Card>)
 
-    expect(screen.getByText("方向 I 卡片")).toHaveClass(
-      "rounded-3xl",
-      "border-0",
-      "shadow-soft"
+    expect(screen.getByText("方向 H 卡片")).toHaveClass(
+      "rounded-xl",
+      "border",
+      "bg-card",
+      "shadow-card"
     )
-    expect(screen.getByText("方向 I 卡片")).not.toHaveClass("shadow-sm")
+    expect(screen.getByText("方向 H 卡片")).not.toHaveClass("shadow-soft")
   })
 })

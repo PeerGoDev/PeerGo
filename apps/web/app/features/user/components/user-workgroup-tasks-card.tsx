@@ -1,4 +1,5 @@
 import { Link } from "react-router"
+import { UsersRoundIcon } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
 import {
@@ -35,13 +36,16 @@ export function UserWorkgroupTasksCard({
   )
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="px-6 pt-6 pb-4">
+      <CardHeader className="px-(--card-spacing) pt-(--card-spacing) pb-3">
         <CardTitle>
-          <h2>活跃工作组任务</h2>
+          <h2 className="flex items-center gap-2">
+            <UsersRoundIcon className="size-4 text-primary" />
+            活跃工作组任务
+          </h2>
         </CardTitle>
         <CardDescription>仅自己可见的种审、补种与保种任务。</CardDescription>
       </CardHeader>
-      <CardContent className="px-6 pb-6">
+      <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
         {loading && !page ? (
           <p className="py-5 text-sm text-muted-foreground">正在加载任务…</p>
         ) : active.length === 0 ? (
@@ -54,13 +58,13 @@ export function UserWorkgroupTasksCard({
               <Link
                 key={assignment.id}
                 to="/workgroups"
-                className="flex flex-wrap items-center justify-between gap-3 p-3 transition-colors hover:bg-muted/50"
+                className="flex flex-wrap items-center justify-between gap-3 p-3 transition-colors hover:bg-accent"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium">
                     {assignment.task.title}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-faint">
                     截止{" "}
                     <time dateTime={assignment.task.due_at}>
                       {formatCompactDateTime(assignment.task.due_at)}

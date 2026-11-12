@@ -172,7 +172,7 @@ function HitAndRunTableRow({
         <div className="flex min-w-0 flex-col gap-1">
           <Link
             to={`/torrents/${entry.torrent.id}`}
-            className="truncate font-bold text-title transition-colors hover:text-title-hover hover:underline"
+            className="truncate font-medium text-title transition-colors hover:text-title-hover"
           >
             {entry.torrent.title}
           </Link>
@@ -221,7 +221,7 @@ function HitAndRunMobileCard({
         <div className="flex min-w-0 flex-col gap-1">
           <Link
             to={`/torrents/${entry.torrent.id}`}
-            className="line-clamp-2 font-bold text-title transition-colors hover:text-title-hover hover:underline"
+            className="line-clamp-2 font-medium text-title transition-colors hover:text-title-hover"
           >
             {entry.torrent.title}
           </Link>

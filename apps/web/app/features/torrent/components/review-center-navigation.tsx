@@ -36,15 +36,15 @@ export function ReviewCenterNavigation({
     <nav
       aria-label="审核中心"
       className={cn(
-        "grid h-10 w-full max-w-lg rounded-md bg-muted p-1 text-muted-foreground",
+        "grid h-9 w-full max-w-lg gap-0.5 rounded-lg border bg-muted p-[3px] text-muted-foreground",
         canReview ? "grid-cols-2" : "grid-cols-1"
       )}
     >
       {items.map((item) => {
         const active = location.pathname === item.to
         const className = cn(
-          "flex items-center justify-center gap-2 rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          active && "bg-background text-foreground shadow-sm"
+          "flex items-center justify-center gap-2 rounded-md border border-transparent px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30",
+          active && "border-border bg-segment text-foreground shadow-xs"
         )
         return (
           <Link

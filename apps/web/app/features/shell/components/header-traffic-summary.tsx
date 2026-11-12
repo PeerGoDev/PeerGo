@@ -1,11 +1,5 @@
 import type { ReactNode } from "react"
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  CoinsIcon,
-  StarIcon,
-  TrendingUpIcon,
-} from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon } from "lucide-react"
 
 import { Skeleton } from "~/components/ui/skeleton"
 import {
@@ -15,9 +9,12 @@ import {
 } from "~/components/ui/tooltip"
 import { useEconomyOverview } from "~/features/economy/api/economy.queries"
 import { useTrafficOverview } from "~/features/traffic/api/traffic.queries"
-import { formatShareRatio } from "~/features/traffic/model/format"
+import {
+  formatShareRatio,
+  shareRatioToneClass,
+} from "~/features/traffic/model/format"
 import { cn } from "~/lib/utils"
-import { exactNonNegativeInteger, formatBytes } from "~/shared/formatters/bytes"
+import { formatBytes } from "~/shared/formatters/bytes"
 import {
   formatCompactInteger,
   formatInteger,
@@ -27,10 +24,14 @@ export function HeaderTrafficSummary({
   userId,
   trafficEnabled,
   economyEnabled,
+  variant = "header",
+  className,
 }: {
   userId: string | undefined
   trafficEnabled: boolean
   economyEnabled: boolean
+  variant?: "header" | "menu"
+  className?: string
 }) {
   const traffic = useTrafficOverview(trafficEnabled ? userId : undefined)
   const economy = useEconomyOverview(economyEnabled ? userId : undefined)
@@ -42,10 +43,85 @@ export function HeaderTrafficSummary({
   const trafficPending = trafficEnabled && traffic.isPending
   const economyPending = economyEnabled && economy.isPending
 
+  if (!traffic.data && !economy.data && !trafficPending && !economyPending) {
+    return null
+  }
+
+  const totals = traffic.data?.totals
+  const ratio = totals
+    ? {
+        value: formatShareRatio(
+          totals.credited_uploaded_bytes,
+          totals.charged_downloaded_bytes,
+          variant === "header" ? 3 : 2
+        ),
+        className: shareRatioToneClass(
+          totals.credited_uploaded_bytes,
+          totals.charged_downloaded_bytes
+        ),
+      }
+    : undefined
+
+  if (variant === "menu") {
+    const metrics: Array<{
+      label: string
+      value: string
+      className?: string
+    }> = []
+    if (totals && ratio) {
+      metrics.push(
+        { label: "分享率", value: ratio.value, className: ratio.className },
+        {
+          label: "上传",
+          value: formatBytes(totals.credited_uploaded_bytes),
+        },
+        {
+          label: "下载",
+          value: formatBytes(totals.charged_downloaded_bytes),
+        }
+      )
+    }
+    if (economy.data) {
+      metrics.push(
+        { label: "等级", value: `Lv.${economy.data.progress.level}` },
+        {
+          label: "魔力值",
+          value: formatCompactInteger(economy.data.magic_balance),
+          className: "text-warning-foreground",
+        }
+      )
+    }
+    if (metrics.length === 0) return null
+
+    return (
+      <dl
+        aria-label="账户汇总"
+        className={cn("grid grid-cols-3 gap-x-2 gap-y-2", className)}
+      >
+        {metrics.map((metric) => (
+          <div
+            key={metric.label}
+            className="flex min-w-0 flex-col gap-0.5 rounded-md bg-accent px-2 py-1.5"
+          >
+            <dt className="text-2xs text-faint">{metric.label}</dt>
+            <dd
+              className={cn(
+                "truncate font-mono text-xs font-medium text-foreground tabular-nums",
+                metric.className
+              )}
+            >
+              {metric.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    )
+  }
+
   if (trafficPending && economyPending) {
     return (
       <div
-        className="hidden w-56 grid-cols-2 gap-x-5 md:grid"
+        className={cn("grid w-[13.75rem] grid-cols-2 gap-x-4", className)}
         aria-label="正在加载账户汇总"
         aria-busy="true"
       >
@@ -55,36 +131,26 @@ export function HeaderTrafficSummary({
     )
   }
 
-  if (!traffic.data && !economy.data && !trafficPending && !economyPending) {
-    return null
-  }
-
   return (
-    <div className="hidden items-start gap-5 text-xs leading-4 md:flex">
-      {traffic.data ? (
-        <dl className="flex w-[126px] flex-col gap-1">
+    <div
+      className={cn("flex items-start gap-4 text-[11px] leading-4", className)}
+    >
+      {totals && ratio ? (
+        <dl className="flex w-[7.375rem] flex-col gap-0.5">
           <HeaderMetric
-            icon={<TrendingUpIcon className="text-muted-foreground" />}
             label="分享率"
-            value={formatShareRatio(
-              traffic.data.totals.credited_uploaded_bytes,
-              traffic.data.totals.charged_downloaded_bytes,
-              3
-            )}
-            valueClassName={shareRatioClassName(
-              traffic.data.totals.credited_uploaded_bytes,
-              traffic.data.totals.charged_downloaded_bytes
-            )}
+            value={ratio.value}
+            valueClassName={ratio.className}
           />
           <HeaderMetric
             icon={<ArrowUpIcon className="text-success-foreground" />}
             label="上传"
-            value={formatBytes(traffic.data.totals.credited_uploaded_bytes)}
+            value={formatBytes(totals.credited_uploaded_bytes)}
           />
           <HeaderMetric
             icon={<ArrowDownIcon className="text-destructive" />}
             label="下载"
-            value={formatBytes(traffic.data.totals.charged_downloaded_bytes)}
+            value={formatBytes(totals.charged_downloaded_bytes)}
           />
         </dl>
       ) : trafficPending ? (
@@ -92,17 +158,16 @@ export function HeaderTrafficSummary({
       ) : null}
 
       {economy.data ? (
-        <dl className="flex w-[118px] flex-col gap-1">
+        <dl className="flex w-[6.375rem] flex-col gap-0.5">
           <HeaderMetric
-            icon={<StarIcon className="text-warning-foreground" />}
             label="等级"
             value={`Lv.${economy.data.progress.level}`}
           />
           <HeaderMetric
-            icon={<CoinsIcon className="text-warning-foreground" />}
             label="魔力值"
             value={formatCompactInteger(economy.data.magic_balance)}
             fullValue={`${formatInteger(economy.data.magic_balance)} 魔力值`}
+            valueClassName="text-warning-foreground"
           />
         </dl>
       ) : economyPending ? (
@@ -119,7 +184,7 @@ function HeaderMetric({
   valueClassName,
   fullValue,
 }: {
-  icon: ReactNode
+  icon?: ReactNode
   label: string
   value: string
   valueClassName?: string
@@ -135,11 +200,13 @@ function HeaderMetric({
   )
 
   return (
-    <div className="flex items-center gap-1.5">
-      <dt className="flex min-w-[52px] items-center gap-1 text-muted-foreground">
-        <span className="[&>svg]:size-3" aria-hidden="true">
-          {icon}
-        </span>
+    <div className="flex items-center gap-1">
+      <dt className="flex shrink-0 items-center gap-1 text-muted-foreground">
+        {icon ? (
+          <span className="[&>svg]:size-3" aria-hidden="true">
+            {icon}
+          </span>
+        ) : null}
         <span>{label}</span>
       </dt>
       <dd className="ml-auto min-w-0 text-right font-mono font-medium text-foreground tabular-nums">
@@ -158,29 +225,10 @@ function HeaderMetric({
 
 function HeaderSummarySkeleton({ rows }: { rows: number }) {
   return (
-    <div className="flex w-[110px] flex-col gap-1" aria-hidden="true">
+    <div className="flex w-[6.375rem] flex-col gap-1.5" aria-hidden="true">
       {Array.from({ length: rows }, (_, index) => (
-        <Skeleton key={index} className="h-3 w-full" />
+        <Skeleton key={index} className="h-2.5 w-full" />
       ))}
     </div>
   )
-}
-
-function shareRatioClassName(uploaded: string, downloaded: string) {
-  const uploadedBytes = exactNonNegativeInteger(uploaded)
-  const downloadedBytes = exactNonNegativeInteger(downloaded)
-
-  if (uploadedBytes === undefined || downloadedBytes === undefined) {
-    return undefined
-  }
-
-  if (downloadedBytes === 0n) {
-    return uploadedBytes > 0n ? "text-success-foreground" : undefined
-  }
-
-  // Compare integer products so large byte counters never lose precision.
-  const ratioPermille = (uploadedBytes * 1_000n) / downloadedBytes
-  if (ratioPermille < 400n) return "text-destructive"
-  if (ratioPermille < 1_000n) return "text-warning-foreground"
-  return "text-success-foreground"
 }

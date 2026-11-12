@@ -27,7 +27,7 @@ describe("StaffCommentModerationPage", () => {
 
     expect(
       await screen.findByRole("heading", { name: "评论审核" })
-    ).toHaveClass("text-2xl", "font-bold")
+    ).toHaveClass("text-lg", "font-semibold")
     expect(screen.getByRole("button", { name: "刷新" })).toBeVisible()
     expect(screen.getByText("评论举报案件")).toBeVisible()
     expect(screen.getByRole("columnheader", { name: "目标" })).toBeVisible()

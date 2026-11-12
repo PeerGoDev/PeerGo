@@ -163,13 +163,13 @@ export function TorrentMediaInfoCard({ mediaInfo }: { mediaInfo: string }) {
   return (
     <Card className="gap-0 py-0">
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CardHeader className="p-6 pb-2">
+        <CardHeader className="p-(--card-spacing) pb-2">
           <CardTitle className="flex items-center gap-2">
             <InfoIcon className="size-4" />
             MediaInfo/BDInfo
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-6 pb-6">
+        <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
           {hasMediaInfoSummary(summary) ? (
             <MediaInfoSummaryList summary={summary} />
           ) : (
@@ -177,8 +177,8 @@ export function TorrentMediaInfoCard({ mediaInfo }: { mediaInfo: string }) {
               暂无可提取的摘要，可展开查看完整技术信息。
             </p>
           )}
-          <div className="mt-4 flex justify-end">
-            <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <div className="mt-3 flex justify-end">
+            <CollapsibleTrigger className="flex items-center gap-1 rounded-sm text-xs text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40">
               {open ? "隐藏原始信息" : "查看原始信息"}
               <ChevronDownIcon
                 data-icon="inline-end"
@@ -190,7 +190,7 @@ export function TorrentMediaInfoCard({ mediaInfo }: { mediaInfo: string }) {
             </CollapsibleTrigger>
           </div>
           <CollapsibleContent>
-            <pre className="mt-4 overflow-x-auto rounded bg-muted p-4 font-mono text-xs leading-5 break-words whitespace-pre-wrap">
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-muted p-4 font-mono text-xs leading-5 break-words whitespace-pre-wrap text-muted-foreground">
               {mediaInfo}
             </pre>
           </CollapsibleContent>
@@ -218,8 +218,8 @@ function MediaInfoSummaryList({ summary }: { summary: MediaInfoSummary }) {
   )
 
   return (
-    <div className="grid gap-x-8 gap-y-3 text-sm md:grid-cols-3 md:gap-y-1">
-      <dl className="flex flex-col gap-1">
+    <div className="grid gap-x-8 gap-y-3 rounded-lg border bg-muted px-3.5 py-3 font-mono text-xs leading-[1.9] text-muted-foreground md:grid-cols-3 md:gap-y-1">
+      <dl className="flex flex-col">
         {visibleVideoFacts.map(([label, value]) => (
           <MediaInfoFact key={label} label={label} value={value} />
         ))}
@@ -244,7 +244,7 @@ function MediaInfoTrackList({
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <dl className="flex flex-col gap-1">
+      <dl className="flex flex-col">
         {visibleTracks.map((value, index) => (
           <MediaInfoFact
             key={`${kind}-${index}`}
@@ -258,7 +258,7 @@ function MediaInfoTrackList({
         <button
           type="button"
           aria-expanded={expanded}
-          className="inline-flex w-fit items-center gap-1 text-sm text-primary hover:underline"
+          className="inline-flex w-fit items-center gap-1 font-sans text-xs text-link hover:underline"
           onClick={() => setExpanded((current) => !current)}
         >
           <ChevronDownIcon
@@ -290,9 +290,7 @@ function MediaInfoFact({
 }) {
   return (
     <div className="flex min-w-0">
-      <dt
-        className={cn("w-14 shrink-0 text-muted-foreground", track && "w-16")}
-      >
+      <dt className={cn("w-14 shrink-0 text-faint", track && "w-16")}>
         {label}:
       </dt>
       <dd className="min-w-0 break-words">{value}</dd>
@@ -311,18 +309,18 @@ export function TorrentDescriptionCard({
 }) {
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="p-6 pb-2">
+      <CardHeader className="p-(--card-spacing) pb-2">
         <CardTitle className="flex items-center gap-2">
           <FileTextIcon className="size-4" />
           描述
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-6 pb-6">
-        <div>
+      <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
+        <div className="text-muted-foreground">
           {!description ? (
-            <p className="text-muted-foreground">暂无描述</p>
+            <p>暂无描述</p>
           ) : format === "plain_text" ? (
-            <p className="text-sm leading-7 break-words whitespace-pre-wrap">
+            <p className="text-sm leading-[1.9] break-words whitespace-pre-wrap">
               {description}
             </p>
           ) : (
@@ -338,23 +336,59 @@ export function TorrentDescriptionCard({
                     {...props}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-primary underline underline-offset-4"
+                    className="text-link underline underline-offset-4"
                   >
                     {children}
                   </a>
                 ),
+                h1: ({ children }) => (
+                  <h3 className="mt-5 mb-2 text-md font-semibold tracking-title text-foreground first:mt-0">
+                    {children}
+                  </h3>
+                ),
+                h2: ({ children }) => (
+                  <h3 className="mt-5 mb-2 text-md font-semibold tracking-title text-foreground first:mt-0">
+                    {children}
+                  </h3>
+                ),
+                h3: ({ children }) => (
+                  <h4 className="mt-4 mb-1.5 text-sm font-semibold text-foreground first:mt-0">
+                    {children}
+                  </h4>
+                ),
+                h4: ({ children }) => (
+                  <h4 className="mt-4 mb-1.5 text-sm font-semibold text-foreground first:mt-0">
+                    {children}
+                  </h4>
+                ),
                 p: ({ children }) => (
-                  <p className="my-3 text-sm leading-7 break-words whitespace-pre-wrap first:mt-0 last:mb-0">
+                  <p className="my-3 text-sm leading-[1.9] break-words whitespace-pre-wrap first:mt-0 last:mb-0">
                     {children}
                   </p>
                 ),
+                ul: ({ children }) => (
+                  <ul className="my-3 list-disc space-y-1 pl-5 text-sm leading-[1.8] marker:text-faint">
+                    {children}
+                  </ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="my-3 list-decimal space-y-1 pl-5 text-sm leading-[1.8] marker:text-faint">
+                    {children}
+                  </ol>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold text-foreground">
+                    {children}
+                  </strong>
+                ),
+                hr: () => <hr className="my-5 border-border" />,
                 blockquote: ({ children }) => (
-                  <blockquote className="my-4 border-l-2 border-primary/70 bg-primary/5 px-4 py-1 text-muted-foreground">
+                  <blockquote className="my-4 rounded-r-md border-l-2 border-primary/60 bg-primary/5 px-4 py-1">
                     {children}
                   </blockquote>
                 ),
                 pre: ({ children }) => (
-                  <pre className="my-4 overflow-auto rounded-md border bg-muted/35 p-4 font-mono text-xs leading-5 break-words whitespace-pre-wrap">
+                  <pre className="my-4 overflow-auto rounded-lg border bg-muted p-4 font-mono text-xs leading-5 break-words whitespace-pre-wrap">
                     {children}
                   </pre>
                 ),
@@ -368,10 +402,8 @@ export function TorrentDescriptionCard({
           )}
         </div>
         {shareAction ? (
-          <div className="mt-3 flex items-center justify-end gap-2 border-t pt-3">
-            <span className="mr-2 text-sm text-muted-foreground">
-              觉得这个资源不错？
-            </span>
+          <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t pt-3.5">
+            <span className="mr-1 text-xs text-faint">觉得这个资源不错？</span>
             {shareAction}
           </div>
         ) : null}

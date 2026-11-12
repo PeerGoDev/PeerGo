@@ -33,6 +33,26 @@ export function formatShareRatio(
   }).format(Number(scaled) / 10 ** fractionDigits)
 }
 
+/** Text tone for a share ratio: red below 0.4, amber below 1.0, green above. */
+export function shareRatioToneClass(uploaded: string, downloaded: string) {
+  const uploadedBytes = exactNonNegativeInteger(uploaded)
+  const downloadedBytes = exactNonNegativeInteger(downloaded)
+
+  if (uploadedBytes === undefined || downloadedBytes === undefined) {
+    return undefined
+  }
+
+  if (downloadedBytes === 0n) {
+    return uploadedBytes > 0n ? "text-success-foreground" : undefined
+  }
+
+  // Compare integer products so large byte counters never lose precision.
+  const ratioPermille = (uploadedBytes * 1_000n) / downloadedBytes
+  if (ratioPermille < 400n) return "text-destructive"
+  if (ratioPermille < 1_000n) return "text-warning-foreground"
+  return "text-success-foreground"
+}
+
 export function trafficAdjustmentLabels(entry: TrafficAdjustment) {
   const rawUploaded = exactNonNegativeInteger(entry.raw_uploaded_bytes)
   const creditedUploaded = exactNonNegativeInteger(

@@ -125,7 +125,7 @@ export function EmailVerificationPage() {
         <CardHeader className="gap-2 px-6 pt-6 pb-6">
           <CardTitle
             id="email-verification-title"
-            className="text-2xl leading-none font-semibold"
+            className="text-base leading-none font-semibold tracking-title"
           >
             验证邮箱
           </CardTitle>
@@ -133,7 +133,7 @@ export function EmailVerificationPage() {
             重新输入注册邮箱，我们会发送一条 30 分钟内有效的验证链接。
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-6 pb-6">
+        <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
           <form id="email-verification-form" onSubmit={handleSubmit} noValidate>
             <FieldGroup>
               <Alert>
@@ -189,7 +189,7 @@ export function EmailVerificationPage() {
             </FieldGroup>
           </form>
         </CardContent>
-        <CardFooter className="flex-col gap-3 bg-transparent px-6 pb-6">
+        <CardFooter className="flex-col gap-3 bg-transparent px-(--card-spacing) pb-(--card-spacing)">
           <Button
             type="submit"
             form="email-verification-form"
@@ -232,7 +232,7 @@ function EmailVerificationFrame({ children }: { children: React.ReactNode }) {
     >
       <Card className="w-full gap-0 py-0">
         <CardHeader>
-          <CardTitle className="text-2xl leading-none font-semibold">
+          <CardTitle className="text-base leading-none font-semibold tracking-title">
             验证邮箱
           </CardTitle>
           <CardDescription>确认当前账户的登录邮箱。</CardDescription>

@@ -385,7 +385,7 @@ export function TorrentSearchPage() {
               />
               <TorrentCards
                 torrents={torrents.data.items}
-                poster={false}
+                view="list"
                 bookmarkControls={bookmarkControls}
                 adultCoversVisible={adultCoversVisible}
                 activityByTorrentId={activityByTorrentId}
@@ -473,14 +473,14 @@ function SearchTermsCard({
 }) {
   return (
     <Card className="gap-0 py-0 md:min-h-[246px]">
-      <CardHeader className="flex flex-row items-center justify-between p-6 pb-3">
+      <CardHeader className="flex flex-row items-center justify-between p-(--card-spacing) pb-3">
         <CardTitle className="flex items-center gap-2">
           <Icon className="size-4" />
           <h2>{title}</h2>
         </CardTitle>
         {action}
       </CardHeader>
-      <CardContent className="flex flex-wrap content-start gap-2 px-6 pb-6.5">
+      <CardContent className="flex flex-wrap content-start gap-2 px-(--card-spacing) pb-(--card-spacing)">
         {terms.length
           ? terms.map((term) => (
               <span
@@ -489,7 +489,7 @@ function SearchTermsCard({
                   "group inline-flex h-[34px] items-center rounded-md text-sm transition-colors hover:bg-primary hover:text-primary-foreground",
                   tone === "history"
                     ? "bg-secondary text-secondary-foreground"
-                    : "border bg-background"
+                    : "border bg-card"
                 )}
               >
                 <button

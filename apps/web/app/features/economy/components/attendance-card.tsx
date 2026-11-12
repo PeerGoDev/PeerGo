@@ -141,7 +141,7 @@ function AttendanceContent({
           </Badge>
         </CardAction>
       </CardHeader>
-      <CardContent className="space-y-5 px-6 pb-6">
+      <CardContent className="space-y-5 px-(--card-spacing) pb-(--card-spacing)">
         {overview.claimed_today && overview.today_record ? (
           <Alert>
             <ShieldCheckIcon />

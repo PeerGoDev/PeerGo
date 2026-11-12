@@ -252,9 +252,9 @@ function UsersContent({
       ) : null}
 
       <Card className="gap-0 py-0">
-        <CardHeader className="p-6 pb-2">
+        <CardHeader className="p-(--card-spacing) pb-2">
           <div className="flex flex-col gap-3 lg:grid lg:min-h-[52px] lg:grid-cols-[minmax(203px,1fr)_auto] lg:items-start lg:gap-3">
-            <CardTitle className="flex min-h-12 items-start gap-2 text-2xl leading-none lg:pt-3.5">
+            <CardTitle className="flex min-h-12 items-start gap-2 text-lg leading-none lg:pt-3.5">
               <UsersRoundIcon className="size-5" aria-hidden="true" />
               <h1>用户管理</h1>
               <span className="text-sm font-normal text-muted-foreground">
@@ -539,7 +539,11 @@ function UsersFrame({ children }: { children: React.ReactNode }) {
 }
 
 function UsersHeader() {
-  return <h1 className="font-heading text-xl font-semibold">用户管理</h1>
+  return (
+    <h1 className="font-heading text-lg font-semibold tracking-title">
+      用户管理
+    </h1>
+  )
 }
 
 function UsersSkeleton() {

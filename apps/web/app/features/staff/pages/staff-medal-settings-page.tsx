@@ -148,8 +148,10 @@ function MedalSettingsContent({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">勋章管理</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            勋章管理
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             用户持有与佩戴数据独立保存；这里调整的是勋章本身和未来生效的权益。
           </p>
         </div>

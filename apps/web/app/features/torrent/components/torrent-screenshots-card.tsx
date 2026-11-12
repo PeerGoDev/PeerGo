@@ -82,14 +82,14 @@ export function TorrentScreenshotsCard({
   return (
     <>
       <Card className="gap-0 py-0">
-        <CardHeader className="p-6 pb-2">
+        <CardHeader className="p-(--card-spacing) pb-2">
           <CardTitle className="flex items-center gap-2">
             <ImageIcon className="size-4" />
             截图 ({positions.length})
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-6 pb-6">
-          <div className="-mx-6 flex snap-x gap-2 overflow-x-auto px-6 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:px-0 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
+          <div className="-mx-(--card-spacing) flex snap-x gap-2.5 overflow-x-auto px-(--card-spacing) sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4">
             {positions.map((position) => (
               <ScreenshotThumbnail
                 key={position}
@@ -111,7 +111,7 @@ export function TorrentScreenshotsCard({
           if (!open) setSelectedPosition(null)
         }}
       >
-        <DialogContent className="flex min-h-[50vh] w-auto max-w-[calc(100%-2rem)] items-center justify-center gap-0 overflow-hidden border-black bg-black p-2 sm:max-w-[calc(100%-3rem)] [&_[data-slot=dialog-close]]:bg-black/50 [&_[data-slot=dialog-close]]:text-white">
+        <DialogContent className="flex min-h-[50vh] w-auto max-w-[calc(100%-2rem)] items-center justify-center gap-0 overflow-hidden border-white/10 bg-black p-2 sm:max-w-[calc(100%-3rem)] [&_[data-slot=dialog-close]]:bg-black/50 [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-black/70">
           <DialogTitle className="sr-only">
             {selectedPosition === null
               ? "种子截图"
@@ -181,12 +181,12 @@ function ScreenshotThumbnail({
     <button
       type="button"
       aria-label={`查看截图 ${position + 1}`}
-      className="relative aspect-[2/3] w-32 shrink-0 snap-start overflow-hidden rounded-lg border bg-muted text-muted-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none sm:w-auto"
+      className="relative aspect-video w-56 shrink-0 snap-start overflow-hidden rounded-lg border bg-muted text-muted-foreground transition-opacity hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none sm:w-auto"
       onClick={onSelect}
       disabled={failed}
     >
       {position === 0 ? (
-        <Badge className="absolute top-1 left-1 z-10 rounded-sm px-1.5 py-0.5 text-xs font-normal">
+        <Badge className="absolute top-1.5 left-1.5 z-10 h-4 rounded-sm px-1.5 text-[0.625rem] font-medium">
           封面
         </Badge>
       ) : null}

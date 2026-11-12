@@ -6,6 +6,7 @@ import {
   CopyIcon,
   EyeOffIcon,
   FileArchiveIcon,
+  FileIcon,
   FolderOpenIcon,
   HashIcon,
   RefreshCwIcon,
@@ -51,7 +52,10 @@ import {
   useTorrentFiles,
 } from "~/features/torrent/api/torrent.queries"
 import { TorrentDownloadButton } from "~/features/torrent/components/torrent-download-button"
-import { TorrentCoverImage } from "~/features/torrent/components/torrent-cover-image"
+import {
+  TorrentCoverImage,
+  torrentCoverFallbackClass,
+} from "~/features/torrent/components/torrent-cover-image"
 import { TorrentCoverPreview } from "~/features/torrent/components/torrent-cover-preview"
 import { torrentPromotionLabel } from "~/features/torrent/components/torrent-promotion"
 import { TorrentBookmarkButton } from "~/features/torrent/components/torrent-bookmark-button"
@@ -228,43 +232,21 @@ function TorrentDetailContent({
 
   return (
     <Card className="gap-0 py-0">
-      <CardContent className="p-6">
-        <div className="mb-2 flex items-start justify-between gap-4 max-sm:flex-col max-sm:gap-2">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold break-all text-title max-sm:text-base">
-              {detail.title}
-            </h1>
-          </div>
-          <div className="flex shrink-0 items-center justify-end gap-1.5 max-sm:justify-start">
+      <CardContent className="p-4 sm:p-6">
+        <div className="mb-3.5 flex items-start justify-between gap-4">
+          <h1 className="min-w-0 flex-1 text-base leading-snug font-semibold tracking-title break-words sm:text-lg">
+            {detail.title}
+          </h1>
+          <div className="flex shrink-0 items-center justify-end gap-1.5">
             {published ? (
-              <>
-                <TorrentBookmarkButton
-                  torrentId={detail.id}
-                  torrentName={detail.title}
-                  controls={bookmarkControls}
-                  iconVariant="outline"
-                  iconSize="icon"
-                  className="size-9"
-                />
-                <TorrentReportDialog
-                  torrentId={detail.id}
-                  torrentTitle={detail.title}
-                  compact
-                />
-                <ContentTipDialog
-                  target={{
-                    kind: "torrent",
-                    torrentId: detail.id,
-                    title: detail.title,
-                  }}
-                  userId={userId}
-                  csrfToken={csrfToken}
-                  buttonVariant="outline"
-                  buttonSize="icon"
-                  className="size-9"
-                  iconOnly
-                />
-              </>
+              <TorrentBookmarkButton
+                torrentId={detail.id}
+                torrentName={detail.title}
+                controls={bookmarkControls}
+                iconVariant="outline"
+                iconSize="icon-sm"
+                className="aria-pressed:border-warning/40 aria-pressed:text-warning-foreground"
+              />
             ) : null}
             <TorrentManageShortcut
               torrentId={detail.id}
@@ -274,20 +256,20 @@ function TorrentDetailContent({
           </div>
         </div>
 
-        <div className="flex min-w-0 gap-4 max-md:flex-wrap max-md:gap-3">
+        <div className="flex min-w-0 gap-4 max-md:flex-wrap sm:gap-[1.125rem]">
           <TorrentCoverPreview
             torrentId={detail.id}
             title={detail.title}
             disabled={detail.screenshot_count === 0}
             triggerClassName={cn(
-              "relative w-32 shrink-0 self-start overflow-hidden rounded-lg border bg-muted max-sm:w-24 md:w-40",
+              "relative w-24 shrink-0 self-start overflow-hidden rounded-lg border bg-muted sm:w-32 md:w-[9.375rem]",
               // Migrated images are intentionally absent. Preserve the same
               // desktop cover slot as PtYes so the statistics rail and the
               // following MediaInfo card do not jump upward for legacy rows.
-              detail.screenshot_count === 0 && "h-36 md:h-56"
+              detail.screenshot_count === 0 && "h-36 md:h-[13.125rem]"
             )}
           >
-            <Badge className="absolute top-1 left-1 z-10 rounded-sm px-1.5 py-0.5 text-xs font-normal">
+            <Badge className="absolute top-1.5 left-1.5 z-10 h-4 rounded-sm px-1.5 text-[0.625rem] font-medium">
               封面
             </Badge>
             <TorrentCoverImage
@@ -295,23 +277,26 @@ function TorrentDetailContent({
               title={detail.title}
               available={detail.screenshot_count > 0}
               className="h-auto max-h-56 w-full object-contain max-sm:max-h-40"
-              fallbackClassName="bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-300 px-2 text-center text-xs text-neutral-500 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 dark:text-neutral-400 [&_svg]:size-7"
+              fallbackClassName={cn(
+                torrentCoverFallbackClass,
+                "px-2 text-center text-xs [&_svg]:size-7"
+              )}
               fallbackLabel="暂无封面"
             />
           </TorrentCoverPreview>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-2 max-md:basis-[55%]">
+          <div className="flex min-w-0 flex-1 flex-col gap-2.5 max-md:basis-[55%]">
             {detail.subtitle ? (
               <p className="text-sm text-muted-foreground">{detail.subtitle}</p>
             ) : null}
 
-            <dl className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <dl className="flex flex-wrap items-center gap-x-[1.125rem] gap-y-1.5 text-sm">
               <div className="flex min-w-0 items-baseline gap-1">
-                <dt className="text-muted-foreground">分类:</dt>
+                <dt className="text-faint">分类:</dt>
                 <dd>
                   <Link
                     to={`/torrents?category=${encodeURIComponent(detail.category.id)}`}
-                    className="font-medium text-primary hover:underline"
+                    className="font-medium text-link hover:underline hover:underline-offset-4"
                   >
                     {detail.category.name}
                   </Link>
@@ -326,12 +311,16 @@ function TorrentDetailContent({
               ))}
               <InlineDetailFact
                 label="大小"
-                value={formatTorrentSize(detail.total_size_bytes)}
+                value={
+                  <span className="font-mono tabular-nums">
+                    {formatTorrentSize(detail.total_size_bytes)}
+                  </span>
+                }
               />
             </dl>
 
             {detail.external_identifiers.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
                 {sortExternalIdentifiers(detail.external_identifiers).map(
                   (identifier) => {
                     const href = externalIdentifierURL(
@@ -344,17 +333,13 @@ function TorrentDetailContent({
                         href={href}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 hover:opacity-80"
+                        className={cn(
+                          "inline-flex h-5 items-center gap-1.5 rounded-md px-2 text-2xs font-semibold transition-[filter] hover:brightness-110",
+                          externalIdentifierBadgeClass(identifier.provider)
+                        )}
                       >
-                        <Badge
-                          className={cn(
-                            "rounded-sm border-0 px-1 py-0 text-[10px] leading-4 font-bold",
-                            externalIdentifierBadgeClass(identifier.provider)
-                          )}
-                        >
-                          {externalIdentifierLabel(identifier.provider)}
-                        </Badge>
-                        <span className="text-muted-foreground">暂无</span>
+                        {externalIdentifierLabel(identifier.provider)}
+                        <span className="font-normal opacity-80">暂无</span>
                       </a>
                     ) : null
                   }
@@ -363,19 +348,15 @@ function TorrentDetailContent({
             ) : null}
 
             {tagFacets.length > 0 ? (
-              <dl className="flex flex-col gap-2 text-sm">
+              <dl className="flex flex-col gap-1.5 text-xs">
                 {tagFacets.map((facet) => (
-                  <div key={facet.id} className="flex items-center gap-1.5">
-                    <dt className="text-xs text-muted-foreground">
+                  <div key={facet.id} className="flex items-start gap-1.5">
+                    <dt className="shrink-0 leading-[1.125rem] text-faint">
                       {facet.name}:
                     </dt>
-                    <dd className="flex flex-wrap gap-1">
+                    <dd className="flex flex-wrap gap-1.5">
                       {facet.values.map((value) => (
-                        <Badge
-                          key={value}
-                          variant="secondary"
-                          className="rounded px-2 py-0.5 text-xs font-normal"
-                        >
+                        <Badge key={value} variant="secondary">
                           {value}
                         </Badge>
                       ))}
@@ -386,37 +367,55 @@ function TorrentDetailContent({
             ) : null}
           </div>
 
-          <div className="flex w-[156px] shrink-0 flex-col gap-2 self-start max-md:w-full">
+          <div className="grid w-full shrink-0 grid-cols-3 gap-2 self-start *:data-[slot=button]:px-2 md:flex md:w-[9.75rem] md:flex-col md:*:data-[slot=button]:px-4">
             <TorrentDownloadButton
               torrentId={detail.id}
               torrentName={detail.title}
               purchaseAware={published}
               showLabel
               showCopyAction
-              className="h-10 w-full"
+              className="col-span-full h-10 w-full"
             />
             {published ? (
-              <TorrentPromotionProductDialog
-                torrentId={detail.id}
-                torrentTitle={detail.title}
-              />
+              <>
+                <TorrentPromotionProductDialog
+                  torrentId={detail.id}
+                  torrentTitle={detail.title}
+                />
+                <ContentTipDialog
+                  target={{
+                    kind: "torrent",
+                    torrentId: detail.id,
+                    title: detail.title,
+                  }}
+                  userId={userId}
+                  csrfToken={csrfToken}
+                  buttonVariant="outline"
+                  buttonSize="default"
+                  className="w-full"
+                />
+                <TorrentReportDialog
+                  torrentId={detail.id}
+                  torrentTitle={detail.title}
+                />
+              </>
             ) : null}
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-x-4 gap-y-2 max-md:flex-wrap">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-t pt-3.5">
           <div className="flex items-center gap-2">
             {published ? (
               <TorrentSticky stickyUntil={detail.sticky_until} />
             ) : (
-              <Badge>待审核</Badge>
+              <Badge variant="warning">待审核</Badge>
             )}
             {published && promotionLabel ? (
-              <div className="inline-flex h-[30px] items-center gap-1.5 rounded-full bg-destructive/10 px-3 text-sm font-semibold text-destructive">
+              <div className="inline-flex h-7 items-center gap-1.5 rounded-md bg-destructive/10 px-3 text-sm font-semibold text-destructive">
                 <ZapIcon className="size-3.5" />
                 <span>{promotionLabel}</span>
                 {detail.promotion_ends_at ? (
-                  <span className="ml-1 text-xs font-semibold opacity-70">
+                  <span className="text-xs font-normal opacity-75">
                     至{" "}
                     <time dateTime={detail.promotion_ends_at}>
                       {formatCompactDate(detail.promotion_ends_at)}
@@ -426,35 +425,42 @@ function TorrentDetailContent({
               </div>
             ) : null}
           </div>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-2 max-md:w-full max-md:flex-col max-md:items-start md:min-w-[678px]">
-            {published ? (
-              <TorrentSwarmOverview
-                torrentId={detail.id}
-                compact
-                showFreshness={false}
-                className="w-auto"
-              />
-            ) : null}
-            <dl className="flex flex-wrap items-center justify-start gap-x-4 gap-y-2 text-sm">
-              <InlineDetailFact
-                label="上传者"
-                value={
-                  detail.anonymous ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <EyeOffIcon className="size-3.5" />
-                      匿名
-                    </span>
-                  ) : (
-                    detail.uploader_display_name
-                  )
-                }
-              />
-              <InlineDetailFact
-                label={published ? "发布时间" : "提交时间"}
-                value={`${formatCompactDateTime(displayedAt)} (${formatTimeAgo(displayedAt)})`}
-              />
-            </dl>
-          </div>
+          {published ? (
+            <TorrentSwarmOverview
+              torrentId={detail.id}
+              compact
+              showFreshness={false}
+              className="w-auto"
+            />
+          ) : null}
+          <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:ml-auto">
+            <InlineDetailFact
+              label="上传者"
+              value={
+                detail.anonymous ? (
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    <EyeOffIcon className="size-3.5" />
+                    匿名
+                  </span>
+                ) : (
+                  detail.uploader_display_name
+                )
+              }
+            />
+            <InlineDetailFact
+              label={published ? "发布时间" : "提交时间"}
+              value={
+                <>
+                  <span className="font-mono font-normal text-muted-foreground tabular-nums">
+                    {formatCompactDateTime(displayedAt)}
+                  </span>
+                  <span className="font-normal text-faint">
+                    （{formatTimeAgo(displayedAt)}）
+                  </span>
+                </>
+              }
+            />
+          </dl>
         </div>
       </CardContent>
     </Card>
@@ -480,7 +486,8 @@ function TorrentManageShortcut({
         render={
           <Button
             variant="outline"
-            size="icon"
+            size="icon-sm"
+            nativeButton={false}
             render={
               <Link
                 to={`/staff/content/torrents?query=${encodeURIComponent(torrentId)}`}
@@ -506,8 +513,8 @@ function InlineDetailFact({
 }) {
   return (
     <div className="flex min-w-0 items-baseline gap-1">
-      <dt className="text-muted-foreground">{label}:</dt>
-      <dd className="font-medium break-words">{value}</dd>
+      <dt className="shrink-0 text-faint">{label}:</dt>
+      <dd className="font-medium break-words text-foreground">{value}</dd>
     </div>
   )
 }
@@ -582,17 +589,17 @@ function sortExternalIdentifiers(
 function externalIdentifierBadgeClass(provider: string) {
   switch (provider) {
     case "imdb":
-      return "bg-warning text-warning-foreground"
+      return "bg-[#f5c518] text-[#1f232b]"
     case "douban":
-      return "bg-success text-success-foreground"
+      return "bg-action-success text-white"
     case "tmdb":
-      return "bg-chart-3 text-primary-foreground"
+      return "bg-info text-white"
     case "bangumi":
-      return "bg-chart-5 text-primary-foreground"
+      return "bg-[#f09199] text-[#1f232b]"
     case "steam":
-      return "bg-secondary text-secondary-foreground"
+      return "bg-[#1b2838] text-white"
     default:
-      return "bg-secondary text-secondary-foreground"
+      return "border bg-secondary text-secondary-foreground"
   }
 }
 
@@ -643,7 +650,7 @@ function TorrentFilesCard({
 
   return (
     <Card className="gap-0 py-0" aria-labelledby="torrent-files-title">
-      <CardHeader className="p-6 pb-2">
+      <CardHeader className="p-(--card-spacing) pb-2">
         <CardTitle
           id="torrent-files-title"
           className="flex flex-wrap items-center justify-between gap-2"
@@ -652,23 +659,24 @@ function TorrentFilesCard({
             <FileArchiveIcon className="size-4" />
             文件列表
             {files.data
-              ? ` (${files.data.total.toLocaleString("zh-CN")} 个文件)`
+              ? `（${files.data.total.toLocaleString("zh-CN")} 个文件）`
               : ""}
           </span>
-          <span className="flex min-w-0 items-center gap-2 text-sm font-normal">
-            <HashIcon className="size-3.5 shrink-0 text-muted-foreground" />
-            <code className="max-w-[140px] truncate font-mono text-xs text-muted-foreground sm:max-w-[200px] md:max-w-none">
+          <span className="flex min-w-0 items-center gap-1.5 text-sm font-normal tracking-normal">
+            <HashIcon className="size-3.5 shrink-0 text-faint" />
+            <code className="max-w-[140px] truncate font-mono text-2xs text-faint sm:max-w-[220px] md:max-w-xs">
               {infoHash}
             </code>
             <Button
               type="button"
               variant="ghost"
               size="icon-xs"
+              className="text-muted-foreground"
               aria-label="复制 Info Hash"
               onClick={() => void copyInfoHash()}
             >
               {copied ? (
-                <CircleCheckIcon className="text-success" />
+                <CircleCheckIcon className="text-success-foreground" />
               ) : (
                 <CopyIcon />
               )}
@@ -676,7 +684,7 @@ function TorrentFilesCard({
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-6 pb-6">
+      <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
         {files.isPending && <TorrentFilesSkeleton />}
         {files.isError && (
           <Alert variant="destructive">
@@ -710,14 +718,14 @@ function TorrentFilesCard({
         )}
         {files.data && files.data.items.length > 0 && (
           <>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col">
               {visibleFiles.map((file) => (
                 <div
                   key={file.file_index}
-                  className="flex items-center justify-between gap-4 border-b py-2.5 text-sm last:border-0"
+                  className="flex min-h-9 items-center justify-between gap-4 border-t py-2 text-sm first:border-t-0"
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <FileArchiveIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                    <FileIcon className="size-3.5 shrink-0 text-faint" />
                     <span className="truncate" title={file.display_path}>
                       {file.display_path}
                     </span>
@@ -725,7 +733,7 @@ function TorrentFilesCard({
                       <Badge variant="outline">填充</Badge>
                     ) : null}
                   </div>
-                  <span className="shrink-0 text-muted-foreground tabular-nums">
+                  <span className="shrink-0 font-mono text-xs text-faint tabular-nums">
                     {formatTorrentSize(file.size_bytes)}
                   </span>
                 </div>
@@ -737,7 +745,7 @@ function TorrentFilesCard({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="mt-2 w-full text-muted-foreground"
+                className="mt-1 w-full rounded-t-none border-t border-t-border text-xs font-normal text-faint hover:text-foreground"
                 onClick={() => setExpanded((current) => !current)}
               >
                 {expanded
@@ -777,11 +785,16 @@ function TorrentDetailUnavailable({
   const unavailable = invalidId || notFound
   if (unavailable) {
     return (
-      <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
-        <div className="text-center">
-          <CircleAlertIcon className="mx-auto mb-4 size-16 text-destructive" />
-          <p className="mb-4 text-xl font-medium text-destructive">
+      <div className="flex min-h-[calc(100svh-12rem)] items-center justify-center">
+        <div className="flex flex-col items-center text-center">
+          <span className="mb-4 flex size-12 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/10 text-destructive">
+            <CircleAlertIcon className="size-6" />
+          </span>
+          <p className="mb-1 text-lg font-semibold tracking-title text-destructive">
             种子不存在
+          </p>
+          <p className="mb-5 text-sm text-muted-foreground">
+            链接可能已失效，或种子尚未公开发布。
           </p>
           <Button nativeButton={false} render={<Link to="/" />}>
             返回首页
@@ -792,10 +805,12 @@ function TorrentDetailUnavailable({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
-      <div className="text-center">
-        <CircleAlertIcon className="mx-auto mb-4 size-16 text-destructive" />
-        <p className="mb-4 text-xl font-medium text-destructive">
+    <div className="flex min-h-[calc(100svh-12rem)] items-center justify-center">
+      <div className="flex flex-col items-center text-center">
+        <span className="mb-4 flex size-12 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/10 text-destructive">
+          <CircleAlertIcon className="size-6" />
+        </span>
+        <p className="mb-5 text-lg font-semibold tracking-title text-destructive">
           种子暂时无法读取
         </p>
         <div className="flex justify-center gap-2">

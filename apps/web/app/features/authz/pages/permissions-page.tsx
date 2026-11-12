@@ -243,16 +243,18 @@ function CapabilityOverview({
   return (
     <Collapsible>
       <Card className="min-w-0 gap-0 py-0">
-        <CardHeader className="px-6 pt-6 pb-5">
+        <CardHeader className="pt-(--card-spacing) pb-4 sm:pb-5">
           <CardTitle>
-            <h2 className="text-2xl leading-none font-semibold">可用功能</h2>
+            <h2 className="text-base leading-none font-semibold tracking-title">
+              可用功能
+            </h2>
           </CardTitle>
           <CardDescription>当前账户可以正常使用以下站点功能。</CardDescription>
           <CardAction>
             <Badge variant="outline">{capabilities.items.length} 项</Badge>
           </CardAction>
         </CardHeader>
-        <CardContent className="px-6 pb-5">
+        <CardContent className="pb-4 sm:pb-5">
           {capabilities.items.length === 0 ? (
             <Empty>
               <EmptyHeader>
@@ -284,7 +286,7 @@ function CapabilityOverview({
           )}
         </CardContent>
         {capabilities.items.length > 0 ? (
-          <CardFooter className="justify-center border-t bg-transparent px-6 py-3">
+          <CardFooter className="justify-center border-t bg-transparent py-3">
             <CollapsibleTrigger
               render={<Button type="button" variant="ghost" size="sm" />}
             >
@@ -294,7 +296,7 @@ function CapabilityOverview({
           </CardFooter>
         ) : null}
         <CollapsibleContent>
-          <div className="border-t px-6 py-5">
+          <div className="border-t px-(--card-spacing) py-4 sm:py-5">
             <div className="hidden sm:block">
               <CapabilityTable items={capabilities.items} />
             </div>

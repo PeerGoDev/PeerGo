@@ -140,8 +140,10 @@ function MagicUsageContent({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">魔力值使用规则</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            魔力值使用规则
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             PeerGo
             只保留一种站内资产；购买、赠送和打赏分别控制，不再提供魔力值与 PT
             币兑换。

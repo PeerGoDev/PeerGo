@@ -19,7 +19,7 @@ describe("LoginPage", () => {
     renderLogin()
 
     expect(screen.getByRole("checkbox", { name: /记住登录/ })).toHaveClass(
-      "border-foreground/50",
+      "border-input",
       "bg-native-control"
     )
     await user.click(screen.getByRole("button", { name: "登录" }))

@@ -346,7 +346,7 @@ function StaffPendingWorkbench({
               <Link
                 key={item.id}
                 to={item.to}
-                className="group flex min-h-24 items-center gap-3 rounded-lg border bg-background p-4 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex min-h-24 items-center gap-3 rounded-lg border bg-card p-4 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Badge
                   variant="destructive"

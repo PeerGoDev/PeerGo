@@ -7,7 +7,7 @@ export function TorrentSwarmNumbers({ torrent }: { torrent: Torrent }) {
   if (getTorrentSwarmFreshness(torrent) === "unavailable") {
     return (
       <span
-        className="text-muted-foreground"
+        className="text-faint"
         title="尚无 Tracker 统计"
         aria-label="尚无 Tracker 统计"
       >
@@ -21,11 +21,11 @@ export function TorrentSwarmNumbers({ torrent }: { torrent: Torrent }) {
       <span className="text-success-foreground" title="做种数">
         {torrent.seeders}
       </span>
-      <span className="text-muted-foreground"> / </span>
+      <span className="text-faint"> / </span>
       <span className="text-destructive" title="下载数">
         {torrent.leechers}
       </span>
-      <span className="text-muted-foreground"> / </span>
+      <span className="text-faint"> / </span>
       <span title="完成数">{torrent.completed}</span>
     </>
   )

@@ -148,7 +148,7 @@ describe("SocialPostDetailPage", () => {
 
     expect(
       screen.getByRole("heading", { level: 1, name: "动态详情" })
-    ).toHaveClass("text-3xl")
+    ).toHaveClass("text-lg", "font-semibold")
     expect(screen.getByRole("main")).toHaveClass(
       "max-w-[704px]",
       "lg:max-w-[720px]"

@@ -26,28 +26,20 @@ export function MetricCard({
   tone = "default",
 }: MetricCardProps) {
   return (
-    <Card
-      size="sm"
-      className={cn(
-        "min-h-36 gap-0 rounded-lg border py-0 shadow-sm ring-0",
-        tone === "positive" &&
-          "border-success/20 bg-linear-to-br from-success/10 to-card",
-        tone === "primary" &&
-          "border-primary/20 bg-linear-to-br from-primary/10 to-card",
-        tone === "warning" &&
-          "border-warning/25 bg-linear-to-br from-warning/10 to-card",
-        tone === "muted" && "bg-linear-to-br from-muted/70 to-card"
-      )}
-    >
-      <CardHeader className="px-6 pt-5 pb-0">
-        <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
+    <Card size="sm" className="min-h-32 gap-0 py-0">
+      <CardHeader className="px-4 pt-4 pb-0 sm:px-5">
+        <CardTitle className="text-xs font-medium tracking-normal text-muted-foreground">
+          {title}
+        </CardTitle>
         {icon ? (
           <CardAction
             className={cn(
-              "rounded-full bg-background/80 p-2.5 text-muted-foreground shadow-xs [&>svg]:size-5",
-              tone === "positive" && "text-success-foreground",
-              tone === "primary" && "text-primary",
-              tone === "warning" && "text-warning-foreground"
+              "flex size-8 items-center justify-center rounded-lg border bg-muted text-muted-foreground [&>svg]:size-4",
+              tone === "positive" &&
+                "border-success/20 bg-success/10 text-success-foreground",
+              tone === "primary" && "border-primary/20 bg-primary/10 text-link",
+              tone === "warning" &&
+                "border-warning/20 bg-warning/10 text-warning-foreground"
             )}
             aria-hidden="true"
           >
@@ -55,22 +47,22 @@ export function MetricCard({
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="px-6 pt-2 pb-0">
+      <CardContent className="px-4 pt-1 pb-0 sm:px-5">
         <p
           className={cn(
-            "font-heading text-3xl font-bold tabular-nums",
+            "font-mono text-2xl font-semibold tracking-tight tabular-nums",
             tone === "positive" && "text-success-foreground",
-            tone === "primary" && "text-primary"
+            tone === "primary" && "text-link",
+            tone === "warning" && "text-warning-foreground",
+            tone === "muted" && "text-muted-foreground"
           )}
         >
           {value}
         </p>
       </CardContent>
       {description ? (
-        <CardFooter className="border-0 bg-transparent px-6 pt-1 pb-5">
-          <p className="truncate text-xs text-muted-foreground">
-            {description}
-          </p>
+        <CardFooter className="border-0 bg-transparent px-4 pt-1 pb-4 sm:px-5">
+          <p className="truncate text-xs text-faint">{description}</p>
         </CardFooter>
       ) : null}
     </Card>

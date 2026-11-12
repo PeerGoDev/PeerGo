@@ -46,12 +46,12 @@ export function UserRecentPostsCard({
 }) {
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="px-6 pt-6 pb-2">
-        <CardTitle className="flex items-center gap-2 text-base leading-6 font-semibold">
-          <MessageCircleIcon className="size-4" />
+      <CardHeader className="px-(--card-spacing) pt-(--card-spacing) pb-2">
+        <CardTitle className="flex items-center gap-2 leading-6">
+          <MessageCircleIcon />
           <h2>最新动态</h2>
           {page ? (
-            <span className="text-sm font-normal text-muted-foreground">
+            <span className="text-sm font-normal text-faint">
               ({page.total.toLocaleString("zh-CN")} 条)
             </span>
           ) : null}
@@ -59,7 +59,8 @@ export function UserRecentPostsCard({
         <CardAction>
           <Button
             variant="ghost"
-            size="sm"
+            size="xs"
+            className="text-link hover:text-link"
             nativeButton={false}
             render={
               <Link
@@ -68,11 +69,11 @@ export function UserRecentPostsCard({
               />
             }
           >
-            查看全部
+            查看全部 →
           </Button>
         </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4 px-6 pb-6">
+      <CardContent className="flex flex-col gap-4 px-(--card-spacing) pb-(--card-spacing)">
         {loading ? (
           <RecentPostsSkeleton />
         ) : error ? (
@@ -131,7 +132,7 @@ export function UserRecentPostsCard({
                 >
                   上一页
                 </Button>
-                <span className="text-sm text-muted-foreground">
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">
                   {Math.floor(offset / pageSize) + 1} /{" "}
                   {Math.ceil(page.total / pageSize)}
                 </span>
@@ -159,7 +160,7 @@ function RecentPostsSkeleton() {
       {Array.from({ length: 2 }, (_, index) => (
         <div key={index} className="flex flex-col gap-3 rounded-lg border p-4">
           <div className="flex items-center gap-3">
-            <Skeleton className="size-10 rounded-full" />
+            <Skeleton className="size-9 rounded-lg" />
             <div className="flex flex-col gap-1.5">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-3 w-16" />

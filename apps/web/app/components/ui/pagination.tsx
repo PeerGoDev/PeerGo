@@ -45,14 +45,14 @@ type PaginationLinkProps = {
 function PaginationLink({
   className,
   isActive,
-  size = "icon",
+  size = "icon-sm",
   ...props
 }: PaginationLinkProps) {
   return (
     <Button
-      variant={isActive ? "default" : "secondary"}
+      variant={isActive ? "default" : "outline"}
       size={size}
-      className={cn(className)}
+      className={cn("font-mono tabular-nums", className)}
       nativeButton={false}
       render={
         <a

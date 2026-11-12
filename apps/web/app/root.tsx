@@ -54,8 +54,9 @@ export function isAuthShellPathname(pathname: string) {
 }
 
 // Applies the persisted (or system) theme before first paint so the glass
-// chrome never flashes light while the shell mounts. Keep the storage key in
-// sync with features/shell/model/use-theme.ts, which owns theme switching.
+// chrome never flashes light while the shell mounts. Keep the storage key and
+// browser chrome colors in sync with features/shell/model/use-theme.ts, which
+// owns theme switching.
 const themeInitScript = `try {
   var theme = localStorage.getItem("peergo-theme");
   if (theme !== "dark" && theme !== "light") {
@@ -67,6 +68,10 @@ const themeInitScript = `try {
   }
   document.documentElement.classList.toggle("dark", theme === "dark");
   document.documentElement.style.colorScheme = theme;
+  var themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) {
+    themeColor.setAttribute("content", theme === "dark" ? "#0f1115" : "#f6f7f8");
+  }
 } catch (error) {}`
 
 export const meta: Route.MetaFunction = () => [
@@ -86,6 +91,7 @@ export function Layout({ children }: { children: ReactNode }) {
           name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
         />
+        <meta name="theme-color" content="#f6f7f8" />
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <Meta />
         <Links />
@@ -220,10 +226,12 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   return (
     <main className="mx-auto flex min-h-svh max-w-2xl flex-col justify-center gap-3 p-6">
-      <h1 className="font-heading text-2xl font-semibold">{message}</h1>
+      <h1 className="font-heading text-2xl font-semibold tracking-title">
+        {message}
+      </h1>
       <p className="text-muted-foreground">{details}</p>
       {stack && (
-        <pre className="w-full overflow-x-auto p-4">
+        <pre className="w-full overflow-x-auto rounded-lg border bg-muted p-4 font-mono text-xs leading-5 text-muted-foreground">
           <code>{stack}</code>
         </pre>
       )}

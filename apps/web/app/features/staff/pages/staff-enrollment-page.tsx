@@ -172,10 +172,10 @@ export function StaffEnrollmentPage() {
   return (
     <EnrollmentFrame>
       <header className="flex flex-col gap-1">
-        <h1 className="font-heading text-3xl font-bold tracking-tight">
+        <h1 className="font-heading text-lg font-semibold tracking-title">
           安全凭据登记
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           为 @{activeWebSession.user.username} 登记后台通行密钥。
         </p>
       </header>

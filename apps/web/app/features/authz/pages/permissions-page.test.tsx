@@ -49,7 +49,7 @@ describe("PermissionsPage", () => {
 
     expect(screen.getByRole("heading", { name: "我的权限" })).toBeVisible()
     expect(screen.getByRole("heading", { name: "可用功能" })).toHaveClass(
-      "text-2xl",
+      "text-base",
       "leading-none",
       "font-semibold"
     )
@@ -57,7 +57,7 @@ describe("PermissionsPage", () => {
       screen
         .getByRole("heading", { name: "可用功能" })
         .closest("[data-slot='card']")
-    ).toHaveClass("gap-0", "py-0", "ring-0")
+    ).toHaveClass("gap-0", "py-0", "shadow-card")
     expect(screen.getByRole("link", { name: "安全设置" })).toHaveAttribute(
       "href",
       "/account/security"

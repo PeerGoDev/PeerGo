@@ -64,11 +64,11 @@ export function TwoFactorCard({
   return (
     <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-5">
-        <CardTitle className="text-2xl leading-none font-semibold">
+        <CardTitle className="text-base leading-none font-semibold tracking-title">
           两步验证
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-6 pb-6">
+      <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
         <div
           className={
             status.enabled

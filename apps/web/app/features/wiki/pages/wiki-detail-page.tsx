@@ -98,32 +98,32 @@ export function WikiDetailPage() {
         ) : null}
       </div>
 
-      <header className="flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm md:p-7">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">
+      <header className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-card sm:p-6">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="primary">
             {wiki.visibility === "members" ? "成员文档" : "公开文档"}
           </Badge>
           {wiki.migrated ? <Badge variant="secondary">旧版已迁移</Badge> : null}
           <Badge variant="secondary">版本 {wiki.revision_number}</Badge>
         </div>
-        <div className="flex flex-col gap-2">
-          <h1 className="font-heading text-3xl font-bold break-words md:text-4xl">
+        <div className="flex flex-col gap-1.5">
+          <h1 className="font-heading text-xl font-semibold tracking-title break-words md:text-2xl">
             {wiki.title}
           </h1>
           {wiki.summary ? (
-            <p className="max-w-4xl text-base leading-7 text-muted-foreground">
+            <p className="max-w-4xl text-md leading-6 text-muted-foreground">
               {wiki.summary}
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-faint">
           <span className="flex items-center gap-1.5">
-            <Clock3Icon className="size-4" />
+            <Clock3Icon className="size-3.5" />
             {wiki.updater.display_name} 更新于{" "}
             {formatCompactDateTime(wiki.updated_at)}
           </span>
           <span className="flex items-center gap-1.5">
-            <UsersIcon className="size-4" />
+            <UsersIcon className="size-3.5" />
             创建者 {wiki.creator.display_name}
             {wiki.editors.length > 0
               ? ` · 协作者 ${wiki.editors.map((editor) => editor.display_name).join("、")}`
@@ -132,28 +132,31 @@ export function WikiDetailPage() {
         </div>
       </header>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-        <Card className="hidden lg:sticky lg:top-6 lg:flex">
+      <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)_220px] lg:gap-6">
+        <Card
+          size="sm"
+          className="hidden lg:sticky lg:top-[calc(var(--shell-header-height)+1rem)] lg:flex"
+        >
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BookOpenIcon className="size-4" />
+            <CardTitle className="flex items-center gap-2">
+              <BookOpenIcon />
               Wiki 导航
             </CardTitle>
             <CardDescription>
               {navigation.data?.total ?? 0} 篇可见文档
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <nav aria-label="Wiki 页面" className="flex flex-col gap-1">
+          <CardContent className="px-2">
+            <nav aria-label="Wiki 页面" className="flex flex-col gap-0.5">
               {navigation.data?.items.map((item) => (
                 <Link
                   key={item.id}
                   to={`/wiki/${encodeURIComponent(item.slug)}`}
                   aria-current={item.slug === wiki.slug ? "page" : undefined}
                   className={cn(
-                    "rounded-md px-3 py-2 text-sm leading-5 text-muted-foreground hover:bg-muted hover:text-foreground",
+                    "rounded-md px-2.5 py-1.5 text-sm leading-5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
                     item.slug === wiki.slug &&
-                      "bg-primary/10 font-medium text-primary"
+                      "bg-accent font-medium text-foreground"
                   )}
                 >
                   {item.title}
@@ -164,30 +167,33 @@ export function WikiDetailPage() {
         </Card>
 
         <Card className="min-w-0">
-          <CardContent className="p-5 md:p-8 lg:p-10">
+          <CardContent className="md:px-8">
             <WikiMarkdown body={wiki.body} />
           </CardContent>
         </Card>
 
         {headings.length > 0 ? (
-          <Card className="hidden lg:sticky lg:top-6 lg:flex">
+          <Card
+            size="sm"
+            className="hidden lg:sticky lg:top-[calc(var(--shell-header-height)+1rem)] lg:flex"
+          >
             <CardHeader>
-              <CardTitle className="text-base">本页目录</CardTitle>
+              <CardTitle>本页目录</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-2">
               <nav
                 aria-label="本页目录"
-                className="flex max-h-[70vh] flex-col gap-1 overflow-y-auto"
+                className="flex max-h-[70vh] flex-col gap-0.5 overflow-y-auto"
               >
                 {headings.map((heading) => (
                   <a
                     key={heading.id}
                     href={`#${encodeURIComponent(heading.id)}`}
                     className={cn(
-                      "rounded-md py-1.5 text-sm text-muted-foreground hover:text-foreground",
-                      heading.level === 1 && "px-2 font-medium",
-                      heading.level === 2 && "pr-2 pl-5",
-                      heading.level === 3 && "pr-2 pl-8 text-xs"
+                      "rounded-md py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                      heading.level === 1 && "px-2.5 font-medium",
+                      heading.level === 2 && "pr-2.5 pl-5",
+                      heading.level === 3 && "pr-2.5 pl-8 text-xs"
                     )}
                   >
                     {heading.text}
@@ -200,7 +206,7 @@ export function WikiDetailPage() {
       </div>
 
       <Separator />
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="text-center text-xs text-faint">
         创建于 {formatCompactDateTime(wiki.created_at)} · 当前保留最近 50
         个有效修订
       </p>

@@ -93,8 +93,10 @@ function OperationIncidentsContent() {
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">任务异常与审计</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            任务异常与审计
+          </h1>
+          <p className="text-xs text-muted-foreground">
             汇总持续重试、死信和审计投递积压；正常排队任务仍在 Worker
             状态页查看。
           </p>

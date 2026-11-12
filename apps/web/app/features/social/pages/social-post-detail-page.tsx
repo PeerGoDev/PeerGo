@@ -34,18 +34,19 @@ export function SocialPostDetailPage() {
 
   return (
     <PageLayout className="max-w-[704px] gap-6 lg:max-w-[720px]">
-      <header className="flex items-center gap-4">
+      <header className="flex items-center gap-2 pt-1">
         <Button
           render={<Link to="/social" />}
           nativeButton={false}
           variant="ghost"
-          size="icon"
-          className="size-10"
+          size="icon-sm"
           aria-label="返回动态圈"
         >
           <ArrowLeftIcon />
         </Button>
-        <h1 className="font-heading text-3xl font-bold">动态详情</h1>
+        <h1 className="font-heading text-lg font-semibold tracking-title">
+          动态详情
+        </h1>
       </header>
 
       {session.isPending || (session.data && post.isPending) ? (

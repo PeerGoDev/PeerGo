@@ -7,10 +7,11 @@ describe("TorrentListEmpty", () => {
   it("uses the compact catalog empty state for active filters", () => {
     render(<TorrentListEmpty query="missing" />)
 
-    expect(screen.getByText("没有找到符合条件的种子")).toHaveClass(
+    const message = screen.getByText("没有找到符合条件的种子")
+    expect(message).toHaveClass("text-muted-foreground")
+    expect(message.closest('[data-slot="card"]')).toHaveClass(
       "py-12",
-      "text-center",
-      "text-muted-foreground"
+      "text-center"
     )
   })
 

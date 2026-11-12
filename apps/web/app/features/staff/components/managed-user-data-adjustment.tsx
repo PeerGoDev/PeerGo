@@ -246,7 +246,7 @@ export function ManagedUserDataAdjustment({
                   </ToggleGroupItem>
                   <ToggleGroupItem
                     value="decrease"
-                    className="data-pressed:text-destructive-foreground h-10 w-full data-pressed:bg-destructive"
+                    className="h-10 w-full data-pressed:bg-destructive data-pressed:text-white"
                   >
                     <MinusIcon data-icon="inline-start" />
                     减少

@@ -67,7 +67,8 @@ describe("TorrentCommentsCard", () => {
     expect(screen.getByText("回复 @北岸")).toBeVisible()
     expect(screen.queryByText("我")).not.toBeInTheDocument()
     expect(screen.getByText("回复 @北岸").closest("article")).toHaveClass(
-      "py-0"
+      "border-l-2",
+      "py-3.5"
     )
     expect(
       screen
@@ -77,13 +78,13 @@ describe("TorrentCommentsCard", () => {
     ).toHaveAttribute("data-size", "default")
     expect(
       screen.getByText("这份资源已经校验。").closest("article")
-    ).toHaveClass("py-0")
-    expect(
-      screen
-        .getByText("这份资源已经校验。")
-        .closest("article")
-        ?.querySelector("[data-slot='avatar']")
-    ).toHaveClass("size-10")
+    ).toHaveClass("py-3.5")
+    const rootAvatar = screen
+      .getByText("这份资源已经校验。")
+      .closest("article")
+      ?.querySelector("[data-slot='avatar']")
+    expect(rootAvatar).toHaveClass("size-9")
+    expect(rootAvatar).toHaveAttribute("data-shape", "square")
     expect(screen.getAllByRole("button", { name: "回复" })[0]).toHaveClass(
       "h-auto",
       "px-0",

@@ -109,7 +109,10 @@ export function TurnstileWidget({
         widgetID = turnstile.render(containerRef.current, {
           sitekey: siteKey,
           action,
-          theme: "auto",
+          // Follow the site's own toggle rather than the OS preference.
+          theme: document.documentElement.classList.contains("dark")
+            ? "dark"
+            : "light",
           size: "flexible",
           callback: (token) => {
             if (active) onTokenChangeRef.current(token)
@@ -149,7 +152,7 @@ export function TurnstileWidget({
     <div className="min-w-0">
       {state === "loading" ? (
         <div
-          className="flex min-h-16 items-center justify-center gap-2 rounded-lg border bg-muted/20 text-sm text-muted-foreground"
+          className="flex min-h-16 items-center justify-center gap-2 rounded-lg border bg-muted text-sm text-muted-foreground"
           aria-live="polite"
         >
           <Spinner />

@@ -5,6 +5,9 @@ import { isTorrentId } from "~/features/torrent/api/torrent.download"
 import { resolveApiUrl } from "~/shared/api/client"
 import { cn } from "~/lib/utils"
 
+export const torrentCoverFallbackClass =
+  "bg-linear-to-br from-muted to-border text-faint"
+
 export function TorrentCoverImage({
   torrentId,
   title,
@@ -79,7 +82,7 @@ export function TorrentCoverImage({
         onError={() => setFailed(true)}
       />
       {obscured && showObscuredLabel ? (
-        <span className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-black/70 px-2 py-1 text-[11px] font-semibold whitespace-nowrap text-white shadow-sm">
+        <span className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-black/70 px-2 py-1 text-2xs font-semibold whitespace-nowrap text-white">
           {obscuredLabel}
         </span>
       ) : null}

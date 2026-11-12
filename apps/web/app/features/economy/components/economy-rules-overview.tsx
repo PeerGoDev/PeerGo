@@ -100,7 +100,7 @@ function MagicAcquisitionCard({
           这里只展示当前实际生效的规则，历史收支仍以账本为准。
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-0 px-6 pb-6">
+      <CardContent className="flex flex-col gap-0 px-(--card-spacing) pb-(--card-spacing)">
         <RuleRow
           icon={<SproutIcon />}
           title="做种奖励"
@@ -192,7 +192,7 @@ function SeedingFormulaCard({ overview }: { overview: EconomyOverview }) {
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-5 px-6 pb-6">
+      <CardContent className="flex flex-col gap-5 px-(--card-spacing) pb-(--card-spacing)">
         {!policy ? (
           <Alert>
             <InfoIcon />

@@ -194,11 +194,13 @@ export function MyTorrentSubmissionsPage() {
   }, [submissions.data?.items])
 
   return (
-    <PageLayout className="gap-6 p-10 lg:p-12">
+    <PageLayout className="gap-5">
       <ReviewCenterNavigation canReview={canOpenReviewQueue} />
       <header>
-        <h1 className="font-heading text-2xl font-bold">我的上传审核状态</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="font-heading text-lg font-semibold tracking-title">
+          我的上传审核状态
+        </h1>
+        <p className="mt-1 text-xs text-muted-foreground">
           查看您上传的种子审核进度
         </p>
       </header>
@@ -355,9 +357,11 @@ export function MyTorrentSubmissionsPage() {
               const selected = values[0] as SubmissionFilter | undefined
               if (selected) setFilter(selected)
             }}
-            spacing={0}
+            variant="segment"
+            size="sm"
+            spacing={0.5}
             aria-label="按审核状态筛选"
-            className="grid h-10 w-full max-w-md grid-cols-4 rounded-md bg-muted/60 p-1"
+            className="grid w-full max-w-md grid-cols-4"
           >
             {(
               [
@@ -367,20 +371,16 @@ export function MyTorrentSubmissionsPage() {
                 ["rejected", "已拒绝"],
               ] as const
             ).map(([value, label]) => (
-              <ToggleGroupItem
-                key={value}
-                value={value}
-                className="gap-2 rounded-sm! aria-pressed:bg-background aria-pressed:shadow-sm"
-              >
+              <ToggleGroupItem key={value} value={value} className="gap-1.5">
                 {label}
                 <Badge
                   variant="secondary"
                   className={cn(
-                    "size-5 rounded-full p-0 text-xs",
+                    "h-4 min-w-4 rounded-full px-1 font-mono text-[0.625rem]",
                     (value === "pending" || value === "revision") &&
-                      "bg-warning text-warning-foreground",
+                      "border-transparent bg-warning/15 text-warning-foreground",
                     value === "rejected" &&
-                      "text-destructive-foreground bg-destructive"
+                      "border-transparent bg-destructive/12 text-destructive"
                   )}
                 >
                   {filterCounts[value]}
@@ -710,7 +710,7 @@ function MySubmissionCard({
             {canRequestWithdrawal && submission.state === "published" ? (
               <Button
                 type="button"
-                variant="destructive"
+                variant="outlineDestructive"
                 size="sm"
                 disabled={
                   submission.latest_content_change?.status === "pending" ||
@@ -825,7 +825,7 @@ function SubmissionTitle({ submission }: { submission: MySubmission }) {
   return (
     <Link
       to={`/torrents/${submission.id}`}
-      className="truncate rounded-sm font-bold text-title underline-offset-4 transition-colors hover:text-title-hover hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="truncate rounded-sm font-medium text-title transition-colors hover:text-title-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       {submission.title}
     </Link>

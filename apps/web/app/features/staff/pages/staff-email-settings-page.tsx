@@ -118,8 +118,10 @@ function EmailSettingsContent({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">邮件设置</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            邮件设置
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             邮件地址和一次性链接只在 Privacy Vault
             中处理；后台不读取收件人或投递凭据。
           </p>

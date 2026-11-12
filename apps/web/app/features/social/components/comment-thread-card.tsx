@@ -416,7 +416,7 @@ export function CommentThreadCard({
     >
       <CardHeader
         className={cn(
-          torrentAppearance ? "p-6 pb-4" : "border-b",
+          torrentAppearance ? "p-(--card-spacing) pb-1" : "border-b",
           announcementAppearance && "border-0 p-0 pb-4",
           socialAppearance && "sr-only"
         )}
@@ -425,28 +425,15 @@ export function CommentThreadCard({
           id={titleId}
           role={announcementAppearance ? "heading" : undefined}
           aria-level={announcementAppearance ? 3 : undefined}
-          className={cn(
-            torrentAppearance && "text-2xl leading-none font-semibold",
-            announcementAppearance && "text-lg leading-7 font-semibold"
-          )}
+          className={cn(announcementAppearance && "text-base leading-7")}
         >
           <span className="flex items-center gap-2">
-            <MessageSquareIcon
-              className={cn(
-                torrentAppearance && "size-5",
-                announcementAppearance && "size-5"
-              )}
-            />
+            <MessageSquareIcon />
             评论
             {(torrentAppearance || announcementAppearance) &&
             comments.data?.total ? (
-              <span
-                className={cn(
-                  torrentAppearance &&
-                    "text-sm font-normal text-muted-foreground"
-                )}
-              >
-                ({comments.data.total.toLocaleString("zh-CN")})
+              <span className="text-sm font-normal text-faint">
+                （{comments.data.total.toLocaleString("zh-CN")}）
               </span>
             ) : null}
           </span>
@@ -496,7 +483,7 @@ export function CommentThreadCard({
       <CardContent
         className={cn(
           torrentAppearance
-            ? "flex flex-col gap-4 px-6 pb-6"
+            ? "flex flex-col gap-3 px-(--card-spacing) pb-(--card-spacing)"
             : "flex flex-col gap-5",
           announcementAppearance && "gap-6 p-0",
           socialAppearance && "gap-4 p-0"
@@ -504,7 +491,9 @@ export function CommentThreadCard({
       >
         <div
           className={cn(
-            announcementAppearance && "rounded-lg border bg-card p-4 shadow-sm"
+            torrentAppearance && "order-last border-t pt-3.5",
+            announcementAppearance &&
+              "rounded-xl border bg-card p-4 shadow-card"
           )}
         >
           <CommentComposer
@@ -575,7 +564,7 @@ export function CommentThreadCard({
           ) : null}
           {comments.data?.items.length === 0 &&
           (torrentAppearance || announcementAppearance) ? (
-            <p className="py-4 text-center text-muted-foreground">
+            <p className="py-4 text-center text-sm text-faint">
               暂无评论，来发表第一条评论吧
             </p>
           ) : null}
@@ -601,7 +590,7 @@ export function CommentThreadCard({
               <div
                 role="group"
                 aria-label="评论排序"
-                className="flex items-center rounded-md border bg-background p-0.5"
+                className="flex items-center gap-0.5 rounded-lg border bg-muted p-[3px]"
               >
                 {(
                   [
@@ -613,11 +602,14 @@ export function CommentThreadCard({
                   <Button
                     key={value}
                     type="button"
-                    variant={
-                      socialCommentSort === value ? "secondary" : "ghost"
-                    }
+                    variant="ghost"
                     size="sm"
-                    className="h-7 gap-1 px-2 text-xs shadow-none"
+                    className={cn(
+                      "h-7 gap-1 border px-2 text-xs",
+                      socialCommentSort === value
+                        ? "border-border bg-segment text-foreground shadow-xs hover:bg-segment"
+                        : "border-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    )}
                     disabled={comments.isFetching}
                     aria-pressed={socialCommentSort === value}
                     onClick={() => {
@@ -647,9 +639,7 @@ export function CommentThreadCard({
           {comments.data && comments.data.items.length > 0 ? (
             <div
               className={cn(
-                torrentAppearance
-                  ? "flex flex-col gap-5 border-t pt-5"
-                  : "divide-y",
+                torrentAppearance ? "flex flex-col divide-y" : "divide-y",
                 announcementAppearance && "flex flex-col gap-5 border-0 pt-0",
                 socialAppearance && "border-t-0"
               )}
@@ -819,7 +809,7 @@ function CommentComposer({
     if (announcementAppearance) {
       return (
         <p className="py-1 text-center text-sm text-muted-foreground">
-          <Link to="/login" className="text-primary hover:underline">
+          <Link to="/login" className="text-link hover:underline">
             登录
           </Link>{" "}
           后才能发表评论
@@ -1151,27 +1141,27 @@ function CommentRow({
         "scroll-mt-24 transition-colors target:rounded-lg target:bg-primary/5 target:ring-1 target:ring-primary/20",
         isReply
           ? socialAppearance
-            ? "ml-8 flex gap-3 border-l-2 border-muted px-3 py-3 sm:ml-11"
+            ? "ml-8 flex gap-3 border-l-2 border-border px-3 py-3 sm:ml-11"
             : cn(
                 "ml-8 flex gap-3 border-l-2 px-3 sm:ml-11",
-                torrentAppearance ? "py-0" : "py-4"
+                torrentAppearance ? "py-3.5" : "py-4"
               )
-          : cn("flex gap-3", torrentAppearance ? "py-0" : "py-4"),
-        cardAppearance && "rounded-lg border bg-muted/50 px-4 shadow-sm",
+          : cn("flex gap-3", torrentAppearance ? "py-3.5" : "py-4"),
+        cardAppearance && "rounded-lg border bg-muted/50 px-4",
         cardAppearance && isReply && "bg-muted/30"
       )}
     >
       <Link
         to={`/user/${encodeURIComponent(comment.author.username)}`}
-        className="h-fit shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="h-fit shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <UserAvatar
           username={comment.author.username}
           displayName={comment.author.display_name}
-          colorSeed={comment.author.id}
           online={comment.author.online}
+          shape="square"
           size={torrentAppearance ? "default" : isReply ? "sm" : "default"}
-          className={cn(torrentAppearance && (isReply ? "size-8" : "size-10"))}
+          className={cn(torrentAppearance && (isReply ? "size-8" : "size-9"))}
         />
       </Link>
       <div className="min-w-0 flex-1">
@@ -1180,23 +1170,26 @@ function CommentRow({
             <Link
               to={`/user/${encodeURIComponent(comment.author.username)}`}
               className={cn(
-                "min-w-0 truncate font-semibold hover:underline hover:underline-offset-4",
+                "min-w-0 truncate font-semibold transition-colors",
                 comment.author.administrator
                   ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent hover:opacity-80"
                   : comment.author.vip
-                    ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
-                    : "hover:text-primary"
+                    ? "text-warning-foreground hover:opacity-80"
+                    : "hover:text-link"
               )}
             >
               {comment.author.display_name}
             </Link>
             {comment.author.administrator ? (
-              <Badge className="h-4 shrink-0 border-0 bg-gradient-to-r from-fuchsia-500/15 via-primary/15 to-amber-500/15 px-1.5 text-[10px] font-semibold text-fuchsia-700 shadow-none dark:text-fuchsia-300">
+              <Badge variant="primary" className="h-4 shrink-0 px-1.5">
                 管理员
               </Badge>
             ) : null}
             {comment.author.vip ? (
-              <Badge className="h-4 shrink-0 border border-amber-400/40 bg-amber-400/10 px-1.5 text-[10px] font-bold text-amber-700 shadow-none dark:text-amber-300">
+              <Badge
+                variant="warning"
+                className="h-4 shrink-0 px-1.5 font-semibold"
+              >
                 VIP
               </Badge>
             ) : null}
@@ -1215,7 +1208,7 @@ function CommentRow({
                   />
                 ) : (
                   <SparklesIcon
-                    className="size-3.5 text-amber-500"
+                    className="size-3.5 text-warning-foreground"
                     aria-hidden="true"
                   />
                 )}
@@ -1223,21 +1216,21 @@ function CommentRow({
             ))}
           </span>
           {isReply ? (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-faint">
               {replyTo ? `回复 @${replyTo.display_name}` : "回复"}
             </span>
           ) : null}
           <time
             dateTime={comment.created_at}
             title={formatDateTime(comment.created_at)}
-            className="text-xs text-muted-foreground"
+            className="text-xs text-faint"
           >
             {absoluteTime
               ? formatCompactDateTime(comment.created_at)
               : formatRelativeTime(comment.created_at)}
           </time>
           {comment.edited_at ? (
-            <span className="text-xs text-muted-foreground">已编辑</span>
+            <span className="text-xs text-faint">已编辑</span>
           ) : null}
           {owned && !torrentAppearance ? (
             <Badge variant="outline">我</Badge>
@@ -1330,7 +1323,7 @@ function InlineReplyComposer({
           placeholder={`回复 @${comment.author.display_name}…`}
           disabled={pending}
           autoFocus
-          className="min-h-[76px] resize-y bg-background"
+          className="min-h-[76px] resize-y bg-card"
           onChange={(event) => onDraftChange(event.target.value)}
         />
         <div className="flex items-center justify-between gap-3">
@@ -1476,8 +1469,8 @@ function CommentBody({
     )
   }
   return (
-    <div className="mt-2 flex flex-col gap-1">
-      <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+    <div className="mt-1 flex flex-col gap-1">
+      <p className="text-sm leading-[1.8] break-words whitespace-pre-wrap">
         {visibleBody}
         {shouldCollapse && !expanded ? (
           <span className="text-muted-foreground">...</span>
@@ -1512,7 +1505,7 @@ function CommentListSkeleton() {
     >
       {Array.from({ length: 3 }, (_, index) => (
         <div key={index} className="flex gap-3">
-          <Skeleton className="size-8 rounded-full" />
+          <Skeleton className="size-9 rounded-lg" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-4 w-36" />
             <Skeleton className="h-12 w-full" />

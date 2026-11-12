@@ -12,15 +12,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
 import { Badge } from "~/components/ui/badge"
 import { Button } from "~/components/ui/button"
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card"
+import { Card } from "~/components/ui/card"
 import {
   Dialog,
   DialogClose,
@@ -52,6 +44,7 @@ import {
   myWorkgroupTasksQueryOptions,
   useSubmitWorkgroupTask,
 } from "~/features/workgroups/api/workgroups.queries"
+import { cn } from "~/lib/utils"
 import { requestErrorDescription } from "~/shared/api/problem"
 import { formatDateTime } from "~/shared/formatters/date-time"
 
@@ -66,153 +59,162 @@ export function WorkgroupTaskPanel({
   const tasks = useQuery(myWorkgroupTasksQueryOptions(userId))
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>我的工作组任务</CardTitle>
-          <CardDescription>
+    <section
+      aria-labelledby="workgroup-tasks-title"
+      className="flex flex-col gap-3"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2
+            id="workgroup-tasks-title"
+            className="text-md font-semibold tracking-title"
+          >
+            我的工作组任务
+          </h2>
+          <p className="text-xs text-muted-foreground">
             这里只显示发布时已经分配给你的任务和活动；结果由工作人员人工验收。
-          </CardDescription>
-          <CardAction>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void tasks.refetch()}
-              disabled={tasks.isFetching}
-            >
-              {tasks.isFetching ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <RefreshCwIcon data-icon="inline-start" />
-              )}
-              刷新
-            </Button>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          {tasks.isPending ? <Skeleton className="h-40 w-full" /> : null}
-          {tasks.isError ? (
-            <Alert variant="destructive">
-              <CircleAlertIcon />
-              <AlertTitle>任务暂时无法读取</AlertTitle>
-              <AlertDescription>
-                {requestErrorDescription(
-                  tasks.error,
-                  "请稍后刷新，不会影响已经提交的成果。"
-                )}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          {tasks.data?.items.length === 0 ? (
-            <Empty className="border">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <ClipboardCheckIcon />
-                </EmptyMedia>
-                <EmptyTitle>目前没有分配给你的任务</EmptyTitle>
-                <EmptyDescription>
-                  新任务只会分配给发布当时处于有效状态的工作组成员。
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : null}
-          {tasks.data?.items.length ? (
-            <div className="grid gap-3 lg:grid-cols-2">
-              {tasks.data.items.map((assignment) => (
-                <TaskCard
-                  key={assignment.id}
-                  assignment={assignment}
-                  onSubmit={() => setSelected(assignment)}
-                />
-              ))}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={() => void tasks.refetch()}
+          disabled={tasks.isFetching}
+        >
+          {tasks.isFetching ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <RefreshCwIcon data-icon="inline-start" />
+          )}
+          刷新
+        </Button>
+      </div>
+      {tasks.isPending ? <Skeleton className="h-32 w-full rounded-xl" /> : null}
+      {tasks.isError ? (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>任务暂时无法读取</AlertTitle>
+          <AlertDescription>
+            {requestErrorDescription(
+              tasks.error,
+              "请稍后刷新，不会影响已经提交的成果。"
+            )}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {tasks.data?.items.length === 0 ? (
+        <Empty className="border bg-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ClipboardCheckIcon />
+            </EmptyMedia>
+            <EmptyTitle>目前没有分配给你的任务</EmptyTitle>
+            <EmptyDescription>
+              新任务只会分配给发布当时处于有效状态的工作组成员。
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : null}
+      {tasks.data?.items.length ? (
+        <Card className="gap-0 py-0">
+          <ul className="divide-y">
+            {tasks.data.items.map((assignment) => (
+              <TaskRow
+                key={assignment.id}
+                assignment={assignment}
+                onSubmit={() => setSelected(assignment)}
+              />
+            ))}
+          </ul>
+        </Card>
+      ) : null}
       <TaskSubmissionDialog
         assignment={selected}
         userId={userId}
         csrfToken={csrfToken}
         onOpenChange={(open) => !open && setSelected(undefined)}
       />
-    </>
+    </section>
   )
 }
 
-function TaskCard({
+function TaskRow({
   assignment,
   onSubmit,
 }: {
   assignment: WorkgroupTaskAssignment
   onSubmit: () => void
 }) {
+  const submission = assignment.latest_submission
+  const accepted = submission?.decision === "accepted"
+
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>{assignment.task.title}</CardTitle>
-        <CardDescription>{assignment.task.description}</CardDescription>
-        <CardAction className="flex items-center gap-2">
-          <Badge variant="outline">
+    <li className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4 sm:px-5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold">{assignment.task.title}</h3>
+          <Badge variant="secondary">
             {taskTypeLabel(assignment.task.task_type)}
           </Badge>
-          <Badge
-            variant={assignment.state === "accepted" ? "default" : "secondary"}
-          >
+          <Badge variant={assignmentStateVariant(assignment.state)}>
             {assignmentStateLabel(assignment.state)}
           </Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex items-start gap-2 text-sm text-muted-foreground">
-          <CalendarClockIcon className="mt-0.5 size-4 shrink-0" />
+        </div>
+        {assignment.task.description ? (
+          <p className="text-xs text-muted-foreground">
+            {assignment.task.description}
+          </p>
+        ) : null}
+        <p className="mt-1 flex items-start gap-1.5 text-xs text-faint">
+          <CalendarClockIcon className="mt-px size-3.5 shrink-0" />
           <span>
             {formatDateTime(assignment.task.starts_at)} 至{" "}
             {formatDateTime(assignment.task.due_at)}
           </span>
-        </div>
-        {assignment.latest_submission ? (
-          <div className="flex flex-col gap-2 rounded-md border p-3 text-sm">
-            <p className="font-medium">
-              第 {assignment.latest_submission.sequence} 次成果说明
+        </p>
+        {submission ? (
+          <div className="mt-2 flex flex-col gap-1.5 rounded-lg bg-muted px-3 py-2.5 text-xs">
+            <p className="font-medium text-foreground">
+              第 {submission.sequence} 次成果说明
             </p>
             <p className="whitespace-pre-wrap text-muted-foreground">
-              {assignment.latest_submission.statement}
+              {submission.statement}
             </p>
-            {assignment.latest_submission.review_reason ? (
-              <Alert
-                variant={
-                  assignment.latest_submission.decision === "accepted"
-                    ? "default"
-                    : "destructive"
-                }
-              >
-                {assignment.latest_submission.decision === "accepted" ? (
-                  <CheckCircle2Icon />
-                ) : (
-                  <CircleAlertIcon />
+            {submission.review_reason ? (
+              <p
+                className={cn(
+                  "flex items-start gap-1.5",
+                  accepted ? "text-success-foreground" : "text-destructive"
                 )}
-                <AlertTitle>
-                  {assignment.latest_submission.decision === "accepted"
-                    ? "已通过验收"
-                    : "需要修改"}
-                </AlertTitle>
-                <AlertDescription>
-                  {assignment.latest_submission.review_reason}
-                </AlertDescription>
-              </Alert>
+              >
+                {accepted ? (
+                  <CheckCircle2Icon className="mt-px size-3.5 shrink-0" />
+                ) : (
+                  <CircleAlertIcon className="mt-px size-3.5 shrink-0" />
+                )}
+                <span>
+                  <span className="font-medium">
+                    {accepted ? "已通过验收" : "需要修改"}：
+                  </span>
+                  {submission.review_reason}
+                </span>
+              </p>
             ) : null}
           </div>
         ) : null}
-      </CardContent>
+      </div>
       {assignment.can_submit ? (
-        <CardFooter>
-          <Button size="sm" onClick={onSubmit}>
-            <SendIcon data-icon="inline-start" />
-            {assignment.state === "changes_requested" ? "重新提交" : "提交成果"}
-          </Button>
-        </CardFooter>
+        <Button
+          size="sm"
+          className="shrink-0 max-sm:w-full sm:self-center"
+          onClick={onSubmit}
+        >
+          <SendIcon data-icon="inline-start" />
+          {assignment.state === "changes_requested" ? "重新提交" : "提交成果"}
+        </Button>
       ) : null}
-    </Card>
+    </li>
   )
 }
 
@@ -320,6 +322,19 @@ function TaskSubmissionDialog({
 
 function taskTypeLabel(value: string) {
   return value === "activity" ? "限时活动" : "工作任务"
+}
+
+function assignmentStateVariant(value: string) {
+  switch (value) {
+    case "pending_review":
+      return "warning" as const
+    case "changes_requested":
+      return "destructive" as const
+    case "accepted":
+      return "success" as const
+    default:
+      return "primary" as const
+  }
 }
 
 function assignmentStateLabel(value: string) {

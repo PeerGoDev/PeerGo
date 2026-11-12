@@ -47,12 +47,12 @@ const reviewQueueLimit = 20
 
 export function StaffTorrentReviewsPage() {
   return (
-    <PageLayout className="max-w-[1172px] gap-5 p-4! sm:gap-6 sm:p-6! sm:pt-10!">
+    <PageLayout className="gap-5">
       <header>
-        <h1 className="font-heading text-2xl font-bold tracking-tight">
+        <h1 className="font-heading text-lg font-semibold tracking-title">
           种子审核终审
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-xs text-muted-foreground">
           处理工作组四票 2:2 的升级事项，以及必要的管理员直接结案
         </p>
       </header>
@@ -73,12 +73,30 @@ function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
   const reviews = useQuery(pendingTorrentReviewsQueryOptions(reviewQueueLimit))
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex justify-end">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        {reviews.data ? (
+          <div className="inline-flex rounded-lg border bg-muted p-[3px]">
+            <span className="inline-flex h-7 items-center gap-1.5 rounded-md border bg-segment px-3 text-xs font-medium text-foreground shadow-xs">
+              <Clock3Icon className="size-3.5" />
+              待审核
+              <Badge
+                variant={
+                  reviews.data.total > 0 ? "destructiveSolid" : "secondary"
+                }
+                className="h-4 min-w-4 rounded-full px-1 tabular-nums"
+              >
+                {reviews.data.total.toLocaleString("zh-CN")}
+              </Badge>
+            </span>
+          </div>
+        ) : (
+          <span aria-hidden="true" />
+        )}
         <Button
           type="button"
           variant="outline"
-          size="default"
+          size="sm"
           disabled={reviews.isFetching}
           onClick={() => void reviews.refetch()}
         >
@@ -119,42 +137,23 @@ function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
       ) : null}
 
       {reviews.data ? (
-        <section aria-label="待审核种子" className="flex flex-col gap-6">
-          <div className="flex items-end">
-            <div className="flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground">
-              <Clock3Icon className="size-3.5" />
-              待审核
-              <Badge
-                variant="destructiveSolid"
-                className="h-5 min-w-5 rounded-full px-1.5"
-              >
-                {reviews.data.total.toLocaleString("zh-CN")}
-              </Badge>
-            </div>
-          </div>
-
+        <section aria-label="待审核种子" className="flex flex-col gap-3">
           {reviews.data.items.length === 0 ? (
-            <Card className="gap-0 py-0">
-              <CardContent className="p-0">
-                <Empty className="min-h-60 border-0 py-12">
-                  <EmptyHeader>
-                    <EmptyMedia className="text-muted-foreground/60 [&_svg]:size-12">
-                      <ClipboardCheckIcon />
-                    </EmptyMedia>
-                    <EmptyTitle className="text-base text-muted-foreground">
-                      当前没有待审核的种子
-                    </EmptyTitle>
-                    <EmptyDescription>
-                      新提交或重新送审的种子会按时间进入这里。
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              </CardContent>
-            </Card>
+            <Empty className="min-h-60 border">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ClipboardCheckIcon />
+                </EmptyMedia>
+                <EmptyTitle>当前没有待审核的种子</EmptyTitle>
+                <EmptyDescription>
+                  新提交或重新送审的种子会按时间进入这里。
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               {reviews.data.items.map((torrent) => (
-                <Card key={torrent.id} className="min-h-[130px] gap-0 py-0">
+                <Card key={torrent.id} className="gap-0 py-0">
                   <CardContent className="h-full p-4">
                     <article className="flex h-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0 flex-1">

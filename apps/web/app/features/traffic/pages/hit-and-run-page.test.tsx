@@ -63,15 +63,14 @@ describe("HitAndRunPage", () => {
     expect(screen.getByRole("heading", { name: "H&R" })).toBeVisible()
     expect(
       screen.getByText("考察概览").closest("[data-slot=card]")
-    ).toHaveClass("shadow-soft")
+    ).toHaveClass("shadow-card")
     expect(screen.getByText("考察概览")).toBeVisible()
     expect(
       screen.getByRole("group", { name: "按 H&R 状态筛选" }).parentElement
     ).toHaveClass("overflow-x-auto", "px-4", "sm:px-0")
-    expect(screen.getByRole("group", { name: "按 H&R 状态筛选" })).toHaveClass(
-      "bg-muted/60",
-      "p-1"
-    )
+    expect(
+      screen.getByRole("group", { name: "按 H&R 状态筛选" })
+    ).toHaveAttribute("data-variant", "segment")
     expect(screen.getAllByText("PeerGo H&R Release").length).toBeGreaterThan(0)
     expect(
       screen.getByText("当前有 H&R 待补做记录，新下载已受限")

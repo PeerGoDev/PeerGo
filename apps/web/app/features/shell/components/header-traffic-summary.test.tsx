@@ -65,8 +65,6 @@ describe("HeaderTrafficSummary", () => {
       document.querySelector("svg.text-success-foreground")
     ).toBeInTheDocument()
     expect(document.querySelector("svg.text-destructive")).toBeInTheDocument()
-    expect(
-      document.querySelector("svg.text-warning-foreground")
-    ).toBeInTheDocument()
+    expect(screen.getByText("20.4M")).toHaveClass("text-warning-foreground")
   })
 })

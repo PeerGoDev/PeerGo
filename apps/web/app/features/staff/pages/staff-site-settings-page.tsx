@@ -549,7 +549,7 @@ function SiteDisplaySettingsForm({
                   <Field
                     orientation="horizontal"
                     data-disabled={disabled}
-                    className="min-h-10 rounded-md border bg-background px-3 py-2"
+                    className="min-h-10 rounded-md border px-3 py-2"
                   >
                     <FieldContent>
                       <FieldLabel htmlFor="show-latest-announcement">
@@ -734,7 +734,7 @@ function CustomNavigationItemsEditor({
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-md border border-dashed bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
           暂无自定义菜单；可新增 Wiki、帮助中心或其他站点链接。
         </div>
       ) : (
@@ -742,7 +742,7 @@ function CustomNavigationItemsEditor({
           {items.map((item, index) => (
             <div
               key={index}
-              className="rounded-lg border bg-background p-4 shadow-xs"
+              className="rounded-lg border bg-card p-4 shadow-xs"
             >
               <div className="mb-4 flex items-center justify-between gap-3">
                 <span className="text-sm font-medium">菜单项 {index + 1}</span>

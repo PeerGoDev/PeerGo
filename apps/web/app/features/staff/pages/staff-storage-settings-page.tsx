@@ -91,8 +91,10 @@ function StorageSettingsContent() {
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">图片与存储</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            图片与存储
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             当前生效配置和数据库对象库存；不会显示目录路径、桶名或访问凭据。
           </p>
         </div>

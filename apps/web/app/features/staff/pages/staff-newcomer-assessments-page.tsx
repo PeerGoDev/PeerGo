@@ -216,7 +216,7 @@ function AssessmentContent({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-6 pb-6">
+        <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
           {assessments.data.items.length === 0 ? (
             <Empty>
               <EmptyHeader>

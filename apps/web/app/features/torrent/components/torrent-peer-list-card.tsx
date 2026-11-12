@@ -92,8 +92,8 @@ export function TorrentPeerListCard({ torrentId }: { torrentId: number }) {
   return (
     <Card className="gap-0 py-0">
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CardHeader className="p-6 pb-2">
-          <CollapsibleTrigger className="w-full cursor-pointer transition-colors hover:text-primary">
+        <CardHeader className="p-(--card-spacing) pb-2">
+          <CollapsibleTrigger className="w-full cursor-pointer rounded-md text-left transition-colors outline-none hover:text-link focus-visible:ring-3 focus-visible:ring-ring/30">
             <CardTitle className="flex items-center justify-between gap-4 max-sm:items-start">
               <span className="flex items-center gap-2">
                 <UsersIcon className="size-4" />
@@ -113,12 +113,10 @@ export function TorrentPeerListCard({ torrentId }: { torrentId: number }) {
                   <Skeleton className="h-4 w-28" />
                 ) : (
                   <>
-                    <span className="text-green-500">
+                    <span className="text-success-foreground">
                       {seedingCount} 个做种
                     </span>
-                    <span className="text-blue-500">
-                      {leechingCount} 个下载者
-                    </span>
+                    <span className="text-info">{leechingCount} 个下载者</span>
                   </>
                 )}
                 <span className="text-xs text-muted-foreground">
@@ -216,7 +214,7 @@ function PeerSection({
   return (
     <section>
       <h4
-        className={`mb-2 flex items-center gap-2 text-sm font-medium ${seeding ? "text-green-500" : "text-blue-500"}`}
+        className={`mb-2 flex items-center gap-2 text-sm font-medium ${seeding ? "text-success-foreground" : "text-info"}`}
       >
         {seeding ? (
           <UploadIcon className="size-3.5" />
@@ -226,14 +224,14 @@ function PeerSection({
         {seeding ? "做种者" : "下载者"} ({peers.length})
       </h4>
       {peers.length === 0 ? (
-        <p className="rounded bg-muted/30 py-3 text-center text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed py-3 text-center text-sm text-muted-foreground">
           暂无{seeding ? "做种者" : "下载者"}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
           <Table className={seeding ? "min-w-[1040px]" : "min-w-[1120px]"}>
             <TableHeader>
-              <TableRow className="bg-muted/30 text-xs text-muted-foreground">
+              <TableRow className="text-xs">
                 <TableHead className="px-3 py-2.5">用户</TableHead>
                 <TableHead className="px-3 py-2.5">网络</TableHead>
                 {managedView ? (
@@ -257,10 +255,7 @@ function PeerSection({
             </TableHeader>
             <TableBody>
               {peers.map((peer) => (
-                <TableRow
-                  key={`${kind}:${peer.username}`}
-                  className="text-xs hover:bg-muted/50"
-                >
+                <TableRow key={`${kind}:${peer.username}`} className="text-xs">
                   <TableCell className="px-3 py-2.5">
                     <PeerIdentity peer={peer} />
                   </TableCell>
@@ -282,16 +277,16 @@ function PeerSection({
                       {formatRatio(peer.uploaded, peer.downloaded)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-3 py-2.5 text-right text-green-500">
+                  <TableCell className="px-3 py-2.5 text-right text-success-foreground">
                     {formatBytes(peer.uploaded)}
                   </TableCell>
-                  <TableCell className="px-3 py-2.5 text-right text-blue-500">
+                  <TableCell className="px-3 py-2.5 text-right text-info">
                     {formatBytes(peer.downloaded)}
                   </TableCell>
-                  <TableCell className="px-3 py-2.5 text-right text-green-500">
+                  <TableCell className="px-3 py-2.5 text-right text-success-foreground">
                     {formatSpeed(peer.upload_speed)}
                   </TableCell>
-                  <TableCell className="px-3 py-2.5 text-right text-blue-500">
+                  <TableCell className="px-3 py-2.5 text-right text-info">
                     {formatSpeed(peer.download_speed)}
                   </TableCell>
                   <TableCell className="px-3 py-2.5">
@@ -334,7 +329,7 @@ function PeerIdentity({ peer }: { peer: TorrentPeer }) {
       <div className="flex items-center gap-1 text-muted-foreground">
         <EyeOffIcon className="size-3.5" />
         <span>匿名</span>
-        <span className="text-green-500" title="发布者">
+        <span className="text-success-foreground" title="发布者">
           发布者
         </span>
       </div>
@@ -346,20 +341,20 @@ function PeerIdentity({ peer }: { peer: TorrentPeer }) {
       <div className="flex items-center gap-1">
         <Link
           to={`/user/${encodeURIComponent(peer.username)}`}
-          className="text-primary hover:underline"
+          className="font-medium text-foreground transition-colors hover:text-link"
         >
           {peer.display_name}
         </Link>
         {isManagedPeer(peer) && peer.anonymous_uploader ? (
           <span
-            className="inline-flex items-center gap-0.5 text-amber-500"
+            className="inline-flex items-center gap-0.5 text-warning-foreground"
             title="该账号是匿名发布者，仅管理视图可见"
           >
             <EyeOffIcon className="size-3" />
             匿名发布者
           </span>
         ) : peer.uploader ? (
-          <span className="text-green-500" title="发布者">
+          <span className="text-success-foreground" title="发布者">
             发布者
           </span>
         ) : null}
@@ -380,23 +375,23 @@ function PeerNetwork({ peer }: { peer: TorrentPeer }) {
     <div className="flex min-w-28 flex-wrap items-center gap-1">
       {ipv4 && ipv6 ? (
         <span
-          className="rounded bg-gradient-to-r from-slate-500 to-violet-500 px-1.5 py-0.5 text-[10px] font-medium text-white"
+          className="rounded-md bg-info/12 px-1.5 py-0.5 text-[0.625rem] font-medium text-info"
           title="IPv4 + IPv6"
         >
           双栈
         </span>
       ) : ipv6 ? (
-        <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-500">
+        <span className="rounded-md bg-primary/12 px-1.5 py-0.5 text-[0.625rem] font-medium text-link">
           IPv6
         </span>
       ) : (
-        <span className="rounded bg-slate-500/15 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+        <span className="rounded-md border bg-muted px-1.5 py-0.5 text-[0.625rem] font-medium text-muted-foreground">
           IPv4
         </span>
       )}
       {peer.seedbox ? (
         <span
-          className="rounded bg-gradient-to-r from-orange-500 to-amber-400 px-1.5 py-0.5 text-[10px] font-medium text-white"
+          className="rounded-md bg-warning/12 px-1.5 py-0.5 text-[0.625rem] font-medium text-warning-foreground"
           title="该用户至少有一个活跃连接命中后台盒子规则"
         >
           盒子
@@ -437,13 +432,13 @@ function PeerProgress({ basisPoints }: { basisPoints: number }) {
   const percentage = Math.min(100, Math.max(0, basisPoints / 100))
   return (
     <div className="flex items-center justify-center gap-1">
-      <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+      <div className="h-1.5 w-12 overflow-hidden rounded-full bg-accent">
         <div
-          className="h-full bg-blue-500 transition-all"
+          className="h-full rounded-full bg-primary transition-all"
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <span className="text-blue-500">{percentage.toFixed(0)}%</span>
+      <span className="text-info">{percentage.toFixed(0)}%</span>
     </div>
   )
 }
@@ -464,10 +459,11 @@ function formatRatio(uploaded: string, downloaded: string) {
 }
 
 function ratioTone(uploaded: string, downloaded: string) {
-  if (downloaded === "0") return uploaded === "0" ? "" : "text-green-500"
+  if (downloaded === "0")
+    return uploaded === "0" ? "" : "text-success-foreground"
   const ratio = Number(uploaded) / Number(downloaded)
-  if (ratio >= 1) return "text-green-500"
-  if (ratio >= 0.5) return "text-amber-500"
+  if (ratio >= 1) return "text-success-foreground"
+  if (ratio >= 0.5) return "text-warning-foreground"
   return "text-destructive"
 }
 

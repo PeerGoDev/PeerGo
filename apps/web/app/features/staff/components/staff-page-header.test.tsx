@@ -16,12 +16,15 @@ describe("StaffPageHeader", () => {
     )
 
     expect(screen.getByRole("heading", { name: "分类管理" })).toHaveClass(
-      "text-[15px]",
-      "font-semibold"
+      "text-lg",
+      "font-semibold",
+      "tracking-title"
     )
-    expect(
-      screen.getByRole("heading", { name: "分类管理" }).closest("header")
-    ).toHaveClass("bg-glass", "shadow-soft")
+    const header = screen
+      .getByRole("heading", { name: "分类管理" })
+      .closest("header")
+    expect(header).toHaveClass("flex-col", "sm:flex-row", "sm:justify-between")
+    expect(header?.className).not.toMatch(/bg-glass|shadow-soft/)
     expect(screen.getByText("管理分类顺序与状态。")).toBeVisible()
     expect(screen.getByText("10 条记录")).toBeVisible()
     expect(screen.getByRole("button", { name: "新建分类" })).toBeVisible()

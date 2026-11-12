@@ -264,8 +264,10 @@ function SeedboxPolicyEditor({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">盒子设置</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            盒子设置
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             Tracker 只发布分类证据，不把用户 IP 传给 Settlement；优惠和 VIP
             权益先结算，再应用盒子流量倍率。
           </p>

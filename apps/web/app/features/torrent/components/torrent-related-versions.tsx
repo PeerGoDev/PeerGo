@@ -12,6 +12,7 @@ import { Button, buttonVariants } from "~/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
 import { Skeleton } from "~/components/ui/skeleton"
 import { useTorrentRelatedVersions } from "~/features/torrent/api/torrent.queries"
+import { TorrentPromotion } from "~/features/torrent/components/torrent-promotion"
 import {
   formatTorrentSize,
   getTorrentSwarmFreshness,
@@ -46,45 +47,38 @@ export function TorrentRelatedVersions({ torrentId }: { torrentId: number }) {
 
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="p-6 pb-2">
+      <CardHeader className="p-(--card-spacing) pb-2">
         <CardTitle className="flex items-center gap-2">
           <LayersIcon className="size-4" />
           其它版本 ({related.data.items.length.toLocaleString("zh-CN")})
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 px-6 pb-6">
+      <CardContent className="flex flex-col gap-2.5 px-(--card-spacing) pb-(--card-spacing)">
         {visibleVersions.map((torrent) => (
           <div
             key={torrent.id}
-            className="flex items-start justify-between gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50"
+            className="flex items-center justify-between gap-4 rounded-lg border px-3.5 py-3 transition-colors hover:border-input hover:bg-accent/50"
           >
             <div className="min-w-0 flex-1">
               <Link
                 to={`/torrents/${torrent.id}`}
                 title={torrent.name}
-                className="block truncate font-bold text-title transition-colors hover:text-title-hover hover:underline"
+                className="block truncate font-medium text-title transition-colors hover:text-title-hover"
               >
                 {torrent.name}
               </Link>
               {torrent.subtitle ? (
-                <p className="mt-2 truncate text-sm text-muted-foreground">
+                <p className="mt-0.5 truncate text-xs text-faint">
                   {torrent.subtitle}
                 </p>
               ) : null}
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <FileTextIcon className="size-3.5" />
+              <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-faint">
+                <span className="flex items-center gap-1 font-mono text-foreground tabular-nums">
+                  <FileTextIcon className="size-3.5 text-faint" />
                   {formatTorrentSize(torrent.size_bytes)}
                 </span>
                 <Badge variant="secondary">{torrent.category.name}</Badge>
-                {torrent.promotion === "free" ? (
-                  <Badge
-                    variant="outline"
-                    className="border-transparent bg-success/10 text-success-foreground"
-                  >
-                    免费
-                  </Badge>
-                ) : null}
+                <TorrentPromotion promotion={torrent.promotion} />
                 <span className="flex items-center gap-1 font-mono text-success-foreground tabular-nums">
                   <UploadIcon className="size-3.5" />
                   {swarmValue(torrent, torrent.seeders)}
@@ -93,14 +87,18 @@ export function TorrentRelatedVersions({ torrentId }: { torrentId: number }) {
                   <DownloadIcon className="size-3.5" />
                   {swarmValue(torrent, torrent.leechers)}
                 </span>
-                <span className="text-xs">
+                <span className="font-mono tabular-nums">
                   {formatCompactDateTime(torrent.uploaded_at)}
                 </span>
               </div>
             </div>
             <Link
               to={`/torrents/${torrent.id}`}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
+              className={buttonVariants({
+                variant: "outline",
+                size: "xs",
+                className: "h-7 shrink-0 px-2.5",
+              })}
             >
               查看
             </Link>
@@ -111,7 +109,7 @@ export function TorrentRelatedVersions({ torrentId }: { torrentId: number }) {
             type="button"
             variant="ghost"
             size="sm"
-            className="w-full text-muted-foreground"
+            className="w-full text-xs font-normal text-faint hover:text-foreground"
             onClick={() => setExpanded((current) => !current)}
           >
             {expanded

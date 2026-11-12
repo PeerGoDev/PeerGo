@@ -301,7 +301,7 @@ export function MemberGiftCard({
                       <TableCell
                         className={
                           received
-                            ? "text-right text-emerald-600 dark:text-emerald-400"
+                            ? "text-right text-success-foreground"
                             : "text-right text-destructive"
                         }
                       >

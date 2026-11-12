@@ -54,43 +54,36 @@ describe("AppShell mobile navigation", () => {
     expect(screen.getAllByRole("main")).toHaveLength(1)
 
     expect(screen.getByRole("button", { name: "切换侧栏" })).toHaveClass(
-      "-ml-2",
-      "size-10",
-      "rounded-lg",
-      "[&_svg]:size-6"
+      "size-(--control-h-sm)",
+      "text-muted-foreground"
     )
-    expect(
-      screen.queryByRole("button", { name: "切换到深色模式" })
-    ).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "切换到深色模式" })).toBeVisible()
+    expect(screen.getByRole("button", { name: "登录" })).toHaveAttribute(
+      "href",
+      "/login"
+    )
+    expect(screen.getByRole("button", { name: "注册" })).toHaveAttribute(
+      "href",
+      "/register"
+    )
 
     await user.click(screen.getByRole("button", { name: "切换侧栏" }))
 
     const navigation = await screen.findByRole("dialog")
-    expect(navigation).toHaveStyle({
-      "--sidebar-width": "15rem",
-      width: "240px",
-    })
-    expect(document.querySelector('[data-slot="sheet-overlay"]')).toHaveClass(
-      "bg-black/50",
-      "supports-backdrop-filter:backdrop-blur-none"
+    expect(navigation.style.getPropertyValue("--sidebar-width")).toBe(
+      "min(17.5rem, 85vw)"
     )
+    const overlay = document.querySelector('[data-slot="sheet-overlay"]')
+    expect(overlay).toHaveClass("bg-black/50")
+    expect(overlay?.className).not.toMatch(/backdrop-blur/)
     expect(
       within(navigation).getByRole("button", { name: "收起导航" })
     ).toBeVisible()
     expect(
       within(navigation).queryByRole("button", { name: "关闭" })
     ).not.toBeInTheDocument()
-    expect(navigation.querySelector('a[href="/"]')).not.toHaveClass(
-      "max-lg:w-[calc(100%-2.5rem)]"
-    )
     expect(navigation.querySelector('a[href="/"]')).not.toHaveFocus()
-    expect(within(navigation).getByText("Powered by PeerGo")).toHaveClass(
-      "hidden",
-      "lg:block"
-    )
-    expect(
-      navigation.querySelector('[data-slot="sidebar-separator"]')
-    ).toHaveClass("mx-0")
+    expect(within(navigation).queryByText(/Powered by/)).not.toBeInTheDocument()
 
     await user.click(within(navigation).getByRole("link", { name: "登录" }))
 
@@ -260,22 +253,11 @@ describe("AppShell mobile navigation", () => {
     await user.click(screen.getByRole("button", { name: "打开账户菜单" }))
 
     expect(
-      await screen.findByRole("menuitem", { name: "流量统计" })
-    ).toHaveAttribute("href", "/account/traffic")
-    expect(
-      screen.getByRole("menuitem", { name: "分享率考核" })
-    ).toHaveAttribute("href", "/account/ratio")
+      await screen.findByRole("menuitem", { name: "个人主页" })
+    ).toHaveAttribute("href", "/user/demo")
     expect(screen.getByRole("menuitem", { name: /消息/ })).toHaveAttribute(
       "href",
       "/notifications"
-    )
-    expect(screen.getByRole("menuitem", { name: "个人主页" })).toHaveAttribute(
-      "href",
-      "/user/demo"
-    )
-    expect(screen.getByRole("menuitem", { name: "H&R" })).toHaveAttribute(
-      "href",
-      "/account/hnr"
     )
     expect(screen.getByRole("menuitem", { name: "我的上传" })).toHaveAttribute(
       "href",
@@ -289,10 +271,16 @@ describe("AppShell mobile navigation", () => {
       "href",
       "/account"
     )
-    expect(screen.getByRole("menuitem", { name: "员工后台" })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: "管理后台" })).toHaveAttribute(
       "href",
       "/staff"
     )
+    // The full account navigation stays in the sidebar; the menu keeps only
+    // personal shortcuts.
+    for (const name of ["流量统计", "分享率考核", "H&R", "勋章"]) {
+      expect(screen.queryByRole("menuitem", { name })).not.toBeInTheDocument()
+    }
+    expect(screen.getAllByRole("menuitem")).toHaveLength(7)
   })
 
   it("keeps the signed-in Rousi shell on account entry routes", async () => {

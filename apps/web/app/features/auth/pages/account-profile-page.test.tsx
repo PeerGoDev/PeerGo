@@ -65,7 +65,7 @@ describe("AccountProfilePage", () => {
     )
     expect(
       screen.getByLabelText("昵称").closest("[data-slot='card-content']")
-    ).toHaveClass("px-6", "pb-6")
+    ).toHaveClass("px-(--card-spacing)", "pb-(--card-spacing)")
     expect(
       screen.getByText("邮箱已验证").closest("[data-slot='card']")
     ).toHaveClass("border-success/30")

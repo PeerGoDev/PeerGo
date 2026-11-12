@@ -74,6 +74,7 @@ import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
 import { hasCapability } from "~/features/staff/model/capability"
 import type { components } from "~/generated/api"
+import { cn } from "~/lib/utils"
 import { ApiProblemError } from "~/shared/api/problem"
 import { formatDateTime } from "~/shared/formatters/date-time"
 
@@ -245,8 +246,10 @@ function GovernanceHeader({
           <UsersRoundIcon className="size-6" />
         </span>
         <div>
-          <h1 className="font-heading text-2xl font-bold">权限与任期</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            权限与任期
+          </h1>
+          <p className="text-xs text-muted-foreground">
             管理后台角色任期与独立撤权复核
           </p>
         </div>
@@ -283,7 +286,7 @@ function GrantTableCard({
     <Card className="gap-0 py-0">
       <CardHeader className="p-6">
         <CardTitle className="leading-none">
-          <h2 className="text-2xl leading-none font-semibold">
+          <h2 className="text-base leading-none font-semibold tracking-title">
             角色授权与任期
           </h2>
         </CardTitle>
@@ -294,7 +297,7 @@ function GrantTableCard({
           <Badge variant="outline">{grants.length} 条</Badge>
         </CardAction>
       </CardHeader>
-      <CardContent className="px-6 pb-6">
+      <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
         {grants.length === 0 ? (
           <Empty className="min-h-40">
             <EmptyHeader>
@@ -421,7 +424,9 @@ function RevocationListCard({
     <Card className="gap-0 py-0">
       <CardHeader className="p-6">
         <CardTitle className="leading-none">
-          <h2 className="text-2xl leading-none font-semibold">撤权复核</h2>
+          <h2 className="text-base leading-none font-semibold tracking-title">
+            撤权复核
+          </h2>
         </CardTitle>
         <CardDescription>
           提议者、治理复核者和安全复核者职责分离，双批准后才执行撤权。
@@ -430,7 +435,7 @@ function RevocationListCard({
           <Badge variant="outline">{requests.length} 条</Badge>
         </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 px-6 pb-6">
+      <CardContent className="flex flex-col gap-3 px-(--card-spacing) pb-(--card-spacing)">
         {requests.length === 0 ? (
           <Empty className="min-h-40">
             <EmptyHeader>
@@ -861,21 +866,24 @@ function SummaryCard({
   compact?: boolean
 }) {
   return (
-    <Card className="h-[102px] gap-0 py-0">
-      <CardHeader className="grid h-full grid-cols-[auto_1fr] items-center gap-3 p-6">
+    <Card className="min-h-[88px] justify-center gap-0 py-0">
+      <div className="grid grid-cols-[auto_1fr] items-center gap-3 px-4 py-4 sm:px-5">
         <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-          <Icon className="size-5" />
+          <Icon className="size-4" />
         </span>
         <div className="min-w-0">
           <CardDescription>{title}</CardDescription>
           <CardTitle
-            className={compact ? "truncate text-lg" : "text-2xl font-bold"}
+            className={cn(
+              "tabular-nums",
+              compact ? "truncate text-md" : "text-xl"
+            )}
           >
             {value}
           </CardTitle>
           <span className="sr-only">{description}</span>
         </div>
-      </CardHeader>
+      </div>
     </Card>
   )
 }
@@ -950,12 +958,12 @@ function GovernanceSkeleton() {
         <Skeleton className="h-4 w-96 max-w-full" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-[102px] w-full" />
-        <Skeleton className="h-[102px] w-full" />
-        <Skeleton className="h-[102px] w-full" />
-        <Skeleton className="h-[102px] w-full" />
+        <Skeleton className="h-[88px] w-full rounded-xl" />
+        <Skeleton className="h-[88px] w-full rounded-xl" />
+        <Skeleton className="h-[88px] w-full rounded-xl" />
+        <Skeleton className="h-[88px] w-full rounded-xl" />
       </div>
-      <Skeleton className="h-96 w-full" />
+      <Skeleton className="h-96 w-full rounded-xl" />
     </GovernanceFrame>
   )
 }

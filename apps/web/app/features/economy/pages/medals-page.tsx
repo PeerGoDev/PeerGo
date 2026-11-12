@@ -200,28 +200,26 @@ function MedalCenter({
 
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 font-heading text-3xl font-bold">
-            <AwardIcon aria-hidden="true" />
+      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 pt-1">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="font-heading text-lg leading-tight font-semibold tracking-title">
             勋章中心
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             收集勋章，展示荣誉，获得加成
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">当前魔力值</p>
-          <p className="flex items-center justify-end gap-2 font-heading text-2xl font-bold tabular-nums">
-            <SparklesIcon className="text-primary" aria-hidden="true" />
+        <div className="flex items-baseline gap-2 rounded-lg border bg-card px-3 py-1.5 shadow-card">
+          <span className="text-xs text-muted-foreground">当前魔力值</span>
+          <span className="font-mono text-md font-semibold text-warning-foreground tabular-nums">
             {formatInteger(overview.magic_balance)}
-          </p>
+          </span>
         </div>
       </header>
 
-      <Card className="bg-linear-to-r from-primary/5 to-card">
+      <Card>
         <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-3">
+          <CardTitle className="flex flex-wrap items-center gap-2">
             <ZapIcon aria-hidden="true" />
             当前勋章加成
             <Badge variant="secondary">
@@ -233,7 +231,7 @@ function MedalCenter({
             工作组勋章自动生效，不占普通佩戴名额；以下数值已经按站点上限封顶。
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <BenefitMetric
             icon={UploadIcon}
             label="上传加成"
@@ -257,36 +255,35 @@ function MedalCenter({
         </CardContent>
       </Card>
 
-      <section className="flex flex-col gap-4" aria-label="勋章列表">
-        <div className="overflow-x-auto border-b">
-          <ToggleGroup
-            value={[filter]}
-            onValueChange={(values) => {
-              const selected = values[0] as MedalFilter | undefined
-              if (selected) onFilterChange(selected)
-            }}
-            spacing={0}
-            aria-label="切换勋章分类"
-            className="min-w-max rounded-none"
-          >
-            <MedalTab
-              value="owned"
-              label="我的勋章"
-              count={overview.owned_count}
-            />
-            <MedalTab
-              value="wearing"
-              label="佩戴中"
-              count={overview.wearing_count}
-            />
-            <MedalTab
-              value="shop"
-              label="勋章商店"
-              count={overview.shop_count}
-              icon={ShoppingBagIcon}
-            />
-          </ToggleGroup>
-        </div>
+      <section className="flex flex-col gap-3" aria-label="勋章列表">
+        <ToggleGroup
+          value={[filter]}
+          onValueChange={(values) => {
+            const selected = values[0] as MedalFilter | undefined
+            if (selected) onFilterChange(selected)
+          }}
+          variant="segment"
+          size="sm"
+          spacing={0.5}
+          aria-label="切换勋章分类"
+        >
+          <MedalTab
+            value="owned"
+            label="我的勋章"
+            count={overview.owned_count}
+          />
+          <MedalTab
+            value="wearing"
+            label="佩戴中"
+            count={overview.wearing_count}
+          />
+          <MedalTab
+            value="shop"
+            label="勋章商店"
+            count={overview.shop_count}
+            icon={ShoppingBagIcon}
+          />
+        </ToggleGroup>
 
         {items.length === 0 ? (
           <Empty className="min-h-52 border">
@@ -303,7 +300,7 @@ function MedalCenter({
             </EmptyHeader>
           </Empty>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
             {items.map((medal) => {
               const wearingIndex = wearingItems.findIndex(
                 (item) => item.id === medal.id
@@ -371,16 +368,18 @@ function BenefitMetric({
   value: string
 }) {
   return (
-    <dl className="flex items-center gap-3">
+    <dl className="flex min-w-0 items-center gap-3 rounded-lg border bg-muted/50 p-3">
       <span
-        className="flex size-9 items-center justify-center rounded-full bg-background text-primary shadow-xs"
+        className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-link [&_svg]:size-4"
         aria-hidden="true"
       >
         <Icon />
       </span>
-      <div>
-        <dt className="text-sm text-muted-foreground">{label}</dt>
-        <dd className="text-lg font-semibold tabular-nums">{value}</dd>
+      <div className="min-w-0">
+        <dt className="truncate text-xs text-muted-foreground">{label}</dt>
+        <dd className="font-mono text-md font-semibold tabular-nums">
+          {value}
+        </dd>
       </div>
     </dl>
   )
@@ -398,13 +397,10 @@ function MedalTab({
   icon?: typeof AwardIcon
 }) {
   return (
-    <ToggleGroupItem
-      value={value}
-      className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-    >
+    <ToggleGroupItem value={value}>
       {Icon ? <Icon data-icon="inline-start" /> : null}
       {label}
-      <Badge variant="secondary">{count}</Badge>
+      <span className="text-faint tabular-nums">{count}</span>
     </ToggleGroupItem>
   )
 }
@@ -435,10 +431,10 @@ function MedalCard({
 
   return (
     <Card
-      className={cn(isWearing && "border-primary/70 ring-1 ring-primary/20")}
+      className={cn(isWearing && "border-primary/50 ring-1 ring-primary/15")}
     >
-      <CardHeader className="grid grid-cols-[4rem_1fr_auto] items-start gap-4">
-        <div className="row-span-2 flex size-16 items-center justify-center overflow-hidden rounded-lg bg-muted">
+      <CardHeader className="grid-cols-[4rem_1fr_auto] gap-x-4 gap-y-1 has-data-[slot=card-action]:grid-cols-[4rem_1fr_auto]">
+        <div className="row-span-2 flex size-16 items-center justify-center overflow-hidden rounded-lg border bg-muted">
           {image ? (
             <img
               src={image}
@@ -452,17 +448,19 @@ function MedalCard({
             />
           )}
         </div>
-        <CardTitle>{medal.name}</CardTitle>
-        <CardAction>
+        <CardTitle className="col-start-2 row-start-1 min-w-0 break-words">
+          {medal.name}
+        </CardTitle>
+        <CardAction className="col-start-3 row-span-1">
           <Badge
             variant={
-              medal.acquisition_method === "purchase" ? "secondary" : "outline"
+              medal.acquisition_method === "purchase" ? "primary" : "secondary"
             }
           >
             {acquisitionLabel(medal.acquisition_method)}
           </Badge>
         </CardAction>
-        <CardDescription className="line-clamp-3 min-h-10">
+        <CardDescription className="col-span-2 col-start-2 row-start-2 line-clamp-3">
           {medal.description || "暂无勋章说明。"}
         </CardDescription>
       </CardHeader>
@@ -493,7 +491,7 @@ function MedalCard({
           </div>
         ) : null}
       </CardContent>
-      <CardFooter className="gap-2 bg-background">
+      <CardFooter className="gap-2">
         {shop ? (
           <Button
             className="flex-1"

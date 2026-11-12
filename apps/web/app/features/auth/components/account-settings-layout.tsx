@@ -84,12 +84,11 @@ export function AccountSettingsLayout({
               key={item.section}
               to={item.to}
               className={cn(
-                buttonVariants({
-                  variant: current ? "default" : "ghost",
-                  size: "sm",
-                }),
-                "w-full shrink-0 justify-start gap-3 px-3 font-normal max-md:w-auto",
-                !current && "text-muted-foreground"
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "w-full shrink-0 justify-start gap-2.5 px-3 font-medium max-md:w-auto",
+                current
+                  ? "bg-sidebar-accent text-foreground hover:bg-sidebar-accent max-md:border max-md:border-border max-md:bg-card"
+                  : "text-muted-foreground hover:text-foreground"
               )}
               aria-current={current ? "page" : undefined}
             >

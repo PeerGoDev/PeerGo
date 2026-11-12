@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { components } from "~/generated/api"
 import {
   ArrowDownIcon,
@@ -5,18 +6,9 @@ import {
   CircleCheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  DownloadIcon,
-  FileIcon,
-  UploadIcon,
 } from "lucide-react"
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card"
+import { Card } from "~/components/ui/card"
 import {
   Table,
   TableBody,
@@ -33,7 +25,10 @@ import { formatRelativeTime } from "~/features/torrent/model/format"
 import { TorrentSize } from "~/features/torrent/components/torrent-size"
 import { TorrentBookmarkButton } from "~/features/torrent/components/torrent-bookmark-button"
 import { TorrentDownloadButton } from "~/features/torrent/components/torrent-download-button"
-import { TorrentCoverImage } from "~/features/torrent/components/torrent-cover-image"
+import {
+  TorrentCoverImage,
+  torrentCoverFallbackClass,
+} from "~/features/torrent/components/torrent-cover-image"
 import { TorrentCoverPreview } from "~/features/torrent/components/torrent-cover-preview"
 import {
   TorrentDownloadProgress,
@@ -49,6 +44,18 @@ import { cn } from "~/lib/utils"
 
 type Torrent = components["schemas"]["TorrentSummary"]
 
+// Tablet and small-laptop widths drop the category column so the title keeps
+// a readable share of the row; the category returns at `xl`.
+const catalogGridClass =
+  "grid grid-cols-[48px_minmax(0,1fr)_76px_120px_68px_52px] gap-x-2.5 xl:grid-cols-[56px_minmax(0,1fr)_72px_84px_148px_78px_52px]"
+const bookmarkGridClass =
+  "grid grid-cols-[48px_minmax(0,1fr)_64px_64px_64px_112px_40px] gap-x-3 xl:grid-cols-[56px_minmax(0,1fr)_88px_64px_64px_64px_120px_40px]"
+const coverTriggerClass =
+  "flex h-8 w-12 items-center justify-center overflow-hidden rounded-md border bg-muted text-faint"
+const coverFallbackClass = cn(torrentCoverFallbackClass, "[&_svg]:size-4")
+const rowActionClass =
+  "size-6 rounded-md border-0 p-1 text-faint hover:bg-accent hover:text-foreground aria-pressed:text-warning-foreground [&_svg:not([class*='size-'])]:size-3.5"
+
 export function TorrentTable({
   torrents,
   bookmarkControls,
@@ -59,6 +66,7 @@ export function TorrentTable({
   onSortChange,
   adultCoversVisible = false,
   activityByTorrentId,
+  footer,
 }: {
   torrents: Torrent[]
   bookmarkControls?: TorrentBookmarkControls
@@ -69,6 +77,7 @@ export function TorrentTable({
   onSortChange?: (sort: TorrentSort) => void
   adultCoversVisible?: boolean
   activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
+  footer?: ReactNode
 }) {
   if (layout === "bookmarks") {
     return (
@@ -77,175 +86,140 @@ export function TorrentTable({
         bookmarkControls={bookmarkControls}
         adultCoversVisible={adultCoversVisible}
         activityByTorrentId={activityByTorrentId}
+        footer={footer}
       />
     )
   }
 
   return (
     <Card className="hidden gap-0 py-0 md:flex">
-      <CardHeader className="sr-only">
-        <CardTitle>最新种子列表</CardTitle>
-        <CardDescription>按上传时间从新到旧排列。</CardDescription>
-      </CardHeader>
-      <CardContent className="px-0 py-3">
-        <Table className="block min-w-0 px-3">
-          <TableHeader className="block">
-            <TableRow className="grid grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px] items-center gap-2 rounded-lg bg-muted px-3.5 py-3">
-              <TableHead className="h-auto p-0">
-                <span className="sr-only">封面</span>
-              </TableHead>
-              <TableHead className="h-auto p-0 text-muted-foreground">
-                名称
-              </TableHead>
-              <TableHead className="h-auto p-0 text-muted-foreground">
-                分类
-              </TableHead>
-              <TableHead className="h-auto p-0 text-right text-muted-foreground">
-                {onSortChange ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onSortChange(
-                        sort === "size_desc" ? "size_asc" : "size_desc"
-                      )
-                    }
-                    className={cn(
-                      "group ml-auto flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground",
-                      (sort === "size_desc" || sort === "size_asc") &&
-                        "text-primary"
-                    )}
-                  >
-                    大小
-                    {sort === "size_asc" ? (
-                      <ChevronUpIcon className="size-3" />
-                    ) : (
-                      <ChevronDownIcon
-                        className={cn(
-                          "size-3",
-                          sort !== "size_desc" &&
-                            "opacity-0 group-hover:opacity-50"
-                        )}
-                      />
-                    )}
-                  </button>
-                ) : (
-                  "大小"
-                )}
-              </TableHead>
-              <TableHead className="h-auto p-0 text-center text-muted-foreground">
-                <span
-                  className="flex items-center justify-center gap-1"
-                  aria-label="做种数 / 下载数 / 完成数"
+      <Table className="block min-w-0" aria-label="种子列表">
+        <TableHeader className="block">
+          <TableRow
+            className={cn(
+              catalogGridClass,
+              "h-10 items-center rounded-none border-b! px-4 [&>th]:rounded-none!"
+            )}
+          >
+            <TableHead className="h-auto p-0">
+              <span className="sr-only">封面</span>
+            </TableHead>
+            <TableHead className="h-auto p-0">名称</TableHead>
+            <TableHead className="hidden h-auto p-0 xl:block">分类</TableHead>
+            <TableHead className="h-auto p-0 text-right">
+              {onSortChange ? (
+                <SortHeaderButton
+                  active={sort === "size_desc" || sort === "size_asc"}
+                  ascending={sort === "size_asc"}
+                  onClick={() =>
+                    onSortChange(
+                      sort === "size_desc" ? "size_asc" : "size_desc"
+                    )
+                  }
                 >
-                  <ArrowUpIcon className="size-3.5 text-success-foreground" />
-                  <span aria-hidden="true">/</span>
-                  <ArrowDownIcon className="size-3.5 text-destructive" />
-                  <span aria-hidden="true">/</span>
-                  {onSortChange ? (
-                    <button
-                      type="button"
-                      onClick={() => onSortChange("completed_desc")}
-                      className={cn(
-                        "rounded-sm p-0.5 transition-colors hover:bg-accent",
-                        sort === "completed_desc" && "bg-accent text-primary"
-                      )}
-                      aria-label="按完成数排序"
-                    >
-                      <CircleCheckIcon className="size-3.5" />
-                    </button>
-                  ) : (
-                    <CircleCheckIcon className="size-3.5" />
-                  )}
-                </span>
-              </TableHead>
-              <TableHead className="h-auto p-0 text-right text-muted-foreground">
+                  大小
+                </SortHeaderButton>
+              ) : (
+                "大小"
+              )}
+            </TableHead>
+            <TableHead className="h-auto p-0 text-center">
+              <span
+                className="flex items-center justify-center gap-1"
+                aria-label="做种数 / 下载数 / 完成数"
+              >
+                <ArrowUpIcon className="size-3.5 text-success-foreground" />
+                <span aria-hidden="true">/</span>
+                <ArrowDownIcon className="size-3.5 text-destructive" />
+                <span aria-hidden="true">/</span>
                 {onSortChange ? (
                   <button
                     type="button"
-                    onClick={() =>
-                      onSortChange(
-                        sort === "published_desc"
-                          ? "published_asc"
-                          : "published_desc"
-                      )
-                    }
+                    onClick={() => onSortChange("completed_desc")}
                     className={cn(
-                      "group ml-auto flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground",
-                      (sort === "published_desc" || sort === "published_asc") &&
-                        "text-primary"
+                      "rounded-sm p-0.5 transition-colors hover:bg-accent hover:text-foreground",
+                      sort === "completed_desc" && "bg-accent text-link"
                     )}
+                    aria-label="按完成数排序"
+                    aria-pressed={sort === "completed_desc"}
                   >
-                    {timestampLabel}
-                    {sort === "published_asc" ? (
-                      <ChevronUpIcon className="size-3" />
-                    ) : (
-                      <ChevronDownIcon
-                        className={cn(
-                          "size-3",
-                          sort !== "published_desc" &&
-                            "opacity-0 group-hover:opacity-50"
-                        )}
-                      />
-                    )}
+                    <CircleCheckIcon className="size-3.5" />
                   </button>
                 ) : (
-                  timestampLabel
+                  <CircleCheckIcon className="size-3.5" />
                 )}
-              </TableHead>
-              <TableHead className="h-auto p-0 text-center text-muted-foreground">
-                操作
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="block">
-            {torrents.map((torrent) => (
+              </span>
+            </TableHead>
+            <TableHead className="h-auto p-0 text-right">
+              {onSortChange ? (
+                <SortHeaderButton
+                  active={sort === "published_desc" || sort === "published_asc"}
+                  ascending={sort === "published_asc"}
+                  onClick={() =>
+                    onSortChange(
+                      sort === "published_desc"
+                        ? "published_asc"
+                        : "published_desc"
+                    )
+                  }
+                >
+                  {timestampLabel}
+                </SortHeaderButton>
+              ) : (
+                timestampLabel
+              )}
+            </TableHead>
+            <TableHead className="h-auto p-0 text-center">操作</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="block">
+          {torrents.map((torrent) => {
+            const timestamp =
+              timestampByTorrentId?.get(torrent.id) ?? torrent.uploaded_at
+            const obscured =
+              !adultCoversVisible &&
+              torrentCoverRequiresAdultConfirmation(torrent.category)
+            return (
               <TableRow
                 key={torrent.id}
-                className="relative grid grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px] items-center gap-2 overflow-hidden px-3.5 py-2.5"
+                className={cn(
+                  catalogGridClass,
+                  "relative h-14 items-center overflow-hidden px-4"
+                )}
               >
                 <TableCell className="p-0">
                   <TorrentCoverPreview
                     torrentId={torrent.id}
                     title={torrent.name}
-                    triggerClassName="flex h-8 w-12 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground"
-                    disabled={
-                      !adultCoversVisible &&
-                      torrentCoverRequiresAdultConfirmation(torrent.category)
-                    }
+                    triggerClassName={coverTriggerClass}
+                    disabled={obscured}
                   >
                     <TorrentCoverImage
                       torrentId={torrent.id}
                       title={torrent.name}
                       className="size-full object-cover"
-                      fallbackClassName="bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-300 text-neutral-500 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 dark:text-neutral-400 [&_svg]:size-4"
-                      obscured={
-                        !adultCoversVisible &&
-                        torrentCoverRequiresAdultConfirmation(torrent.category)
-                      }
+                      fallbackClassName={coverFallbackClass}
+                      obscured={obscured}
                     />
                   </TorrentCoverPreview>
                 </TableCell>
                 <TableCell className="min-w-0 p-0">
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <TorrentTitleLink
-                        torrentId={torrent.id}
-                        title={torrent.name}
-                        className="truncate"
-                      />
-                      <TorrentSticky
-                        stickyUntil={torrent.sticky_until}
-                        iconOnly
-                        className="h-auto shrink-0 border-0 bg-transparent p-0 text-title shadow-none [&_svg]:size-3.5!"
-                      />
-                      <TorrentPromotion promotion={torrent.promotion} />
-                    </div>
-                    <p className="truncate text-xs text-muted-foreground">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <TorrentTitleLink
+                      torrentId={torrent.id}
+                      title={torrent.name}
+                      className="truncate"
+                    />
+                    <TorrentSticky stickyUntil={torrent.sticky_until} />
+                    <TorrentPromotion promotion={torrent.promotion} />
+                  </div>
+                  {torrent.subtitle ? (
+                    <p className="mt-0.5 truncate text-xs text-faint">
                       {torrent.subtitle}
                     </p>
-                  </div>
+                  ) : null}
                 </TableCell>
-                <TableCell className="p-0 text-muted-foreground">
+                <TableCell className="hidden truncate p-0 text-muted-foreground xl:block">
                   {torrent.category.name}
                 </TableCell>
                 <TableCell className="p-0 text-right">
@@ -254,48 +228,85 @@ export function TorrentTable({
                 <TableCell className="p-0 text-center font-mono text-xs tabular-nums">
                   <TorrentSwarmNumbers torrent={torrent} />
                 </TableCell>
-                <TableCell className="p-0 text-right text-xs text-muted-foreground">
-                  <time
-                    dateTime={
-                      timestampByTorrentId?.get(torrent.id) ??
-                      torrent.uploaded_at
-                    }
-                    title={formatDateTime(
-                      timestampByTorrentId?.get(torrent.id) ??
-                        torrent.uploaded_at
-                    )}
-                  >
-                    {formatRelativeTime(
-                      timestampByTorrentId?.get(torrent.id) ??
-                        torrent.uploaded_at
-                    )}
+                <TableCell className="p-0 text-right text-xs text-faint">
+                  <time dateTime={timestamp} title={formatDateTime(timestamp)}>
+                    {formatRelativeTime(timestamp)}
                   </time>
                 </TableCell>
-                <TableCell className="p-0 text-center">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
+                <TableCell className="p-0">
+                  <div className="flex items-center justify-center gap-1">
                     <TorrentDownloadButton
                       torrentId={torrent.id}
                       torrentName={torrent.name}
-                      className="size-[22px] rounded border-0 p-1 hover:bg-primary/10 hover:text-primary [&_svg:not([class*='size-'])]:size-3.5"
+                      className={rowActionClass}
                     />
                     <TorrentBookmarkButton
                       torrentId={torrent.id}
                       torrentName={torrent.name}
                       controls={bookmarkControls}
-                      className="size-[22px] rounded border-0 p-1 hover:bg-warning/10 hover:text-warning-foreground [&_svg:not([class*='size-'])]:size-3.5"
+                      className={rowActionClass}
                     />
                   </div>
                 </TableCell>
-                <TorrentDownloadProgress
+                <RowDownloadProgress
                   activity={activityByTorrentId?.get(torrent.id)}
-                  overlay
                 />
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
+            )
+          })}
+        </TableBody>
+      </Table>
+      {footer ? <div className="border-t px-4 py-2.5">{footer}</div> : null}
     </Card>
+  )
+}
+
+// Absolutely positioned so the cell never claims a track in the row grid.
+function RowDownloadProgress({
+  activity,
+}: {
+  activity: TorrentActivity | undefined
+}) {
+  if (!activity) return null
+  return (
+    <td className="pointer-events-none absolute inset-x-0 bottom-0 h-1 p-0">
+      <TorrentDownloadProgress activity={activity} overlay />
+    </td>
+  )
+}
+
+function SortHeaderButton({
+  active,
+  ascending,
+  onClick,
+  children,
+}: {
+  active: boolean
+  ascending: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "group ml-auto flex cursor-pointer items-center gap-0.5 rounded-sm transition-colors hover:text-foreground",
+        active && "text-foreground"
+      )}
+    >
+      {children}
+      {active && ascending ? (
+        <ChevronUpIcon className="size-3" />
+      ) : (
+        <ChevronDownIcon
+          className={cn(
+            "size-3",
+            !active && "opacity-0 group-hover:opacity-60"
+          )}
+        />
+      )}
+    </button>
   )
 }
 
@@ -304,106 +315,96 @@ function TorrentBookmarkTable({
   bookmarkControls,
   adultCoversVisible,
   activityByTorrentId,
+  footer,
 }: {
   torrents: Torrent[]
   bookmarkControls?: TorrentBookmarkControls
   adultCoversVisible: boolean
   activityByTorrentId?: ReadonlyMap<number, TorrentActivity>
+  footer?: ReactNode
 }) {
   return (
     <Card className="hidden gap-0 py-0 md:flex">
-      <CardHeader className="sr-only">
-        <CardTitle>我的收藏</CardTitle>
-        <CardDescription>按最近收藏时间排列。</CardDescription>
-      </CardHeader>
-      <CardContent className="px-0 py-3">
-        <Table className="block min-w-0 px-3">
-          <TableHeader className="block">
-            <TableRow className="grid grid-cols-[48px_minmax(0,1fr)_100px_70px_70px_70px_110px_40px] items-center gap-3 rounded-lg bg-muted px-3.5 py-3">
-              <TableHead className="h-auto p-0">
-                <span className="sr-only">封面</span>
-              </TableHead>
-              <TableHead className="h-auto p-0 text-muted-foreground">
-                名称
-              </TableHead>
-              <TableHead className="h-auto p-0 text-muted-foreground">
-                分类
-              </TableHead>
-              <TableHead className="h-auto p-0 text-right text-muted-foreground">
-                做种
-              </TableHead>
-              <TableHead className="h-auto p-0 text-right text-muted-foreground">
-                下载
-              </TableHead>
-              <TableHead className="h-auto p-0 text-right text-muted-foreground">
-                完成
-              </TableHead>
-              <TableHead className="h-auto p-0 text-right text-muted-foreground">
-                上传时间
-              </TableHead>
-              <TableHead className="h-auto p-0" />
-            </TableRow>
-          </TableHeader>
-          <TableBody className="block">
-            {torrents.map((torrent) => (
+      <Table className="block min-w-0" aria-label="我的收藏">
+        <TableHeader className="block">
+          <TableRow
+            className={cn(
+              bookmarkGridClass,
+              "h-10 items-center rounded-none border-b! px-4 [&>th]:rounded-none!"
+            )}
+          >
+            <TableHead className="h-auto p-0">
+              <span className="sr-only">封面</span>
+            </TableHead>
+            <TableHead className="h-auto p-0">名称</TableHead>
+            <TableHead className="hidden h-auto p-0 xl:block">分类</TableHead>
+            <TableHead className="h-auto p-0 text-right">做种</TableHead>
+            <TableHead className="h-auto p-0 text-right">下载</TableHead>
+            <TableHead className="h-auto p-0 text-right">完成</TableHead>
+            <TableHead className="h-auto p-0 text-right">上传时间</TableHead>
+            <TableHead className="h-auto p-0">
+              <span className="sr-only">操作</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="block">
+          {torrents.map((torrent) => {
+            const obscured =
+              !adultCoversVisible &&
+              torrentCoverRequiresAdultConfirmation(torrent.category)
+            return (
               <TableRow
                 key={torrent.id}
-                className="relative grid grid-cols-[48px_minmax(0,1fr)_100px_70px_70px_70px_110px_40px] items-center gap-3 overflow-hidden px-3.5 py-2.5"
+                className={cn(
+                  bookmarkGridClass,
+                  "relative h-14 items-center overflow-hidden px-4"
+                )}
               >
                 <TableCell className="p-0">
                   <TorrentCoverPreview
                     torrentId={torrent.id}
                     title={torrent.name}
-                    triggerClassName="flex h-8 w-12 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground"
-                    disabled={
-                      !adultCoversVisible &&
-                      torrentCoverRequiresAdultConfirmation(torrent.category)
-                    }
+                    triggerClassName={coverTriggerClass}
+                    disabled={obscured}
                   >
                     <TorrentCoverImage
                       torrentId={torrent.id}
                       title={torrent.name}
                       className="size-full object-cover"
-                      fallbackClassName="bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-300 text-neutral-500 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 dark:text-neutral-400 [&_svg]:size-4"
-                      obscured={
-                        !adultCoversVisible &&
-                        torrentCoverRequiresAdultConfirmation(torrent.category)
-                      }
+                      fallbackClassName={coverFallbackClass}
+                      obscured={obscured}
                     />
                   </TorrentCoverPreview>
                 </TableCell>
                 <TableCell className="min-w-0 p-0">
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <TorrentTitleLink
-                        torrentId={torrent.id}
-                        title={torrent.name}
-                        className="truncate"
-                      />
-                      <TorrentSticky stickyUntil={torrent.sticky_until} />
-                      <TorrentPromotion promotion={torrent.promotion} />
-                    </div>
-                    <p className="truncate text-xs text-muted-foreground">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <TorrentTitleLink
+                      torrentId={torrent.id}
+                      title={torrent.name}
+                      className="truncate"
+                    />
+                    <TorrentSticky stickyUntil={torrent.sticky_until} />
+                    <TorrentPromotion promotion={torrent.promotion} />
+                  </div>
+                  {torrent.subtitle ? (
+                    <p className="mt-0.5 truncate text-xs text-faint">
                       {torrent.subtitle}
                     </p>
-                  </div>
+                  ) : null}
                 </TableCell>
-                <TableCell className="p-0 text-sm text-muted-foreground">
+                <TableCell className="hidden truncate p-0 text-muted-foreground xl:block">
                   {torrent.category.name}
                 </TableCell>
-                <TableCell className="flex items-center justify-end gap-1 p-0 text-right font-mono tabular-nums">
-                  <UploadIcon className="size-3.5 text-success-foreground" />
-                  <span>{torrent.seeders.toLocaleString("zh-CN")}</span>
+                <TableCell className="p-0 text-right font-mono text-xs text-success-foreground tabular-nums">
+                  {torrent.seeders.toLocaleString("zh-CN")}
                 </TableCell>
-                <TableCell className="flex items-center justify-end gap-1 p-0 text-right font-mono tabular-nums">
-                  <DownloadIcon className="size-3.5 text-destructive" />
-                  <span>{torrent.leechers.toLocaleString("zh-CN")}</span>
+                <TableCell className="p-0 text-right font-mono text-xs text-destructive tabular-nums">
+                  {torrent.leechers.toLocaleString("zh-CN")}
                 </TableCell>
-                <TableCell className="flex items-center justify-end gap-1 p-0 text-right font-mono tabular-nums">
-                  <FileIcon className="size-3.5" />
-                  <span>{torrent.completed.toLocaleString("zh-CN")}</span>
+                <TableCell className="p-0 text-right font-mono text-xs tabular-nums">
+                  {torrent.completed.toLocaleString("zh-CN")}
                 </TableCell>
-                <TableCell className="p-0 text-right text-xs text-muted-foreground">
+                <TableCell className="p-0 text-right font-mono text-xs text-faint tabular-nums">
                   <time dateTime={torrent.uploaded_at}>
                     {formatCompactDateTime(torrent.uploaded_at)}
                   </time>
@@ -413,17 +414,18 @@ function TorrentBookmarkTable({
                     torrentId={torrent.id}
                     torrentName={torrent.name}
                     controls={bookmarkControls}
+                    className={rowActionClass}
                   />
                 </TableCell>
-                <TorrentDownloadProgress
+                <RowDownloadProgress
                   activity={activityByTorrentId?.get(torrent.id)}
-                  overlay
                 />
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
+            )
+          })}
+        </TableBody>
+      </Table>
+      {footer ? <div className="border-t px-4 py-2.5">{footer}</div> : null}
     </Card>
   )
 }

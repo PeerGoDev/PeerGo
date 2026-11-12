@@ -163,7 +163,7 @@ function TorrentIdentity({ torrent }: { torrent: ManagedTorrent }) {
   return (
     <Link to={`/torrents/${torrent.id}`} className="group block min-w-0">
       <div className="flex min-w-0 flex-col">
-        <span className="truncate font-bold text-title transition-colors group-hover:text-title-hover">
+        <span className="truncate font-medium text-title transition-colors group-hover:text-title-hover">
           {torrent.title}
         </span>
         {torrent.subtitle ? (

@@ -117,8 +117,10 @@ function PromotionWorkbench({
   return (
     <StaffPageFrame className="gap-4">
       <header>
-        <h1 className="font-heading text-xl font-semibold">优惠规则</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="font-heading text-lg font-semibold tracking-title">
+          优惠规则
+        </h1>
+        <p className="text-xs text-muted-foreground">
           管理全站和单种子倍率、成员付费价格与置顶，并检查规则是否已经同步。
         </p>
       </header>
@@ -263,7 +265,7 @@ function SummaryCard({
         <CardDescription>{title}</CardDescription>
         <CardTitle
           className={
-            attention ? "text-xl text-amber-700" : "text-xl text-primary"
+            attention ? "text-xl text-warning-foreground" : "text-xl text-link"
           }
         >
           {value.toLocaleString("zh-CN")}

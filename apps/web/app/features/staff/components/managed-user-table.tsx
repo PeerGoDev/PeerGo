@@ -160,9 +160,8 @@ function UserIdentity({ user }: { user: ManagedUserSummary }) {
       <UserAvatar
         username={user.username}
         displayName={user.display_name}
-        colorSeed={user.username}
         className="size-7"
-        fallbackClassName="bg-muted text-xs text-muted-foreground"
+        fallbackClassName="text-xs"
       />
       <div className="flex min-w-0 flex-col">
         <span className="flex min-w-0 items-center gap-1">

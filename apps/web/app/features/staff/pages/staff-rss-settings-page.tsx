@@ -158,8 +158,10 @@ function RSSSettingsForm({
   return (
     <StaffPageFrame className="gap-4">
       <header>
-        <h1 className="font-heading text-xl font-semibold">RSS 设置</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="font-heading text-lg font-semibold tracking-title">
+          RSS 设置
+        </h1>
+        <p className="mt-1 text-xs text-muted-foreground">
           管理私密订阅的容量、缓存与请求频率。
         </p>
       </header>

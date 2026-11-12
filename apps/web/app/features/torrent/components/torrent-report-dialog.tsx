@@ -118,15 +118,15 @@ export function TorrentReportDialog({
       <DialogTrigger
         render={
           <Button
-            variant="outline"
-            size={compact ? "icon" : "default"}
-            className={compact ? undefined : "h-9 w-full"}
-            aria-label={compact ? `举报“${torrentTitle}”` : undefined}
+            variant={compact ? "outline" : "outlineDestructive"}
+            size={compact ? "icon-sm" : "default"}
+            className={compact ? undefined : "w-full"}
+            aria-label={compact ? `举报“${torrentTitle}”` : "举报种子"}
           />
         }
       >
         <FlagIcon data-icon="inline-start" />
-        {compact ? null : "举报种子"}
+        {compact ? null : "举报"}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

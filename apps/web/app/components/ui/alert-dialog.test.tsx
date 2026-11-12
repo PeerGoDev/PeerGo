@@ -16,7 +16,7 @@ import {
 } from "~/components/ui/alert-dialog"
 
 describe("AlertDialog", () => {
-  it("uses the opaque unblurred backdrop shared with the reference UI", async () => {
+  it("uses an unblurred dimming backdrop and the dialog elevation", async () => {
     const user = userEvent.setup()
 
     render(
@@ -40,20 +40,18 @@ describe("AlertDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "删除" }))
 
-    expect(
-      document.querySelector('[data-slot="alert-dialog-overlay"]')
-    ).toHaveClass("bg-black/80", "supports-backdrop-filter:backdrop-blur-none")
-    expect(
-      document.querySelector('[data-slot="alert-dialog-overlay"]')
-    ).not.toHaveClass("supports-backdrop-filter:backdrop-blur-xs")
+    const overlay = document.querySelector('[data-slot="alert-dialog-overlay"]')
+    expect(overlay).toHaveClass("bg-black/50", "dark:bg-black/65")
+    expect(overlay?.className).not.toMatch(/backdrop-blur/)
     expect(
       document.querySelector('[data-slot="alert-dialog-content"]')
     ).toHaveClass(
       "max-h-[calc(100dvh-1rem)]",
       "max-w-[calc(100%-1rem)]",
       "data-[size=default]:sm:max-w-[425px]",
-      "rounded-3xl",
-      "shadow-soft",
+      "rounded-xl",
+      "border",
+      "shadow-dialog",
       "p-4",
       "sm:p-6"
     )

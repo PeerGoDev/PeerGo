@@ -123,14 +123,15 @@ describe("TorrentDetailPage", () => {
     expect(cover.parentElement).not.toHaveClass("h-56")
     expect(screen.getByText("PeerGo 发布者")).toBeVisible()
     expect(screen.getByText("PeerGo 发布者").closest("dl")).toHaveClass(
-      "justify-start"
+      "flex-wrap",
+      "md:ml-auto"
     )
     expect(screen.getAllByText("免费").length).toBeGreaterThan(0)
     expect(screen.getByText("2026-08-13")).toBeVisible()
     expect(screen.getByText("2026-08-13").parentElement).toHaveClass(
       "text-xs",
-      "font-semibold",
-      "opacity-70"
+      "font-normal",
+      "opacity-75"
     )
     expect(screen.getByText("1080p")).toBeVisible()
     expect(screen.getByRole("link", { name: /IMDb/ })).toHaveAttribute(
@@ -144,7 +145,7 @@ describe("TorrentDetailPage", () => {
     const peerListHeader = screen
       .getByText("用户列表")
       .closest("[data-slot=card-header]")
-    expect(peerListHeader).toHaveClass("p-6", "pb-2")
+    expect(peerListHeader).toHaveClass("p-(--card-spacing)", "pb-2")
     expect(peerListHeader?.closest("[data-slot=card]")).toHaveClass(
       "gap-0",
       "py-0"
@@ -156,7 +157,7 @@ describe("TorrentDetailPage", () => {
       .getByText("MediaInfo/BDInfo")
       .closest("[data-slot=card-header]")
     expect(mediaInfoHeader).not.toBeNull()
-    expect(mediaInfoHeader).toHaveClass("p-6", "pb-2")
+    expect(mediaInfoHeader).toHaveClass("p-(--card-spacing)", "pb-2")
     expect(mediaInfoHeader).not.toHaveClass("pt-[18px]")
     const mediaInfoCard = screen
       .getByText("MediaInfo/BDInfo")
@@ -164,10 +165,10 @@ describe("TorrentDetailPage", () => {
     expect(mediaInfoCard).toHaveClass("gap-0", "py-0")
     expect(
       mediaInfoCard?.querySelector("[data-slot=card-content]")
-    ).toHaveClass("px-6", "pb-6")
+    ).toHaveClass("px-(--card-spacing)", "pb-(--card-spacing)")
     expect(
       screen.getByText("用户列表").closest("[data-slot=card-title]")
-    ).toHaveClass("font-bold")
+    ).toHaveClass("font-semibold")
     const rawMediaInfoButton = screen.getByRole("button", {
       name: "查看原始信息",
     })
@@ -182,9 +183,9 @@ describe("TorrentDetailPage", () => {
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
     expect(rawMediaInfo).toHaveClass(
-      "mt-4",
+      "mt-3",
       "overflow-x-auto",
-      "rounded",
+      "rounded-lg",
       "bg-muted",
       "p-4",
       "text-xs"
@@ -200,7 +201,7 @@ describe("TorrentDetailPage", () => {
     const firstScreenshot = screen.getByRole("button", {
       name: "查看截图 1",
     })
-    expect(firstScreenshot).toHaveClass("w-32", "sm:w-auto")
+    expect(firstScreenshot).toHaveClass("w-56", "sm:w-auto")
     await user.click(firstScreenshot)
     expect(screen.getByRole("img", { name: "截图 1 大图" })).toBeVisible()
     expect(screen.getByText("1 / 2")).toBeVisible()
@@ -219,7 +220,7 @@ describe("TorrentDetailPage", () => {
     expect(screen.getByText(/2 个文件/)).toBeVisible()
     expect(
       screen.getByText(/2 个文件/).closest("[data-slot='card-title']")
-    ).toHaveClass("text-sm", "font-bold")
+    ).toHaveClass("text-md", "font-semibold")
     expect(screen.getByText("Final.Release.2026/movie.mkv")).toBeVisible()
     expect(screen.getByText("填充")).toBeVisible()
     const downloadButton = screen.getByRole("button", {
@@ -231,8 +232,8 @@ describe("TorrentDetailPage", () => {
     )
     expect(desktopDownloadActions).toHaveClass("h-10", "w-full")
     expect(desktopDownloadActions?.parentElement).toHaveClass(
-      "w-[156px]",
-      "max-md:w-full"
+      "grid-cols-3",
+      "md:w-[9.75rem]"
     )
     const copyDownloadAddress = screen.getByRole("button", {
       name: "复制“Final Release 2026”的下载地址",
@@ -268,8 +269,8 @@ describe("TorrentDetailPage", () => {
     renderDetailPage(detailTestClient(), "/torrents/tiny-orchestra")
 
     expect(screen.getByText("种子不存在")).toHaveClass(
-      "text-xl",
-      "font-medium",
+      "text-lg",
+      "font-semibold",
       "text-destructive"
     )
     expect(screen.getByRole("button", { name: "返回首页" })).toHaveAttribute(
@@ -323,9 +324,9 @@ describe("TorrentDetailPage", () => {
       screen.getByRole("img", { name: "Migrated Release暂无封面" })
     ).toBeVisible()
     expect(screen.getByText("暂无封面").parentElement).toHaveClass(
-      "bg-gradient-to-br",
-      "from-neutral-100",
-      "to-neutral-300"
+      "bg-linear-to-br",
+      "from-muted",
+      "to-border"
     )
     const fallbackCover = screen.getByRole("img", {
       name: "Migrated Release暂无封面",
@@ -334,7 +335,7 @@ describe("TorrentDetailPage", () => {
     expect(fallbackCover).not.toHaveClass("min-h-56")
     expect(fallbackCover.parentElement).toHaveClass(
       "h-36",
-      "md:h-56",
+      "md:h-[13.125rem]",
       "self-start"
     )
     expect(

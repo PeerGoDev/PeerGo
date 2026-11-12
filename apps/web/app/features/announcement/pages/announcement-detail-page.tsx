@@ -82,7 +82,7 @@ export function AnnouncementDetailPage() {
         <article>
           <Card className="gap-0 py-0">
             <CardHeader className="p-6">
-              <CardTitle className="flex items-start gap-2 text-2xl leading-none font-semibold tracking-tight">
+              <CardTitle className="flex items-start gap-2 text-lg leading-none font-semibold tracking-title">
                 <PinIcon className="mt-0.5 size-4 shrink-0 text-primary" />
                 <h1 className="break-words">{announcement.data.title}</h1>
               </CardTitle>

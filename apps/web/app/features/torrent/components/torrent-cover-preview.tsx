@@ -29,9 +29,9 @@ export function TorrentCoverPreview({
       <TooltipContent
         side="inline-end"
         sideOffset={10}
-        className="block max-w-none border bg-popover p-2 text-popover-foreground shadow-xl"
+        className="block max-w-none rounded-lg border bg-popover p-1.5 text-popover-foreground shadow-popover [&>[aria-hidden=true]]:hidden"
       >
-        <div className="relative flex max-h-[70vh] w-72 items-center justify-center overflow-hidden rounded bg-muted sm:w-80">
+        <div className="relative flex max-h-[70vh] w-72 items-center justify-center overflow-hidden rounded-md bg-muted sm:w-80">
           <TorrentCoverImage
             torrentId={torrentId}
             title={title}

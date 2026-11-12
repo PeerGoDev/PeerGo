@@ -20,17 +20,17 @@ export function torrentPromotionLabel(promotion: TorrentPromotionValue) {
 }
 
 // Semantic promotion tones: green = free download, blue = discounted
-// download, primary orange = pure upload bonus.
-const promotionToneClasses: Record<
+// download, brand blue = pure upload bonus.
+const promotionTones: Record<
   Exclude<TorrentPromotionValue, "none">,
-  string
+  "success" | "primary" | "info"
 > = {
-  free: "bg-success/10 text-success-foreground",
-  double_upload: "bg-primary/10 text-sidebar-accent-foreground",
-  double_upload_free: "bg-success/10 text-success-foreground",
-  half_download: "bg-info/10 text-info",
-  double_upload_half_download: "bg-info/10 text-info",
-  thirty_percent_download: "bg-info/10 text-info",
+  free: "success",
+  double_upload: "primary",
+  double_upload_free: "success",
+  half_download: "info",
+  double_upload_half_download: "info",
+  thirty_percent_download: "info",
 }
 
 export function TorrentPromotion({
@@ -46,14 +46,7 @@ export function TorrentPromotion({
   }
 
   return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "h-5 border-transparent",
-        promotionToneClasses[promotion],
-        className
-      )}
-    >
+    <Badge variant={promotionTones[promotion]} className={className}>
       {label}
     </Badge>
   )
@@ -74,11 +67,8 @@ export function TorrentSticky({
 
   return (
     <Badge
-      variant="outline"
-      className={cn(
-        "h-5 border-transparent bg-destructive/10 text-title",
-        className
-      )}
+      variant="warning"
+      className={cn(iconOnly && "px-1", className)}
       title={`置顶至 ${new Date(stickyUntil).toLocaleString("zh-CN")}`}
     >
       <PinIcon data-icon="inline-start" />

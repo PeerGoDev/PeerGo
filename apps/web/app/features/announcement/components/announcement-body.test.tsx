@@ -12,7 +12,7 @@ describe("AnnouncementBody", () => {
     )
 
     expect(container.querySelectorAll("p")).toHaveLength(2)
-    expect(container.firstChild).toHaveClass("text-base", "leading-7")
+    expect(container.firstChild).toHaveClass("text-md", "leading-7")
     expect(screen.getByText(/第一段。/)).toHaveTextContent(
       /第一段。\s+仍在第一段。/
     )

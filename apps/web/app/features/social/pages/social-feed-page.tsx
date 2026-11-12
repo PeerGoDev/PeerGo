@@ -40,6 +40,15 @@ import { cn } from "~/lib/utils"
 
 const pageSize = 20
 
+function feedTabClass(active: boolean) {
+  return cn(
+    "flex items-center justify-center gap-2 rounded-md border transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+    active
+      ? "border-border bg-segment font-medium text-foreground shadow-xs"
+      : "border-transparent text-muted-foreground hover:text-foreground"
+  )
+}
+
 export function SocialFeedPage() {
   const [sort, setSort] = React.useState<SocialPostSort>("newest")
   const [feed, setFeed] = React.useState<SocialFeedKind>("discover")
@@ -92,7 +101,9 @@ export function SocialFeedPage() {
   return (
     <PageLayout className="max-w-[944px] gap-0">
       <header className="mb-6 flex items-center justify-between">
-        <h1 className="font-heading text-3xl font-bold">动态圈</h1>
+        <h1 className="font-heading text-lg font-semibold tracking-title">
+          动态圈
+        </h1>
         <div className="flex items-center gap-2">
           {canReadNotifications ? (
             <Button
@@ -143,7 +154,7 @@ export function SocialFeedPage() {
           ) : null}
 
           <div
-            className="grid h-10 grid-cols-3 rounded-lg bg-muted p-1 text-sm"
+            className="grid h-10 grid-cols-3 gap-1 rounded-lg border bg-muted p-[3px] text-sm"
             role="tablist"
             aria-label="动态流筛选"
           >
@@ -155,12 +166,7 @@ export function SocialFeedPage() {
                 setFeed("following")
                 if (sort === "hot") setSort("newest")
               }}
-              className={cn(
-                "flex items-center justify-center gap-2 rounded-md",
-                feed === "following"
-                  ? "bg-background font-medium text-foreground shadow-sm"
-                  : "text-muted-foreground"
-              )}
+              className={feedTabClass(feed === "following")}
             >
               <UsersIcon className="size-4" />
               关注
@@ -173,12 +179,7 @@ export function SocialFeedPage() {
                 setFeed("discover")
                 if (sort === "hot") setSort("newest")
               }}
-              className={cn(
-                "flex items-center justify-center gap-2 rounded-md",
-                feed === "discover" && sort !== "hot"
-                  ? "bg-background font-medium text-foreground shadow-sm"
-                  : "text-muted-foreground"
-              )}
+              className={feedTabClass(feed === "discover" && sort !== "hot")}
             >
               <SparklesIcon className="size-4" />
               发现
@@ -191,12 +192,7 @@ export function SocialFeedPage() {
                 setFeed("discover")
                 setSort("hot")
               }}
-              className={cn(
-                "flex items-center justify-center gap-2 rounded-md",
-                sort === "hot"
-                  ? "bg-background font-medium text-foreground shadow-sm"
-                  : "text-muted-foreground"
-              )}
+              className={feedTabClass(sort === "hot")}
             >
               <TrendingUpIcon className="size-4" />
               热门
@@ -240,8 +236,9 @@ export function SocialFeedPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Button
-                  variant={featuredOnly ? "secondary" : "ghost"}
+                  variant={featuredOnly ? "soft" : "ghost"}
                   size="sm"
+                  aria-pressed={featuredOnly}
                   onClick={() => setFeaturedOnly((value) => !value)}
                 >
                   只看精华

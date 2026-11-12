@@ -174,7 +174,9 @@ function TorrentWorkbench({
   if (torrents.isError || !torrents.data) {
     return (
       <StaffPageFrame className="gap-4">
-        <h1 className="font-heading text-xl font-semibold">种子管理</h1>
+        <h1 className="font-heading text-lg font-semibold tracking-title">
+          种子管理
+        </h1>
         <Alert variant="destructive">
           <CircleAlertIcon />
           <AlertTitle>种子工作台暂时无法读取</AlertTitle>
@@ -251,7 +253,7 @@ function TorrentWorkbench({
       <Card className="gap-0 py-0">
         <CardHeader className="p-6 pb-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <CardTitle className="flex min-h-8 items-center gap-2 text-2xl">
+            <CardTitle className="flex min-h-8 items-center gap-2 text-lg">
               <HardDriveIcon className="size-5" aria-hidden="true" />
               <h1>种子管理</h1>
               <span className="text-sm font-normal text-muted-foreground">

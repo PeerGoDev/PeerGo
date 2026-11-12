@@ -14,7 +14,7 @@ export function EmailStatusCard({ verified }: { verified: boolean }) {
     >
       <CardHeader className="px-6 pt-6 pb-6">
         <CardTitle>
-          <h2 className="flex items-center gap-2 text-2xl leading-none font-semibold">
+          <h2 className="flex items-center gap-2 text-base leading-none font-semibold tracking-title">
             {verified ? (
               <CircleCheckIcon className="size-6 text-success" />
             ) : (
@@ -24,7 +24,7 @@ export function EmailStatusCard({ verified }: { verified: boolean }) {
           </h2>
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-6 pb-6 text-sm text-muted-foreground">
+      <CardContent className="px-(--card-spacing) pb-(--card-spacing) text-sm text-muted-foreground">
         {verified ? (
           "您的邮箱已完成验证，可以正常使用需要验证邮箱的功能。"
         ) : (

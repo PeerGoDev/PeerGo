@@ -3,7 +3,7 @@ import { cn } from "~/lib/utils"
 
 const unitToneClass = {
   muted: "text-muted-foreground",
-  blue: "text-chart-3",
+  blue: "text-info",
   green: "text-success-foreground",
   purple: "text-chart-5",
   red: "text-destructive",
@@ -18,12 +18,12 @@ export function TorrentSize({
 }) {
   const size = formatTorrentSizeParts(bytes)
   if (!size) {
-    return <span className={cn("text-muted-foreground", className)}>—</span>
+    return <span className={cn("text-faint", className)}>—</span>
   }
 
   return (
-    <span className={className}>
-      <span className="font-mono font-medium tabular-nums">{size.value}</span>
+    <span className={cn("font-mono tabular-nums", className)}>
+      <span className="font-medium">{size.value}</span>
       <span className={cn("ml-0.5", unitToneClass[size.tone])}>
         {size.unit}
       </span>

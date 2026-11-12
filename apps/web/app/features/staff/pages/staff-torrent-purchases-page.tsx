@@ -177,7 +177,7 @@ function PurchaseWorkbench({
       <Card className="gap-0 py-0">
         <CardHeader className="p-6 pb-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <CardTitle className="flex min-h-8 items-center gap-2 text-2xl">
+            <CardTitle className="flex min-h-8 items-center gap-2 text-lg">
               <ShoppingBagIcon className="size-5" aria-hidden="true" />
               <h1>购买记录</h1>
               <span className="text-sm font-normal text-muted-foreground">
@@ -417,7 +417,7 @@ function PurchaseTable({
               <TableCell className="max-w-[420px]">
                 <Link
                   to={`/torrents/${item.torrent_id}`}
-                  className="block truncate font-bold text-title transition-colors hover:text-title-hover"
+                  className="block truncate font-medium text-title transition-colors hover:text-title-hover"
                 >
                   {item.torrent_title}
                 </Link>
@@ -545,8 +545,7 @@ function PurchaseStatus({ purchase }: { purchase: ManagedTorrentPurchase }) {
 
 function PurchaseHeading() {
   return (
-    <h1 className="flex items-center gap-2 font-heading text-2xl font-semibold">
-      <ShoppingBagIcon className="size-6" />
+    <h1 className="font-heading text-lg font-semibold tracking-title">
       购买记录
     </h1>
   )

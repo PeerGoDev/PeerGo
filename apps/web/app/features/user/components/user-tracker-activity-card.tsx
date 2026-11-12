@@ -1,5 +1,5 @@
 import { Link } from "react-router"
-import { BoxIcon, MonitorIcon, NetworkIcon } from "lucide-react"
+import { BoxIcon, MonitorIcon, NetworkIcon, RadioTowerIcon } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
 import {
@@ -32,11 +32,14 @@ export function UserTrackerActivityCard({
 
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="px-6 pt-6 pb-4">
+      <CardHeader className="px-(--card-spacing) pt-(--card-spacing) pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle>
-              <h2>活跃任务与 BT 在线客户端</h2>
+              <h2 className="flex items-center gap-2">
+                <RadioTowerIcon className="size-4 text-primary" />
+                活跃任务与 BT 在线客户端
+              </h2>
             </CardTitle>
             <CardDescription className="mt-1">
               {visibility === "admin" ? "管理员实时视图" : "仅自己可见"} ·
@@ -52,7 +55,7 @@ export function UserTrackerActivityCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="px-6 pb-6">
+      <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
         {loading && !activity ? (
           <p className="py-6 text-sm text-muted-foreground">
             正在读取 Tracker 当前活动…
@@ -66,7 +69,7 @@ export function UserTrackerActivityCard({
             当前没有在线 BT 任务。
           </p>
         ) : (
-          <div className="divide-y rounded-lg">
+          <div className="divide-y rounded-lg border">
             {activity.items.map((item) => {
               const progress = item.progress_basis_points / 100
               return (
@@ -77,11 +80,11 @@ export function UserTrackerActivityCard({
                   <div className="min-w-0">
                     <Link
                       to={`/torrents/${item.torrent_id}`}
-                      className="font-medium text-title underline-offset-4 transition-colors hover:text-title-hover hover:underline"
+                      className="font-medium text-title transition-colors hover:text-title-hover"
                     >
                       种子 #{item.torrent_id}
                     </Link>
-                    <p className="truncate font-mono text-[11px] text-muted-foreground">
+                    <p className="truncate font-mono text-2xs text-faint">
                       {item.info_hash_v1}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -129,7 +132,7 @@ export function UserTrackerActivityCard({
                       value={progress}
                       aria-label={`完成进度 ${progress.toFixed(1)}%`}
                     />
-                    <p className="mt-2 text-right text-[11px] text-muted-foreground">
+                    <p className="mt-2 text-right font-mono text-2xs text-faint">
                       <time dateTime={item.last_announce}>
                         {formatCompactDateTime(item.last_announce)}
                       </time>

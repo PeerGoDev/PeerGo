@@ -1,7 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router"
 import {
-  BookmarkIcon,
   CircleAlertIcon,
   LogInIcon,
   RefreshCwIcon,
@@ -101,12 +100,11 @@ export function MyTorrentBookmarksPage() {
   }, [bookmarks.data?.total, offset])
 
   return (
-    <PageLayout className="gap-6">
-      <h1 className="flex items-center gap-3 font-heading text-3xl font-bold">
-        <BookmarkIcon className="size-8" />
+    <PageLayout>
+      <h1 className="flex items-baseline gap-2 pt-1 font-heading text-lg font-semibold tracking-title">
         我的收藏
         {bookmarks.data && bookmarks.data.total > 0 ? (
-          <span className="text-lg font-normal text-muted-foreground">
+          <span className="text-sm font-normal text-faint tabular-nums">
             ({bookmarks.data.total.toLocaleString("zh-CN")})
           </span>
         ) : null}
@@ -197,7 +195,7 @@ export function MyTorrentBookmarksPage() {
               />
               <TorrentCards
                 torrents={torrents}
-                poster={false}
+                view="list"
                 bookmarkControls={bookmarkControls}
                 timestampByTorrentId={bookmarkTimes}
                 adultCoversVisible={adultCoversVisible}

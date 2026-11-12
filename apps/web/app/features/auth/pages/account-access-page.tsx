@@ -117,7 +117,7 @@ export function AccountAccessPage() {
         <CardTitle>
           <h1
             id="restriction-title"
-            className="text-[22px] leading-none font-semibold tracking-tight"
+            className="text-[1.375rem] leading-none font-semibold tracking-title"
           >
             封禁记录与申诉
           </h1>

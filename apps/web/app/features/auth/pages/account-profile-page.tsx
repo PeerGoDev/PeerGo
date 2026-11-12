@@ -37,7 +37,7 @@ export function AccountProfilePage() {
           <CardHeader className="px-6 pt-6 pb-5">
             <Skeleton className="h-7 w-28" />
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 px-6 pb-6">
+          <CardContent className="flex flex-col gap-4 px-(--card-spacing) pb-(--card-spacing)">
             <Skeleton className="size-16 rounded-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
@@ -52,10 +52,10 @@ export function AccountProfilePage() {
       <ProfileFrame>
         <Card className="gap-0 py-0">
           <CardHeader className="px-6 pt-6 pb-3">
-            <CardTitle className="text-2xl leading-none">需要登录</CardTitle>
+            <CardTitle className="text-lg leading-none">需要登录</CardTitle>
             <CardDescription>登录后可以查看自己的账户资料。</CardDescription>
           </CardHeader>
-          <CardFooter className="border-0 bg-transparent px-6 pb-6">
+          <CardFooter className="border-0 bg-transparent px-(--card-spacing) pb-(--card-spacing)">
             <Link to="/login" className={buttonVariants()}>
               <LogInIcon data-icon="inline-start" />
               前往登录
@@ -114,10 +114,12 @@ function ProfileEditor({
     <Card className="gap-0 py-0">
       <CardHeader className="px-6 pt-6 pb-6">
         <CardTitle>
-          <h2 className="text-2xl leading-none font-semibold">个人资料</h2>
+          <h2 className="text-base leading-none font-semibold tracking-title">
+            个人资料
+          </h2>
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-6 pb-6">
+      <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
         <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
           <AvatarUpload
             username={session.user.username}

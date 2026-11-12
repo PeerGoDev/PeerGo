@@ -30,10 +30,10 @@ describe("UserProfilePage", () => {
     expect(screen.getByText("流量统计")).toBeVisible()
     expect(
       screen.getByText("基本信息").closest('[data-slot="card"]')
-    ).toHaveClass("md:min-h-[262px]")
+    ).toHaveClass("gap-0", "py-0", "shadow-card")
     expect(
       screen.getByRole("heading", { name: "迁移用户" }).closest("header")
-    ).toHaveClass("flex-col", "items-stretch", "sm:min-h-[88px]", "sm:flex-row")
+    ).toHaveClass("flex-col", "items-stretch", "sm:flex-row")
     expect(screen.getByText("2 KB")).toBeVisible()
     expect(screen.getAllByText("1 KB")).toHaveLength(2)
     expect(screen.getByText("2.00")).toBeVisible()
@@ -46,14 +46,12 @@ describe("UserProfilePage", () => {
       "/account"
     )
     expect(screen.getByRole("button", { name: "设置" })).toHaveClass(
-      "font-normal",
-      "gap-1",
       "w-full",
       "sm:w-auto"
     )
     expect(
       screen.getByRole("heading", { name: "基本信息" }).parentElement
-    ).toHaveClass("leading-6", "font-bold")
+    ).toHaveClass("leading-6", "font-semibold")
     expect(screen.queryByText(/等级|魔力值|PT币/)).not.toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "最新动态" })).toBeVisible()
     expect(screen.getByText("(1 条)")).toBeVisible()

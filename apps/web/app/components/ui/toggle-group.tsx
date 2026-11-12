@@ -42,7 +42,7 @@ function ToggleGroup({
       data-orientation={orientation}
       style={{ "--gap": spacing } as React.CSSProperties}
       className={cn(
-        "group/toggle-group flex w-fit max-w-full touch-pan-x [scrollbar-width:none] flex-row items-center gap-[--spacing(var(--gap))] overflow-x-auto overscroll-x-contain rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:max-w-none data-vertical:flex-col data-vertical:items-stretch data-vertical:overflow-visible [&::-webkit-scrollbar]:hidden",
+        "group/toggle-group flex w-fit max-w-full touch-pan-x [scrollbar-width:none] flex-row items-center gap-[--spacing(var(--gap))] overflow-x-auto overscroll-x-contain rounded-lg data-[variant=segment]:border data-[variant=segment]:bg-muted data-[variant=segment]:p-[3px] data-vertical:max-w-none data-vertical:flex-col data-vertical:items-stretch data-vertical:overflow-visible [&::-webkit-scrollbar]:hidden",
         className
       )}
       {...props}

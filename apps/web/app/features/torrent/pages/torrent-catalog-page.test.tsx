@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router"
 import { describe, expect, it } from "vitest"
 
@@ -109,45 +109,60 @@ describe("TorrentCatalogPage", () => {
       "true"
     )
     expect(screen.getByRole("button", { name: /电影\s*12/ })).toHaveClass(
-      "bg-background",
-      "aria-pressed:border-transparent",
-      "dark:aria-pressed:bg-primary",
-      "dark:aria-pressed:text-primary-foreground"
+      "bg-card",
+      "aria-pressed:border-primary",
+      "aria-pressed:bg-primary"
     )
     expect(screen.getByRole("button", { name: /纪录片\s*0/ })).toBeVisible()
-    expect(screen.getByRole("heading", { name: "共 60 个种子" })).toBeVisible()
-    expect(
-      screen.getByRole("heading", { name: "共 60 个种子" }).closest("section")
-    ).toHaveClass("gap-2.5", "sm:gap-4")
+    const resultsHeading = screen.getByRole("heading", {
+      name: /搜索结果\s*共\s*60\s*个种子/,
+    })
+    expect(resultsHeading).toBeVisible()
+    expect(resultsHeading.closest("section")).toHaveClass("gap-3")
     expect(
       screen.getAllByText("Release One 2026 1080p").length
     ).toBeGreaterThan(0)
-    expect(screen.getByText("第 1 页 / 共 3 页")).toBeVisible()
-    expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled()
-    expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled()
-    expect(screen.getByRole("spinbutton", { name: "跳转页码" })).toBeVisible()
-    expect(screen.getByRole("combobox", { name: "每页条数" })).toHaveValue("25")
-    expect(screen.getByRole("option", { name: "100" })).toBeVisible()
-    fireEvent.change(screen.getByRole("combobox", { name: "每页条数" }), {
+
+    // The table card carries the desktop pagination; phones get a copy below
+    // the card list.
+    const [desktopPagination] = screen.getAllByRole("navigation", {
+      name: "种子目录分页",
+    })
+    expect(desktopPagination.closest('[data-slot="card"]')).toHaveClass(
+      "md:flex"
+    )
+    const pagination = within(desktopPagination)
+    expect(pagination.getByText("第 1 / 3 页")).toBeVisible()
+    expect(pagination.getByRole("button", { name: "第 1 页" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    )
+    expect(pagination.getByRole("button", { name: "上一页" })).toBeDisabled()
+    expect(pagination.getByRole("button", { name: "下一页" })).toBeEnabled()
+    expect(
+      pagination.getByRole("spinbutton", { name: "跳转页码" })
+    ).toBeVisible()
+    expect(pagination.getByRole("combobox", { name: "每页条数" })).toHaveValue(
+      "25"
+    )
+    expect(pagination.getByRole("option", { name: "100" })).toBeVisible()
+    fireEvent.change(pagination.getByRole("combobox", { name: "每页条数" }), {
       target: { value: "100" },
     })
-    expect(screen.getByRole("combobox", { name: "每页条数" })).toHaveValue(
-      "100"
-    )
+    expect(
+      within(
+        screen.getAllByRole("navigation", { name: "种子目录分页" })[0]
+      ).getByRole("combobox", { name: "每页条数" })
+    ).toHaveValue("100")
     expect(
       screen.getByRole("combobox", { name: "促销" }).parentElement
-    ).toHaveClass(
-      "w-[calc((100%_-_0.75rem)/2)]",
-      "md:w-[calc((100%_-_1.5rem)/3)]",
-      "lg:w-[calc((100%_-_2.25rem)/4)]",
-      "xl:w-[calc((100%_-_3.75rem)/6)]"
-    )
+    ).toHaveClass("max-sm:w-full", "sm:w-36")
     expect(screen.getByRole("button", { name: "搜索" })).toHaveClass(
-      "w-15",
-      "px-0"
+      "w-16",
+      "shrink-0"
     )
-    expect(screen.getByRole("search")).toHaveClass("gap-y-3", "sm:gap-y-4")
-    expect(screen.getByText("促销")).toHaveClass("text-xs", "leading-none")
+    expect(screen.getByRole("search")).toHaveClass("items-end", "gap-2.5")
+    expect(screen.getByText("促销")).toHaveClass("text-2xs", "leading-none")
   })
 })
 

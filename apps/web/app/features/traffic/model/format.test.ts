@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { components } from "~/generated/api"
 import {
   formatShareRatio,
+  shareRatioToneClass,
   trafficAdjustmentLabels,
 } from "~/features/traffic/model/format"
 
@@ -36,6 +37,19 @@ describe("traffic formatters", () => {
     expect(formatShareRatio("1", "3", 3)).toBe("0.333")
     expect(formatShareRatio("1000", "0")).toBe("∞")
     expect(formatShareRatio("0", "0")).toBe("—")
+  })
+
+  it("tones the share ratio by the 0.4 and 1.0 thresholds", () => {
+    expect(shareRatioToneClass("399", "1000")).toBe("text-destructive")
+    expect(shareRatioToneClass("400", "1000")).toBe("text-warning-foreground")
+    expect(shareRatioToneClass("999", "1000")).toBe("text-warning-foreground")
+    expect(shareRatioToneClass("1000", "1000")).toBe("text-success-foreground")
+    expect(shareRatioToneClass("9007199254740993", "9007199254740993")).toBe(
+      "text-success-foreground"
+    )
+    expect(shareRatioToneClass("5", "0")).toBe("text-success-foreground")
+    expect(shareRatioToneClass("0", "0")).toBeUndefined()
+    expect(shareRatioToneClass("-1", "10")).toBeUndefined()
   })
 
   it("derives display labels from final values without re-evaluating policy", () => {

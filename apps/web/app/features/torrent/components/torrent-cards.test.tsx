@@ -23,13 +23,13 @@ const torrent = {
 }
 
 describe("TorrentCards", () => {
-  it("uses a compact two-to-six column 2:3 poster layout without fake media", () => {
+  it("uses a compact two-to-five column 2:3 poster layout without fake media", () => {
     const queryClient = new QueryClient()
     const { container } = render(
       <MemoryRouter>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <TorrentCards torrents={[torrent]} poster />
+            <TorrentCards torrents={[torrent]} view="poster" />
           </TooltipProvider>
         </QueryClientProvider>
       </MemoryRouter>
@@ -43,7 +43,6 @@ describe("TorrentCards", () => {
       `http://localhost:3000/api/v1/torrents/${torrent.id}/cover`
     )
     expect(cover.closest("div")).toHaveClass("aspect-[2/3]")
-    expect(screen.queryByText("电影")).not.toBeInTheDocument()
     expect(screen.getByText("免费")).toBeInTheDocument()
     expect(screen.getByRole("link")).toHaveAttribute(
       "href",
@@ -51,13 +50,35 @@ describe("TorrentCards", () => {
     )
     expect(container.firstElementChild).toHaveClass(
       "grid-cols-2",
-      "xl:grid-cols-6"
+      "xl:grid-cols-5"
     )
 
     fireEvent.error(cover)
     expect(
       screen.getByRole("img", { name: "Published Release暂无封面" })
-    ).toHaveClass("bg-gradient-to-br", "from-neutral-200", "to-neutral-500")
+    ).toHaveClass("bg-linear-to-br", "from-muted", "to-border")
+  })
+
+  it("lays the waterfall view out in balanced columns at natural cover height", () => {
+    const queryClient = new QueryClient()
+    const { container } = render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <TorrentCards
+              torrents={[torrent, { ...torrent, id: 43, name: "Second" }]}
+              view="waterfall"
+            />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    )
+
+    const cover = screen.getByRole("img", { name: "Published Release封面" })
+    expect(cover).toHaveClass("h-auto", "w-full")
+    expect(cover.closest("div")).not.toHaveClass("aspect-[2/3]")
+    expect(container.firstElementChild).toHaveClass("grid", "items-start")
+    expect(screen.getAllByRole("link")).toHaveLength(2)
   })
 
   it("links canonical numeric IDs to torrent detail", () => {
@@ -66,7 +87,7 @@ describe("TorrentCards", () => {
       <MemoryRouter>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <TorrentCards torrents={[{ ...torrent, id: 43 }]} poster />
+            <TorrentCards torrents={[{ ...torrent, id: 43 }]} view="poster" />
           </TooltipProvider>
         </QueryClientProvider>
       </MemoryRouter>
@@ -92,7 +113,7 @@ describe("TorrentCards", () => {
                   category: { id: "9kg", name: "9KG" },
                 },
               ]}
-              poster
+              view="poster"
             />
           </TooltipProvider>
         </QueryClientProvider>
@@ -111,7 +132,7 @@ describe("TorrentCards", () => {
       <MemoryRouter>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <TorrentCards torrents={[torrent]} poster={false} />
+            <TorrentCards torrents={[torrent]} view="list" />
           </TooltipProvider>
         </QueryClientProvider>
       </MemoryRouter>
@@ -121,8 +142,8 @@ describe("TorrentCards", () => {
     expect(title).toHaveClass("line-clamp-2")
     expect(screen.getByText("PeerGo media fixture")).toHaveClass("line-clamp-1")
     expect(title.closest("article")).toHaveClass("border-t", "p-3")
-    expect(screen.getByText("免费")).toHaveClass("text-[10px]")
-    expect(container.querySelector("time")).not.toBeInTheDocument()
+    expect(screen.getByText("免费")).toHaveClass("text-2xs")
+    expect(container.querySelector("time")).toHaveClass("ml-auto", "text-faint")
     expect(screen.getByLabelText("做种数 12，下载数 3")).toHaveClass(
       "items-center",
       "tabular-nums"
@@ -133,6 +154,6 @@ describe("TorrentCards", () => {
     fireEvent.error(cover)
     expect(
       screen.getByRole("img", { name: "Published Release暂无封面" })
-    ).toHaveClass("from-neutral-100", "to-neutral-300")
+    ).toHaveClass("from-muted", "to-border")
   })
 })

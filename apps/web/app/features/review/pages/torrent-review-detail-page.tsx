@@ -107,7 +107,7 @@ export function TorrentReviewDetailPage() {
   }
   if (!session.data) {
     return (
-      <PageLayout className="max-w-[1280px] gap-5 p-4! sm:px-6! sm:py-10!">
+      <PageLayout className="gap-5">
         <ReviewDetailProblem
           title="需要登录"
           description="登录后才能读取待审种子的完整资料。"
@@ -122,7 +122,7 @@ export function TorrentReviewDetailPage() {
   }
   if (voteResult) {
     return (
-      <PageLayout className="max-w-[900px] gap-5 p-4! sm:px-6! sm:py-10!">
+      <PageLayout className="max-w-[900px] gap-5">
         <ReviewVoteSuccess result={voteResult} />
       </PageLayout>
     )
@@ -132,7 +132,7 @@ export function TorrentReviewDetailPage() {
       detail.error instanceof ApiProblemError &&
       detail.error.code === "torrent_review_not_found"
     return (
-      <PageLayout className="max-w-[1280px] gap-5 p-4! sm:px-6! sm:py-10!">
+      <PageLayout className="gap-5">
         <ReviewDetailProblem
           title={assignmentGone ? "该审核任务已结束" : "审核资料暂时无法读取"}
           description={
@@ -160,7 +160,7 @@ export function TorrentReviewDetailPage() {
   }
 
   return (
-    <PageLayout className="max-w-[1320px] gap-5 p-4! sm:px-6! sm:py-8!">
+    <PageLayout className="gap-5">
       <Button
         nativeButton={false}
         variant="ghost"
@@ -187,7 +187,7 @@ export function TorrentReviewDetailPage() {
             infoHash={detail.data.info_hash_v1}
           />
         </main>
-        <aside className="lg:sticky lg:top-5">
+        <aside className="lg:sticky lg:top-[calc(var(--shell-header-height)+1rem)]">
           <ReviewVotePanel
             torrent={detail.data}
             csrfToken={session.data.csrf_token}
@@ -499,7 +499,7 @@ function ReviewVotePanel({
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="reject"
-                  className="data-pressed:text-destructive-foreground h-11 w-full data-pressed:bg-destructive"
+                  className="h-11 w-full data-pressed:bg-destructive data-pressed:text-white"
                 >
                   <ThumbsDownIcon data-icon="inline-start" />
                   拒绝

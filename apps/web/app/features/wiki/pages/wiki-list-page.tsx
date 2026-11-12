@@ -51,14 +51,7 @@ export function WikiListPage() {
   return (
     <PageLayout className="gap-6">
       <PageHeader
-        title={
-          <span className="flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <BookOpenIcon className="size-6" />
-            </span>
-            Wiki 文档
-          </span>
-        }
+        title="Wiki 文档"
         description="站点规则、发种规范与使用指南。登录成员可阅读成员文档，被指派的协作者可以维护正文。"
       />
 
@@ -116,33 +109,35 @@ export function WikiListPage() {
       {pages.data ? (
         pages.data.items.length > 0 ? (
           <section aria-label="Wiki 文档列表" className="flex flex-col gap-4">
-            <ol className="grid gap-4 md:grid-cols-2">
+            <ol className="grid gap-3 sm:gap-4 md:grid-cols-2">
               {pages.data.items.map((page) => (
                 <li key={page.id}>
                   <Link
                     to={`/wiki/${encodeURIComponent(page.slug)}`}
-                    className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="group block h-full rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
                   >
-                    <Card className="h-full ring-2 ring-transparent transition-shadow group-hover:ring-primary/50">
+                    <Card className="h-full transition-colors group-hover:border-primary/40">
                       <CardHeader>
                         <div className="flex items-start justify-between gap-3">
-                          <CardTitle className="text-xl break-words">
+                          <CardTitle className="text-base break-words">
                             {page.title}
                           </CardTitle>
-                          <ArrowRightIcon className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+                          <ArrowRightIcon className="size-4 shrink-0 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-link" />
                         </div>
-                        <CardDescription className="line-clamp-3 leading-6">
+                        <CardDescription className="line-clamp-3 text-sm leading-6">
                           {page.summary || "站点 Wiki 文档"}
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="mt-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">
+                      <CardContent className="mt-auto flex flex-wrap items-center gap-2 text-xs text-faint">
+                        <Badge variant="secondary">
                           {page.visibility === "members"
                             ? "成员文档"
                             : "公开文档"}
                         </Badge>
-                        {page.can_edit ? <Badge>可协作编辑</Badge> : null}
-                        <span className="ml-auto">
+                        {page.can_edit ? (
+                          <Badge variant="primary">可协作编辑</Badge>
+                        ) : null}
+                        <span className="ml-auto tabular-nums">
                           更新于 {formatCompactDateTime(page.updated_at)}
                         </span>
                       </CardContent>
@@ -151,7 +146,7 @@ export function WikiListPage() {
                 </li>
               ))}
             </ol>
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center text-xs text-faint">
               共 {pages.data.total} 篇文档
               {query ? `，搜索“${query}”` : ""}
             </p>
@@ -194,7 +189,7 @@ export function WikiListPage() {
 
 function WikiListSkeleton() {
   return (
-    <div className="grid gap-4 md:grid-cols-2" aria-busy="true">
+    <div className="grid gap-3 sm:gap-4 md:grid-cols-2" aria-busy="true">
       {Array.from({ length: 4 }, (_, index) => (
         <Card key={index}>
           <CardHeader>

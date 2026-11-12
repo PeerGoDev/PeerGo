@@ -1,11 +1,20 @@
 import * as React from "react"
 import { Link } from "react-router"
-import { NewspaperIcon, PinIcon, TriangleAlertIcon } from "lucide-react"
+import {
+  NewspaperIcon,
+  PinIcon,
+  SearchIcon,
+  TriangleAlertIcon,
+} from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
 import { Button } from "~/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
-import { Input } from "~/components/ui/input"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "~/components/ui/input-group"
 import { Skeleton } from "~/components/ui/skeleton"
 import { useWebSession } from "~/features/auth/api/session.mutations"
 import {
@@ -60,8 +69,8 @@ export function HomePage() {
   }
 
   return (
-    <PageLayout className="gap-6">
-      <PageHeader title="首页" />
+    <PageLayout>
+      <PageHeader title="首页" description={siteInfo.data?.description} />
 
       {showLatestAnnouncement ? (
         <section
@@ -82,19 +91,20 @@ export function HomePage() {
         <h2 id="catalog-search-title" className="sr-only">
           搜索种子
         </h2>
-        <form onSubmit={handleSearch} role="search" className="flex gap-3">
-          <Input
-            value={draftQuery}
-            onChange={(event) => setDraftQuery(event.target.value)}
-            placeholder="搜索种子..."
-            aria-label="搜索种子"
-            maxLength={100}
-            className="h-10 flex-1 rounded-[6px] bg-background"
-          />
-          <Button
-            type="submit"
-            className="h-10 w-[60px] shrink-0 rounded-[6px] px-0"
-          >
+        <form onSubmit={handleSearch} role="search" className="flex gap-2.5">
+          <InputGroup className="min-w-0 flex-1">
+            <InputGroupAddon className="pl-3">
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              value={draftQuery}
+              onChange={(event) => setDraftQuery(event.target.value)}
+              placeholder="搜索种子..."
+              aria-label="搜索种子"
+              maxLength={100}
+            />
+          </InputGroup>
+          <Button type="submit" className="w-16 shrink-0">
             搜索
           </Button>
         </form>
@@ -103,27 +113,27 @@ export function HomePage() {
       <section
         id="latest-torrents"
         aria-labelledby="latest-torrents-title"
-        className="flex w-full scroll-mt-20 flex-col gap-4"
+        className="flex w-full scroll-mt-20 flex-col gap-3"
       >
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2
-              id="latest-torrents-title"
-              className="font-heading text-xl font-semibold"
-            >
+        <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <h2
+            id="latest-torrents-title"
+            className="flex min-w-0 items-baseline gap-2.5"
+          >
+            <span className="text-base font-semibold tracking-title">
               {query ? "搜索结果" : "最新种子"}
-            </h2>
-            {query && (
+            </span>
+            {query ? (
               <span
-                className="text-xs text-muted-foreground"
+                className="text-xs font-normal text-faint"
                 aria-live="polite"
               >
                 {torrents.data
                   ? `共 ${torrents.data.total.toLocaleString("zh-CN")} 条`
                   : "搜索中"}
               </span>
-            )}
-          </div>
+            ) : null}
+          </h2>
 
           <TorrentViewControls
             value={view}
@@ -143,33 +153,30 @@ export function HomePage() {
         {torrents.data && torrents.data.items.length === 0 && (
           <TorrentListEmpty query={query} />
         )}
-        {torrents.data && torrents.data.items.length > 0 && (
-          <>
-            {view === "list" && (
-              <>
-                <TorrentTable
-                  torrents={torrents.data.items}
-                  bookmarkControls={bookmarkControls}
-                  adultCoversVisible={adultCoversVisible}
-                />
-                <TorrentCards
-                  torrents={torrents.data.items}
-                  poster={false}
-                  bookmarkControls={bookmarkControls}
-                  adultCoversVisible={adultCoversVisible}
-                />
-              </>
-            )}
-            {view === "poster" && (
-              <TorrentCards
+        {torrents.data && torrents.data.items.length > 0 ? (
+          view === "list" ? (
+            <>
+              <TorrentTable
                 torrents={torrents.data.items}
-                poster
                 bookmarkControls={bookmarkControls}
                 adultCoversVisible={adultCoversVisible}
               />
-            )}
-          </>
-        )}
+              <TorrentCards
+                torrents={torrents.data.items}
+                view="list"
+                bookmarkControls={bookmarkControls}
+                adultCoversVisible={adultCoversVisible}
+              />
+            </>
+          ) : (
+            <TorrentCards
+              torrents={torrents.data.items}
+              view={view}
+              bookmarkControls={bookmarkControls}
+              adultCoversVisible={adultCoversVisible}
+            />
+          )
+        ) : null}
       </section>
     </PageLayout>
   )
@@ -186,18 +193,18 @@ function CommunityWelcome({
 }) {
   return (
     <PageLayout
-      className="min-h-[calc(100svh-var(--shell-header-height)-var(--shell-gap))] items-center justify-center"
+      className="min-h-[calc(100svh-var(--shell-header-height))] items-center justify-center"
       aria-labelledby="community-welcome-title"
     >
       <div className="flex max-w-xl flex-col items-center gap-6 text-center">
         <div className="flex flex-col gap-3">
           <h1
             id="community-welcome-title"
-            className="font-heading text-4xl font-bold tracking-tight sm:text-5xl"
+            className="font-heading text-3xl font-semibold tracking-title sm:text-4xl"
           >
             {name}
           </h1>
-          <p className="text-base text-muted-foreground">{description}</p>
+          <p className="text-md text-muted-foreground">{description}</p>
         </div>
         <div className="flex items-center gap-3">
           <Button nativeButton={false} render={<Link to="/login" />} size="lg">
@@ -241,20 +248,19 @@ function AnnouncementState({
   if (loading) {
     return (
       <Card
-        className="min-h-[122px] gap-0 py-0"
+        size="sm"
+        className="gap-3"
         aria-label="正在加载最新公告"
         aria-busy="true"
       >
-        <CardHeader className="px-4 pt-4 pb-3">
-          <CardTitle className="flex items-center gap-2 leading-5 [&_svg]:size-4">
+        <CardHeader>
+          <CardTitle>
             <Skeleton className="h-4 w-24" />
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-4 pt-0 pb-4">
-          <div className="flex flex-col gap-2 border-l-2 border-primary py-2 pl-3">
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-3 w-72 max-w-full" />
-          </div>
+        <CardContent className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-3 w-72 max-w-full" />
         </CardContent>
       </Card>
     )
@@ -272,60 +278,61 @@ function AnnouncementState({
     )
   }
 
+  const header = (
+    <CardHeader className="grid-cols-[1fr_auto]">
+      <CardTitle className="flex items-center gap-2">
+        <NewspaperIcon />
+        <span>最新公告</span>
+      </CardTitle>
+      <Link
+        to="/announcements"
+        className="col-start-2 row-start-1 self-center text-xs text-link hover:underline hover:underline-offset-4"
+      >
+        全部公告 →
+      </Link>
+    </CardHeader>
+  )
+
   if (!data) {
     return (
-      <Card className="min-h-[122px] gap-0 py-0">
-        <CardHeader className="px-4 pt-4 pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm leading-5 font-semibold text-muted-foreground [&_svg]:size-4">
-            <NewspaperIcon className="text-primary" />
-            <span>最新公告</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pt-0 pb-4">
-          <div className="border-l-2 border-primary py-2 pl-3 text-sm text-muted-foreground">
-            暂无公告
-          </div>
+      <Card size="sm" className="gap-3">
+        {header}
+        <CardContent className="text-sm text-muted-foreground">
+          暂无公告
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <Card className="min-h-[122px] gap-0 py-0">
-      <CardHeader className="px-4 pt-4 pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm leading-5 font-semibold text-muted-foreground [&_svg]:size-4">
-          <NewspaperIcon className="text-primary" />
-          <span>最新公告</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pt-0 pb-4">
-        <div className="-ml-1 border-l-2 border-primary py-2 pl-3">
-          <div className="flex min-w-0 items-start gap-2">
-            <PinIcon
-              className="mt-0.5 size-3.5 shrink-0 text-primary"
-              aria-hidden="true"
-            />
-            <div className="min-w-0 flex-1">
-              <h2
-                id="announcement-title"
-                className="truncate text-sm font-medium"
+    <Card size="sm" className="gap-3">
+      {header}
+      <CardContent>
+        <div className="flex min-w-0 items-start gap-2.5 rounded-lg border bg-muted/60 px-3 py-2.5">
+          <PinIcon
+            className="mt-0.5 size-3.5 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1">
+            <h2
+              id="announcement-title"
+              className="truncate text-sm font-medium"
+            >
+              <Link
+                to={`/announcements/${encodeURIComponent(data.id)}`}
+                className="transition-colors hover:text-link"
               >
-                <Link
-                  to={`/announcements/${encodeURIComponent(data.id)}`}
-                  className="hover:text-primary hover:underline hover:underline-offset-4"
-                >
-                  {data.title}
-                </Link>
-              </h2>
-              <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                <span className="min-w-0 truncate">{publisherLabel}</span>
-                <span className="shrink-0" aria-hidden="true">
-                  •
-                </span>
-                <time className="shrink-0" dateTime={data.published_at}>
-                  {formatLongDate(data.published_at)}
-                </time>
-              </div>
+                {data.title}
+              </Link>
+            </h2>
+            <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-faint">
+              <span className="min-w-0 truncate">{publisherLabel}</span>
+              <span className="shrink-0" aria-hidden="true">
+                ·
+              </span>
+              <time className="shrink-0" dateTime={data.published_at}>
+                {formatLongDate(data.published_at)}
+              </time>
             </div>
           </div>
         </div>

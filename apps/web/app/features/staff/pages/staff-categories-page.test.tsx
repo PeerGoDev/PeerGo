@@ -27,7 +27,7 @@ describe("StaffCategoriesPage", () => {
 
     expect(
       await screen.findByRole("heading", { name: "分类管理" })
-    ).toHaveClass("text-xl", "font-semibold")
+    ).toHaveClass("text-lg", "font-semibold")
     expect(screen.getByRole("button", { name: "新建分类" })).toHaveClass("w-26")
     expect(screen.getByRole("button", { name: "刷新" })).toHaveClass("w-19")
     expect(screen.getByText(/点击分类可直接展开类型/)).toBeVisible()

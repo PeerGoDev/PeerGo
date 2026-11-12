@@ -32,9 +32,9 @@ export function WikiMarkdownEditor({
           const selected = next[0] as EditorMode | undefined
           if (selected) setMode(selected)
         }}
-        variant="outline"
+        variant="segment"
         size="sm"
-        spacing={0}
+        spacing={0.5}
         aria-label="编辑器显示模式"
       >
         <ToggleGroupItem value="edit" disabled={disabled}>

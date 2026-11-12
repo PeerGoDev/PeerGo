@@ -10,12 +10,12 @@ import { cn } from "~/lib/utils"
 import { useAvatarRevision } from "~/shared/components/avatar-revision"
 
 const fallbackColors = [
-  "bg-sidebar-accent text-sidebar-accent-foreground",
-  "bg-success/20 text-success-foreground",
-  "bg-warning/20 text-warning-foreground",
-  "bg-info/20 text-info",
-  "bg-primary/25 text-sidebar-accent-foreground",
-  "bg-destructive/15 text-destructive",
+  "bg-linear-135 from-[#3c83d6] to-[#1d5eb0] text-white",
+  "bg-linear-135 from-[#6366f1] to-[#4338ca] text-white",
+  "bg-linear-135 from-[#14b8a6] to-[#0f766e] text-white",
+  "bg-linear-135 from-[#22c55e] to-[#15803d] text-white",
+  "bg-linear-135 from-[#f59e0b] to-[#b45309] text-white",
+  "bg-linear-135 from-[#f43f5e] to-[#be123c] text-white",
 ] as const
 const unavailableAvatarUsernames = new Set<string>()
 
@@ -74,8 +74,8 @@ export function UserAvatar({
       ) : null}
       <AvatarFallback
         className={cn(
-          "font-medium",
-          avatarColor(colorSeed?.trim() || identity),
+          "font-semibold",
+          avatarColor(colorSeed?.trim() || usernameKey || identity),
           fallbackClassName
         )}
       >
@@ -83,7 +83,7 @@ export function UserAvatar({
       </AvatarFallback>
       {online ? (
         <AvatarBadge
-          className="bg-success shadow-[0_0_6px_color-mix(in_oklab,var(--color-success)_70%,transparent)]"
+          className="bg-success"
           title="在线"
           aria-label={`${identity}在线`}
         />

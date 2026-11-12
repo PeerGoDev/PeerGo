@@ -101,7 +101,7 @@ function SettingsOverviewContent({
         <FieldLabel htmlFor="staff-settings-search" className="sr-only">
           搜索设置
         </FieldLabel>
-        <InputGroup className="h-10 bg-background">
+        <InputGroup className="h-10 bg-card">
           <InputGroupAddon>
             <SearchIcon />
           </InputGroupAddon>
@@ -180,7 +180,7 @@ function SettingsGroupCard({
               )}
               aria-label={`打开${item.label}`}
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground transition-colors group-hover:text-foreground">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors group-hover:text-foreground">
                 <ItemIcon className="size-[18px]" />
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-1">

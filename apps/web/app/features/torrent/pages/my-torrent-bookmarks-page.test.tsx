@@ -96,8 +96,9 @@ describe("MyTorrentBookmarksPage", () => {
     expect(table).not.toHaveClass("min-w-[900px]")
     expect(table.querySelector("thead")).toHaveClass("block")
     expect(screen.getAllByText("Saved Release")[0].closest("tr")).toHaveClass(
-      "px-3.5",
-      "py-2.5"
+      "relative",
+      "h-14",
+      "px-4"
     )
     expect(screen.getByText("上传时间")).toBeInTheDocument()
     expect(screen.getAllByText("Saved Release").length).toBeGreaterThan(0)

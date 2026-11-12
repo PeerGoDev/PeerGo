@@ -5,9 +5,9 @@ import { cn } from "~/lib/utils"
 /**
  * Shared content frame for authenticated staff pages.
  *
- * PtYes lets administration tables use the full space remaining beside the
- * 200px sidebar. Keeping that rule here avoids page-specific width caps while
- * preserving the same 16px/24px responsive gutter used by the public shell.
+ * Administration tables use the full space remaining beside the sidebar.
+ * Keeping that rule here avoids page-specific width caps while preserving the
+ * same responsive gutter as the public shell.
  */
 export function StaffPageFrame({
   className,
@@ -16,7 +16,7 @@ export function StaffPageFrame({
   return (
     <main
       className={cn(
-        "flex w-full min-w-0 flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6",
+        "flex w-full min-w-0 flex-1 flex-col gap-4 px-4 pt-4 pb-8 sm:px-6 lg:gap-5",
         className
       )}
       {...props}

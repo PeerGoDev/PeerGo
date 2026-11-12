@@ -127,8 +127,10 @@ function ActivityRewardsContent({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">签到与活动奖励</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            签到与活动奖励
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             设置用户每天看到的签到方式、连续奖励与经验奖励。
           </p>
         </div>

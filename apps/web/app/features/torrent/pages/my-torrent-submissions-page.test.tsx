@@ -225,7 +225,7 @@ describe("MyTorrentSubmissionsPage", () => {
     renderSubmissionsPage(queryClient)
 
     expect(screen.getByRole("navigation", { name: "审核中心" })).toBeVisible()
-    expect(screen.getByRole("main")).toHaveClass("p-10", "lg:p-12")
+    expect(screen.getByRole("main")).toHaveClass("max-w-[1120px]", "gap-5")
     expect(screen.getByRole("main")).not.toHaveClass("max-w-3xl")
     expect(screen.getByRole("link", { name: "审核队列" })).toHaveAttribute(
       "href",

@@ -42,7 +42,7 @@ import {
 } from "~/features/review/api/torrent-review-voting.queries"
 import { ReviewCenterNavigation } from "~/features/torrent/components/review-center-navigation"
 import { ApiProblemError, requestErrorDescription } from "~/shared/api/problem"
-import { PageLayout } from "~/shared/components/page-layout"
+import { PageHeader, PageLayout } from "~/shared/components/page-layout"
 import { formatBytes } from "~/shared/formatters/bytes"
 import { formatDateTime } from "~/shared/formatters/date-time"
 
@@ -61,17 +61,13 @@ export function TorrentReviewQueuePage() {
   })
 
   return (
-    <PageLayout className="max-w-[1172px] gap-5 p-4! sm:gap-6 sm:p-6! sm:pt-10!">
+    <PageLayout>
       <ReviewCenterNavigation canReview />
 
-      <header>
-        <h1 className="font-heading text-2xl font-bold tracking-tight">
-          审核队列
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          打开完整发布资料后独立判断；提交前不会显示赞成与反对票分布
-        </p>
-      </header>
+      <PageHeader
+        title="审核队列"
+        description="打开完整发布资料后独立判断；提交前不会显示赞成与反对票分布"
+      />
 
       {session.isPending ? <TorrentReviewQueueSkeleton /> : null}
       {session.isError ? (
@@ -98,38 +94,41 @@ export function TorrentReviewQueuePage() {
       ) : null}
 
       {session.data ? (
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2 border-b sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
             <ToggleGroup
               value={[view]}
               onValueChange={(values) => {
                 const selected = values[0] as typeof view | undefined
                 if (selected) setView(selected)
               }}
-              spacing={0}
+              variant="segment"
+              size="sm"
+              spacing={0.5}
               aria-label="切换种审记录"
-              className="max-w-full gap-0.5"
             >
-              <ToggleGroupItem
-                value="pending"
-                className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-pressed:bg-primary data-pressed:text-primary-foreground"
-              >
+              <ToggleGroupItem value="pending">
                 <Clock3Icon data-icon="inline-start" />
                 待审核
                 {reviews.data ? (
-                  <Badge variant="destructiveSolid" className="rounded-full">
+                  <Badge
+                    variant={
+                      reviews.data.total > 0 ? "destructiveSolid" : "secondary"
+                    }
+                    className="h-4 min-w-4 rounded-full px-1 tabular-nums"
+                  >
                     {reviews.data.total.toLocaleString("zh-CN")}
                   </Badge>
                 ) : null}
               </ToggleGroupItem>
-              <ToggleGroupItem
-                value="reviewed"
-                className="h-9 rounded-lg border-0 px-3.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-pressed:bg-primary data-pressed:text-primary-foreground"
-              >
+              <ToggleGroupItem value="reviewed">
                 <HistoryIcon data-icon="inline-start" />
                 已审核
                 {history.data ? (
-                  <Badge variant="secondary" className="rounded-full">
+                  <Badge
+                    variant="secondary"
+                    className="h-4 min-w-4 rounded-full px-1 tabular-nums"
+                  >
                     {history.data.total.toLocaleString("zh-CN")}
                   </Badge>
                 ) : null}
@@ -147,7 +146,6 @@ export function TorrentReviewQueuePage() {
                   ? reviews.refetch()
                   : history.refetch())
               }
-              className="mb-2 w-full sm:mb-0 sm:w-auto"
             >
               <RefreshCwIcon data-icon="inline-start" />
               {(view === "pending" ? reviews.isFetching : history.isFetching)
@@ -163,27 +161,21 @@ export function TorrentReviewQueuePage() {
             <ReviewQueueError error={reviews.error} retry={reviews.refetch} />
           ) : null}
           {view === "pending" && reviews.data ? (
-            <section aria-label="种审任务" className="flex flex-col gap-6">
+            <section aria-label="种审任务" className="flex flex-col gap-3">
               {reviews.data.items.length === 0 ? (
-                <Card className="gap-0 py-0">
-                  <CardContent className="p-0">
-                    <Empty className="min-h-60 border-0 py-12">
-                      <EmptyHeader>
-                        <EmptyMedia className="text-muted-foreground/60 [&_svg]:size-12">
-                          <ClipboardCheckIcon />
-                        </EmptyMedia>
-                        <EmptyTitle className="text-base text-muted-foreground">
-                          当前没有待参与的种审任务
-                        </EmptyTitle>
-                        <EmptyDescription>
-                          新种子进入审核队列后会显示在这里。
-                        </EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
-                  </CardContent>
-                </Card>
+                <Empty className="min-h-60 border">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <ClipboardCheckIcon />
+                    </EmptyMedia>
+                    <EmptyTitle>当前没有待参与的种审任务</EmptyTitle>
+                    <EmptyDescription>
+                      新种子进入审核队列后会显示在这里。
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               ) : (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                   {reviews.data.items.map((torrent) => (
                     <ReviewAssignmentCard key={torrent.id} torrent={torrent} />
                   ))}
@@ -212,7 +204,7 @@ function ReviewAssignmentCard({
   torrent: MyTorrentReviewAssignment
 }) {
   return (
-    <Card className="min-h-[130px] gap-0 py-0">
+    <Card className="gap-0 py-0">
       <CardContent className="h-full p-4">
         <article className="flex h-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1">
@@ -273,7 +265,7 @@ function ReviewedTorrentList({ items }: { items: ReviewedTorrentReview[] }) {
     )
   }
   return (
-    <section aria-label="已审核种子" className="flex flex-col gap-4">
+    <section aria-label="已审核种子" className="flex flex-col gap-3">
       {items.map((torrent) => (
         <Card key={torrent.vote_id} className="gap-0 py-0">
           <CardContent className="p-4">
@@ -284,7 +276,7 @@ function ReviewedTorrentList({ items }: { items: ReviewedTorrentReview[] }) {
                   <h2 className="font-medium">{torrent.title}</h2>
                   <Badge
                     variant={
-                      torrent.decision === "approve" ? "default" : "destructive"
+                      torrent.decision === "approve" ? "success" : "destructive"
                     }
                   >
                     {torrent.decision === "approve" ? (
@@ -334,11 +326,11 @@ function reviewOutcomeLabel(outcome: ReviewedTorrentReview["outcome"]) {
 function reviewOutcomeVariant(outcome: ReviewedTorrentReview["outcome"]) {
   switch (outcome) {
     case "published":
-      return "default" as const
+      return "success" as const
     case "rejected":
       return "destructive" as const
     default:
-      return "outline" as const
+      return "secondary" as const
   }
 }
 
@@ -384,10 +376,9 @@ function ReviewQueueError({
 
 function TorrentReviewQueueSkeleton() {
   return (
-    <div className="space-y-4" aria-label="正在加载种审任务">
-      <Skeleton className="h-10 w-full" />
+    <div className="flex flex-col gap-3" aria-label="正在加载种审任务">
       {[0, 1, 2].map((item) => (
-        <Skeleton key={item} className="h-[130px] w-full rounded-lg" />
+        <Skeleton key={item} className="h-28 w-full rounded-xl" />
       ))}
     </div>
   )

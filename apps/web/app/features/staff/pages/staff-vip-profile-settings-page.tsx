@@ -132,8 +132,10 @@ function VIPProfileSettingsContent() {
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">VIP 与用户资料</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            VIP 与用户资料
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             这里显示服务端真实执行的规则；没有接入 Core
             的权益不会显示为可用开关。
           </p>

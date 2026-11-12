@@ -8,9 +8,11 @@ import {
 import { Link, useParams } from "react-router"
 import { useQuery } from "@tanstack/react-query"
 import {
+  ActivityIcon,
   ArrowDownToLineIcon,
   ArrowUpFromLineIcon,
   CalendarDaysIcon,
+  ChartNoAxesCombinedIcon,
   CircleAlertIcon,
   GaugeIcon,
   LogInIcon,
@@ -18,6 +20,7 @@ import {
   SettingsIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  UserIcon,
 } from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
@@ -49,7 +52,10 @@ import {
 import { useMyTorrentBookmarks } from "~/features/torrent/api/torrent-bookmarks.queries"
 import { useMyTorrentSubmissions } from "~/features/torrent/api/torrent.queries"
 import { useTrafficOverview } from "~/features/traffic/api/traffic.queries"
-import { formatShareRatio } from "~/features/traffic/model/format"
+import {
+  formatShareRatio,
+  shareRatioToneClass,
+} from "~/features/traffic/model/format"
 import { usePublicUserProfile } from "~/features/user/api/user.queries"
 import {
   managedTrackerActivityQueryOptions,
@@ -277,40 +283,41 @@ export function UserProfilePage() {
   ).length
 
   return (
-    <PageLayout className="gap-6">
-      <header className="flex flex-col items-stretch gap-4 sm:min-h-[88px] sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
+    <PageLayout>
+      <header className="flex flex-col items-stretch gap-4 pt-1 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
           <UserAvatar
             username={publicUser.username}
             displayName={publicUser.display_name}
-            className="mt-1 size-14! sm:mt-3 sm:size-16!"
-            fallbackClassName="text-xl"
+            shape="square"
+            className="size-14! sm:size-16!"
+            fallbackClassName="text-xl sm:text-2xl"
           />
-          <div className="flex min-w-0 flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate font-heading text-2xl font-bold">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <h1 className="truncate font-heading text-xl font-semibold tracking-title sm:text-[1.375rem]">
                 {publicUser.display_name}
               </h1>
-              <span className="text-sm text-muted-foreground">
-                @{publicUser.username}
-              </span>
-              <Badge variant={isAdminView ? "default" : "secondary"}>
+              <span className="text-sm text-faint">@{publicUser.username}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant={isAdminView ? "primary" : "secondary"}>
                 {isOwnProfile
                   ? "我的资料"
                   : isAdminView
                     ? "管理员视图"
                     : "公开资料"}
               </Badge>
+              <span className="font-mono text-xs text-faint tabular-nums">
+                UID {publicUser.numeric_id.toLocaleString("zh-CN")}
+              </span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              用户 ID {publicUser.numeric_id.toLocaleString("zh-CN")}
-            </p>
           </div>
         </div>
         {isOwnProfile ? (
           <Button
             variant="outline"
-            size="legacySm"
+            size="sm"
             className="w-full justify-center sm:w-auto"
             nativeButton={false}
             render={<Link to="/account" />}
@@ -323,9 +330,9 @@ export function UserProfilePage() {
 
       <section
         aria-label="用户统计"
-        className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-6"
+        className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
       >
-        <ProfileCard title="基本信息">
+        <ProfileCard title="基本信息" icon={UserIcon}>
           <ProfileMetric
             icon={CalendarDaysIcon}
             label="注册时间"
@@ -378,22 +385,26 @@ export function UserProfilePage() {
           ) : null}
         </ProfileCard>
 
-        <ProfileCard title="流量统计">
+        <ProfileCard title="流量统计" icon={ChartNoAxesCombinedIcon}>
           <ProfileMetric
             icon={ArrowUpFromLineIcon}
             iconClassName="text-success-foreground"
             label="上传量"
             value={
-              uploaded
-                ? formatBytes(uploaded)
-                : isOwnProfile || isAdminView
-                  ? "—"
-                  : "未公开"
+              uploaded ? (
+                <span className="text-success-foreground">
+                  {formatBytes(uploaded)}
+                </span>
+              ) : isOwnProfile || isAdminView ? (
+                "—"
+              ) : (
+                "未公开"
+              )
             }
           />
           <ProfileMetric
             icon={ArrowDownToLineIcon}
-            iconClassName="text-chart-3"
+            iconClassName="text-info"
             label="下载量"
             value={
               downloaded
@@ -408,21 +419,25 @@ export function UserProfilePage() {
             iconClassName="text-warning-foreground"
             label="分享率"
             value={
-              uploaded && downloaded
-                ? formatShareRatio(uploaded, downloaded)
-                : isOwnProfile || isAdminView
-                  ? "—"
-                  : "未公开"
+              uploaded && downloaded ? (
+                <span className={shareRatioToneClass(uploaded, downloaded)}>
+                  {formatShareRatio(uploaded, downloaded)}
+                </span>
+              ) : isOwnProfile || isAdminView ? (
+                "—"
+              ) : (
+                "未公开"
+              )
             }
           />
           {!isOwnProfile && !isAdminView ? (
-            <p className="pt-2 text-xs text-muted-foreground">
+            <p className="pt-2 text-xs text-faint">
               流量属于私密信息，仅本人和具备账户读取权限的管理员可见。
             </p>
           ) : null}
         </ProfileCard>
 
-        <ProfileCard title="活动统计">
+        <ProfileCard title="活动统计" icon={ActivityIcon}>
           <ProfileMetric
             label="公开发布"
             value={formatCount(publicUser.published_torrent_count)}
@@ -528,7 +543,7 @@ function SeedingRewardCard({
 }) {
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
+      <CardHeader className="px-4 pt-4 pb-3 sm:px-5">
         <CardTitle>
           <h2 className="flex items-center gap-2">
             <SparklesIcon className="size-4 text-warning-foreground" />
@@ -537,7 +552,7 @@ function SeedingRewardCard({
         </CardTitle>
         <CardDescription>仅自己可见的最近一次结算结果。</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-6 sm:pb-6 lg:grid-cols-4">
+      <CardContent className="grid gap-2.5 px-4 pb-4 sm:grid-cols-2 sm:px-5 lg:grid-cols-4">
         {loading && !reward ? (
           <p className="text-sm text-muted-foreground">正在加载奖励结算…</p>
         ) : reward ? (
@@ -569,8 +584,8 @@ function SeedingRewardCard({
 
 function RewardMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-muted/50 p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
+    <div className="rounded-lg border bg-muted px-3 py-2.5">
+      <p className="text-xs text-faint">{label}</p>
       <p className="mt-1 font-mono text-sm font-medium tabular-nums">{value}</p>
     </div>
   )
@@ -590,7 +605,7 @@ function ProfileStateCard({
       <Card className="w-full max-w-md gap-0 py-0">
         <CardHeader className="px-6 pt-6 pb-3">
           <div className="flex items-start gap-3">
-            <CircleAlertIcon className="mt-0.5 size-5 text-muted-foreground" />
+            <CircleAlertIcon className="mt-0.5 size-5 shrink-0 text-faint" />
             <div className="flex flex-col gap-1">
               <CardTitle>
                 <h1>{title}</h1>
@@ -599,7 +614,9 @@ function ProfileStateCard({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-6 pb-6">{action}</CardContent>
+        <CardContent className="px-(--card-spacing) pb-(--card-spacing)">
+          {action}
+        </CardContent>
       </Card>
     </PageLayout>
   )
@@ -607,21 +624,26 @@ function ProfileStateCard({
 
 function ProfileCard({
   title,
+  icon: Icon,
   children,
   className,
 }: {
   title: string
+  icon: ComponentType<{ className?: string }>
   children: ReactNode
   className?: string
 }) {
   return (
-    <Card className={cn("gap-0 py-0 md:min-h-[262px]", className)}>
-      <CardHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6">
+    <Card className={cn("gap-0 py-0", className)}>
+      <CardHeader className="px-4 pt-4 pb-2 sm:px-5">
         <CardTitle className="leading-6">
-          <h2>{title}</h2>
+          <h2 className="flex items-center gap-2">
+            <Icon className="size-4 text-primary" />
+            {title}
+          </h2>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2 px-4 pb-4 sm:px-6 sm:pb-6">
+      <CardContent className="flex flex-col px-4 pb-3 sm:px-5">
         {children}
       </CardContent>
     </Card>
@@ -640,12 +662,14 @@ function ProfileMetric({
   value: ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 text-sm">
-      <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
-        {Icon ? <Icon className={cn("size-3.5", iconClassName)} /> : null}
+    <div className="flex min-h-[1.875rem] items-center justify-between gap-4 py-1 text-sm">
+      <span className="flex shrink-0 items-center gap-2 text-faint">
+        {Icon ? (
+          <Icon className={cn("size-3.5 text-faint", iconClassName)} />
+        ) : null}
         {label}
       </span>
-      <span className="min-w-0 text-right font-mono break-all tabular-nums">
+      <span className="min-w-0 text-right font-mono font-medium break-all text-foreground tabular-nums">
         {value}
       </span>
     </div>
@@ -654,21 +678,21 @@ function ProfileMetric({
 
 function UserProfileSkeleton() {
   return (
-    <PageLayout className="gap-6" aria-busy="true">
-      <div className="flex items-center gap-4">
-        <Skeleton className="size-16 rounded-full" />
+    <PageLayout aria-busy="true">
+      <div className="flex items-center gap-4 pt-1">
+        <Skeleton className="size-16 rounded-xl" />
         <div className="flex flex-col gap-2">
-          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-32" />
         </div>
       </div>
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 3 }, (_, index) => (
-          <Skeleton key={index} className="h-56 rounded-lg" />
+          <Skeleton key={index} className="h-44 rounded-xl" />
         ))}
       </div>
-      <Skeleton className="h-40 rounded-lg" />
-      <Skeleton className="h-64 rounded-lg" />
+      <Skeleton className="h-40 rounded-xl" />
+      <Skeleton className="h-64 rounded-xl" />
     </PageLayout>
   )
 }
@@ -703,7 +727,7 @@ function JoinedAt({ value }: { value: string }) {
       <time dateTime={value} className="whitespace-nowrap">
         {formatted.date}
       </time>
-      <span className="ml-1 text-xs text-muted-foreground">
+      <span className="ml-1 font-sans text-xs font-normal text-faint">
         ({formatted.duration})
       </span>
     </span>

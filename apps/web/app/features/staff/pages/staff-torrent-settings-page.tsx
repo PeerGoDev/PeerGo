@@ -96,8 +96,10 @@ function TorrentSettingsContent({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">种子规则</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            种子规则
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             这里只放上传、文件和购买规则；种子上下架在“种子管理”，流量优惠时间线在“优惠规则”。
           </p>
         </div>

@@ -45,16 +45,17 @@ describe("ResetPasswordPage", () => {
     expect(title).toBeVisible()
     expect(title.closest("main")).toHaveClass(
       "flex",
-      "min-h-svh",
-      "items-center",
-      "justify-center"
+      "flex-1",
+      "justify-center",
+      "sm:items-center"
     )
     expect(title.closest("[data-slot='card']")).toHaveClass(
-      "rounded-3xl",
+      "max-w-sm",
       "border-0",
-      "shadow-soft"
+      "bg-transparent",
+      "shadow-none"
     )
-    expect(title.closest("[data-slot='card-content']")).toHaveClass("px-6")
+    expect(title.closest("[data-slot='card-content']")).toBeVisible()
     expect(
       screen.queryByRole("button", { name: "重置密码" })
     ).not.toBeInTheDocument()

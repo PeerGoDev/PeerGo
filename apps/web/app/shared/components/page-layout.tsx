@@ -6,7 +6,7 @@ export function PageLayout({ className, ...props }: ComponentProps<"main">) {
   return (
     <main
       className={cn(
-        "mx-auto flex w-full max-w-[1248px] min-w-0 flex-1 flex-col gap-4 p-4 sm:gap-5 lg:p-6",
+        "mx-auto flex w-full max-w-[1120px] min-w-0 flex-1 flex-col gap-4 px-4 pt-4 pb-8 sm:px-6 lg:px-8",
         className
       )}
       {...props}
@@ -29,20 +29,17 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <header
-      className={cn(
-        "flex min-h-[50px] flex-wrap items-center gap-x-3.5 gap-y-1 rounded-lg border-b border-muted bg-glass px-5 py-2.5 shadow-soft backdrop-blur-[7px]",
-        className
-      )}
+      className={cn("flex min-w-0 flex-col gap-1 pt-1", className)}
       {...props}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="font-heading text-[15px] font-semibold">{title}</h1>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <h1 className="font-heading text-lg leading-tight font-semibold tracking-title">
+          {title}
+        </h1>
         {badge}
       </div>
       {description ? (
-        <p className="text-xs text-muted-foreground sm:border-l sm:border-border sm:pl-3.5">
-          {description}
-        </p>
+        <p className="text-xs text-muted-foreground">{description}</p>
       ) : null}
     </header>
   )

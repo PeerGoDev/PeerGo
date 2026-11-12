@@ -87,8 +87,10 @@ function WorkerContent() {
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">Worker 状态</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            Worker 状态
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             每 15 秒自动刷新，只显示可安全公开给管理员的队列元数据。
           </p>
         </div>

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest"
 import { AccountSettingsLayout } from "~/features/auth/components/account-settings-layout"
 
 describe("AccountSettingsLayout", () => {
-  it("keeps the PtYes settings rail and turns it into a mobile scroll strip", () => {
+  it("keeps the settings rail and turns it into a mobile scroll strip", () => {
     render(
       <MemoryRouter>
         <AccountSettingsLayout
@@ -34,10 +34,13 @@ describe("AccountSettingsLayout", () => {
       "max-md:flex-row",
       "max-md:overflow-x-auto"
     )
-    expect(screen.getByRole("link", { name: "我的权限" })).toHaveClass(
+    const activeLink = screen.getByRole("link", { name: "我的权限" })
+    expect(activeLink).toHaveClass(
       "w-full",
       "max-md:w-auto",
-      "font-normal"
+      "font-medium",
+      "bg-sidebar-accent"
     )
+    expect(activeLink).toHaveAttribute("aria-current", "page")
   })
 })

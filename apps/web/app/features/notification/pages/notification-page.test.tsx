@@ -122,48 +122,39 @@ describe("NotificationPage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "站内消息" })
     ).toBeVisible()
-    expect(screen.getByRole("main")).toHaveClass(
-      "p-4!",
-      "gap-5",
-      "md:px-8!",
-      "md:pt-10!",
-      "md:gap-6",
-      "lg:px-10!",
-      "lg:pt-12!",
-      "md:max-w-3xl"
-    )
+    expect(screen.getByRole("main")).toHaveClass("gap-5", "max-w-[1120px]")
     expect(
       screen.getByRole("heading", { level: 2, name: "消息列表" })
     ).toBeVisible()
-    const messageCards = screen
+    const inboxCards = screen
       .getByRole("region", { name: "站内消息" })
       .querySelectorAll("[data-slot='card']")
-    expect(messageCards).toHaveLength(2)
-    expect(messageCards[0]).toHaveClass(
+    expect(inboxCards).toHaveLength(1)
+    expect(inboxCards[0]).toHaveClass(
       "gap-0",
       "py-0",
-      "rounded-3xl",
-      "text-base",
-      "shadow-soft",
-      "md:min-h-[640px]"
-    )
-    expect(messageCards[1]).toHaveClass(
-      "md:col-span-2",
-      "text-base",
-      "shadow-soft",
-      "md:min-h-[640px]"
+      "shadow-card",
+      "md:grid",
+      "md:h-[640px]"
     )
     expect(screen.getByLabelText("未读")).toHaveClass("bg-primary")
-    expect(screen.getByRole("button", { name: "联系管理员" })).toHaveClass(
-      "border-0",
-      "min-w-0",
-      "whitespace-nowrap",
-      "md:shrink-0"
+    expect(screen.getByText("共 7 条消息，1 条未读")).toBeVisible()
+    expect(screen.getByRole("button", { name: "联系管理员" })).toBeVisible()
+    expect(screen.getByRole("group", { name: "筛选消息" })).toHaveAttribute(
+      "data-variant",
+      "segment"
     )
-    expect(screen.getByRole("button", { name: "仅未读" })).toHaveClass(
-      "border-0",
-      "bg-sidebar-accent"
+    expect(screen.getByRole("button", { name: "全部" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
     )
+    expect(screen.getByRole("button", { name: /^未读/ })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    )
+    expect(
+      screen.getByRole("button", { name: /需要修改：Release/ })
+    ).toHaveTextContent("种子审核")
     expect(screen.getByText(/Release Needs Details/)).toBeVisible()
     expect(screen.getByText(/审核通过：Approved Release/)).toBeVisible()
     expect(screen.getByText("下载权限已受限")).toBeVisible()
@@ -236,7 +227,7 @@ describe("NotificationPage", () => {
     expect(
       screen.queryByRole("button", { name: "标为已读" })
     ).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "全部标记为已读" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: "全部已读" })).toBeEnabled()
 
     fireEvent.click(screen.getByRole("button", { name: "联系管理员" }))
     expect(screen.getByRole("heading", { name: "联系管理员" })).toBeVisible()
@@ -260,8 +251,11 @@ describe("NotificationPage", () => {
     expect(screen.getByRole("button", { name: "确认清空" })).toBeEnabled()
     fireEvent.click(screen.getByRole("button", { name: "取消" }))
 
-    fireEvent.click(screen.getByRole("button", { name: "仅未读" }))
-    expect(screen.getByRole("button", { name: "显示全部" })).toBeVisible()
+    fireEvent.click(screen.getByRole("button", { name: /^未读/ }))
+    expect(screen.getByRole("button", { name: /^未读/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    )
     expect(
       screen.queryByText(/审核通过：Approved Release/)
     ).not.toBeInTheDocument()
@@ -298,7 +292,7 @@ describe("NotificationPage", () => {
     expect(screen.getByText("第 2 / 2 页")).toBeVisible()
   })
 
-  it("keeps the PtYes action rhythm when there are no unread messages", async () => {
+  it("keeps the inbox actions available when there are no unread messages", async () => {
     const queryClient = notificationQueryClient()
     queryClient.setQueryData(notificationKeys.page(userId, 20, 0, false), {
       total: 0,
@@ -310,11 +304,9 @@ describe("NotificationPage", () => {
 
     renderNotificationPage(queryClient, "/notifications")
 
-    expect(
-      screen.getByRole("button", { name: "全部标记为已读" })
-    ).toBeDisabled()
+    expect(screen.getByRole("button", { name: "全部已读" })).toBeDisabled()
     expect(screen.getByText("暂无消息")).toBeVisible()
-    expect(screen.getByRole("button", { name: "仅未读" })).toBeVisible()
+    expect(screen.getByRole("button", { name: "未读" })).toBeVisible()
     expect(screen.getByRole("button", { name: "删除全部" })).toBeVisible()
   })
 })

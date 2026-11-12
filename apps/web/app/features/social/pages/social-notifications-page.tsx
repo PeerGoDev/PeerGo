@@ -102,20 +102,22 @@ export function SocialNotificationsPage() {
     session.isPending || Boolean(session.data && capabilities.isPending)
 
   return (
-    <PageLayout className="max-w-[760px] gap-0 px-4! pt-6! pb-10! sm:px-6! lg:pt-8!">
-      <header className="sticky top-0 z-10 -mx-4 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur sm:-mx-6 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
+    <PageLayout className="max-w-[760px] gap-0">
+      <header className="sticky top-(--shell-header-height) z-10 -mx-4 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex min-w-0 items-center gap-2">
           <Button
             render={<Link to="/social" />}
             nativeButton={false}
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             aria-label="返回动态圈"
           >
             <ArrowLeftIcon />
           </Button>
           <div className="min-w-0">
-            <h1 className="font-heading text-xl font-bold">动态圈通知</h1>
+            <h1 className="font-heading text-lg leading-tight font-semibold tracking-title">
+              动态圈通知
+            </h1>
             <p className="text-xs text-muted-foreground">
               互动提醒，与站内信分开
             </p>
@@ -150,8 +152,8 @@ export function SocialNotificationsPage() {
             key={item.value}
             type="button"
             className={cn(
-              "relative min-w-0 px-1 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground",
-              category === item.value && "font-semibold text-foreground"
+              "relative min-w-0 px-1 py-3 text-sm text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground",
+              category === item.value && "font-medium text-foreground"
             )}
             aria-current={category === item.value ? "page" : undefined}
             onClick={() => setCategory(item.value)}
@@ -278,8 +280,8 @@ function SocialNotificationRow({
       <button
         type="button"
         className={cn(
-          "group relative flex w-full gap-3 px-3 py-4 text-left transition-colors hover:bg-muted/40 sm:px-4",
-          unread && "bg-primary/[0.035]"
+          "group relative flex w-full gap-3 px-3 py-4 text-left transition-colors outline-none hover:bg-accent focus-visible:bg-accent sm:px-4",
+          unread && "bg-primary/5"
         )}
         onClick={onOpen}
       >
@@ -306,19 +308,19 @@ function SocialNotificationRow({
                 notification.actor.administrator
                   ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent"
                   : notification.actor.vip
-                    ? "text-amber-600 dark:text-amber-400"
+                    ? "text-warning-foreground"
                     : "text-foreground"
               )}
             >
               {notification.actor.display_name}
             </span>
             {notification.actor.administrator ? (
-              <Badge className="h-4 border-0 bg-gradient-to-r from-fuchsia-500/15 via-primary/15 to-amber-500/15 px-1.5 text-[10px] text-fuchsia-700 shadow-none dark:text-fuchsia-300">
+              <Badge variant="primary" className="h-4 px-1.5">
                 管理员
               </Badge>
             ) : null}
             {notification.actor.vip ? (
-              <Badge className="h-4 border border-amber-400/40 bg-amber-400/10 px-1.5 text-[10px] font-bold text-amber-700 shadow-none dark:text-amber-300">
+              <Badge variant="warning" className="h-4 px-1.5 font-semibold">
                 VIP
               </Badge>
             ) : null}
@@ -335,7 +337,7 @@ function SocialNotificationRow({
                     className="max-h-full max-w-full object-contain"
                   />
                 ) : (
-                  <SparklesIcon className="size-3.5 text-amber-500" />
+                  <SparklesIcon className="size-3.5 text-warning-foreground" />
                 )}
               </span>
             ))}
@@ -380,7 +382,7 @@ function socialNotificationPresentation(notification: SocialNotification) {
       return {
         action: "关注了你",
         icon: <UserPlusIcon className="size-4" />,
-        iconClass: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+        iconClass: "bg-info/12 text-info",
         primaryPreview: undefined,
         secondaryPreview: undefined,
       }
@@ -388,7 +390,7 @@ function socialNotificationPresentation(notification: SocialNotification) {
       return {
         action: "赞了你的动态",
         icon: <HeartIcon className="size-4 fill-current" />,
-        iconClass: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+        iconClass: "bg-destructive/12 text-destructive",
         primaryPreview: notification.post_preview,
         secondaryPreview: undefined,
       }
@@ -396,7 +398,7 @@ function socialNotificationPresentation(notification: SocialNotification) {
       return {
         action: "转发了你的动态",
         icon: <Repeat2Icon className="size-4" />,
-        iconClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+        iconClass: "bg-success/12 text-success-foreground",
         primaryPreview: notification.post_preview,
         secondaryPreview: undefined,
       }
@@ -404,7 +406,7 @@ function socialNotificationPresentation(notification: SocialNotification) {
       return {
         action: "评论了你的动态",
         icon: <MessageCircleIcon className="size-4" />,
-        iconClass: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+        iconClass: "bg-primary/12 text-link",
         primaryPreview: notification.comment_preview,
         secondaryPreview: notification.post_preview,
       }
@@ -412,7 +414,7 @@ function socialNotificationPresentation(notification: SocialNotification) {
       return {
         action: "回复了你的评论",
         icon: <MessageCircleIcon className="size-4" />,
-        iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+        iconClass: "bg-warning/12 text-warning-foreground",
         primaryPreview: notification.comment_preview,
         secondaryPreview: notification.post_preview,
       }

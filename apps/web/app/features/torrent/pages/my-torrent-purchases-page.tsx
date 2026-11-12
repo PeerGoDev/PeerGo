@@ -76,12 +76,11 @@ export function MyTorrentPurchasesPage() {
   }, [offset, purchases.data?.total])
 
   return (
-    <PageLayout className="gap-6">
-      <h1 className="flex items-center gap-3 font-heading text-3xl font-bold">
-        <ShoppingBagIcon className="size-8" />
+    <PageLayout>
+      <h1 className="flex items-baseline gap-2 pt-1 font-heading text-lg font-semibold tracking-title">
         已购种子
         {purchases.data && purchases.data.total > 0 ? (
-          <span className="text-lg font-normal text-muted-foreground">
+          <span className="text-sm font-normal text-faint tabular-nums">
             ({purchases.data.total.toLocaleString("zh-CN")})
           </span>
         ) : null}
@@ -191,7 +190,7 @@ export function MyTorrentPurchasesPage() {
                           {item.torrent_state === "published" ? (
                             <Link
                               to={`/torrents/${item.torrent_id}`}
-                              className="truncate font-bold text-title transition-colors hover:text-title-hover"
+                              className="truncate font-medium text-title transition-colors hover:text-title-hover"
                             >
                               {item.title}
                             </Link>
@@ -239,7 +238,7 @@ export function MyTorrentPurchasesPage() {
                         {item.torrent_state === "published" ? (
                           <Link
                             to={`/torrents/${item.torrent_id}`}
-                            className="line-clamp-2 font-bold text-title transition-colors hover:text-title-hover"
+                            className="line-clamp-2 font-medium text-title transition-colors hover:text-title-hover"
                           >
                             {item.title}
                           </Link>

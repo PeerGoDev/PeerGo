@@ -465,8 +465,10 @@ function ModerationHeader({ children }: { children?: React.ReactNode }) {
   return (
     <header className="flex min-h-14 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="font-heading text-2xl font-bold">评论审核</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="font-heading text-lg font-semibold tracking-title">
+          评论审核
+        </h1>
+        <p className="mt-1 text-xs text-muted-foreground">
           集中核对评论举报，并保留完整处置记录。
         </p>
       </div>

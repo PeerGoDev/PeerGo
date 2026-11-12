@@ -29,7 +29,7 @@ export function TorrentDownloadProgress({
     return (
       <div
         className={cn(
-          "pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1 bg-black/20",
+          "pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1 bg-foreground/10",
           className
         )}
         role="progressbar"
@@ -42,7 +42,7 @@ export function TorrentDownloadProgress({
         <div
           className={cn(
             "h-full transition-[width] duration-300",
-            activity.completed ? "bg-success/80" : "bg-blue-500/80"
+            activity.completed ? "bg-success" : "bg-primary"
           )}
           style={{ width: `${activity.completed ? 100 : percent}%` }}
         />
@@ -55,7 +55,7 @@ export function TorrentDownloadProgress({
       className={cn("mt-1 min-w-0", className)}
       title={`已下载 ${percent.toFixed(1)}%`}
     >
-      <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px] leading-none text-muted-foreground">
+      <div className="mb-1 flex items-center justify-between gap-2 text-2xs leading-none text-faint">
         <span>{activity.completed ? "已完成" : "下载进度"}</span>
         <span className="tabular-nums">
           {percent.toFixed(compact ? 0 : 1)}%

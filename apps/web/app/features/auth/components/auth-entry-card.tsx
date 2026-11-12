@@ -1,7 +1,6 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 
-import { Badge } from "~/components/ui/badge"
 import { Card, CardContent, CardHeader } from "~/components/ui/card"
 import { Skeleton } from "~/components/ui/skeleton"
 import { siteInfoQueryOptions } from "~/features/site/api/site.queries"
@@ -10,11 +9,11 @@ import { cn } from "~/lib/utils"
 /**
  * Shared public-account entry surface.
  *
- * Auth routes render inside the chrome-less AuthShell, so the default
- * viewport centers one fixed-width stacked card (two tinted layers behind a
- * soft-shadow card) against the full viewport. `viewport="shell"` keeps the
- * previous in-shell centering for pages that still live under the AppShell
- * header, such as /restrictions.
+ * Auth routes render inside the split AuthShell, so the default viewport
+ * centers a 384px form column inside the form panel: the page's card slots
+ * keep their structure but lose the card chrome. `viewport="shell"` keeps a
+ * regular centered card for pages that still live under the AppShell header,
+ * such as /restrictions.
  */
 export function AuthEntryCard({
   className,
@@ -26,8 +25,14 @@ export function AuthEntryCard({
 }) {
   if (viewport === "shell") {
     return (
-      <main className="mt-4 flex min-h-[calc(100svh-var(--shell-header-height)-var(--shell-gap)-3.75rem)] items-center justify-center p-4 sm:p-6 lg:mt-6">
-        <Card className={cn("w-full max-w-md", className)} {...props}>
+      <main className="flex min-h-[calc(100svh-var(--shell-header-height)-3.75rem)] items-center justify-center p-4 sm:p-6 lg:mt-4">
+        <Card
+          className={cn(
+            "w-full max-w-md [&_p>a]:text-link [&_p>a]:underline-offset-4 [&_p>a]:hover:underline",
+            className
+          )}
+          {...props}
+        >
           {children}
         </Card>
       </main>
@@ -35,32 +40,24 @@ export function AuthEntryCard({
   }
 
   return (
-    <main className="flex min-h-svh items-center justify-center p-4 sm:p-6">
-      <div className="relative w-full max-w-[448px]">
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-[26px] -top-6 bottom-6 rounded-3xl bg-auth-layer-2 opacity-70"
-        />
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-[13px] -top-[13px] bottom-[13px] rounded-3xl bg-auth-layer-1"
-        />
-        <Card
-          className={cn(
-            "relative w-full gap-4 rounded-3xl border-0 shadow-soft ring-0 [--card-spacing:--spacing(6)]",
-            className
-          )}
-          {...props}
-        >
-          <AuthEntryBrand />
-          {children}
-        </Card>
-      </div>
+    <main className="flex flex-1 items-start justify-center px-5 pt-16 pb-10 sm:items-center sm:px-10 sm:py-20">
+      <Card
+        className={cn(
+          "w-full max-w-sm gap-4 overflow-visible rounded-none border-0 bg-transparent py-0 shadow-none [--card-spacing:0px]",
+          "*:data-[slot=card-content]:px-0 *:data-[slot=card-footer]:px-0 *:data-[slot=card-footer]:pb-0 *:data-[slot=card-header]:px-0",
+          "[&_p>a]:text-link [&_p>a]:underline-offset-4 [&_p>a]:hover:underline",
+          className
+        )}
+        {...props}
+      >
+        <AuthEntryBrand />
+        {children}
+      </Card>
     </main>
   )
 }
 
-/** Brand row at the top of the stacked auth card (site name + beta pill). */
+/** Brand row above the auth form (site name + beta tag). */
 function AuthEntryBrand() {
   // Read-only cache subscription: pages that already fetch site info (login,
   // register, forgot-password) show the configured name; the rest fall back
@@ -69,16 +66,13 @@ function AuthEntryBrand() {
   const siteName = siteInfo.data?.name ?? "PeerGo"
 
   return (
-    <div data-slot="auth-brand" className="flex items-baseline gap-1.5 px-6">
-      <span className="font-heading text-[19px] leading-none font-bold tracking-tight">
+    <div data-slot="auth-brand" className="mb-2 flex items-center gap-2">
+      <span className="font-heading text-xl leading-none font-bold tracking-title">
         {siteName}
       </span>
-      <Badge
-        variant="outline"
-        className="h-4 border-transparent bg-sidebar-accent px-1 text-[9px] tracking-wider text-sidebar-accent-foreground uppercase"
-      >
+      <span className="rounded-sm border border-primary/40 px-1 py-px text-[0.5625rem] leading-none font-semibold tracking-[0.14em] text-primary uppercase">
         beta
-      </Badge>
+      </span>
     </div>
   )
 }
@@ -88,14 +82,14 @@ export function AuthEntryLoading({ label }: { label: string }) {
   return (
     <AuthEntryCard role="status" aria-label={label} aria-busy="true">
       <span className="sr-only">{label}</span>
-      <CardHeader className="flex flex-col gap-3 px-6">
-        <Skeleton className="h-8 w-28" aria-hidden="true" />
+      <CardHeader className="flex flex-col gap-3">
+        <Skeleton className="h-7 w-24" aria-hidden="true" />
         <Skeleton className="h-4 w-64 max-w-full" aria-hidden="true" />
       </CardHeader>
-      <CardContent className="flex flex-col gap-4 px-6 pb-6">
-        <Skeleton className="h-10 w-full" aria-hidden="true" />
-        <Skeleton className="h-10 w-full" aria-hidden="true" />
-        <Skeleton className="h-10 w-full" aria-hidden="true" />
+      <CardContent className="flex flex-col gap-4">
+        <Skeleton className="h-10 w-full rounded-lg" aria-hidden="true" />
+        <Skeleton className="h-10 w-full rounded-lg" aria-hidden="true" />
+        <Skeleton className="h-10 w-full rounded-lg" aria-hidden="true" />
       </CardContent>
     </AuthEntryCard>
   )

@@ -21,13 +21,20 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "~/components/ui/empty"
 import { Skeleton } from "~/components/ui/skeleton"
 import {
   useAnnouncementPage,
   useSiteInfo,
 } from "~/features/site/api/site.queries"
 import { OffsetPagination } from "~/shared/components/offset-pagination"
-import { PageLayout } from "~/shared/components/page-layout"
+import { PageHeader, PageLayout } from "~/shared/components/page-layout"
 import { formatCompactDateTime } from "~/shared/formatters/date-time"
 
 const announcementPageSize = 20
@@ -70,11 +77,8 @@ export function AnnouncementListPage() {
   }
 
   return (
-    <PageLayout className="gap-6">
-      <h1 className="flex items-center gap-3 font-heading text-3xl font-bold">
-        <NewspaperIcon className="size-8" />
-        公告
-      </h1>
+    <PageLayout>
+      <PageHeader title="公告" />
 
       {announcements.isPending ? <AnnouncementListSkeleton /> : null}
 
@@ -101,31 +105,33 @@ export function AnnouncementListPage() {
 
       {announcements.data ? (
         announcements.data.items.length === 0 ? (
-          <Card className="gap-0 py-0">
-            <CardContent className="py-12 text-center text-muted-foreground">
-              <NewspaperIcon className="mx-auto mb-4 size-12 opacity-50" />
-              <p className="text-lg">暂无公告</p>
-              <p className="mt-2 text-sm">目前还没有发布任何公告</p>
-            </CardContent>
-          </Card>
+          <Empty className="min-h-60 border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <NewspaperIcon />
+              </EmptyMedia>
+              <EmptyTitle>暂无公告</EmptyTitle>
+              <EmptyDescription>目前还没有发布任何公告</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <section aria-label="公告列表" className="flex flex-col gap-4">
-            <ol className="flex flex-col gap-4">
+            <ol className="flex flex-col gap-3">
               {announcements.data.items.map((announcement) => (
                 <li key={announcement.id}>
                   <Link
                     to={`/announcements/${encodeURIComponent(announcement.id)}`}
-                    className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="group block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
                   >
-                    <Card className="cursor-pointer gap-0 py-0 ring-2 ring-transparent transition-shadow hover:ring-primary/50">
-                      <CardContent className="p-5">
-                        <div className="mb-2 flex items-center gap-2">
+                    <Card className="gap-0 py-0 transition-colors group-hover:border-primary/40">
+                      <CardContent className="p-4 sm:px-5">
+                        <div className="mb-1.5 flex items-center gap-2">
                           <PinIcon className="size-3.5 shrink-0 fill-primary text-primary" />
-                          <h2 className="text-lg font-semibold break-words">
+                          <h2 className="text-md font-semibold break-words transition-colors group-hover:text-link">
                             {announcement.title}
                           </h2>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-faint">
                           由 {publisherLabel} 发布于{" "}
                           <time dateTime={announcement.published_at}>
                             {formatCompactDateTime(announcement.published_at)}

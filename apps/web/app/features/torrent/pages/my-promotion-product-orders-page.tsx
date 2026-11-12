@@ -58,12 +58,11 @@ export function MyPromotionProductOrdersPage() {
   )
 
   return (
-    <PageLayout className="gap-6">
-      <h1 className="flex items-center gap-3 font-heading text-3xl font-bold">
-        <BadgePercentIcon className="size-8" />
+    <PageLayout>
+      <h1 className="flex items-baseline gap-2 pt-1 font-heading text-lg font-semibold tracking-title">
         促销与置顶记录
         {orders.data?.total ? (
-          <span className="text-lg font-normal text-muted-foreground">
+          <span className="text-sm font-normal text-faint tabular-nums">
             ({orders.data.total.toLocaleString("zh-CN")})
           </span>
         ) : null}
@@ -159,7 +158,7 @@ export function MyPromotionProductOrdersPage() {
                       <TableCell className="max-w-80">
                         <Link
                           to={`/torrents/${order.torrent_id}`}
-                          className="line-clamp-2 font-bold text-title transition-colors hover:text-title-hover"
+                          className="line-clamp-2 font-medium text-title transition-colors hover:text-title-hover"
                         >
                           {order.torrent_title}
                         </Link>

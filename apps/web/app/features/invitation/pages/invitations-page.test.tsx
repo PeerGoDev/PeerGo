@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -148,7 +148,9 @@ describe("InvitationsPage", () => {
     await user.click(await screen.findByRole("tab", { name: "后宫" }))
     expect(await screen.findByText("后宫奖励")).toBeVisible()
     expect(screen.getByText("后宫加成正在运行")).toBeVisible()
-    expect(screen.getByText("12.5", { exact: true })).toBeVisible()
+    expect(
+      within(screen.getByRole("table")).getByText("12.5", { exact: true })
+    ).toBeVisible()
     expect(screen.getByText("正在贡献")).toBeVisible()
     expect(screen.getByText("12,345 魔力值")).toBeVisible()
     expect(screen.getByText("旧站成员")).toBeVisible()

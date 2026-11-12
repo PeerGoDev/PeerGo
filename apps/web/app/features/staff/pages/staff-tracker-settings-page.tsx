@@ -76,8 +76,10 @@ function TrackerSettingsContent() {
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">Tracker 状态</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            Tracker 状态
+          </h1>
+          <p className="text-xs text-muted-foreground">
             用于排查数据同步和结算链路；Announce 等日常参数在“Tracker
             参数”中查看。
           </p>

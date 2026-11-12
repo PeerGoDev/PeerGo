@@ -3,60 +3,72 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it } from "vitest"
 
+import type { TorrentView } from "~/features/torrent/model/torrent-view"
 import { TorrentViewControls } from "~/features/torrent/components/torrent-view-controls"
 
 describe("TorrentViewControls", () => {
+  it("switches between the list, poster and waterfall views", async () => {
+    const user = userEvent.setup()
+    render(<ControlledTorrentView />)
+
+    expect(screen.getByRole("group", { name: "种子显示方式" })).toHaveAttribute(
+      "data-variant",
+      "segment"
+    )
+    const list = screen.getByRole("button", { name: "列表视图" })
+    const waterfall = screen.getByRole("button", { name: "瀑布流视图" })
+    expect(list).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByRole("button", { name: "海报视图" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    )
+    expect(list.querySelector("span")).toHaveClass("max-sm:sr-only")
+
+    await user.click(waterfall)
+    expect(waterfall).toHaveAttribute("aria-pressed", "true")
+    expect(list).toHaveAttribute("aria-pressed", "false")
+  })
+
   it("requires an age confirmation before revealing adult covers", async () => {
     const user = userEvent.setup()
     render(<ControlledTorrentView />)
 
-    const adultToggle = screen.getByRole("button", { name: "18+" })
-    expect(adultToggle).toHaveAttribute("aria-pressed", "false")
-    expect(adultToggle).toHaveClass("max-sm:w-8", "max-sm:h-6")
-    expect(adultToggle.querySelector("span")).toHaveClass("max-sm:sr-only")
-    expect(screen.getByRole("button", { name: "列表视图" })).toHaveClass(
-      "max-sm:w-[30px]"
-    )
-    expect(screen.getByRole("button", { name: "海报视图" })).toHaveClass(
-      "max-sm:w-[31px]"
-    )
+    const adultSwitch = screen.getByRole("switch", {
+      name: "显示成人封面（18+）",
+    })
+    expect(adultSwitch).toHaveAttribute("aria-checked", "false")
 
-    await user.click(adultToggle)
+    await user.click(adultSwitch)
     const confirmation = screen.getByRole("alertdialog", {
       name: "显示成人内容？",
     })
     expect(confirmation).toBeVisible()
-    expect(confirmation).toHaveClass("p-6", "sm:max-w-[425px]!")
+    expect(confirmation).toHaveClass("data-[size=default]:sm:max-w-[425px]")
     expect(screen.getByRole("heading", { name: "显示成人内容？" })).toHaveClass(
-      "text-lg",
-      "leading-none"
+      "text-md",
+      "font-semibold"
     )
-    expect(screen.getByRole("button", { name: "取消" })).toHaveClass("w-[62px]")
-    expect(screen.getByRole("button", { name: "关闭" })).toHaveClass(
-      "size-4",
-      "p-0"
+    expect(adultSwitch).toHaveAttribute("aria-checked", "false")
+
+    await user.click(
+      screen.getByRole("button", { name: "我已年满 18 周岁，确认显示" })
     )
+    expect(adultSwitch).toHaveAttribute("aria-checked", "true")
 
-    const confirm = screen.getByRole("button", {
-      name: "我已年满 18 周岁，确认显示",
-    })
-    expect(confirm).toHaveClass("w-[209px]")
-    await user.click(confirm)
-    expect(adultToggle).toHaveAttribute("aria-pressed", "true")
-
-    await user.click(adultToggle)
-    expect(adultToggle).toHaveAttribute("aria-pressed", "false")
+    await user.click(adultSwitch)
+    expect(adultSwitch).toHaveAttribute("aria-checked", "false")
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
   })
 })
 
 function ControlledTorrentView() {
+  const [view, setView] = React.useState<TorrentView>("list")
   const [adultCoversVisible, setAdultCoversVisible] = React.useState(false)
 
   return (
     <TorrentViewControls
-      value="list"
-      onValueChange={() => undefined}
+      value={view}
+      onValueChange={setView}
       adultCoversVisible={adultCoversVisible}
       onAdultCoversVisibleChange={setAdultCoversVisible}
     />

@@ -74,12 +74,12 @@ describe("StaffShell navigation", () => {
     await user.click(screen.getByRole("button", { name: "切换后台侧栏" }))
     const navigation = await screen.findByRole("dialog")
 
-    expect(navigation.querySelector('a[href="/staff"]')).toHaveClass(
-      "max-lg:w-[calc(100%-2.5rem)]",
-      "max-lg:self-start"
+    expect(navigation.querySelector('a[href="/staff"]')).toHaveTextContent(
+      "管理后台"
     )
     expect(within(navigation).getByText("P")).toHaveClass(
-      "group-data-[collapsible=icon]:inline"
+      "hidden",
+      "group-data-[collapsible=icon]:flex"
     )
 
     expect(
@@ -153,9 +153,10 @@ describe("StaffShell navigation", () => {
     )
     expect(activeAnnouncement).toHaveAttribute("data-active")
     expect(activeAnnouncement).toHaveClass(
-      "h-10",
+      "h-9",
       "justify-start",
-      "rounded-lg",
+      "rounded-md",
+      "data-active:bg-sidebar-accent",
       "group-data-[collapsible=icon]:h-10!",
       "group-data-[collapsible=icon]:w-full!"
     )

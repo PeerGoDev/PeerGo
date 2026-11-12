@@ -1,6 +1,11 @@
 import * as React from "react"
 import { Link } from "react-router"
-import { CircleXIcon, Clock3Icon, FileUpIcon } from "lucide-react"
+import {
+  CircleXIcon,
+  Clock3Icon,
+  FileUpIcon,
+  FolderClockIcon,
+} from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
@@ -67,33 +72,35 @@ export function UserTorrentActivityCard({
       className={cn("min-h-[218px] gap-0 py-0", className)}
       aria-busy={loading}
     >
-      <CardHeader className="overflow-x-auto px-6 pt-6 pb-0">
-        <CardTitle className="sr-only">种子活动</CardTitle>
+      <CardHeader className="flex flex-wrap items-center justify-between gap-3 overflow-x-auto px-(--card-spacing) pt-(--card-spacing) pb-0">
+        <CardTitle className="flex items-center gap-2">
+          <FolderClockIcon />
+          种子活动
+        </CardTitle>
         <ToggleGroup
           value={[activeTab]}
           onValueChange={(values) => {
             const selected = values[0] as ActivityTab | undefined
             if (selected) setActiveTab(selected)
           }}
+          variant="segment"
+          size="sm"
+          spacing={0.5}
           aria-label="按种子活动状态筛选"
           className="w-max"
         >
           {activityTabs.map(({ value, label, icon: Icon }) => (
-            <ToggleGroupItem
-              key={value}
-              value={value}
-              className="gap-1.5 rounded-lg bg-muted/50 px-3.5 text-muted-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-            >
+            <ToggleGroupItem key={value} value={value} className="gap-1.5">
               <Icon data-icon="inline-start" />
               {label}
-              <span className="text-xs opacity-80">
+              <span className="font-mono text-2xs opacity-70">
                 {formatTabCount(counts[value], page, windowIsComplete)}
               </span>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
       </CardHeader>
-      <CardContent className="px-6 pt-4 pb-6">
+      <CardContent className="px-(--card-spacing) pt-3.5 pb-(--card-spacing)">
         {loading && !page ? (
           <ActivityEmpty title="正在加载种子活动…" />
         ) : items.length === 0 ? (
@@ -116,10 +123,10 @@ function ActivityTable({
   const showState = activeTab !== "published"
 
   return (
-    <div className="overflow-hidden rounded-lg">
+    <div className="overflow-hidden rounded-lg border">
       <Table>
-        <TableHeader className="bg-muted text-xs text-muted-foreground">
-          <TableRow>
+        <TableHeader>
+          <TableRow className="[&>th]:rounded-none!">
             <TableHead className="w-full min-w-72 pl-3">名称</TableHead>
             {showState ? (
               <TableHead className="w-24 text-center">状态</TableHead>
@@ -143,10 +150,10 @@ function ActivityTable({
               <TableCell className="text-right text-muted-foreground">
                 {submission.category.name}
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right font-mono tabular-nums">
                 {formatBytes(submission.total_size_bytes)}
               </TableCell>
-              <TableCell className="pr-3 text-right text-xs text-muted-foreground">
+              <TableCell className="pr-3 text-right font-mono text-xs text-faint tabular-nums">
                 <time dateTime={submission.state_changed_at}>
                   {formatCompactDateTime(submission.state_changed_at)}
                 </time>
@@ -163,10 +170,8 @@ function SubmissionName({ submission }: { submission: Submission }) {
   const published = submission.state === "published"
   const content = (
     <>
-      <span className={cn("truncate", published ? "font-bold" : "font-medium")}>
-        {submission.title}
-      </span>
-      <span className="truncate text-xs font-normal text-muted-foreground">
+      <span className="truncate font-medium">{submission.title}</span>
+      <span className="truncate text-xs font-normal text-faint">
         {submission.subtitle || submission.content_name}
       </span>
     </>
@@ -179,7 +184,7 @@ function SubmissionName({ submission }: { submission: Submission }) {
   return (
     <Link
       to={`/torrents/${submission.id}`}
-      className="flex min-w-0 flex-col gap-0.5 rounded-sm text-title underline-offset-4 transition-colors hover:text-title-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="flex min-w-0 flex-col gap-0.5 rounded-sm text-title transition-colors hover:text-title-hover focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
     >
       {content}
     </Link>
@@ -188,7 +193,7 @@ function SubmissionName({ submission }: { submission: Submission }) {
 
 function SubmissionStateBadge({ submission }: { submission: Submission }) {
   if (submission.state === "pending_review") {
-    return <Badge variant="secondary">审核中</Badge>
+    return <Badge variant="warning">审核中</Badge>
   }
   return (
     <Badge variant="destructive">

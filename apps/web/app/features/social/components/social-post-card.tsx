@@ -247,23 +247,26 @@ export function SocialPostCard({
               <Link
                 to={`/user/${encodeURIComponent(post.author.username)}`}
                 className={cn(
-                  "min-w-0 truncate text-sm font-semibold hover:underline hover:underline-offset-4",
+                  "min-w-0 truncate text-sm font-semibold transition-colors",
                   post.author.administrator
                     ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent hover:opacity-80"
                     : post.author.vip
-                      ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
-                      : "hover:text-primary"
+                      ? "text-warning-foreground hover:opacity-80"
+                      : "hover:text-link"
                 )}
               >
                 {post.author.display_name}
               </Link>
               {post.author.administrator ? (
-                <Badge className="h-4 shrink-0 border-0 bg-gradient-to-r from-fuchsia-500/15 via-primary/15 to-amber-500/15 px-1.5 text-[10px] font-semibold text-fuchsia-700 shadow-none dark:text-fuchsia-300">
+                <Badge variant="primary" className="h-4 shrink-0 px-1.5">
                   管理员
                 </Badge>
               ) : null}
               {post.author.vip ? (
-                <Badge className="h-4 shrink-0 border border-amber-400/40 bg-amber-400/10 px-1.5 text-[10px] font-bold text-amber-700 shadow-none dark:text-amber-300">
+                <Badge
+                  variant="warning"
+                  className="h-4 shrink-0 px-1.5 font-semibold"
+                >
                   VIP
                 </Badge>
               ) : null}
@@ -282,7 +285,7 @@ export function SocialPostCard({
                     />
                   ) : (
                     <SparklesIcon
-                      className="size-3.5 text-amber-500"
+                      className="size-3.5 text-warning-foreground"
                       aria-hidden="true"
                     />
                   )}
@@ -472,7 +475,7 @@ export function SocialPostCard({
             "relative mt-3 overflow-hidden rounded-xl text-white shadow-sm",
             post.red_packet.remaining_claims === 0
               ? "bg-gradient-to-br from-slate-400 to-slate-500"
-              : "bg-gradient-to-br from-[#FFB25E] to-[#F5762C]"
+              : "bg-gradient-to-br from-[#f2545b] to-[#c81e2b]"
           )}
         >
           <span className="pointer-events-none absolute -top-14 -right-10 size-40 rounded-full border-[24px] border-white/5" />
@@ -583,16 +586,13 @@ export function SocialPostCard({
       {post.pinned || post.featured ? (
         <div className="mt-2 flex gap-1">
           {post.pinned ? (
-            <Badge
-              variant="outline"
-              className="border-transparent bg-destructive/10 text-title"
-            >
+            <Badge variant="destructive">
               <PinIcon />
               置顶
             </Badge>
           ) : null}
           {post.featured ? (
-            <Badge variant="outline">
+            <Badge variant="warning">
               <SparklesIcon />
               精华
             </Badge>
@@ -758,7 +758,7 @@ function SharedTorrentCard({
           </div>
         ) : null}
         <div className="min-w-0 flex-1 p-3">
-          <div className="line-clamp-1 font-bold text-title transition-colors group-hover:text-title-hover">
+          <div className="line-clamp-1 font-medium text-title transition-colors group-hover:text-title-hover">
             {torrent.title}
           </div>
           {torrent.subtitle ? (

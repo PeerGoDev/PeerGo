@@ -2,7 +2,6 @@ import {
   useCallback,
   useState,
   type ComponentProps,
-  type CSSProperties,
   type ReactNode,
 } from "react"
 import { Link, useLocation, useNavigate } from "react-router"
@@ -12,7 +11,8 @@ import {
   BookmarkIcon,
   BookOpenIcon,
   ChartNoAxesCombinedIcon,
-  ChevronDownIcon,
+  ChevronRightIcon,
+  ChevronUpIcon,
   ClockAlertIcon,
   DownloadIcon,
   ExternalLinkIcon,
@@ -27,7 +27,6 @@ import {
   MailCheckIcon,
   MailIcon,
   CoinsIcon,
-  MoonIcon,
   MessageCircleIcon,
   NewspaperIcon,
   PinIcon,
@@ -37,12 +36,10 @@ import {
   ShieldAlertIcon,
   SettingsIcon,
   ShieldIcon,
-  SunIcon,
   TicketIcon,
   UploadIcon,
   UserIcon,
   UserPlusIcon,
-  UsersIcon,
   UsersRoundIcon,
   RssIcon,
 } from "lucide-react"
@@ -82,7 +79,6 @@ import {
   SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
-  SidebarSeparator,
   SidebarTrigger,
   useSidebar,
 } from "~/components/ui/sidebar"
@@ -96,11 +92,20 @@ import { useSiteInfo } from "~/features/site/api/site.queries"
 import { HeaderAttendanceButton } from "~/features/economy/components/header-attendance-button"
 import { SidebarCollapseControl } from "~/features/shell/components/sidebar-collapse-control"
 import { HeaderTrafficSummary } from "~/features/shell/components/header-traffic-summary"
-import { useTheme } from "~/features/shell/model/use-theme"
+import {
+  navigationButtonClass,
+  navigationCountBadgeClass,
+  navigationSubMenuClass,
+  subNavigationButtonClass,
+} from "~/features/shell/components/navigation-styles"
+import { ShellBreadcrumb } from "~/features/shell/components/shell-breadcrumb"
+import { ThemeToggleButton } from "~/features/shell/components/theme-toggle-button"
+import { resolveAppBreadcrumbs } from "~/features/shell/model/breadcrumbs"
 import {
   readDesktopSidebarOpen,
   writeDesktopSidebarOpen,
 } from "~/features/shell/model/sidebar-preference"
+import { cn } from "~/lib/utils"
 import { UserAvatar } from "~/shared/components/user-avatar"
 
 type NavigationItem = {
@@ -118,12 +123,6 @@ type NavigationGroup = {
   collapsible?: boolean
   icon?: LucideIcon
 }
-
-const appNavigationButtonClass =
-  "h-10 justify-start gap-3 rounded-lg px-3 font-medium group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center [&_svg]:size-5"
-
-const appSubNavigationButtonClass =
-  "h-9 translate-x-0 justify-start gap-3 rounded-lg px-3 text-sidebar-foreground transition-colors hover:bg-muted hover:text-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>svg]:text-current"
 
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -387,13 +386,37 @@ export function AppShell({ children }: { children: ReactNode }) {
         ]
       : []),
   ]
-  // The account dropdown and sidebar share these capability-backed entries so
-  // navigation cannot drift when a permission or route changes. The sidebar
-  // presents them in compact sections; the dropdown remains a flat shortcut.
-  const personalNavigationItems = [
-    ...communityNavigationItems,
-    ...accountDataNavigationItems,
-    ...torrentAccountNavigationItems,
+  // The sidebar is the full navigation (and the phone menu); the account
+  // dropdown keeps only the personal shortcuts people reach for most.
+  const accountShortcutItems: NavigationItem[] = [
+    ...(canReadNotifications
+      ? [
+          {
+            label: "消息",
+            to: "/notifications",
+            icon: MailIcon,
+            badge: notificationBadge,
+          },
+        ]
+      : []),
+    ...(canReadTorrentSubmissions
+      ? [
+          {
+            label: "我的上传",
+            to: "/account/submissions",
+            icon: FolderClockIcon,
+          },
+        ]
+      : []),
+    ...(canReadTorrentBookmarks
+      ? [
+          {
+            label: "我的收藏",
+            to: "/account/bookmarks",
+            icon: BookmarkIcon,
+          },
+        ]
+      : []),
   ]
   const navigationGroups: NavigationGroup[] = !activeSession
     ? [
@@ -499,7 +522,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         },
       ]
   const deleteSession = useDeleteWebSession()
-  const { theme, toggleTheme } = useTheme()
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(
     readDesktopSidebarOpen
   )
@@ -521,95 +543,139 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }
 
+  const accountMenu = activeSession ? (
+    <AccountMenuItems
+      username={activeSession.user.username}
+      displayName={activeSession.user.display_name}
+      userId={activeSession.user.id}
+      trafficEnabled={canReadTraffic}
+      economyEnabled={canReadEconomy}
+      shortcutItems={accountShortcutItems}
+      canEnterStaff={Boolean(canEnterStaff)}
+      logoutPending={deleteSession.isPending}
+      logoutFailed={deleteSession.isError}
+      onLogout={handleLogout}
+    />
+  ) : null
+
   return (
     <SidebarProvider
       open={desktopSidebarOpen}
       onOpenChange={handleDesktopSidebarOpenChange}
-      style={
-        {
-          "--sidebar-width":
-            "calc(var(--shell-sidebar-width) + 2 * var(--shell-gap))",
-          "--sidebar-width-icon": "3.75rem",
-        } as CSSProperties
-      }
     >
-      <Sidebar variant="floating" collapsible="icon">
-        <SidebarHeader className="h-(--shell-header-height) shrink-0 justify-center gap-0 border-b px-5 py-0">
-          <Link
-            to="/"
-            className="flex w-full min-w-0 items-baseline gap-1.5 outline-none group-data-[collapsible=icon]:justify-center focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          >
-            <span className="font-heading text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">
-              {siteName}
-            </span>
-            <Badge
-              variant="outline"
-              className="h-4 border-transparent bg-sidebar-accent px-1 text-[9px] tracking-wider text-sidebar-accent-foreground uppercase group-data-[collapsible=icon]:hidden"
-            >
-              beta
-            </Badge>
-            <span className="hidden font-heading text-sm font-bold group-data-[collapsible=icon]:inline">
-              {siteName.slice(0, 2)}
-            </span>
-          </Link>
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="h-14 shrink-0 flex-row items-center gap-0 px-5 py-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 md:h-16">
+          <SiteBrandLink siteName={siteName} />
         </SidebarHeader>
 
-        <SidebarContent className="py-2">
+        <SidebarContent className="pb-2">
           {navigationGroups
             .filter((group) => group.items.length > 0)
-            .map((group, groupIndex) => (
-              <div key={group.label}>
-                {groupIndex > 0 ? <SidebarSeparator /> : null}
-                <AppNavigationGroup
-                  group={group}
-                  pathname={location.pathname}
-                  hash={location.hash}
-                />
-              </div>
+            .map((group) => (
+              <AppNavigationGroup
+                key={group.label}
+                group={group}
+                pathname={location.pathname}
+                hash={location.hash}
+              />
             ))}
         </SidebarContent>
 
-        <SidebarSeparator className="mx-0" />
-        <SidebarFooter className="gap-0 p-0">
+        <SidebarFooter className="gap-1.5 p-3 group-data-[collapsible=icon]:px-2">
           <SidebarCollapseControl />
-          <Separator className="hidden group-data-[collapsible=icon]:hidden lg:block" />
-          <div className="hidden px-5 py-3 text-left text-xs text-muted-foreground group-data-[collapsible=icon]:hidden lg:block">
-            Powered by {siteName}
-          </div>
+          {activeSession && accountMenu ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <button
+                    type="button"
+                    className="flex w-full min-w-0 items-center gap-3 rounded-lg border border-sidebar-border p-2 text-left transition-colors outline-none group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:p-1 hover:bg-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring data-popup-open:bg-accent"
+                  />
+                }
+              >
+                <UserAvatar
+                  username={activeSession.user.username}
+                  displayName={activeSession.user.display_name}
+                  shape="square"
+                  className="size-10 group-data-[collapsible=icon]:size-8"
+                  fallbackClassName="text-base group-data-[collapsible=icon]:text-sm"
+                />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5 group-data-[collapsible=icon]:hidden">
+                  <span className="truncate text-sm font-semibold tracking-title text-foreground">
+                    {activeSession.user.display_name}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    @{activeSession.user.username}
+                  </span>
+                </span>
+                <ChevronUpIcon
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-faint group-data-[collapsible=icon]:hidden"
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="top"
+                align="start"
+                sideOffset={6}
+                className="w-(--anchor-width) min-w-60"
+              >
+                {accountMenu}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-20 shrink-0 px-4 pt-(--shell-gap) lg:px-6">
-          <div className="mx-auto flex h-(--shell-header-height) w-full max-w-[1200px] items-center gap-2 rounded-lg bg-glass px-4 shadow-soft backdrop-blur-[7px]">
-            <SidebarTrigger
-              aria-label="切换侧栏"
-              className="-ml-2 size-10 rounded-lg lg:hidden [&_svg]:size-6"
-            />
-            {activeSession ? (
-              <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-                {siteInfo.data ? (
-                  <>
-                    <Badge
-                      variant="secondary"
-                      className="hidden gap-1.5 rounded-full md:inline-flex"
-                      title="最近 15 分钟内活跃的真实用户数"
-                    >
-                      <span className="size-1.5 rounded-full bg-success" />
-                      {siteInfo.data.online_users} 在线
-                    </Badge>
-                  </>
-                ) : (
-                  <Badge variant="outline" className="hidden sm:inline-flex">
-                    {siteInfo.isError ? "服务暂不可用" : "正在连接"}
-                  </Badge>
-                )}
+        <header className="sticky top-0 z-20 flex h-(--shell-header-height) shrink-0 items-center gap-2 border-b bg-background/95 pr-3 pl-2 backdrop-blur-sm supports-backdrop-filter:bg-background/85 sm:gap-3 sm:pr-4 sm:pl-3">
+          <SidebarTrigger
+            aria-label="切换侧栏"
+            className="text-muted-foreground hover:text-foreground"
+          />
+          <Link
+            to="/"
+            className="flex min-w-0 items-center gap-1.5 rounded-md text-md font-bold tracking-title outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+          >
+            <span className="truncate">{siteName}</span>
+          </Link>
+          <Separator
+            orientation="vertical"
+            className="h-6 max-md:hidden data-vertical:self-center"
+          />
+          <ShellBreadcrumb
+            items={resolveAppBreadcrumbs(location.pathname)}
+            className="max-md:hidden"
+          />
 
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
+            {siteInfo.data ? (
+              <span
+                className="hidden h-[1.625rem] items-center gap-1.5 rounded-full border border-input px-3 text-xs text-muted-foreground md:inline-flex"
+                title="最近 15 分钟内活跃的真实用户数"
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 rounded-full bg-success"
+                />
+                <span className="font-mono tabular-nums">
+                  {siteInfo.data.online_users.toLocaleString("zh-CN")}
+                </span>
+                在线
+              </span>
+            ) : (
+              <span className="hidden h-[1.625rem] items-center rounded-full border border-input px-3 text-xs text-muted-foreground sm:inline-flex">
+                {siteInfo.isError ? "服务暂不可用" : "正在连接"}
+              </span>
+            )}
+
+            {activeSession && accountMenu ? (
+              <>
                 <HeaderTrafficSummary
                   userId={activeSession.user.id}
                   trafficEnabled={canReadTraffic}
                   economyEnabled={canReadEconomy}
+                  className="hidden xl:flex"
                 />
 
                 <HeaderAttendanceButton
@@ -623,8 +689,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                     render={
                       <Button
                         variant="ghost"
-                        size="icon-lg"
-                        className="rounded-full"
+                        size="icon"
+                        className="rounded-full p-0 data-popup-open:bg-accent"
                         aria-label="打开账户菜单"
                       />
                     }
@@ -632,137 +698,172 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <UserAvatar
                       username={activeSession.user.username}
                       displayName={activeSession.user.display_name}
-                      className="ring-2 ring-border"
+                      className="size-[2.125rem]"
                     />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {activeSession ? (
-                      <>
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel className="flex items-center gap-3 p-3 font-normal">
-                            <UserAvatar
-                              username={activeSession.user.username}
-                              displayName={activeSession.user.display_name}
-                            />
-                            <span className="flex min-w-0 flex-col gap-1">
-                              <span className="truncate text-sm font-medium text-foreground">
-                                {activeSession.user.display_name}
-                              </span>
-                              <span className="truncate text-xs text-muted-foreground">
-                                @{activeSession.user.username}
-                              </span>
-                            </span>
-                          </DropdownMenuLabel>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                          <DropdownMenuItem
-                            render={
-                              <Link
-                                to={`/user/${encodeURIComponent(activeSession.user.username)}`}
-                              />
-                            }
-                          >
-                            <UserIcon />
-                            个人主页
-                          </DropdownMenuItem>
-                          {personalNavigationItems.map((item) => (
-                            <DropdownMenuItem
-                              key={item.to}
-                              render={<Link to={item.to} />}
-                            >
-                              <item.icon />
-                              {item.label}
-                              {item.badge ? (
-                                <Badge
-                                  variant="secondary"
-                                  className="ml-auto min-w-5 justify-center px-1.5"
-                                >
-                                  {item.badge}
-                                </Badge>
-                              ) : null}
-                            </DropdownMenuItem>
-                          ))}
-                          <DropdownMenuItem render={<Link to="/account" />}>
-                            <SettingsIcon />
-                            账户设置
-                          </DropdownMenuItem>
-                          {canEnterStaff ? (
-                            <DropdownMenuItem render={<Link to="/staff" />}>
-                              <ShieldIcon />
-                              员工后台
-                            </DropdownMenuItem>
-                          ) : null}
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                          <DropdownMenuItem
-                            variant="destructive"
-                            disabled={deleteSession.isPending}
-                            onClick={handleLogout}
-                          >
-                            {deleteSession.isPending ? (
-                              <Spinner />
-                            ) : (
-                              <LogOutIcon />
-                            )}
-                            {deleteSession.isPending
-                              ? "正在退出"
-                              : deleteSession.isError
-                                ? "退出失败，请重试"
-                                : "退出登录"}
-                          </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                      </>
-                    ) : (
-                      <>
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel>
-                            {session.isError
-                              ? "暂时无法确认登录状态"
-                              : "尚未登录"}
-                          </DropdownMenuLabel>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                          <DropdownMenuItem render={<Link to="/login" />}>
-                            <UserIcon />
-                            登录
-                          </DropdownMenuItem>
-                          {registrationAvailable ? (
-                            <DropdownMenuItem render={<Link to="/register" />}>
-                              <UserPlusIcon />
-                              创建账户
-                            </DropdownMenuItem>
-                          ) : null}
-                          <DropdownMenuItem render={<Link to="/" />}>
-                            <UsersIcon />
-                            内容首页
-                          </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                      </>
-                    )}
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={6}
+                    className="w-64"
+                  >
+                    {accountMenu}
                   </DropdownMenuContent>
                 </DropdownMenu>
-
+              </>
+            ) : !session.isPending ? (
+              <>
                 <Button
-                  variant="secondary"
-                  size="icon"
-                  onClick={toggleTheme}
-                  aria-label={
-                    theme === "dark" ? "切换到浅色模式" : "切换到深色模式"
-                  }
+                  nativeButton={false}
+                  render={<Link to="/login" />}
+                  size="sm"
                 >
-                  {theme === "light" ? <SunIcon /> : <MoonIcon />}
+                  登录
                 </Button>
-              </div>
+                {registrationAvailable ? (
+                  <Button
+                    nativeButton={false}
+                    render={<Link to="/register" />}
+                    variant="outline"
+                    size="sm"
+                    className="max-sm:hidden"
+                  >
+                    注册
+                  </Button>
+                ) : null}
+              </>
             ) : null}
+
+            <ThemeToggleButton />
           </div>
         </header>
 
         {children}
       </SidebarInset>
     </SidebarProvider>
+  )
+}
+
+function SiteBrandLink({ siteName }: { siteName: string }) {
+  return (
+    <Link
+      to="/"
+      className="flex min-w-0 items-center gap-2 rounded-md outline-none group-data-[collapsible=icon]:justify-center focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+    >
+      <span className="truncate text-lg font-bold tracking-title text-foreground group-data-[collapsible=icon]:hidden">
+        {siteName}
+      </span>
+      <span className="shrink-0 rounded-sm border border-primary/40 px-1 py-px text-[0.5625rem] leading-none font-semibold tracking-[0.14em] text-primary uppercase group-data-[collapsible=icon]:hidden">
+        beta
+      </span>
+      <span
+        aria-hidden="true"
+        className="hidden size-9 items-center justify-center rounded-lg bg-primary sheen text-sm font-bold text-primary-foreground shadow-button group-data-[collapsible=icon]:flex"
+      >
+        {Array.from(siteName)[0]?.toLocaleUpperCase() ?? "P"}
+      </span>
+    </Link>
+  )
+}
+
+function AccountMenuItems({
+  username,
+  displayName,
+  userId,
+  trafficEnabled,
+  economyEnabled,
+  shortcutItems,
+  canEnterStaff,
+  logoutPending,
+  logoutFailed,
+  onLogout,
+}: {
+  username: string
+  displayName: string
+  userId: string
+  trafficEnabled: boolean
+  economyEnabled: boolean
+  shortcutItems: NavigationItem[]
+  canEnterStaff: boolean
+  logoutPending: boolean
+  logoutFailed: boolean
+  onLogout: () => void
+}) {
+  return (
+    <>
+      <DropdownMenuGroup>
+        <DropdownMenuLabel className="flex flex-col gap-3 p-2 font-normal text-foreground">
+          <span className="flex items-center gap-3">
+            <UserAvatar
+              username={username}
+              displayName={displayName}
+              shape="square"
+              className="size-9"
+            />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-sm font-semibold tracking-title text-foreground">
+                {displayName}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                @{username}
+              </span>
+            </span>
+          </span>
+          <HeaderTrafficSummary
+            userId={userId}
+            trafficEnabled={trafficEnabled}
+            economyEnabled={economyEnabled}
+            variant="menu"
+            className="xl:hidden"
+          />
+        </DropdownMenuLabel>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem
+          render={<Link to={`/user/${encodeURIComponent(username)}`} />}
+        >
+          <UserIcon />
+          个人主页
+        </DropdownMenuItem>
+        {shortcutItems.map((item) => (
+          <DropdownMenuItem key={item.to} render={<Link to={item.to} />}>
+            <item.icon />
+            {item.label}
+            {item.badge ? (
+              <Badge className={navigationCountBadgeClass}>{item.badge}</Badge>
+            ) : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem render={<Link to="/account" />}>
+          <SettingsIcon />
+          账户设置
+        </DropdownMenuItem>
+        {canEnterStaff ? (
+          <DropdownMenuItem render={<Link to="/staff" />}>
+            <ShieldIcon />
+            管理后台
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem
+          variant="destructive"
+          disabled={logoutPending}
+          onClick={onLogout}
+        >
+          {logoutPending ? <Spinner /> : <LogOutIcon />}
+          {logoutPending
+            ? "正在退出"
+            : logoutFailed
+              ? "退出失败，请重试"
+              : "退出登录"}
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+    </>
   )
 }
 
@@ -782,16 +883,16 @@ function AppNavigationGroup({
     const GroupIcon = group.icon ?? UserIcon
 
     return (
-      <SidebarGroup className="px-2.5 py-0">
+      <SidebarGroup className="px-3 py-0">
         <SidebarGroupContent>
-          <SidebarMenu className="gap-0.5">
+          <SidebarMenu className="gap-1">
             <Collapsible defaultOpen={active} render={<SidebarMenuItem />}>
               <CollapsibleTrigger
                 render={
                   <SidebarMenuButton
                     tooltip={group.label}
                     variant="classic"
-                    className={appNavigationButtonClass}
+                    className={navigationButtonClass}
                   />
                 }
               >
@@ -799,10 +900,10 @@ function AppNavigationGroup({
                 <span className="group-data-[collapsible=icon]:hidden">
                   {group.label}
                 </span>
-                <ChevronDownIcon className="ml-auto transition-transform group-data-[collapsible=icon]:hidden in-data-open:rotate-180" />
+                <ChevronRightIcon className="ml-auto size-3.5! text-faint transition-transform group-data-[collapsible=icon]:hidden in-data-open:rotate-90" />
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <SidebarMenuSub className="mx-0 gap-0.5 border-l-0 px-0 py-0.5">
+                <SidebarMenuSub className={navigationSubMenuClass}>
                   {group.items.map((item) => {
                     const itemActive = navigationItemIsActive(
                       item.to,
@@ -820,17 +921,12 @@ function AppNavigationGroup({
                             />
                           }
                           isActive={itemActive}
-                          className={appSubNavigationButtonClass}
+                          className={subNavigationButtonClass}
                         >
                           <item.icon />
                           <span>{item.label}</span>
                           {item.badge ? (
-                            <Badge
-                              variant="secondary"
-                              className="ml-auto min-w-5 justify-center px-1.5"
-                            >
-                              {item.badge}
-                            </Badge>
+                            <NavigationCountBadge value={item.badge} />
                           ) : null}
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -846,12 +942,12 @@ function AppNavigationGroup({
   }
 
   return (
-    <SidebarGroup className="px-2.5 py-0">
-      <SidebarGroupLabel className="px-3 text-[10.5px] font-semibold tracking-wider text-muted-foreground group-data-[collapsible=icon]:sr-only">
+    <SidebarGroup className="px-3 py-0">
+      <SidebarGroupLabel className="group-data-[collapsible=icon]:sr-only">
         {group.label}
       </SidebarGroupLabel>
       <SidebarGroupContent>
-        <SidebarMenu className="gap-0.5">
+        <SidebarMenu className="gap-1">
           {group.items.map((item) => {
             const active = navigationItemIsActive(item.to, pathname, hash)
             return (
@@ -867,16 +963,17 @@ function AppNavigationGroup({
                       openInNewTab={item.openInNewTab}
                     />
                   }
-                  className={appNavigationButtonClass}
+                  className={navigationButtonClass}
                 >
                   <item.icon />
                   <span className="group-data-[collapsible=icon]:hidden">
                     {item.label}
                   </span>
                   {item.badge ? (
-                    <Badge className="ml-auto min-w-5 justify-center px-1.5 group-data-[collapsible=icon]:hidden">
-                      {item.badge}
-                    </Badge>
+                    <NavigationCountBadge
+                      value={item.badge}
+                      className="group-data-[collapsible=icon]:hidden"
+                    />
                   ) : null}
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -885,6 +982,18 @@ function AppNavigationGroup({
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
+  )
+}
+
+function NavigationCountBadge({
+  value,
+  className,
+}: {
+  value: string
+  className?: string
+}) {
+  return (
+    <Badge className={cn(navigationCountBadgeClass, className)}>{value}</Badge>
   )
 }
 

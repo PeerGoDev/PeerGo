@@ -68,7 +68,7 @@ function EmailVerificationConfirmationContent({ token }: { token: string }) {
         <CardTitle>
           <h1
             id="email-confirmation-title"
-            className="text-2xl leading-none font-semibold tracking-tight"
+            className="text-lg leading-none font-semibold tracking-title"
           >
             {title}
           </h1>

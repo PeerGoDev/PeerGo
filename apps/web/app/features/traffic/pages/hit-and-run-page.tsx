@@ -298,16 +298,16 @@ function HitAndRunContent({
               const selected = values[0] as HitAndRunFilter | undefined
               if (selected) onFilterChange(selected)
             }}
-            size="default"
-            spacing={1}
+            variant="segment"
+            spacing={0.5}
             aria-label="按 H&R 状态筛选"
-            className="min-w-max bg-muted/60 p-1 pr-4 sm:pr-1"
+            className="min-w-max"
           >
             {filters.map((item) => (
               <ToggleGroupItem
                 key={item.value}
                 value={item.value}
-                className="min-w-20 data-[state=on]:bg-background data-[state=on]:shadow-sm"
+                className="min-w-16 px-3"
               >
                 {item.label}
               </ToggleGroupItem>

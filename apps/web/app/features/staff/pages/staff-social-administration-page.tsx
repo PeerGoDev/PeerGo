@@ -50,10 +50,20 @@ import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
 import { hasCapability } from "~/features/staff/model/capability"
 import type { components } from "~/generated/api"
+import { cn } from "~/lib/utils"
 import { ApiProblemError } from "~/shared/api/problem"
 
 type CapabilityList = components["schemas"]["CapabilityList"]
 type SocialPost = components["schemas"]["SocialPost"]
+
+function sectionTabClass(active: boolean) {
+  return cn(
+    "rounded-md border transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+    active
+      ? "border-border bg-segment font-medium text-foreground shadow-xs"
+      : "border-transparent text-muted-foreground hover:text-foreground"
+  )
+}
 
 export function StaffSocialAdministrationPage() {
   return (
@@ -89,8 +99,10 @@ function SocialAdministrationContent({
     <StaffPageFrame className="gap-4">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-xl font-semibold">动态圈管理</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            动态圈管理
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             轻社区信息流与板块配置
           </p>
         </div>
@@ -104,27 +116,21 @@ function SocialAdministrationContent({
           刷新
         </Button>
       </header>
-      <div className="grid h-10 grid-cols-2 rounded-lg bg-muted p-1 text-sm">
+      <div className="grid h-10 grid-cols-2 gap-1 rounded-lg border bg-muted p-[3px] text-sm">
         <button
           type="button"
+          aria-pressed={section === "boards"}
           onClick={() => setSection("boards")}
-          className={
-            section === "boards"
-              ? "rounded-md bg-background font-medium shadow-sm"
-              : "rounded-md text-muted-foreground"
-          }
+          className={sectionTabClass(section === "boards")}
         >
           <Settings2Icon className="mr-2 inline size-4" />
           板块设置
         </button>
         <button
           type="button"
+          aria-pressed={section === "posts"}
           onClick={() => setSection("posts")}
-          className={
-            section === "posts"
-              ? "rounded-md bg-background font-medium shadow-sm"
-              : "rounded-md text-muted-foreground"
-          }
+          className={sectionTabClass(section === "posts")}
         >
           <MessageSquareTextIcon className="mr-2 inline size-4" />
           内容管理

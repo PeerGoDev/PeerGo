@@ -10,6 +10,7 @@ import {
   GitForkIcon,
   GiftIcon,
   KeyRoundIcon,
+  Link2Icon,
   LockIcon,
   LogInIcon,
   RefreshCwIcon,
@@ -381,7 +382,7 @@ type InvitationOverview =
 
 function InvitationStats({ overview }: { overview: InvitationOverview }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 max-lg:*:last:col-span-2 lg:grid-cols-5">
       <SummaryCard
         icon={TicketIcon}
         label="剩余邀请"
@@ -399,22 +400,19 @@ function InvitationStats({ overview }: { overview: InvitationOverview }) {
       />
       <SummaryCard
         icon={CoinsIcon}
-        label="预计后宫奖励 / 小时"
-        value={
-          formatMilliMagic(
-            overview.network.live_harem_reward.current_hourly_estimate_milli
-          ) + " 魔力值"
-        }
-        tone="text-purple-600"
+        label="预计后宫奖励"
+        value={formatMilliMagic(
+          overview.network.live_harem_reward.current_hourly_estimate_milli
+        )}
+        unit="魔力值/时"
+        tone="text-warning-foreground"
       />
       <SummaryCard
         icon={GiftIcon}
         label="PeerGo 已结算"
-        value={
-          formatInteger(overview.network.live_harem_reward.awarded_amount) +
-          " 魔力值"
-        }
-        tone="text-emerald-600"
+        value={formatInteger(overview.network.live_harem_reward.awarded_amount)}
+        unit="魔力值"
+        tone="text-success-foreground"
       />
     </div>
   )
@@ -431,10 +429,13 @@ function InvitationTabs({
     { id: "invites" as const, label: "邀请码", icon: KeyRoundIcon },
     { id: "tree" as const, label: "邀请树", icon: UsersRoundIcon },
     { id: "harem" as const, label: "后宫", icon: GiftIcon },
-    { id: "chain" as const, label: "邀请链", icon: ChevronRightIcon },
+    { id: "chain" as const, label: "邀请链", icon: Link2Icon },
   ]
   return (
-    <div className="flex gap-0.5 overflow-x-auto" role="tablist">
+    <div
+      className="inline-flex w-fit max-w-full [scrollbar-width:none] gap-0.5 overflow-x-auto rounded-lg border bg-muted p-[3px]"
+      role="tablist"
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -443,10 +444,10 @@ function InvitationTabs({
           aria-selected={active === tab.id}
           onClick={() => onChange(tab.id)}
           className={cn(
-            "flex h-9 items-center gap-2 rounded-lg px-3.5 text-sm whitespace-nowrap transition-colors",
+            "flex h-8 items-center gap-2 rounded-md border px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
             active === tab.id
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "border-border bg-segment text-foreground shadow-xs"
+              : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
           <tab.icon className="size-4" />
@@ -789,7 +790,7 @@ function InvitationMembersTable({
                 <>
                   <TableCell>
                     <Badge
-                      variant={member.harem_eligible ? "secondary" : "outline"}
+                      variant={member.harem_eligible ? "success" : "outline"}
                     >
                       {member.harem_eligible ? "正在贡献" : "暂未计入"}
                     </Badge>
@@ -800,7 +801,7 @@ function InvitationMembersTable({
                   <TableCell className="text-right tabular-nums">
                     {formatInteger(member.current_seeding_reward)}
                   </TableCell>
-                  <TableCell className="text-right font-medium text-purple-600 tabular-nums">
+                  <TableCell className="text-right font-mono font-medium text-warning-foreground tabular-nums">
                     {formatMilliMagic(member.current_contribution_milli)}
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap text-muted-foreground">
@@ -983,23 +984,35 @@ function SummaryCard({
   icon: Icon,
   label,
   value,
+  unit,
   tone,
 }: {
   icon: typeof TicketIcon
   label: string
   value: string
+  unit?: string
   tone?: string
 }) {
   return (
-    <Card className="py-4">
-      <CardContent className="flex items-center gap-3">
-        <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+    <Card className="py-3.5 sm:py-4">
+      <CardContent className="flex items-center gap-3 px-3.5 sm:px-4">
+        <div className="hidden size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-link sm:flex">
           <Icon className="size-4" />
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className={cn("text-lg font-semibold tabular-nums", tone)}>
+        <div className="min-w-0">
+          <p className="truncate text-xs text-muted-foreground">{label}</p>
+          <p
+            className={cn(
+              "truncate text-lg leading-tight font-semibold tabular-nums",
+              tone
+            )}
+          >
             {value}
+            {unit ? (
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                {unit}
+              </span>
+            ) : null}
           </p>
         </div>
       </CardContent>
@@ -1044,10 +1057,12 @@ function InvitationStatusBadge({ status }: { status: string }) {
     <Badge
       variant={
         status === "available"
-          ? "default"
-          : status === "used"
-            ? "secondary"
-            : "outline"
+          ? "success"
+          : status === "claimed"
+            ? "info"
+            : status === "used"
+              ? "secondary"
+              : "outline"
       }
     >
       {labels[status] ?? status}

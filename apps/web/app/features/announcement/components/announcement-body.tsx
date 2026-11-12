@@ -20,7 +20,7 @@ export function AnnouncementBody({
   return (
     <div
       className={cn(
-        "flex max-w-none flex-col gap-4 text-base leading-7 break-words",
+        "flex max-w-none flex-col gap-4 text-md leading-7 break-words",
         legacy && "font-mono text-[13px]"
       )}
     >

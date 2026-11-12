@@ -81,16 +81,16 @@ export function UserSocialPostsPage() {
       <header className="flex items-center gap-4">
         <BackToProfile username={profile.data.username} />
         <div className="min-w-0">
-          <h1 className="truncate font-heading text-xl font-bold">
+          <h1 className="truncate font-heading text-lg leading-tight font-semibold tracking-title">
             <Link
               to={`/user/${encodeURIComponent(profile.data.username)}`}
-              className="hover:text-primary"
+              className="transition-colors hover:text-link"
             >
               {profile.data.username}
             </Link>{" "}
             的动态
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {total === undefined
               ? "正在读取动态…"
               : `共 ${total.toLocaleString("zh-CN")} 条`}

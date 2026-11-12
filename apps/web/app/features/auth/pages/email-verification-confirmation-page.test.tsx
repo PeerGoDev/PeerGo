@@ -44,16 +44,21 @@ describe("EmailVerificationConfirmationPage", () => {
     expect(message).toBeVisible()
     expect(message.closest("main")).toHaveClass(
       "flex",
-      "min-h-svh",
-      "items-center",
-      "justify-center"
+      "flex-1",
+      "justify-center",
+      "sm:items-center"
     )
     const card = message.closest('[data-slot="card"]')
-    expect(card).toHaveClass("rounded-3xl", "border-0", "shadow-soft")
-    expect(card?.querySelector('[data-slot="card-header"]')).toHaveClass("px-6")
-    expect(card?.querySelector('[data-slot="card-content"]')).toHaveClass(
-      "px-6"
+    expect(card).toHaveClass(
+      "max-w-sm",
+      "border-0",
+      "bg-transparent",
+      "shadow-none"
     )
+    expect(card?.querySelector('[data-slot="auth-brand"]')).toHaveTextContent(
+      "PeerGo"
+    )
+    expect(card?.querySelector('[data-slot="card-content"]')).toBeVisible()
     expect(
       screen.queryByRole("button", { name: "确认验证" })
     ).not.toBeInTheDocument()

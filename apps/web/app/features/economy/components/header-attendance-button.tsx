@@ -37,7 +37,8 @@ export function HeaderAttendanceButton({
         nativeButton={false}
         variant="ghost"
         size="sm"
-        className="hidden h-8 gap-1.5 rounded-full px-2.5 text-success-foreground md:inline-flex"
+        className="hidden gap-1.5 px-2.5 text-xs text-success-foreground hover:text-success-foreground md:inline-flex"
+        title={`已连续签到 ${overview.current_streak} 天`}
       >
         <CalendarCheck2Icon />
         已签到 {overview.current_streak} 天
@@ -49,9 +50,8 @@ export function HeaderAttendanceButton({
   const mode: AttendanceMode = settings.fixed_enabled ? "fixed" : "random"
   return (
     <Button
-      variant="outline"
       size="sm"
-      className="hidden h-8 rounded-full border-primary/30 bg-primary/5 px-2.5 text-primary hover:bg-primary/10 hover:text-primary md:inline-flex"
+      className="px-3.5"
       disabled={mutation.isPending}
       onClick={() =>
         mutation.mutate({
@@ -66,7 +66,7 @@ export function HeaderAttendanceButton({
           : undefined
       }
     >
-      {mutation.isPending ? <Spinner /> : <CalendarCheck2Icon />}
+      {mutation.isPending ? <Spinner /> : null}
       {mutation.isPending ? "签到中" : "签到"}
     </Button>
   )

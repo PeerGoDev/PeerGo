@@ -436,8 +436,10 @@ function SeedingRewardPolicyEditor({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">做种奖励</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            做种奖励
+          </h1>
+          <p className="text-xs text-muted-foreground">
             按种子体积、年龄、稀缺度、做种数量和用户权益计算魔力值。
           </p>
         </div>
@@ -516,7 +518,7 @@ function SeedingRewardPolicyEditor({
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 2xl:sticky 2xl:top-20">
+        <div className="grid gap-4 2xl:sticky 2xl:top-[calc(var(--shell-header-height)+1rem)]">
           <Card>
             <CardHeader>
               <CardTitle>保存前检查</CardTitle>

@@ -1,14 +1,26 @@
 import * as React from "react"
 import { Link, useSearchParams } from "react-router"
 import {
+  type LucideIcon,
+  ArrowLeftIcon,
+  CheckCheckIcon,
   CheckIcon,
   CircleAlertIcon,
+  ClockAlertIcon,
+  CoinsIcon,
+  FileCheck2Icon,
+  FilePenLineIcon,
+  GaugeIcon,
+  GiftIcon,
+  InboxIcon,
   LogInIcon,
+  MailOpenIcon,
   MessageSquarePlusIcon,
   RefreshCwIcon,
   SendIcon,
   ShieldXIcon,
   Trash2Icon,
+  UsersRoundIcon,
 } from "lucide-react"
 
 import {
@@ -28,9 +40,8 @@ import {
   AlertDescription,
   AlertTitle,
 } from "~/components/ui/alert"
-import { Badge } from "~/components/ui/badge"
 import { Button, buttonVariants } from "~/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
+import { Card, CardContent } from "~/components/ui/card"
 import {
   Dialog,
   DialogClose,
@@ -58,6 +69,12 @@ import {
 } from "~/components/ui/empty"
 import { Skeleton } from "~/components/ui/skeleton"
 import { Spinner } from "~/components/ui/spinner"
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip"
 import { useWebSession } from "~/features/auth/api/session.mutations"
 import { useCapabilities } from "~/features/authz/api/capabilities.queries"
 import {
@@ -95,6 +112,7 @@ export function NotificationPage() {
   const [feedbackError, setFeedbackError] = React.useState<string>()
   const [feedbackSent, setFeedbackSent] = React.useState(false)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = React.useState(false)
+  const inboxRef = React.useRef<HTMLElement>(null)
   const pageNumber = notificationPageNumber(searchParams.get("page"))
   const unreadOnly = searchParams.get("unread") === "1"
   const offset = (pageNumber - 1) * notificationPageSize
@@ -215,68 +233,44 @@ export function NotificationPage() {
     if (canWrite && notification.read_at === null && !markRead.isPending) {
       markRead.mutate(notification.id)
     }
+    // Phones swap the list for the detail pane, so bring its top into view.
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(width < 48rem)").matches
+    ) {
+      inboxRef.current?.scrollIntoView({ block: "start" })
+    }
   }
 
   return (
-    <PageLayout className="gap-5 p-4! md:max-w-3xl md:gap-6 md:px-8! md:pt-10! md:pb-8! lg:max-w-5xl lg:px-10! lg:pt-12! xl:max-w-7xl">
-      <header className="flex items-center justify-between gap-4 max-md:flex-col max-md:items-stretch">
-        <h1 className="font-heading text-2xl font-bold sm:text-3xl">
-          站内消息
-        </h1>
-        {session.data && canRead && notifications.data ? (
-          <div className="grid min-w-0 grid-cols-2 gap-2 md:flex">
-            {canCreateFeedback ? (
-              <Button
-                type="button"
-                size="legacy"
-                className="h-10 min-w-0 border-0 whitespace-nowrap md:shrink-0"
-                onClick={() => {
-                  setFeedbackError(undefined)
-                  setFeedbackOpen(true)
-                }}
-              >
-                <MessageSquarePlusIcon data-icon="inline-start" />
-                联系管理员
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="soft"
-              size="legacy"
-              className="h-10 min-w-0 border-0 whitespace-nowrap md:shrink-0"
-              onClick={() => setUnreadOnly(!unreadOnly)}
-            >
-              {unreadOnly ? "显示全部" : "仅未读"}
-            </Button>
-            {canWrite ? (
-              <Button
-                type="button"
-                variant="soft"
-                size="legacy"
-                className="h-10 min-w-0 border-0 whitespace-nowrap md:shrink-0"
-                disabled={
-                  markAllRead.isPending || notifications.data.unread_count === 0
-                }
-                onClick={() => markAllRead.mutate()}
-              >
-                {markAllRead.isPending ? (
-                  <Spinner data-icon="inline-start" />
-                ) : null}
-                全部标记为已读
-              </Button>
-            ) : null}
-            {canArchive ? (
-              <Button
-                type="button"
-                variant="softDestructive"
-                size="legacy"
-                className="h-10 min-w-0 border-0 whitespace-nowrap md:shrink-0"
-                onClick={() => setArchiveConfirmOpen(true)}
-              >
-                删除全部
-              </Button>
-            ) : null}
-          </div>
+    <PageLayout className="gap-5">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1 pt-1">
+          <h1 className="font-heading text-lg leading-tight font-semibold tracking-title">
+            站内消息
+          </h1>
+          {notifications.data ? (
+            <p className="text-xs text-muted-foreground">
+              共 {notifications.data.total.toLocaleString("zh-CN")} 条
+              {unreadOnly ? "未读消息" : "消息"}
+              {notifications.data.unread_count > 0 && !unreadOnly
+                ? `，${notifications.data.unread_count.toLocaleString("zh-CN")} 条未读`
+                : ""}
+            </p>
+          ) : null}
+        </div>
+        {session.data && canRead && notifications.data && canCreateFeedback ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              setFeedbackError(undefined)
+              setFeedbackOpen(true)
+            }}
+          >
+            <MessageSquarePlusIcon data-icon="inline-start" />
+            联系管理员
+          </Button>
         ) : null}
       </header>
 
@@ -340,88 +334,152 @@ export function NotificationPage() {
 
       {session.data && canRead && notifications.data ? (
         <section
+          ref={inboxRef}
           aria-label="站内消息"
-          className="grid grid-cols-1 gap-6 md:grid-cols-3"
+          className="scroll-mt-[calc(var(--shell-header-height)+1rem)]"
         >
-          <Card className="gap-0 py-0 md:col-span-1 md:min-h-[640px]">
-            <CardHeader className="border-b p-4">
-              <CardTitle className="text-base leading-6 font-semibold">
-                <h2 id="notification-list-title">消息列表</h2>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="min-h-0 flex-1 px-0">
+          <Card className="gap-0 py-0 md:grid md:h-[640px] md:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)]">
+            <div
+              className={cn(
+                "flex min-h-0 min-w-0 flex-col md:border-r",
+                selectedNotification && "max-md:hidden"
+              )}
+            >
+              <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+                <h2 id="notification-list-title" className="sr-only">
+                  消息列表
+                </h2>
+                <ToggleGroup
+                  value={[unreadOnly ? "unread" : "all"]}
+                  onValueChange={(values) => {
+                    const next = values[0]
+                    if (next) setUnreadOnly(next === "unread")
+                  }}
+                  variant="segment"
+                  size="sm"
+                  spacing={0.5}
+                  aria-label="筛选消息"
+                >
+                  <ToggleGroupItem value="all" className="px-3">
+                    全部
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="unread" className="px-3">
+                    未读
+                    {notifications.data.unread_count > 0 ? (
+                      <span className="font-mono text-2xs text-link tabular-nums">
+                        {notifications.data.unread_count > 99
+                          ? "99+"
+                          : notifications.data.unread_count}
+                      </span>
+                    ) : null}
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <div className="flex items-center gap-0.5">
+                  {canWrite ? (
+                    <InboxToolbarButton
+                      label="全部已读"
+                      disabled={
+                        markAllRead.isPending ||
+                        notifications.data.unread_count === 0
+                      }
+                      onClick={() => markAllRead.mutate()}
+                    >
+                      {markAllRead.isPending ? <Spinner /> : <CheckCheckIcon />}
+                    </InboxToolbarButton>
+                  ) : null}
+                  {canArchive ? (
+                    <InboxToolbarButton
+                      label="删除全部"
+                      className="hover:text-destructive"
+                      onClick={() => setArchiveConfirmOpen(true)}
+                    >
+                      <Trash2Icon />
+                    </InboxToolbarButton>
+                  ) : null}
+                </div>
+              </div>
+
               {notifications.data.items.length === 0 ? (
-                <Empty className="flex-none gap-0 rounded-none border-0 p-4 text-muted-foreground">
-                  <p>暂无消息</p>
+                <Empty className="min-h-64 flex-1 border-0">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <InboxIcon />
+                    </EmptyMedia>
+                    <EmptyTitle>暂无消息</EmptyTitle>
+                    <EmptyDescription>
+                      {unreadOnly
+                        ? "所有消息都已读完。"
+                        : "审核结果、H&R 与魔力值变动等通知会出现在这里。"}
+                    </EmptyDescription>
+                  </EmptyHeader>
                 </Empty>
               ) : (
-                <ol className="max-h-[600px] divide-y overflow-y-auto">
-                  {notifications.data.items.map((notification) => {
-                    const unread = notification.read_at === null
-                    return (
-                      <li key={notification.id}>
-                        <button
-                          type="button"
-                          className={cn(
-                            "w-full cursor-pointer p-4 text-left transition-colors hover:bg-muted/50",
-                            unread && "bg-accent/50",
-                            selectedNotificationID === notification.id &&
-                              "bg-muted"
-                          )}
-                          onClick={() => selectNotification(notification)}
-                        >
-                          <span className="mb-1.5 flex items-start justify-between gap-2">
-                            <span className="text-sm font-semibold">
-                              系统消息
-                            </span>
-                            {unread ? (
-                              <Badge aria-label="未读">未读</Badge>
-                            ) : null}
-                          </span>
-                          <span className="mb-1.5 block truncate text-sm font-medium">
-                            {notificationListTitle(notification)}
-                          </span>
-                          <time
-                            className="block text-xs text-muted-foreground"
-                            dateTime={notification.created_at}
-                          >
-                            {formatTimeAgo(notification.created_at)}
-                          </time>
-                        </button>
-                      </li>
-                    )
-                  })}
+                <ol className="min-h-0 flex-1 divide-y overflow-y-auto">
+                  {notifications.data.items.map((notification) => (
+                    <li key={notification.id}>
+                      <NotificationListItem
+                        notification={notification}
+                        selected={selectedNotificationID === notification.id}
+                        onSelect={() => selectNotification(notification)}
+                      />
+                    </li>
+                  ))}
                 </ol>
               )}
-            </CardContent>
 
-            {notifications.data.total > notifications.data.limit ? (
-              <div className="border-t p-4">
-                <OffsetPagination
-                  total={notifications.data.total}
-                  limit={notifications.data.limit}
-                  offset={notifications.data.offset}
-                  onOffsetChange={setNotificationOffset}
-                  ariaLabel="消息分页"
-                  summaryLabel="消息"
-                  summaryUnit="条"
-                  buttonVariant="ghost"
-                  className="justify-between"
-                />
-              </div>
-            ) : null}
-          </Card>
+              {notifications.data.total > notifications.data.limit ? (
+                <div className="border-t px-3 py-2.5">
+                  <OffsetPagination
+                    total={notifications.data.total}
+                    limit={notifications.data.limit}
+                    offset={notifications.data.offset}
+                    onOffsetChange={setNotificationOffset}
+                    ariaLabel="消息分页"
+                    summaryLabel="消息"
+                    summaryUnit="条"
+                    buttonVariant="ghost"
+                    compact
+                    className="justify-between"
+                  />
+                </div>
+              ) : null}
+            </div>
 
-          <Card className="min-w-0 gap-0 py-0 md:col-span-2 md:min-h-[640px]">
-            <CardContent className="p-6">
+            <div
+              className={cn(
+                "min-h-0 min-w-0 overflow-y-auto",
+                !selectedNotification && "max-md:hidden"
+              )}
+            >
               {selectedNotification ? (
-                <NotificationDetail notification={selectedNotification} />
+                <>
+                  <div className="border-b px-2 py-1.5 md:hidden">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedNotificationID(null)}
+                    >
+                      <ArrowLeftIcon data-icon="inline-start" />
+                      返回列表
+                    </Button>
+                  </div>
+                  <NotificationDetail notification={selectedNotification} />
+                </>
               ) : (
-                <Empty className="flex-none gap-0 rounded-none border-0 p-0 text-muted-foreground">
-                  <p>请选择一条消息查看详情</p>
+                <Empty className="h-full border-0">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <MailOpenIcon />
+                    </EmptyMedia>
+                    <EmptyTitle>请选择一条消息查看详情</EmptyTitle>
+                    <EmptyDescription>
+                      点击左侧消息即可查看完整内容和相关操作。
+                    </EmptyDescription>
+                  </EmptyHeader>
                 </Empty>
               )}
-            </CardContent>
+            </div>
           </Card>
         </section>
       ) : null}
@@ -435,7 +493,7 @@ export function NotificationPage() {
       >
         <DialogContent
           overlayClassName="bg-black/80 supports-backdrop-filter:backdrop-blur-none"
-          className="gap-4 rounded-lg border bg-background p-6 sm:max-w-lg"
+          className="gap-4 sm:max-w-lg"
         >
           <form className="contents" onSubmit={submitFeedback}>
             <DialogHeader className="gap-1.5">
@@ -473,7 +531,7 @@ export function NotificationPage() {
                   maxLength={2000}
                   rows={6}
                   aria-invalid={Boolean(feedbackError)}
-                  className="min-h-[162px] resize-none text-base leading-6"
+                  className="min-h-[162px] resize-none leading-6"
                 />
                 <span className="mt-1.5 text-right text-xs text-muted-foreground">
                   {feedbackContent.length}/2000
@@ -569,61 +627,376 @@ export function NotificationPage() {
   )
 }
 
+type NotificationTone = "success" | "warning" | "destructive" | "info"
+
+const notificationToneClasses: Record<NotificationTone, string> = {
+  success: "bg-success/12 text-success-foreground",
+  warning: "bg-warning/12 text-warning-foreground",
+  destructive: "bg-destructive/12 text-destructive",
+  info: "bg-info/12 text-info",
+}
+
+type NotificationPresentation = {
+  category: string
+  icon: LucideIcon
+  tone: NotificationTone
+  title: string
+  sender: string
+}
+
+function notificationPresentation(
+  notification: MyNotification
+): NotificationPresentation {
+  const torrentTitle = notification.torrent_title ?? "种子"
+  switch (notification.kind) {
+    case "content_tip":
+      return {
+        category: "魔力值",
+        icon: CoinsIcon,
+        tone: "warning",
+        title: "收到内容打赏",
+        sender: notification.content_tip_sender_display_name ?? "站点成员",
+      }
+    case "member_gift":
+      return {
+        category: "魔力值",
+        icon: GiftIcon,
+        tone: "warning",
+        title: "收到成员赠送",
+        sender: notification.member_gift_sender_display_name ?? "站点成员",
+      }
+    case "workgroup_contribution":
+      return {
+        category: "工作组",
+        icon: UsersRoundIcon,
+        tone:
+          notification.workgroup_disciplinary_action === "membership_ended"
+            ? "destructive"
+            : notification.workgroup_disciplinary_action === "marked"
+              ? "warning"
+              : "info",
+        title: notificationListTitle(notification),
+        sender: "系统",
+      }
+    case "ratio_watch":
+      return {
+        category: "分享率",
+        icon: GaugeIcon,
+        tone:
+          notification.ratio_watch_status === "download_restricted"
+            ? "destructive"
+            : notification.ratio_watch_status === "satisfied" ||
+                notification.ratio_watch_status === "manually_cleared"
+              ? "success"
+              : "warning",
+        title: ratioWatchNotificationTitle(notification.ratio_watch_status),
+        sender: "系统",
+      }
+    case "ratio_appeal":
+      return {
+        category: "分享率",
+        icon: GaugeIcon,
+        tone: "warning",
+        title: "分享率申诉处理结果",
+        sender: "系统",
+      }
+    case "hnr":
+      return {
+        category: "H&R",
+        icon: ClockAlertIcon,
+        tone:
+          notification.hnr_status === "download_restricted"
+            ? "destructive"
+            : notification.hnr_status === "satisfied"
+              ? "success"
+              : "warning",
+        title: `${hnrNotificationTitle(notification.hnr_status)}：${torrentTitle}`,
+        sender: "系统",
+      }
+    case "hnr_appeal":
+      return {
+        category: "H&R",
+        icon: ClockAlertIcon,
+        tone:
+          notification.hnr_status === "appeal_approved"
+            ? "success"
+            : "destructive",
+        title: `${
+          notification.hnr_status === "appeal_approved"
+            ? "H&R 申诉已批准"
+            : "H&R 申诉已驳回"
+        }：${torrentTitle}`,
+        sender: "系统",
+      }
+    default: {
+      const published = notification.outcome === "published"
+      return {
+        category: "种子审核",
+        icon: published ? FileCheck2Icon : FilePenLineIcon,
+        tone: published ? "success" : "warning",
+        title: `${published ? "审核通过" : "需要修改"}：${torrentTitle}`,
+        sender: "系统",
+      }
+    }
+  }
+}
+
+function NotificationKindIcon({
+  presentation,
+  className,
+}: {
+  presentation: NotificationPresentation
+  className?: string
+}) {
+  const Icon = presentation.icon
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-lg",
+        notificationToneClasses[presentation.tone],
+        className
+      )}
+    >
+      <Icon />
+    </span>
+  )
+}
+
+function NotificationListItem({
+  notification,
+  selected,
+  onSelect,
+}: {
+  notification: MyNotification
+  selected: boolean
+  onSelect: () => void
+}) {
+  const presentation = notificationPresentation(notification)
+  const unread = notification.read_at === null
+  return (
+    <button
+      type="button"
+      aria-current={selected ? "true" : undefined}
+      className={cn(
+        "relative flex w-full gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-accent focus-visible:bg-accent",
+        selected &&
+          "bg-accent before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary"
+      )}
+      onClick={onSelect}
+    >
+      <NotificationKindIcon
+        presentation={presentation}
+        className="mt-0.5 size-8 [&_svg]:size-4"
+      />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-xs text-muted-foreground">
+            {presentation.category}
+          </span>
+          <time
+            className="ml-auto shrink-0 text-2xs text-faint"
+            dateTime={notification.created_at}
+          >
+            {formatTimeAgo(notification.created_at)}
+          </time>
+        </span>
+        <span
+          className={cn(
+            "line-clamp-2 text-sm leading-5 break-words",
+            unread ? "font-semibold text-foreground" : "text-muted-foreground"
+          )}
+        >
+          {notificationListTitle(notification)}
+        </span>
+      </span>
+      {unread ? (
+        <span
+          role="img"
+          aria-label="未读"
+          className="mt-2 size-2 shrink-0 rounded-full bg-primary"
+        />
+      ) : null}
+    </button>
+  )
+}
+
+function InboxToolbarButton({
+  label,
+  className,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string
+  className?: string
+  disabled?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={label}
+            className={cn("text-muted-foreground", className)}
+            disabled={disabled}
+            onClick={onClick}
+          />
+        }
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function NotificationDetail({
   notification,
 }: {
   notification: MyNotification
 }) {
-  if (notification.kind === "content_tip") {
-    return <ContentTipNotificationDetail notification={notification} />
-  }
-  if (notification.kind === "member_gift") {
-    return <MemberGiftNotificationDetail notification={notification} />
-  }
-  if (notification.kind === "workgroup_contribution") {
-    return (
-      <WorkgroupContributionNotificationDetail notification={notification} />
-    )
-  }
-  if (notification.kind === "ratio_watch") {
-    return <RatioWatchNotificationDetail notification={notification} />
-  }
-  if (notification.kind === "ratio_appeal") {
-    return <RatioAppealNotificationDetail notification={notification} />
-  }
-  if (notification.kind === "hnr") {
-    return <HNRNotificationDetail notification={notification} />
-  }
-  if (notification.kind === "hnr_appeal") {
-    return <HNRAppealNotificationDetail notification={notification} />
-  }
-
-  const published = notification.outcome === "published"
-  const torrentTitle = notification.torrent_title ?? "种子"
-  const reason = notification.reason ?? "审核结果详情暂时不可用。"
-
+  const presentation = notificationPresentation(notification)
   return (
     <article>
-      <header className="flex flex-col gap-2">
+      <header className="flex items-start gap-3 border-b px-4 py-4 sm:px-6 sm:py-5">
+        <NotificationKindIcon
+          presentation={presentation}
+          className="size-10 [&_svg]:size-5"
+        />
         <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            {published ? "审核通过" : "需要修改"}：{torrentTitle}
+          <p className="text-xs text-muted-foreground">
+            {presentation.category}
+          </p>
+          <h2 className="mt-0.5 font-heading text-md leading-snug font-semibold tracking-title break-words sm:text-lg">
+            {presentation.title}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            来自：系统
-            <span className="mx-2">•</span>
-            <time dateTime={notification.created_at}>
+          <p className="mt-1 text-xs text-faint">
+            来自：{presentation.sender}
+            <span aria-hidden="true" className="mx-1.5">
+              ·
+            </span>
+            <time
+              dateTime={notification.created_at}
+              title={formatDateTime(notification.created_at)}
+            >
               {formatTimeAgo(notification.created_at)}
             </time>
           </p>
         </div>
       </header>
+      <div className="flex flex-col gap-5 px-4 py-5 sm:px-6">
+        <NotificationDetailBody notification={notification} />
+      </div>
+    </article>
+  )
+}
 
-      <p className="mt-6 text-base leading-7 break-words whitespace-pre-wrap">
-        {reason}
+function NotificationDetailBody({
+  notification,
+}: {
+  notification: MyNotification
+}) {
+  switch (notification.kind) {
+    case "content_tip":
+      return <ContentTipNotificationDetail notification={notification} />
+    case "member_gift":
+      return <MemberGiftNotificationDetail notification={notification} />
+    case "workgroup_contribution":
+      return (
+        <WorkgroupContributionNotificationDetail notification={notification} />
+      )
+    case "ratio_watch":
+      return <RatioWatchNotificationDetail notification={notification} />
+    case "ratio_appeal":
+      return <RatioAppealNotificationDetail notification={notification} />
+    case "hnr":
+      return <HNRNotificationDetail notification={notification} />
+    case "hnr_appeal":
+      return <HNRAppealNotificationDetail notification={notification} />
+    default:
+      return <TorrentReviewNotificationDetail notification={notification} />
+  }
+}
+
+function DetailText({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-md leading-7 break-words whitespace-pre-wrap">
+      {children}
+    </p>
+  )
+}
+
+function DetailFacts({ children }: { children: React.ReactNode }) {
+  return (
+    <dl className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 sm:[&>:last-child:nth-child(odd)]:col-span-2">
+      {children}
+    </dl>
+  )
+}
+
+function DetailFact({
+  label,
+  emphasis = false,
+  children,
+}: {
+  label: string
+  emphasis?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 bg-card px-3.5 py-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd
+        className={cn(
+          "text-sm font-medium break-words",
+          emphasis && "font-mono text-lg font-semibold tabular-nums"
+        )}
+      >
+        {children}
+      </dd>
+    </div>
+  )
+}
+
+function DetailNote({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-lg bg-muted px-4 py-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm leading-6 break-words whitespace-pre-wrap">
+        {children}
       </p>
+    </div>
+  )
+}
 
-      <div className="mt-6">
+function DetailActions({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-wrap gap-2">{children}</div>
+}
+
+function TorrentReviewNotificationDetail({
+  notification,
+}: {
+  notification: MyNotification
+}) {
+  const published = notification.outcome === "published"
+  return (
+    <>
+      <DetailText>
+        {notification.reason ?? "审核结果详情暂时不可用。"}
+      </DetailText>
+      <DetailActions>
         <Link
           to={
             published
@@ -634,8 +1007,8 @@ function NotificationDetail({
         >
           {published ? "查看种子" : "查看反馈"}
         </Link>
-      </div>
-    </article>
+      </DetailActions>
+    </>
   )
 }
 
@@ -653,45 +1026,23 @@ function ContentTipNotificationDetail({
   const targetPath = contentTipTargetPath(notification)
 
   return (
-    <article>
-      <header className="flex flex-col gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            收到内容打赏
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            来自：{senderDisplayName}
-            <span className="mx-2">•</span>
-            <time dateTime={notification.created_at}>
-              {formatTimeAgo(notification.created_at)}
-            </time>
-          </p>
-        </div>
-      </header>
-
-      <dl className="mt-6 grid gap-4 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-muted-foreground">到账魔力值</dt>
-          <dd className="mt-1 text-lg font-semibold">{amount}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">打赏成员</dt>
-          <dd className="mt-1 font-medium">
-            {senderDisplayName}
-            {senderNumericID ? ` #${senderNumericID}` : ""}
-            {senderUsername ? ` · @${senderUsername}` : ""}
-          </dd>
-        </div>
-      </dl>
-
-      <div className="mt-6 rounded-md border p-4">
-        <div className="text-sm text-muted-foreground">
-          {contentTipTargetLabel(notification.content_tip_target_kind)}
-        </div>
-        <p className="mt-1 leading-7 break-words">{targetTitle}</p>
-      </div>
-
-      <div className="mt-6 flex flex-wrap gap-2">
+    <>
+      <DetailFacts>
+        <DetailFact label="到账魔力值" emphasis>
+          <span className="text-warning-foreground">{amount}</span>
+        </DetailFact>
+        <DetailFact label="打赏成员">
+          {senderDisplayName}
+          {senderNumericID ? ` #${senderNumericID}` : ""}
+          {senderUsername ? ` · @${senderUsername}` : ""}
+        </DetailFact>
+      </DetailFacts>
+      <DetailNote
+        label={contentTipTargetLabel(notification.content_tip_target_kind)}
+      >
+        {targetTitle}
+      </DetailNote>
+      <DetailActions>
         {targetPath ? (
           <Link
             to={targetPath}
@@ -706,8 +1057,8 @@ function ContentTipNotificationDetail({
         >
           查看魔力值账本
         </Link>
-      </div>
-    </article>
+      </DetailActions>
+    </>
   )
 }
 
@@ -723,55 +1074,29 @@ function MemberGiftNotificationDetail({
   const amount = formatInteger(notification.member_gift_net_amount ?? "")
 
   return (
-    <article>
-      <header className="flex flex-col gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            收到成员赠送
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            来自：{senderDisplayName}
-            <span className="mx-2">•</span>
-            <time dateTime={notification.created_at}>
-              {formatTimeAgo(notification.created_at)}
-            </time>
-          </p>
-        </div>
-      </header>
-
-      <dl className="mt-6 grid gap-4 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-muted-foreground">到账魔力值</dt>
-          <dd className="mt-1 text-lg font-semibold">{amount}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">赠送成员</dt>
-          <dd className="mt-1 font-medium">
-            {senderDisplayName}
-            {senderNumericID ? ` #${senderNumericID}` : ""}
-            {senderUsername ? ` · @${senderUsername}` : ""}
-          </dd>
-        </div>
-      </dl>
-
+    <>
+      <DetailFacts>
+        <DetailFact label="到账魔力值" emphasis>
+          <span className="text-warning-foreground">{amount}</span>
+        </DetailFact>
+        <DetailFact label="赠送成员">
+          {senderDisplayName}
+          {senderNumericID ? ` #${senderNumericID}` : ""}
+          {senderUsername ? ` · @${senderUsername}` : ""}
+        </DetailFact>
+      </DetailFacts>
       {notification.member_gift_message ? (
-        <div className="mt-6 rounded-md border p-4">
-          <div className="text-sm text-muted-foreground">留言</div>
-          <p className="mt-1 leading-7 whitespace-pre-wrap">
-            {notification.member_gift_message}
-          </p>
-        </div>
+        <DetailNote label="留言">{notification.member_gift_message}</DetailNote>
       ) : null}
-
-      <div className="mt-6">
+      <DetailActions>
         <Link
           to="/account/economy"
           className={buttonVariants({ variant: "outline", size: "sm" })}
         >
           查看魔力值账本
         </Link>
-      </div>
-    </article>
+      </DetailActions>
+    </>
   )
 }
 
@@ -788,81 +1113,48 @@ function WorkgroupContributionNotificationDetail({
     ? formatContributionValue(metric, notification.workgroup_target_value ?? 0)
     : "—"
   return (
-    <article>
-      <header className="flex flex-col gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            {notification.workgroup_disciplinary_action === "membership_ended"
-              ? `${workgroupKindLabel(notification.workgroup_kind)}资格已结束`
-              : notification.workgroup_disciplinary_action === "marked"
-                ? `${workgroupKindLabel(notification.workgroup_kind)}月度未达标标记`
-                : `${workgroupKindLabel(notification.workgroup_kind)}贡献进度提醒`}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            来自：系统
-            <span className="mx-2">•</span>
-            <time dateTime={notification.created_at}>
-              {formatTimeAgo(notification.created_at)}
-            </time>
-          </p>
-        </div>
-      </header>
-      <p className="mt-6 text-base leading-7 whitespace-pre-wrap">
+    <>
+      <DetailText>
         {notification.workgroup_reason ?? "请关注本期工作组贡献进度。"}
-      </p>
-      <dl className="mt-6 grid gap-4 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-muted-foreground">贡献周期</dt>
-          <dd className="mt-1 font-medium">
-            {formatWorkgroupPeriod(notification.workgroup_period_starts_at)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">贡献项目</dt>
-          <dd className="mt-1 font-medium">
-            {metric ? contributionMetricLabel(metric) : "工作组贡献"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">提醒时进度</dt>
-          <dd className="mt-1 font-medium">
-            {current} / {target}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">证据状态</dt>
-          <dd className="mt-1 font-medium">
-            {notification.workgroup_evidence_state === "complete"
-              ? "证据完整"
-              : "仍在采集"}
-          </dd>
-        </div>
+      </DetailText>
+      <DetailFacts>
+        <DetailFact label="贡献周期">
+          {formatWorkgroupPeriod(notification.workgroup_period_starts_at)}
+        </DetailFact>
+        <DetailFact label="贡献项目">
+          {metric ? contributionMetricLabel(metric) : "工作组贡献"}
+        </DetailFact>
+        <DetailFact label="提醒时进度">
+          {current} / {target}
+        </DetailFact>
+        <DetailFact label="证据状态">
+          {notification.workgroup_evidence_state === "complete"
+            ? "证据完整"
+            : "仍在采集"}
+        </DetailFact>
         {notification.workgroup_miss_count ? (
-          <div>
-            <dt className="text-muted-foreground">未达标标记</dt>
-            <dd className="mt-1 font-medium">
-              {notification.workgroup_miss_count} /{" "}
-              {notification.workgroup_allowed_misses ?? 3}
-            </dd>
-          </div>
+          <DetailFact label="未达标标记">
+            {notification.workgroup_miss_count} /{" "}
+            {notification.workgroup_allowed_misses ?? 3}
+          </DetailFact>
         ) : null}
-      </dl>
-      <p className="mt-4 text-sm leading-6 text-muted-foreground">
+      </DetailFacts>
+      <p className="text-xs leading-5 text-muted-foreground">
         {notification.workgroup_disciplinary_action
           ? notification.workgroup_disciplinary_action === "membership_ended"
             ? `这是已结束自然月的不可变结算结果；未达标已超过 ${notification.workgroup_allowed_misses ?? 3} 次，系统已结束转种组资格。`
             : `这是已结束自然月的不可变结算结果；前 ${notification.workgroup_allowed_misses ?? 3} 次未达标只做标记。`
           : "这是一条人工进度提醒，不会自动变更你的成员资格。页面显示的是发送提醒时冻结的数值。"}
       </p>
-      <div className="mt-6">
+      <DetailActions>
         <Link
           to="/workgroups"
           className={buttonVariants({ variant: "outline", size: "sm" })}
         >
           查看工作组贡献
         </Link>
-      </div>
-    </article>
+      </DetailActions>
+    </>
   )
 }
 
@@ -872,52 +1164,40 @@ function HNRAppealNotificationDetail({
   notification: MyNotification
 }) {
   const approved = notification.hnr_status === "appeal_approved"
-  const torrentTitle = notification.torrent_title ?? "种子"
   return (
-    <article>
-      <header className="flex flex-col gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            {approved ? "H&R 申诉已批准" : "H&R 申诉已驳回"}：{torrentTitle}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            来自：系统
-            <span className="mx-2">•</span>
-            <time dateTime={notification.created_at}>
-              {formatTimeAgo(notification.created_at)}
-            </time>
-          </p>
-        </div>
-      </header>
-      <p className="mt-6 text-base leading-7">
+    <>
+      <DetailText>
         {approved
           ? "管理员已批准这条申诉，对应 H&R 义务已经豁免；其他独立限制仍按各自规则处理。"
           : "管理员已核对并驳回这条申诉，对应 H&R 义务仍需继续做种达标。"}
-      </p>
-      <div className="mt-6 rounded-md border bg-muted/30 p-4">
-        <div className="text-sm text-muted-foreground">处理意见</div>
-        <p className="mt-1 leading-7 whitespace-pre-wrap">
-          {notification.hnr_appeal_response ??
-            "请前往 H&R 页面查看当前处理结果。"}
-        </p>
-      </div>
-      <div className="mt-6 flex flex-wrap gap-2">
+      </DetailText>
+      <DetailNote label="处理意见">
+        {notification.hnr_appeal_response ??
+          "请前往 H&R 页面查看当前处理结果。"}
+      </DetailNote>
+      <HNRDetailActions torrentId={notification.torrent_id} />
+    </>
+  )
+}
+
+function HNRDetailActions({ torrentId }: { torrentId?: number | null }) {
+  return (
+    <DetailActions>
+      <Link
+        to="/account/hnr"
+        className={buttonVariants({ variant: "outline", size: "sm" })}
+      >
+        查看 H&amp;R
+      </Link>
+      {torrentId ? (
         <Link
-          to="/account/hnr"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
+          to={`/torrents/${torrentId}`}
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
         >
-          查看 H&amp;R
+          查看种子
         </Link>
-        {notification.torrent_id ? (
-          <Link
-            to={`/torrents/${notification.torrent_id}`}
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
-          >
-            查看种子
-          </Link>
-        ) : null}
-      </div>
-    </article>
+      ) : null}
+    </DetailActions>
   )
 }
 
@@ -926,53 +1206,20 @@ function HNRNotificationDetail({
 }: {
   notification: MyNotification
 }) {
-  const torrentTitle = notification.torrent_title ?? "种子"
   return (
-    <article>
-      <header className="flex flex-col gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            {hnrNotificationTitle(notification.hnr_status)}：{torrentTitle}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            来自：系统
-            <span className="mx-2">•</span>
-            <time dateTime={notification.created_at}>
-              {formatTimeAgo(notification.created_at)}
-            </time>
-          </p>
-        </div>
-      </header>
-      <p className="mt-6 text-base leading-7 break-words">
+    <>
+      <DetailText>
         {hnrNotificationDescription(notification.hnr_status)}
-      </p>
-      <dl className="mt-6 text-sm">
-        <div>
-          <dt className="text-muted-foreground">宽限期截止</dt>
-          <dd className="mt-1 font-medium">
-            {notification.hnr_grace_ends_at
-              ? formatDateTime(notification.hnr_grace_ends_at)
-              : "—"}
-          </dd>
-        </div>
-      </dl>
-      <div className="mt-6 flex flex-wrap gap-2">
-        <Link
-          to="/account/hnr"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          查看 H&amp;R
-        </Link>
-        {notification.torrent_id ? (
-          <Link
-            to={`/torrents/${notification.torrent_id}`}
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
-          >
-            查看种子
-          </Link>
-        ) : null}
-      </div>
-    </article>
+      </DetailText>
+      <DetailFacts>
+        <DetailFact label="宽限期截止">
+          {notification.hnr_grace_ends_at
+            ? formatDateTime(notification.hnr_grace_ends_at)
+            : "—"}
+        </DetailFact>
+      </DetailFacts>
+      <HNRDetailActions torrentId={notification.torrent_id} />
+    </>
   )
 }
 
@@ -982,39 +1229,22 @@ function RatioAppealNotificationDetail({
   notification: MyNotification
 }) {
   return (
-    <article>
-      <header className="flex flex-col gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            分享率申诉处理结果
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            来自：系统
-            <span className="mx-2">•</span>
-            <time dateTime={notification.created_at}>
-              {formatTimeAgo(notification.created_at)}
-            </time>
-          </p>
-        </div>
-      </header>
-      <p className="mt-6 text-base leading-7">
+    <>
+      <DetailText>
         管理员已核对并驳回本期分享率申诉，本期考核继续生效。
-      </p>
-      <div className="mt-6 rounded-md border bg-muted/30 p-4">
-        <div className="text-sm text-muted-foreground">处理意见</div>
-        <p className="mt-1 leading-7 whitespace-pre-wrap">
-          {notification.ratio_appeal_response ?? "请前往考核页面查看处理结果。"}
-        </p>
-      </div>
-      <div className="mt-6">
+      </DetailText>
+      <DetailNote label="处理意见">
+        {notification.ratio_appeal_response ?? "请前往考核页面查看处理结果。"}
+      </DetailNote>
+      <DetailActions>
         <Link
           to="/account/ratio"
           className={buttonVariants({ variant: "outline", size: "sm" })}
         >
           查看分享率考核
         </Link>
-      </div>
-    </article>
+      </DetailActions>
+    </>
   )
 }
 
@@ -1023,7 +1253,6 @@ function RatioWatchNotificationDetail({
 }: {
   notification: MyNotification
 }) {
-  const title = ratioWatchNotificationTitle(notification.ratio_watch_status)
   const currentRatio = formatRatioBasisPoints(
     notification.ratio_basis_points ?? -1
   )
@@ -1035,61 +1264,38 @@ function RatioWatchNotificationDetail({
   )
 
   return (
-    <article>
-      <header className="flex flex-col gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-2xl leading-tight font-bold break-words">
-            {title}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            来自：系统
-            <span className="mx-2">•</span>
-            <time dateTime={notification.created_at}>
-              {formatTimeAgo(notification.created_at)}
-            </time>
-          </p>
-        </div>
-      </header>
-
-      <p className="mt-6 text-base leading-7 break-words">
+    <>
+      <DetailText>
         {ratioWatchNotificationDescription(
           notification.ratio_watch_status,
           targetRatio
         )}
-      </p>
-
-      <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-muted-foreground">当时分享率</dt>
-          <dd className="mt-1 font-medium">{currentRatio}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">恢复目标</dt>
-          <dd className="mt-1 font-medium">{targetRatio}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">下载限制线</dt>
-          <dd className="mt-1 font-medium">{restrictionRatio}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">观察期截止</dt>
-          <dd className="mt-1 font-medium">
-            {notification.deadline_at
-              ? formatDateTime(notification.deadline_at)
-              : "—"}
-          </dd>
-        </div>
-      </dl>
-
-      <div className="mt-6">
+      </DetailText>
+      <DetailFacts>
+        <DetailFact label="当时分享率">
+          <span className="font-mono tabular-nums">{currentRatio}</span>
+        </DetailFact>
+        <DetailFact label="恢复目标">
+          <span className="font-mono tabular-nums">{targetRatio}</span>
+        </DetailFact>
+        <DetailFact label="下载限制线">
+          <span className="font-mono tabular-nums">{restrictionRatio}</span>
+        </DetailFact>
+        <DetailFact label="观察期截止">
+          {notification.deadline_at
+            ? formatDateTime(notification.deadline_at)
+            : "—"}
+        </DetailFact>
+      </DetailFacts>
+      <DetailActions>
         <Link
           to="/account/ratio"
           className={buttonVariants({ variant: "outline", size: "sm" })}
         >
           查看分享率考核
         </Link>
-      </div>
-    </article>
+      </DetailActions>
+    </>
   )
 }
 
@@ -1322,25 +1528,32 @@ function NotificationAccessCard({
 function NotificationPageSkeleton() {
   return (
     <Card
-      className="gap-0 py-0 shadow-none"
+      className="gap-0 py-0 md:grid md:h-[640px] md:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)]"
       aria-label="正在加载消息"
       aria-busy="true"
     >
-      <CardHeader className="border-b py-4">
-        <Skeleton className="h-5 w-24" />
-        <Skeleton className="h-4 w-64 max-w-full" />
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4 py-4">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="flex items-start gap-3">
-            <Skeleton className="mt-1 size-2 rounded-full" />
+      <div className="flex flex-col md:border-r">
+        <div className="border-b px-3 py-2.5">
+          <Skeleton className="h-8 w-32 rounded-lg" />
+        </div>
+        {Array.from({ length: 5 }, (_, index) => (
+          <div
+            key={index}
+            className="flex gap-3 border-b px-4 py-3 last:border-b-0"
+          >
+            <Skeleton className="size-8 shrink-0 rounded-lg" />
             <div className="flex flex-1 flex-col gap-2">
-              <Skeleton className="h-5 w-2/3" />
+              <Skeleton className="h-3 w-16" />
               <Skeleton className="h-4 w-full" />
             </div>
           </div>
         ))}
-      </CardContent>
+      </div>
+      <div className="hidden flex-col gap-3 p-6 md:flex">
+        <Skeleton className="h-6 w-2/3" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
     </Card>
   )
 }

@@ -102,15 +102,18 @@ describe("TorrentTable", () => {
     expect(table.closest("[data-slot=card]")).toHaveClass("hidden", "md:flex")
     expect(table.querySelector("thead")).toHaveClass("block")
     expect(screen.getByText("名称").closest("tr")).toHaveClass(
-      "rounded-lg",
-      "bg-muted"
+      "h-10",
+      "border-b!",
+      "px-4"
     )
     expect(screen.getByText("名称").closest("tr")).toHaveClass(
-      "grid-cols-[48px_minmax(0,1fr)_70px_70px_130px_90px_40px]"
+      "grid-cols-[48px_minmax(0,1fr)_76px_120px_68px_52px]",
+      "xl:grid-cols-[56px_minmax(0,1fr)_72px_84px_148px_78px_52px]"
     )
     expect(screen.getByText("Example Release").closest("tr")).toHaveClass(
-      "px-3.5",
-      "py-2.5"
+      "relative",
+      "h-14",
+      "px-4"
     )
     expect(screen.getByText("Example Release").closest("tr")).not.toHaveClass(
       "border-t!"
@@ -126,15 +129,15 @@ describe("TorrentTable", () => {
       name: "下载“Example Release”的种子文件",
     })
     expect(downloadButton).toHaveAttribute("aria-disabled", "false")
-    expect(downloadButton).toHaveClass("size-[22px]", "border-0", "p-1")
+    expect(downloadButton).toHaveClass("size-6", "border-0", "p-1")
 
     fireEvent.error(screen.getByRole("img", { name: "Example Release封面" }))
     expect(
       screen.getByRole("img", { name: "Example Release暂无封面" })
-    ).toHaveClass("from-neutral-100", "to-neutral-300")
+    ).toHaveClass("from-muted", "to-border")
   })
 
-  it("uses the same neutral fallback in the bookmarks table", () => {
+  it("uses the same token-based fallback in the bookmarks table", () => {
     const queryClient = new QueryClient()
     render(
       <MemoryRouter>
@@ -169,7 +172,7 @@ describe("TorrentTable", () => {
     fireEvent.error(cover)
     expect(
       screen.getByRole("img", { name: "Bookmarked Release暂无封面" })
-    ).toHaveClass("from-neutral-100", "to-neutral-300")
+    ).toHaveClass("from-muted", "to-border")
   })
 
   it("does not present unobserved import defaults as real Tracker values", () => {

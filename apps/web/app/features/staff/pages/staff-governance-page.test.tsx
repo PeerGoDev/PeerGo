@@ -30,13 +30,13 @@ describe("StaffGovernancePage", () => {
 
     expect(
       await screen.findByRole("heading", { name: "权限与任期" })
-    ).toHaveClass("text-2xl", "font-bold")
+    ).toHaveClass("text-lg", "font-semibold")
     expect(screen.getByRole("button", { name: "刷新" })).toHaveClass(
       "min-w-[78px]"
     )
     expect(
       screen.getByText("授权记录").closest('[data-slot="card"]')
-    ).toHaveClass("h-[102px]")
+    ).toHaveClass("min-h-[88px]", "justify-center")
     expect(screen.getByText("有效任期")).toBeVisible()
     expect(screen.getByText("待复核撤权")).toBeVisible()
     expect(screen.getByText("已加载")).toBeVisible()

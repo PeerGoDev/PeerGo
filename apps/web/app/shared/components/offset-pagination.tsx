@@ -1,12 +1,5 @@
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
-
-import { Button } from "~/components/ui/button"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-} from "~/components/ui/pagination"
 import { cn } from "~/lib/utils"
+import { NumberedPagination } from "~/shared/components/numbered-pagination"
 
 export function OffsetPagination({
   total,
@@ -17,6 +10,7 @@ export function OffsetPagination({
   summaryLabel,
   summaryUnit = "个",
   buttonVariant = "outline",
+  compact = false,
   className,
 }: {
   total: number
@@ -27,57 +21,36 @@ export function OffsetPagination({
   summaryLabel?: string
   summaryUnit?: string
   buttonVariant?: "ghost" | "outline"
+  compact?: boolean
   className?: string
 }) {
   const pageCount = Math.ceil(total / limit)
+  const summary = summaryLabel
+    ? `共 ${total.toLocaleString("zh-CN")} ${summaryUnit}${summaryLabel}`
+    : undefined
   if (pageCount <= 1) {
-    return summaryLabel ? (
+    return summary ? (
       <p
         className={cn(
           "px-4 py-3 text-center text-xs text-muted-foreground",
           className
         )}
       >
-        共 {total.toLocaleString("zh-CN")} {summaryUnit}
-        {summaryLabel}
+        {summary}
       </p>
     ) : null
   }
 
-  const currentPage = Math.floor(offset / limit) + 1
   return (
-    <Pagination className={className} aria-label={ariaLabel}>
-      <PaginationContent>
-        <PaginationItem>
-          <Button
-            type="button"
-            variant={buttonVariant}
-            size="sm"
-            disabled={offset === 0}
-            onClick={() => onOffsetChange(Math.max(0, offset - limit))}
-          >
-            <ChevronLeftIcon data-icon="inline-start" />
-            上一页
-          </Button>
-        </PaginationItem>
-        <PaginationItem>
-          <span className="px-3 text-xs text-muted-foreground tabular-nums">
-            第 {currentPage} / {pageCount} 页
-          </span>
-        </PaginationItem>
-        <PaginationItem>
-          <Button
-            type="button"
-            variant={buttonVariant}
-            size="sm"
-            disabled={offset + limit >= total}
-            onClick={() => onOffsetChange(offset + limit)}
-          >
-            下一页
-            <ChevronRightIcon data-icon="inline-end" />
-          </Button>
-        </PaginationItem>
-      </PaginationContent>
-    </Pagination>
+    <NumberedPagination
+      currentPage={Math.floor(offset / limit) + 1}
+      totalPages={pageCount}
+      onPageChange={(page) => onOffsetChange(Math.max(0, (page - 1) * limit))}
+      ariaLabel={ariaLabel}
+      summary={summary}
+      buttonVariant={buttonVariant}
+      compact={compact}
+      className={className}
+    />
   )
 }

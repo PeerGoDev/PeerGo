@@ -10,6 +10,7 @@ import {
   LogInIcon,
   RefreshCwIcon,
   Repeat2Icon,
+  SendIcon,
   ShieldCheckIcon,
   XCircleIcon,
 } from "lucide-react"
@@ -24,12 +25,20 @@ import { Badge } from "~/components/ui/badge"
 import { Button, buttonVariants } from "~/components/ui/button"
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "~/components/ui/card"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog"
 import { Field, FieldDescription, FieldLabel } from "~/components/ui/field"
 import {
   Progress,
@@ -51,6 +60,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "~/components/ui/sheet"
+import { Spinner } from "~/components/ui/spinner"
 import { Textarea } from "~/components/ui/textarea"
 import { useWebSession } from "~/features/auth/api/session.mutations"
 import {
@@ -66,6 +76,7 @@ import {
   contributionPercent,
   formatContributionValue,
 } from "~/features/workgroups/model/contribution-format"
+import { cn } from "~/lib/utils"
 import { PageHeader, PageLayout } from "~/shared/components/page-layout"
 import { requestErrorDescription } from "~/shared/api/problem"
 import { formatBytes } from "~/shared/formatters/bytes"
@@ -84,7 +95,7 @@ export function WorkgroupsPage() {
   const workgroups = useMyWorkgroups(session.data?.user.id)
 
   return (
-    <PageLayout>
+    <PageLayout className="gap-5">
       <PageHeader
         title="工作组"
         description="查看转种、种审和保种职责；工作组权益只在有效成员期内生效。"
@@ -163,84 +174,296 @@ function WorkgroupContent({
   userId: string
 }) {
   const [historyItem, setHistoryItem] = React.useState<MyWorkgroup>()
+  const [applicationItem, setApplicationItem] = React.useState<MyWorkgroup>()
+  const memberships = items.filter(
+    (item) =>
+      item.membership?.status === "active" ||
+      item.membership?.status === "suspended"
+  )
 
   return (
     <>
-      <div className="grid gap-4 xl:grid-cols-3">
-        {items.map((item) => (
-          <WorkgroupCard
-            key={item.definition.kind}
-            item={item}
-            csrfToken={csrfToken}
-            userId={userId}
-            onViewHistory={() => setHistoryItem(item)}
-          />
-        ))}
-      </div>
+      {memberships.length > 0 ? (
+        <section
+          aria-labelledby="my-workgroups-title"
+          className="flex flex-col gap-3"
+        >
+          <SectionTitle id="my-workgroups-title">我的工作组</SectionTitle>
+          <div
+            className={cn(
+              "grid gap-3 sm:gap-4",
+              memberships.length > 1 && "lg:grid-cols-2"
+            )}
+          >
+            {memberships.map((item) => (
+              <MembershipCard
+                key={item.definition.kind}
+                item={item}
+                onViewHistory={() => setHistoryItem(item)}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <WorkgroupTaskPanel userId={userId} csrfToken={csrfToken} />
+
+      <section
+        aria-labelledby="all-workgroups-title"
+        className="flex flex-col gap-3"
+      >
+        <SectionTitle id="all-workgroups-title">全部工作组</SectionTitle>
+        <Card className="gap-0 py-0">
+          <ul className="divide-y">
+            {items.map((item) => (
+              <WorkgroupRow
+                key={item.definition.kind}
+                item={item}
+                onApply={() => setApplicationItem(item)}
+              />
+            ))}
+          </ul>
+        </Card>
+      </section>
+
       <MyContributionHistorySheet
         item={historyItem}
         userId={userId}
         onOpenChange={(open) => !open && setHistoryItem(undefined)}
       />
-      <WorkgroupTaskPanel userId={userId} csrfToken={csrfToken} />
+      <ReviewApplicationDialog
+        item={applicationItem}
+        userId={userId}
+        csrfToken={csrfToken}
+        onOpenChange={(open) => !open && setApplicationItem(undefined)}
+      />
     </>
   )
 }
 
-function WorkgroupCard({
+function SectionTitle({
+  id,
+  children,
+}: {
+  id: string
+  children: React.ReactNode
+}) {
+  return (
+    <h2 id={id} className="text-md font-semibold tracking-title">
+      {children}
+    </h2>
+  )
+}
+
+function WorkgroupIcon({
   item,
-  csrfToken,
-  userId,
-  onViewHistory,
+  className,
 }: {
   item: MyWorkgroup
-  csrfToken: string
-  userId: string
-  onViewHistory: () => void
+  className?: string
 }) {
   const Icon = groupIcons[item.definition.kind]
   return (
-    <Card className="h-fit">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Icon className="size-5" />
-          </span>
-          <WorkgroupStateBadge item={item} />
-        </div>
-        <CardTitle>{item.definition.display_name}</CardTitle>
-        <CardDescription>{item.definition.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="rounded-md border bg-muted/35 p-3 text-sm">
-          <p className="font-medium">生效权益</p>
-          <p className="mt-1 text-muted-foreground">
-            {entitlementLabel(item.definition.entitlement)}
+    <span
+      aria-hidden="true"
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-lg bg-primary/10 text-link",
+        className
+      )}
+    >
+      <Icon />
+    </span>
+  )
+}
+
+function MembershipCard({
+  item,
+  onViewHistory,
+}: {
+  item: MyWorkgroup
+  onViewHistory: () => void
+}) {
+  const membership = item.membership
+  if (!membership) return null
+
+  return (
+    <Card className="gap-0 py-0">
+      <div className="flex flex-wrap items-start gap-3 p-4 sm:p-5">
+        <WorkgroupIcon item={item} className="size-10 [&_svg]:size-5" />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-md font-semibold tracking-title">
+              {item.definition.display_name}
+            </h3>
+            <WorkgroupStateBadge item={item} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            成员资格{membershipStatusLabel(membership.status)} · 自{" "}
+            {formatDateTime(membership.started_at)}
           </p>
         </div>
-        {item.membership ? <MembershipSummary item={item} /> : null}
-        {item.membership?.contribution ? (
-          <ContributionSummary contribution={item.membership.contribution} />
-        ) : null}
-        {item.membership ? (
-          <Button variant="outline" size="sm" onClick={onViewHistory}>
-            <CalendarRangeIcon data-icon="inline-start" />
-            查看贡献历史
-          </Button>
-        ) : null}
-        {item.application ? <ApplicationSummary item={item} /> : null}
-        {item.definition.kind === "review" && item.eligibility ? (
-          <ReviewerEligibility item={item} />
-        ) : null}
-      </CardContent>
-      {item.definition.kind === "review" && item.eligibility ? (
-        <ReviewApplicationFooter
-          item={item}
-          csrfToken={csrfToken}
-          userId={userId}
-        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="max-sm:w-full"
+          onClick={onViewHistory}
+        >
+          <CalendarRangeIcon data-icon="inline-start" />
+          查看贡献历史
+        </Button>
+      </div>
+      {membership.contribution ? (
+        <div className="border-t px-4 py-4 sm:px-5">
+          <ContributionSummary contribution={membership.contribution} />
+        </div>
       ) : null}
+      <p className="border-t bg-muted/50 px-4 py-3 text-xs text-muted-foreground sm:px-5">
+        <span className="font-medium text-foreground">成员权益</span>
+        <span aria-hidden="true" className="mx-1.5 text-faint">
+          ·
+        </span>
+        {entitlementLabel(item.definition.entitlement)}
+      </p>
     </Card>
+  )
+}
+
+function ContributionSummary({
+  contribution,
+}: {
+  contribution: NonNullable<MyWorkgroup["membership"]>["contribution"]
+}) {
+  if (!contribution) return null
+  const current = formatContributionValue(
+    contribution.metric,
+    contribution.current_value
+  )
+  const target = formatContributionValue(
+    contribution.metric,
+    contribution.target_value
+  )
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Progress
+        value={contributionPercent(
+          contribution.current_value,
+          contribution.target_value
+        )}
+      >
+        <ProgressLabel>
+          {contributionMetricLabel(contribution.metric)}
+        </ProgressLabel>
+        <ProgressValue className="font-mono tabular-nums">
+          {() => `${current} / ${target}`}
+        </ProgressValue>
+      </Progress>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-faint">
+        <span>
+          周期至 {formatDateTime(contribution.period_ends_at)}
+          {contribution.evidence_through
+            ? ` · 证据截至 ${formatDateTime(contribution.evidence_through)}`
+            : null}
+        </span>
+        <Badge variant={contribution.met ? "success" : "primary"}>
+          {contribution.met ? "本月已达标" : "进行中"}
+        </Badge>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {contribution.enforcement_mode === "miss_limit"
+          ? `完整自然月未达标将记录标记；当前 ${contribution.miss_count}/${contribution.allowed_misses} 次，第 ${contribution.allowed_misses + 1} 次自动结束资格。`
+          : "当前为观察目标，未达标不会自动变更工作组权益。"}
+      </p>
+    </div>
+  )
+}
+
+function WorkgroupRow({
+  item,
+  onApply,
+}: {
+  item: MyWorkgroup
+  onApply: () => void
+}) {
+  const active = item.membership?.status === "active"
+  const pending = item.application?.status === "pending"
+  const showEligibility =
+    item.definition.kind === "review" &&
+    Boolean(item.eligibility) &&
+    !active &&
+    !pending
+
+  return (
+    <li className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4 sm:px-5">
+      <div className="flex min-w-0 flex-1 gap-3">
+        <WorkgroupIcon item={item} className="size-9 [&_svg]:size-4" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold">
+              {item.definition.display_name}
+            </h3>
+            <WorkgroupStateBadge item={item} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {item.definition.description}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <span className="text-faint">权益：</span>
+            {entitlementLabel(item.definition.entitlement)}
+          </p>
+          {item.application ? (
+            <p className="text-xs text-faint">
+              最近申请：{applicationStatusLabel(item.application.status)} ·{" "}
+              {formatDateTime(item.application.submitted_at)}
+            </p>
+          ) : null}
+          {showEligibility ? <ReviewerEligibility item={item} /> : null}
+        </div>
+      </div>
+      <WorkgroupRowAction item={item} onApply={onApply} />
+    </li>
+  )
+}
+
+function WorkgroupRowAction({
+  item,
+  onApply,
+}: {
+  item: MyWorkgroup
+  onApply: () => void
+}) {
+  if (item.membership?.status === "active") {
+    return (
+      <span className="flex shrink-0 items-center gap-1 text-xs text-success-foreground sm:self-center">
+        <CheckCircle2Icon className="size-3.5" />
+        已加入
+      </span>
+    )
+  }
+  if (item.application?.status === "pending") {
+    return (
+      <span className="shrink-0 text-xs text-faint sm:self-center">
+        等待管理员审批
+      </span>
+    )
+  }
+  if (item.definition.kind === "review" && item.eligibility) {
+    return (
+      <Button
+        size="sm"
+        className="shrink-0 max-sm:w-full sm:self-center"
+        disabled={!item.eligibility.eligible}
+        onClick={onApply}
+      >
+        {item.eligibility.eligible ? "申请加入" : "暂不满足条件"}
+      </Button>
+    )
+  }
+  return (
+    <span className="shrink-0 text-xs text-faint sm:self-center">
+      {item.definition.join_mode === "staff_only"
+        ? "由管理员任命"
+        : "暂未开放申请"}
+    </span>
   )
 }
 
@@ -317,79 +540,6 @@ function MyContributionHistorySheet({
   )
 }
 
-function MembershipSummary({ item }: { item: MyWorkgroup }) {
-  if (!item.membership) return null
-  return (
-    <div className="flex flex-col gap-1 text-sm">
-      <p className="font-medium">成员资格</p>
-      <p className="text-muted-foreground">
-        {membershipStatusLabel(item.membership.status)} · 自{" "}
-        {formatDateTime(item.membership.started_at)}
-      </p>
-    </div>
-  )
-}
-
-function ContributionSummary({
-  contribution,
-}: {
-  contribution: NonNullable<MyWorkgroup["membership"]>["contribution"]
-}) {
-  if (!contribution) return null
-  const current = formatContributionValue(
-    contribution.metric,
-    contribution.current_value
-  )
-  const target = formatContributionValue(
-    contribution.metric,
-    contribution.target_value
-  )
-  return (
-    <div className="flex flex-col gap-2 rounded-md border p-3">
-      <Progress
-        value={contributionPercent(
-          contribution.current_value,
-          contribution.target_value
-        )}
-      >
-        <ProgressLabel>
-          {contributionMetricLabel(contribution.metric)}
-        </ProgressLabel>
-        <ProgressValue>{() => `${current} / ${target}`}</ProgressValue>
-      </Progress>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>
-          周期至 {formatDateTime(contribution.period_ends_at)}
-          {contribution.evidence_through
-            ? ` · 证据截至 ${formatDateTime(contribution.evidence_through)}`
-            : null}
-        </span>
-        <Badge variant={contribution.met ? "outline" : "secondary"}>
-          {contribution.met ? "本月已达标" : "进行中"}
-        </Badge>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {contribution.enforcement_mode === "miss_limit"
-          ? `完整自然月未达标将记录标记；当前 ${contribution.miss_count}/${contribution.allowed_misses} 次，第 ${contribution.allowed_misses + 1} 次自动结束资格。`
-          : "当前为观察目标，未达标不会自动变更工作组权益。"}
-      </p>
-    </div>
-  )
-}
-
-function ApplicationSummary({ item }: { item: MyWorkgroup }) {
-  if (!item.application) return null
-  return (
-    <div className="flex flex-col gap-1 text-sm">
-      <p className="font-medium">最近申请</p>
-      <p className="text-muted-foreground">
-        {applicationStatusLabel(item.application.status)} ·{" "}
-        {formatDateTime(item.application.submitted_at)}
-      </p>
-    </div>
-  )
-}
-
 function ReviewerEligibility({ item }: { item: MyWorkgroup }) {
   const eligibility = item.eligibility
   if (!eligibility) return null
@@ -423,21 +573,25 @@ function ReviewerEligibility({ item }: { item: MyWorkgroup }) {
     },
   ]
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">种审申请条件</p>
-      <ul className="flex flex-col gap-2 text-sm">
+    <div className="mt-1.5 flex flex-col gap-1.5">
+      <p className="text-xs font-medium text-foreground">种审申请条件</p>
+      <ul className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
         {checks.map((check) => (
-          <li key={check.label} className="flex items-start gap-2">
+          <li key={check.label} className="flex items-start gap-1.5">
             {check.met ? (
-              <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-success" />
+              <CheckCircle2Icon
+                aria-label="已满足"
+                className="mt-0.5 size-3.5 shrink-0 text-success-foreground"
+              />
             ) : (
-              <XCircleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
+              <XCircleIcon
+                aria-label="未满足"
+                className="mt-0.5 size-3.5 shrink-0 text-destructive"
+              />
             )}
             <span>
               {check.label}
-              <span className="ml-1 text-muted-foreground">
-                （{check.current}）
-              </span>
+              <span className="ml-1 text-faint">（{check.current}）</span>
             </span>
           </li>
         ))}
@@ -446,84 +600,120 @@ function ReviewerEligibility({ item }: { item: MyWorkgroup }) {
   )
 }
 
-function ReviewApplicationFooter({
+function ReviewApplicationDialog({
   item,
-  csrfToken,
   userId,
+  csrfToken,
+  onOpenChange,
 }: {
-  item: MyWorkgroup
-  csrfToken: string
+  item?: MyWorkgroup
   userId: string
+  csrfToken: string
+  onOpenChange: (open: boolean) => void
 }) {
   const createApplication = useCreateWorkgroupApplication(userId)
   const [statement, setStatement] = React.useState("")
-  const pending = item.application?.status === "pending"
-  const active = item.membership?.status === "active"
-  if (pending || active || !item.eligibility?.eligible) {
-    return null
-  }
+  const valid = statement.trim().length >= 20
+
+  React.useEffect(() => {
+    if (item) {
+      setStatement("")
+      createApplication.reset()
+    }
+  }, [item]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <CardFooter className="flex-col items-stretch gap-3 border-t">
-      {createApplication.isError ? (
-        <Alert variant="destructive">
-          <CircleAlertIcon />
-          <AlertTitle>申请提交失败</AlertTitle>
-          <AlertDescription>
-            {requestErrorDescription(
-              createApplication.error,
-              "请检查申请说明后重试。"
+    <Dialog open={Boolean(item)} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>申请加入种审组</DialogTitle>
+          <DialogDescription>
+            提交后由管理员审批，审批记录会长期保留。
+          </DialogDescription>
+        </DialogHeader>
+        {createApplication.isError ? (
+          <Alert variant="destructive">
+            <CircleAlertIcon />
+            <AlertTitle>申请提交失败</AlertTitle>
+            <AlertDescription>
+              {requestErrorDescription(
+                createApplication.error,
+                "请检查申请说明后重试。"
+              )}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        <Field data-invalid={statement.length > 0 && !valid}>
+          <FieldLabel htmlFor="review-workgroup-statement">申请说明</FieldLabel>
+          <Textarea
+            id="review-workgroup-statement"
+            value={statement}
+            minLength={20}
+            maxLength={1000}
+            rows={5}
+            placeholder="说明你对站点规则、资源质量和审核工作的理解。"
+            disabled={createApplication.isPending}
+            onChange={(event) => setStatement(event.target.value)}
+          />
+          <FieldDescription>
+            20 至 1000 个字符，当前 {statement.trim().length} 个。
+          </FieldDescription>
+        </Field>
+        <DialogFooter>
+          <DialogClose
+            render={
+              <Button
+                variant="outline"
+                disabled={createApplication.isPending}
+              />
+            }
+          >
+            取消
+          </DialogClose>
+          <Button
+            disabled={!valid || createApplication.isPending}
+            onClick={() => {
+              void createApplication
+                .mutateAsync({
+                  csrfToken,
+                  idempotencyKey: globalThis.crypto.randomUUID(),
+                  groupKind: "review",
+                  statement: statement.trim(),
+                })
+                .then(() => onOpenChange(false))
+                .catch(() => undefined)
+            }}
+          >
+            {createApplication.isPending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <SendIcon data-icon="inline-start" />
             )}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      <Field>
-        <FieldLabel htmlFor="review-workgroup-statement">申请说明</FieldLabel>
-        <Textarea
-          id="review-workgroup-statement"
-          value={statement}
-          minLength={20}
-          maxLength={1000}
-          rows={4}
-          placeholder="说明你对站点规则、资源质量和审核工作的理解。"
-          onChange={(event) => setStatement(event.target.value)}
-        />
-        <FieldDescription>
-          20 至 1000 个字符，审批记录会长期保留。
-        </FieldDescription>
-      </Field>
-      <Button
-        disabled={statement.trim().length < 20 || createApplication.isPending}
-        onClick={() => {
-          void createApplication
-            .mutateAsync({
-              csrfToken,
-              idempotencyKey: globalThis.crypto.randomUUID(),
-              groupKind: "review",
-              statement: statement.trim(),
-            })
-            .catch(() => undefined)
-        }}
-      >
-        {createApplication.isPending ? "正在提交…" : "申请加入种审组"}
-      </Button>
-    </CardFooter>
+            {createApplication.isPending ? "正在提交…" : "提交申请"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 function WorkgroupStateBadge({ item }: { item: MyWorkgroup }) {
   if (item.membership?.status === "active") {
-    return <Badge variant="outline">有效成员</Badge>
+    return <Badge variant="success">有效成员</Badge>
   }
   if (item.membership?.status === "suspended") {
     return <Badge variant="destructive">已暂停</Badge>
   }
   if (item.application?.status === "pending") {
     return (
-      <Badge variant="secondary">
+      <Badge variant="warning">
         <Clock3Icon data-icon="inline-start" />
         审批中
       </Badge>
     )
+  }
+  if (item.membership?.status === "ended") {
+    return <Badge variant="secondary">已结束</Badge>
   }
   return <Badge variant="secondary">未加入</Badge>
 }
@@ -559,20 +749,11 @@ function applicationStatusLabel(value: string) {
 
 function WorkgroupSkeleton() {
   return (
-    <div className="grid gap-4 xl:grid-cols-3">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <Card key={index}>
-          <CardHeader>
-            <Skeleton className="size-10 rounded-lg" />
-            <Skeleton className="h-6 w-24" />
-            <Skeleton className="h-4 w-full" />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-          </CardContent>
-        </Card>
-      ))}
+    <div className="flex flex-col gap-4" aria-busy="true">
+      <Skeleton className="h-5 w-24" />
+      <Skeleton className="h-44 w-full rounded-xl" />
+      <Skeleton className="h-5 w-28" />
+      <Skeleton className="h-56 w-full rounded-xl" />
     </div>
   )
 }

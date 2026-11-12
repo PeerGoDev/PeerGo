@@ -115,8 +115,10 @@ function TrackerRuntimeSettingsContent({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">Tracker 设置</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            Tracker 设置
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             日常策略在这里统一管理；进程容量仍由部署配置控制，避免误改后中断服务。
           </p>
         </div>

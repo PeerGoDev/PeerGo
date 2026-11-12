@@ -44,10 +44,10 @@ export function WikiMarkdown({ body }: { body: string }) {
           id={id}
           className={
             level === 1
-              ? "scroll-mt-20 border-b pb-3 font-heading text-3xl font-bold"
+              ? "scroll-mt-[calc(var(--shell-header-height)+1rem)] border-b pb-3 font-heading text-xl font-semibold tracking-title"
               : level === 2
-                ? "scroll-mt-20 border-b pb-2 font-heading text-2xl font-semibold"
-                : "scroll-mt-20 font-heading text-xl font-semibold"
+                ? "mt-2 scroll-mt-[calc(var(--shell-header-height)+1rem)] border-b pb-2 font-heading text-lg font-semibold tracking-title"
+                : "mt-1 scroll-mt-[calc(var(--shell-header-height)+1rem)] font-heading text-base font-semibold tracking-title"
           }
         >
           {children}
@@ -60,7 +60,7 @@ export function WikiMarkdown({ body }: { body: string }) {
     h2: heading(2),
     h3: heading(3),
     h4: ({ children }) => (
-      <h4 className="font-heading text-lg font-semibold">{children}</h4>
+      <h4 className="font-heading text-md font-semibold">{children}</h4>
     ),
     p: ({ children }) => <p className="leading-7">{children}</p>,
     a: ({ href, children }) => {
@@ -70,20 +70,24 @@ export function WikiMarkdown({ body }: { body: string }) {
           href={href}
           target={external ? "_blank" : undefined}
           rel={external ? "noreferrer" : undefined}
-          className="font-medium text-primary underline underline-offset-4"
+          className="font-medium text-link underline decoration-link/40 underline-offset-4 hover:decoration-link"
         >
           {children}
         </a>
       )
     },
     ul: ({ children }) => (
-      <ul className="flex list-disc flex-col gap-2 pl-6">{children}</ul>
+      <ul className="flex list-disc flex-col gap-1.5 pl-6 marker:text-faint">
+        {children}
+      </ul>
     ),
     ol: ({ children }) => (
-      <ol className="flex list-decimal flex-col gap-2 pl-6">{children}</ol>
+      <ol className="flex list-decimal flex-col gap-1.5 pl-6 marker:text-faint">
+        {children}
+      </ol>
     ),
     blockquote: ({ children }) => (
-      <blockquote className="border-l-4 border-primary bg-muted/60 px-4 py-3 text-muted-foreground">
+      <blockquote className="rounded-r-md border-l-2 border-primary/60 bg-muted px-4 py-3 text-muted-foreground">
         {children}
       </blockquote>
     ),
@@ -91,15 +95,15 @@ export function WikiMarkdown({ body }: { body: string }) {
       <code
         className={
           className
-            ? `${className} font-mono text-sm`
-            : "rounded border bg-muted px-1.5 py-0.5 font-mono text-sm"
+            ? `${className} font-mono text-[0.9em]`
+            : "rounded-sm border bg-muted px-1.5 py-0.5 font-mono text-[0.9em]"
         }
       >
         {children}
       </code>
     ),
     pre: ({ children }) => (
-      <pre className="overflow-x-auto rounded-lg border bg-muted p-4 text-sm">
+      <pre className="overflow-x-auto rounded-lg border bg-muted p-4 text-sm [&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0">
         {children}
       </pre>
     ),
@@ -113,7 +117,9 @@ export function WikiMarkdown({ body }: { body: string }) {
     ),
     table: ({ children }) => (
       <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full border-collapse text-sm">{children}</table>
+        <table className="w-full border-collapse text-sm [&_tbody_tr:last-child_td]:border-b-0">
+          {children}
+        </table>
       </div>
     ),
     th: ({ children }) => (
@@ -126,7 +132,7 @@ export function WikiMarkdown({ body }: { body: string }) {
   }
 
   return (
-    <article className="flex min-w-0 flex-col gap-5 break-words [&_li]:leading-7 [&_strong]:font-semibold">
+    <article className="flex min-w-0 flex-col gap-4 text-md break-words [&_li]:leading-7 [&_strong]:font-semibold">
       <Markdown remarkPlugins={[remarkGfm]} components={components}>
         {body}
       </Markdown>

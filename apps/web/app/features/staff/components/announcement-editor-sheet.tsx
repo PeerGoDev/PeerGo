@@ -582,7 +582,7 @@ function AnnouncementPreview({
               <Badge variant="outline">旧版格式</Badge>
             ) : null}
           </div>
-          <CardTitle className="text-2xl break-words">
+          <CardTitle className="text-lg break-words">
             {title.trim() || "未填写标题"}
           </CardTitle>
           <CardDescription className="leading-relaxed break-words">

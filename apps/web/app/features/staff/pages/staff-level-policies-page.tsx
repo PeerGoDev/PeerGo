@@ -142,8 +142,10 @@ function LevelPoliciesContent({
     <StaffPageFrame className="gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-xl font-semibold">经验与等级</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="font-heading text-lg font-semibold tracking-title">
+            经验与等级
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
             以下内容直接来自实际等级表，不是前端默认值。
           </p>
         </div>
@@ -360,7 +362,7 @@ function ContributionExperienceCard({
                 key={source.label}
                 className="flex items-center gap-3 rounded-lg border bg-muted/20 p-4"
               >
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground [&>svg]:size-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card text-muted-foreground [&>svg]:size-4">
                   {source.icon}
                 </div>
                 <div className="min-w-0">

@@ -559,7 +559,7 @@ function TorrentUploadWorkspace({
 
         <Card className="gap-0 py-0">
           <CardHeader className="p-6">
-            <CardTitle className="text-2xl leading-none font-semibold tracking-tight">
+            <CardTitle className="text-lg leading-none font-semibold tracking-title">
               <h2>种子文件 *</h2>
             </CardTitle>
           </CardHeader>
@@ -637,7 +637,7 @@ function TorrentUploadWorkspace({
 
         <Card className="gap-0 py-0">
           <CardHeader className="p-6">
-            <CardTitle className="text-2xl leading-none font-semibold tracking-tight">
+            <CardTitle className="text-lg leading-none font-semibold tracking-title">
               <h2>基本信息</h2>
             </CardTitle>
           </CardHeader>
@@ -1115,12 +1115,12 @@ function TorrentUploadPreviewDialog({
         {preview ? (
           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
             <Card className="gap-0 py-0">
-              <CardHeader className="p-6 pb-2">
+              <CardHeader className="p-(--card-spacing) pb-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{preview.category}</Badge>
                   {preview.anonymous ? <Badge>匿名上传</Badge> : null}
                 </div>
-                <CardTitle className="text-2xl font-semibold break-words">
+                <CardTitle className="text-lg font-semibold break-words">
                   {preview.title || "未填写标题"}
                 </CardTitle>
                 {preview.subtitle ? (
@@ -1365,7 +1365,7 @@ function CategoryFacetFields({
                         <ToggleGroupItem
                           key={option.key}
                           value={option.key}
-                          className="h-auto rounded-full border-input bg-background px-3 py-1.5 hover:border-primary/50 hover:bg-accent aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                          className="h-auto rounded-full border-input bg-card px-3 py-1.5 hover:border-primary/50 hover:bg-accent aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground"
                         >
                           {isSelected ? (
                             <CheckIcon className="size-3.5" />

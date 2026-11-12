@@ -212,7 +212,7 @@ export function RegistrationPage() {
         <CardTitle>
           <h1
             id="registration-title"
-            className="text-[22px] leading-none font-semibold tracking-tight"
+            className="text-[1.375rem] leading-none font-semibold tracking-title"
           >
             注册
           </h1>
@@ -398,7 +398,7 @@ function ClosedRegistrationState({ siteName }: { siteName: string }) {
         <CardTitle>
           <h1
             id="registration-closed-title"
-            className="text-[22px] leading-none font-semibold tracking-tight"
+            className="text-[1.375rem] leading-none font-semibold tracking-title"
           >
             注册已关闭
           </h1>
@@ -453,7 +453,7 @@ function InvitationRegistrationStep({
         <CardTitle>
           <h1
             id="invitation-registration-title"
-            className="text-[22px] leading-none font-semibold tracking-tight"
+            className="text-[1.375rem] leading-none font-semibold tracking-title"
           >
             邀请注册
           </h1>
@@ -487,7 +487,7 @@ function InvitationRegistrationStep({
           </FieldGroup>
         </form>
       </CardContent>
-      <CardFooter className="-mt-4 flex-col gap-4 border-t-0 bg-transparent px-6 pb-6">
+      <CardFooter className="-mt-4 flex-col gap-4 border-t-0 bg-transparent px-(--card-spacing) pb-(--card-spacing)">
         <Button
           type="submit"
           form="invitation-step-form"

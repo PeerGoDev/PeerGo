@@ -86,7 +86,8 @@ describe("RegistrationPage", () => {
     )
     expect(document.querySelector('[data-slot="card-footer"]')).toHaveClass(
       "-mt-4",
-      "pb-6"
+      "border-t-0",
+      "bg-transparent"
     )
     expect(
       screen.queryByRole("button", { name: "注册" })

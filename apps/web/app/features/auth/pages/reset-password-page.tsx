@@ -151,7 +151,7 @@ function ResetPasswordContent({ token }: { token: string }) {
         <CardTitle>
           <h1
             id="reset-password-title"
-            className="flex items-center gap-2 text-[22px] leading-none font-semibold tracking-tight"
+            className="flex items-center gap-2 text-[1.375rem] leading-none font-semibold tracking-title"
           >
             <KeyRoundIcon />
             重置密码

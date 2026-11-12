@@ -104,11 +104,11 @@ export function TorrentPromotionProductDialog({
       <Button
         type="button"
         variant="outline"
-        className="h-9 w-full"
+        className="w-full"
         onClick={() => setOpen(true)}
       >
         <BadgePercentIcon data-icon="inline-start" />
-        促销与置顶
+        促销种子
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">

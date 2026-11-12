@@ -205,7 +205,9 @@ function CategoriesContent({
 function CategoriesHeader({ children }: { children?: React.ReactNode }) {
   return (
     <header className="flex min-h-9 items-center justify-between gap-4">
-      <h1 className="font-heading text-xl font-semibold">分类管理</h1>
+      <h1 className="font-heading text-lg font-semibold tracking-title">
+        分类管理
+      </h1>
       {children ? (
         <div className="flex flex-wrap items-center justify-end gap-2">
           {children}

@@ -185,7 +185,7 @@ export function LoginPage() {
         <CardTitle>
           <h1
             id="login-title"
-            className="text-[22px] leading-none font-semibold tracking-tight"
+            className="text-[1.375rem] leading-none font-semibold tracking-title"
           >
             登录
           </h1>
@@ -315,15 +315,31 @@ export function LoginPage() {
         </form>
       </CardContent>
 
-      <CardFooter className="flex-col gap-3 border-t-0 bg-transparent px-6 text-xs text-muted-foreground">
-        <div className="flex w-full items-center justify-between gap-3 text-sm">
-          <Link to="/forgot-password">忘记密码？</Link>
+      <CardFooter className="flex-col gap-3 border-t-0 bg-transparent px-6 text-xs text-faint">
+        <div className="flex w-full items-center justify-between gap-3 text-sm text-muted-foreground">
+          <Link
+            to="/forgot-password"
+            className="text-link hover:underline hover:underline-offset-4"
+          >
+            忘记密码？
+          </Link>
           <span>
-            没有账号？<Link to="/register">注册</Link>
+            没有账号？
+            <Link
+              to="/register"
+              className="text-link hover:underline hover:underline-offset-4"
+            >
+              注册
+            </Link>
           </span>
         </div>
         <p className="w-full border-t pt-3 text-center">
-          <Link to="/restrictions">查看封禁记录或提交申诉</Link>
+          <Link
+            to="/restrictions"
+            className="transition-colors hover:text-foreground"
+          >
+            查看封禁记录或提交申诉
+          </Link>
         </p>
       </CardFooter>
     </AuthEntryCard>
