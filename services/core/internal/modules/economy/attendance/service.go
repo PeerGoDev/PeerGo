@@ -70,6 +70,21 @@ func (service *MemberService) Claim(ctx context.Context, cookieToken, csrfToken 
 	return service.repository.Claim(ctx, ClaimCommand{RequestID: requestID, UserID: session.User.ID, Mode: mode, Now: now})
 }
 
+func (service *MemberService) Makeup(ctx context.Context, cookieToken, csrfToken string, requestID uuid.UUID) (Record, error) {
+	now := canonicalTime(service.now())
+	if requestID == uuid.Nil {
+		return Record{}, ErrInput
+	}
+	session, err := service.authenticator.AuthenticateWrite(ctx, cookieToken, csrfToken)
+	if err != nil {
+		return Record{}, err
+	}
+	if _, err := authz.AuthorizeWebSelfAction(ctx, service.authorizer, session.User.ID, authz.ActionEconomyAttendanceClaimSelf, now); err != nil {
+		return Record{}, err
+	}
+	return service.repository.Makeup(ctx, ClaimCommand{RequestID: requestID, UserID: session.User.ID, Now: now})
+}
+
 // OverviewForIntegration reuses the canonical attendance projection after a
 // separately provisioned fixed-scope integration credential has authenticated
 // the user. The credential is the authority at this boundary, matching RSS;
@@ -211,6 +226,10 @@ func (service *Service) MyOverview(ctx context.Context, cookieToken string) (Ove
 
 func (service *Service) Claim(ctx context.Context, cookieToken, csrfToken string, requestID uuid.UUID, mode Mode) (Record, error) {
 	return service.member.Claim(ctx, cookieToken, csrfToken, requestID, mode)
+}
+
+func (service *Service) Makeup(ctx context.Context, cookieToken, csrfToken string, requestID uuid.UUID) (Record, error) {
+	return service.member.Makeup(ctx, cookieToken, csrfToken, requestID)
 }
 
 func (service *Service) OverviewForIntegration(ctx context.Context, user identity.User) (Overview, error) {

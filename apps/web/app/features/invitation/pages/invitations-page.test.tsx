@@ -266,6 +266,7 @@ const disabledOverview: InvitationOverview = {
     enabled: false,
     eligible: false,
     blocker: "disabled",
+    temporary_invites: 0,
     invite_valid_days: 7,
     max_invites_per_member: 5,
     used_invites: 0,

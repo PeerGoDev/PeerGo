@@ -130,6 +130,28 @@ paths:
     $ref: "./domains/economy.yaml#/CommentContentTipsPath"
   /api/v1/me/attendance:
     $ref: "./domains/economy.yaml#/MyAttendancePath"
+  /api/v1/me/attendance/makeup:
+    $ref: "./domains/magicstore.yaml#/MyAttendanceMakeupPath"
+  /api/v1/me/magic-shop:
+    $ref: "./domains/magicstore.yaml#/MyMagicShopPath"
+  /api/v1/me/magic-shop/orders:
+    $ref: "./domains/magicstore.yaml#/MyMagicShopOrdersPath"
+  /api/v1/me/name-style:
+    $ref: "./domains/magicstore.yaml#/MyNameStylePath"
+  /api/v1/name-styles:
+    $ref: "./domains/magicstore.yaml#/NameStylesPath"
+  /api/v1/me/magic-games:
+    $ref: "./domains/magicstore.yaml#/MyMagicGamesPath"
+  /api/v1/me/magic-games/scratch-cards:
+    $ref: "./domains/magicstore.yaml#/MyScratchCardsPath"
+  /api/v1/me/magic-games/lottery/tickets:
+    $ref: "./domains/magicstore.yaml#/MyLotteryTicketsPath"
+  /api/v1/me/magic-games/pvp/challenges:
+    $ref: "./domains/magicstore.yaml#/MyPvPChallengesPath"
+  /api/v1/me/magic-games/pvp/challenges/{challenge_id}/accept:
+    $ref: "./domains/magicstore.yaml#/MyPvPChallengeAcceptPath"
+  /api/v1/me/magic-games/pvp/challenges/{challenge_id}/cancel:
+    $ref: "./domains/magicstore.yaml#/MyPvPChallengeCancelPath"
   /api/v1/me/workgroups:
     $ref: "./domains/workgroups.yaml#/MyWorkgroupsPath"
   /api/v1/me/workgroups/{group_kind}/applications:
@@ -418,6 +440,8 @@ paths:
     $ref: "./domains/economy.yaml#/SeedingRewardPoliciesPath"
   /api/v1/admin/settings/attendance:
     $ref: "./domains/economy.yaml#/AttendancePoliciesPath"
+  /api/v1/admin/settings/magic-store:
+    $ref: "./domains/magicstore.yaml#/MagicStoreSettingsPath"
   /api/v1/admin/settings/seeding-rewards/preview:
     $ref: "./domains/economy.yaml#/SeedingRewardPolicyPreviewPath"
   /api/v1/admin/settings/hnr:

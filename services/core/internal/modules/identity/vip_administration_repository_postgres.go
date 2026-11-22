@@ -297,7 +297,8 @@ func validVIPTransition(value VIPTransitionKind) bool {
 }
 
 func validVIPOrigin(value VIPTransitionOrigin) bool {
-	return value == VIPTransitionOriginLegacyMigration || value == VIPTransitionOriginSystemBackfill || value == VIPTransitionOriginStaff
+	return value == VIPTransitionOriginLegacyMigration || value == VIPTransitionOriginSystemBackfill ||
+		value == VIPTransitionOriginStaff || value == VIPTransitionOriginShop
 }
 
 func pgNullableTimestamp(value *time.Time) pgtype.Timestamptz {

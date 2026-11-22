@@ -20,6 +20,8 @@ var (
 	ErrAlreadyClaimed      = errors.New("attendance was already claimed for this date")
 	ErrIdempotencyConflict = errors.New("attendance idempotency key was reused")
 	ErrInvariant           = errors.New("attendance invariant failed")
+	ErrMakeupUnavailable   = errors.New("no missed attendance day can be made up")
+	ErrNoMakeupCard        = errors.New("member has no makeup card")
 )
 
 type Mode string
@@ -89,18 +91,22 @@ type Record struct {
 	ExperienceEntryID   *uuid.UUID
 	OccurredAt          time.Time
 	RecordedAt          time.Time
+	Makeup              bool
 	Replayed            bool
 }
 
 type Overview struct {
-	Policy        *PublishedPolicy
-	ClaimedToday  bool
-	Today         string
-	CurrentStreak int32
-	TotalDays     int32
-	LongestStreak int32
-	TodayRecord   *Record
-	History       []Record
+	Policy           *PublishedPolicy
+	ClaimedToday     bool
+	Today            string
+	CurrentStreak    int32
+	TotalDays        int32
+	LongestStreak    int32
+	TodayRecord      *Record
+	History          []Record
+	MakeupCards      int32
+	MakeupWindowDays int
+	MakeupDate       *string
 }
 
 type ClaimCommand struct {
@@ -121,6 +127,7 @@ type PublishCommand struct {
 type Repository interface {
 	Overview(context.Context, uuid.UUID, time.Time, int) (Overview, error)
 	Claim(context.Context, ClaimCommand) (Record, error)
+	Makeup(context.Context, ClaimCommand) (Record, error)
 	ListPolicies(context.Context, int, int) ([]PublishedPolicy, int64, error)
 	PublishPolicy(context.Context, PublishCommand) (PublishedPolicy, error)
 	LatestPolicy(context.Context) (PublishedPolicy, error)

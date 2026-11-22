@@ -43,6 +43,7 @@ import {
 import { Spinner } from "~/components/ui/spinner"
 import { Textarea } from "~/components/ui/textarea"
 import { ContentTipDialog } from "~/features/economy/components/content-tip-dialog"
+import { useNameStyle } from "~/features/economy/components/name-style"
 import {
   type SocialPost,
   useDeleteSocialPost,
@@ -93,6 +94,7 @@ export function SocialPostCard({
     post.torrent?.id
   )
   const [editing, setEditing] = React.useState(false)
+  const authorNameStyle = useNameStyle(post.author.username)
   const [draft, setDraft] = React.useState(visiblePostContent)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [reporting, setReporting] = React.useState(false)
@@ -251,12 +253,15 @@ export function SocialPostCard({
                 to={`/user/${encodeURIComponent(post.author.username)}`}
                 className={cn(
                   "min-w-0 truncate text-sm font-semibold transition-colors",
-                  post.author.administrator
-                    ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent hover:opacity-80"
-                    : post.author.vip
-                      ? "text-warning-foreground hover:opacity-80"
-                      : "hover:text-link"
+                  authorNameStyle
+                    ? "hover:opacity-80"
+                    : post.author.administrator
+                      ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent hover:opacity-80"
+                      : post.author.vip
+                        ? "text-warning-foreground hover:opacity-80"
+                        : "hover:text-link"
                 )}
+                data-name-style={authorNameStyle}
               >
                 {post.author.display_name}
               </Link>

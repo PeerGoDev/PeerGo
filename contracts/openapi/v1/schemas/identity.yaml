@@ -239,6 +239,7 @@ InvitationEligibility:
     - max_invites_per_member
     - used_invites
     - remaining_invites
+    - temporary_invites
     - minimum_account_age_days
     - current_account_age_days
     - minimum_level
@@ -251,6 +252,15 @@ InvitationEligibility:
       type: boolean
     blocker:
       $ref: "#/InvitationEligibilityBlocker"
+    temporary_invites:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+      description: 魔力商店购买、尚未过期也未使用的临时邀请名额；发邀请时优先消耗。
+    temporary_invite_next_expiry:
+      type: string
+      format: date-time
+      nullable: true
     invite_valid_days:
       type: integer
       minimum: 1
@@ -2046,7 +2056,7 @@ VIPTransition:
       enum: [granted, renewed, revoked]
     origin:
       type: string
-      enum: [legacy_migration, system_backfill, staff]
+      enum: [legacy_migration, system_backfill, staff, shop]
     reason_summary:
       type: string
       minLength: 10

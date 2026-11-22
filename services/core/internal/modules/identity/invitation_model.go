@@ -81,7 +81,11 @@ type InvitationEligibility struct {
 	MaxInvitesPerMember   int
 	UsedInvites           int
 	RemainingInvites      int
-	MinimumAccountAgeDays int
+	// Temporary invitations are purchased credits that expire on their own
+	// schedule and are spent before the permanent balance.
+	TemporaryInvites          int
+	TemporaryInviteNextExpiry *time.Time
+	MinimumAccountAgeDays     int
 	CurrentAccountAgeDays int
 	MinimumLevel          int
 	CurrentLevel          int
@@ -173,6 +177,8 @@ type invitationIssuerSnapshot struct {
 	AccountRestricted           bool
 	UsedInvites                 int
 	RemainingInvites            int
+	TemporaryInvites            int
+	TemporaryInviteNextExpiry   *time.Time
 }
 
 type IssueInvitationCommand struct {

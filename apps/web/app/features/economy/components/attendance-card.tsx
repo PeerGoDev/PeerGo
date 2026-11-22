@@ -1,6 +1,8 @@
 import * as React from "react"
+import { Link } from "react-router"
 import {
   CalendarCheck2Icon,
+  CalendarPlusIcon,
   CircleAlertIcon,
   Dice5Icon,
   GiftIcon,
@@ -10,7 +12,7 @@ import {
 
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
 import { Badge } from "~/components/ui/badge"
-import { Button } from "~/components/ui/button"
+import { Button, buttonVariants } from "~/components/ui/button"
 import {
   Card,
   CardAction,
@@ -36,6 +38,10 @@ import {
   useAttendanceOverview,
   useClaimAttendance,
 } from "~/features/economy/api/attendance.queries"
+import {
+  isMagicRequestUncertain,
+  useMakeupAttendance,
+} from "~/features/economy/api/magic-store.queries"
 import { requestErrorDescription } from "~/shared/api/problem"
 import { formatCompactDateTime } from "~/shared/formatters/date-time"
 import { formatInteger } from "~/shared/formatters/integer"
@@ -49,6 +55,8 @@ export function AttendanceCard({
 }) {
   const query = useAttendanceOverview(userId)
   const mutation = useClaimAttendance(userId)
+  const makeup = useMakeupAttendance()
+  const retryMakeup = makeup.isError && isMagicRequestUncertain(makeup.error)
 
   if (query.isPending) {
     return <Skeleton className="h-64 rounded-lg" />
@@ -77,14 +85,26 @@ export function AttendanceCard({
     <AttendanceContent
       overview={query.data}
       pending={mutation.isPending}
-      error={mutation.error}
-      onClaim={(mode) =>
+      error={mutation.error ?? makeup.error}
+      makeupPending={makeup.isPending}
+      retryMakeup={retryMakeup}
+      onClaim={(mode) => {
+        makeup.reset()
         mutation.mutate({
           csrfToken,
           mode,
           idempotencyKey: globalThis.crypto.randomUUID(),
         })
-      }
+      }}
+      onMakeup={() => {
+        mutation.reset()
+        makeup.mutate({
+          csrfToken,
+          idempotencyKey:
+            (retryMakeup && makeup.variables?.idempotencyKey) ||
+            crypto.randomUUID(),
+        })
+      }}
     />
   )
 }
@@ -93,13 +113,20 @@ function AttendanceContent({
   overview,
   pending,
   error,
+  makeupPending,
+  retryMakeup,
   onClaim,
+  onMakeup,
 }: {
   overview: AttendanceOverview
   pending: boolean
   error: Error | null
+  makeupPending: boolean
+  retryMakeup: boolean
   onClaim: (mode: AttendanceMode) => void
+  onMakeup: () => void
 }) {
+  const makeupCards = overview.makeup_cards ?? 0
   const policy = overview.policy
   const settings = policy?.settings
   const defaultMode: AttendanceMode = settings?.fixed_enabled
@@ -184,7 +211,7 @@ function AttendanceContent({
                 }}
                 variant="outline"
                 spacing={0}
-                disabled={pending}
+                disabled={pending || makeupPending || retryMakeup}
                 className="w-full sm:w-auto"
               >
                 {settings.fixed_enabled ? (
@@ -204,7 +231,7 @@ function AttendanceContent({
             </div>
             <Button
               className="mt-4 w-full sm:w-auto"
-              disabled={pending}
+              disabled={pending || makeupPending || retryMakeup}
               onClick={() => onClaim(mode)}
             >
               {pending ? (
@@ -216,6 +243,48 @@ function AttendanceContent({
             </Button>
           </div>
         )}
+
+        {overview.makeup_date || makeupCards > 0 || retryMakeup ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {overview.makeup_date
+                  ? `${overview.makeup_date} 漏签，可使用补签卡补回`
+                  : "近期没有可补签的日期"}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                持有补签卡 {makeupCards} 张
+                {overview.makeup_window_days
+                  ? `，可补签最近 ${overview.makeup_window_days} 天`
+                  : ""}
+              </p>
+            </div>
+            {overview.makeup_date || retryMakeup ? (
+              makeupCards > 0 || retryMakeup ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={makeupPending || pending}
+                  onClick={onMakeup}
+                >
+                  {makeupPending ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <CalendarPlusIcon data-icon="inline-start" />
+                  )}
+                  {retryMakeup ? "确认上次补签" : "使用补签卡"}
+                </Button>
+              ) : (
+                <Link
+                  to="/shop"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  购买补签卡
+                </Link>
+              )
+            ) : null}
+          </div>
+        ) : null}
 
         {error ? (
           <Alert variant="destructive">
@@ -244,10 +313,17 @@ function AttendanceContent({
                     key={`${record.attendance_date}-${record.occurred_at}`}
                   >
                     <TableCell>
-                      {formatCompactDateTime(record.occurred_at)}
+                      {record.makeup
+                        ? record.attendance_date
+                        : formatCompactDateTime(record.occurred_at)}
                     </TableCell>
                     <TableCell>
                       {record.mode === "fixed" ? "固定" : "随机"}
+                      {record.makeup ? (
+                        <Badge variant="secondary" className="ml-2">
+                          补签
+                        </Badge>
+                      ) : null}
                     </TableCell>
                     <TableCell>{record.current_streak} 天</TableCell>
                     <TableCell className="text-right font-medium text-success-foreground">

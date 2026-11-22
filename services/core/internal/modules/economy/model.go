@@ -33,6 +33,15 @@ const (
 	TransactionSocialRedPacketClaim TransactionType = "social_red_packet_claim"
 	TransactionRefund               TransactionType = "refund"
 	TransactionAdjustment           TransactionType = "adjustment"
+	TransactionMagicShopPurchase    TransactionType = "magic_shop_purchase"
+	TransactionScratchCardPurchase  TransactionType = "scratch_card_purchase"
+	TransactionScratchCardPayout    TransactionType = "scratch_card_payout"
+	TransactionLotteryTicket        TransactionType = "lottery_ticket_purchase"
+	TransactionLotteryPayout        TransactionType = "lottery_payout"
+	TransactionLotteryBurn          TransactionType = "lottery_burn"
+	TransactionPvPStake             TransactionType = "pvp_stake"
+	TransactionPvPPayout            TransactionType = "pvp_payout"
+	TransactionPvPRefund            TransactionType = "pvp_refund"
 )
 
 var (
@@ -45,7 +54,24 @@ var (
 	medalPurchaseSinkID              = uuid.MustParse("00000000-0000-7000-8000-000000000007")
 	administratorAdjustmentAccountID = uuid.MustParse("00000000-0000-7000-8000-000000000009")
 	haremMintAccountID               = uuid.MustParse("00000000-0000-7000-8000-000000000010")
+	magicShopSinkID                  = uuid.MustParse("00000000-0000-7000-8000-000000000011")
+	magicGameHouseID                 = uuid.MustParse("00000000-0000-7000-8000-000000000012")
+	lotteryPoolEscrowID              = uuid.MustParse("00000000-0000-7000-8000-000000000013")
+	pvpChallengeEscrowID             = uuid.MustParse("00000000-0000-7000-8000-000000000014")
 )
+
+// MagicShopSinkID returns the site-side account that receives shop purchases.
+func MagicShopSinkID() uuid.UUID { return magicShopSinkID }
+
+// MagicGameHouseID returns the house account behind scratch cards, lottery
+// burns and PvP fees. A positive balance is magic removed from circulation.
+func MagicGameHouseID() uuid.UUID { return magicGameHouseID }
+
+// LotteryPoolEscrowID holds ticket sales and rollover until the next draw.
+func LotteryPoolEscrowID() uuid.UUID { return lotteryPoolEscrowID }
+
+// PvPChallengeEscrowID holds both stakes of an open or accepted challenge.
+func PvPChallengeEscrowID() uuid.UUID { return pvpChallengeEscrowID }
 
 // RousiMigrationAccountID returns the immutable opening-balance counterparty.
 func RousiMigrationAccountID() uuid.UUID { return rousiMigrationAccountID }

@@ -18,6 +18,7 @@ import {
   ExternalLinkIcon,
   FileCheckIcon,
   FolderClockIcon,
+  Gamepad2Icon,
   GaugeIcon,
   GraduationCapIcon,
   HomeIcon,
@@ -36,6 +37,7 @@ import {
   ShieldAlertIcon,
   SettingsIcon,
   ShieldIcon,
+  StoreIcon,
   TicketIcon,
   UploadIcon,
   UserIcon,
@@ -87,6 +89,7 @@ import {
   useWebSession,
 } from "~/features/auth/api/session.mutations"
 import { useCapabilities } from "~/features/authz/api/capabilities.queries"
+import { useNameStyles } from "~/features/economy/api/magic-store.queries"
 import { useMyNotificationSummary } from "~/features/notification/api/notifications.queries"
 import { useSiteInfo } from "~/features/site/api/site.queries"
 import { HeaderAttendanceButton } from "~/features/economy/components/header-attendance-button"
@@ -147,6 +150,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const canReadMedals = Boolean(
     capabilities.data?.items.some(
       (capability) => capability.action === "economy.medal.read.self"
+    )
+  )
+  const canReadMagicShop = capabilities.data?.items.some(
+    (capability) => capability.action === "economy.magicshop.read.self"
+  )
+  const canReadMagicGames = capabilities.data?.items.some(
+    (capability) => capability.action === "economy.magicgame.read.self"
+  )
+  useNameStyles(
+    Boolean(
+      capabilities.data?.items.some(
+        (capability) => capability.action === "economy.namestyle.read"
+      )
     )
   )
   const canClaimAttendance = Boolean(
@@ -317,6 +333,24 @@ export function AppShell({ children }: { children: ReactNode }) {
             label: "勋章",
             to: "/medals",
             icon: AwardIcon,
+          },
+        ]
+      : []),
+    ...(canReadMagicShop
+      ? [
+          {
+            label: "魔力商店",
+            to: "/shop",
+            icon: StoreIcon,
+          },
+        ]
+      : []),
+    ...(canReadMagicGames
+      ? [
+          {
+            label: "游戏中心",
+            to: "/games",
+            icon: Gamepad2Icon,
           },
         ]
       : []),

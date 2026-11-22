@@ -260,6 +260,7 @@ type EconomyOverviewService interface {
 type AttendanceService interface {
 	MyOverview(context.Context, string) (attendance.Overview, error)
 	Claim(context.Context, string, string, uuid.UUID, attendance.Mode) (attendance.Record, error)
+	Makeup(context.Context, string, string, uuid.UUID) (attendance.Record, error)
 	ListPolicies(context.Context, authz.StaffActor, int, int) (attendance.PolicyPage, error)
 	IssuePolicy(context.Context, authz.StaffActor, uuid.UUID, attendance.PolicyRevision, string) (attendance.PublishedPolicy, error)
 }
@@ -508,6 +509,8 @@ type Handler struct {
 	contributionExperience      ContributionExperiencePolicyService
 	medalAdministration         MedalAdministrationService
 	memberMedals                MemberMedalService
+	magicStore                  MagicStoreService
+	magicStoreAdministration    MagicStoreAdministrationService
 	hnrPolicyAdministration     HNRPolicyAdministrationService
 	ratioWatchAdministration    RatioWatchAdministrationService
 	newcomerAdministration      NewcomerAdministrationService

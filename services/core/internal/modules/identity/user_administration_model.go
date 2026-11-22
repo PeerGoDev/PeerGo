@@ -205,6 +205,7 @@ const (
 	VIPTransitionOriginLegacyMigration VIPTransitionOrigin = "legacy_migration"
 	VIPTransitionOriginSystemBackfill  VIPTransitionOrigin = "system_backfill"
 	VIPTransitionOriginStaff           VIPTransitionOrigin = "staff"
+	VIPTransitionOriginShop            VIPTransitionOrigin = "shop"
 )
 
 // VIPState exposes the optimistic-concurrency version of the shared account

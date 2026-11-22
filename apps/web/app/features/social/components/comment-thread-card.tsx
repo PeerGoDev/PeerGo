@@ -79,6 +79,7 @@ import { OffsetPagination } from "~/shared/components/offset-pagination"
 import { UserAvatar } from "~/shared/components/user-avatar"
 import { CommentReportDialog } from "~/features/social/components/comment-report-dialog"
 import { ContentTipDialog } from "~/features/economy/components/content-tip-dialog"
+import { useNameStyle } from "~/features/economy/components/name-style"
 import { formatRelativeTime } from "~/features/torrent/model/format"
 import { ApiProblemError, requestErrorDescription } from "~/shared/api/problem"
 import {
@@ -1045,6 +1046,7 @@ function CommentRow({
 }) {
   const isReply = Boolean(comment.parent_comment_id)
   const visible = comment.state === "visible"
+  const authorNameStyle = useNameStyle(comment.author.username)
   const actions = (
     <span
       className={cn(
@@ -1171,12 +1173,15 @@ function CommentRow({
               to={`/user/${encodeURIComponent(comment.author.username)}`}
               className={cn(
                 "min-w-0 truncate font-semibold transition-colors",
-                comment.author.administrator
-                  ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent hover:opacity-80"
-                  : comment.author.vip
-                    ? "text-warning-foreground hover:opacity-80"
-                    : "hover:text-link"
+                authorNameStyle
+                  ? "hover:opacity-80"
+                  : comment.author.administrator
+                    ? "bg-gradient-to-r from-fuchsia-500 via-primary to-amber-500 bg-clip-text text-transparent hover:opacity-80"
+                    : comment.author.vip
+                      ? "text-warning-foreground hover:opacity-80"
+                      : "hover:text-link"
               )}
+              data-name-style={authorNameStyle}
             >
               {comment.author.display_name}
             </Link>

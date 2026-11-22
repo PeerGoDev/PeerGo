@@ -38,6 +38,12 @@ const (
 	ActionEconomyContentTipPolicyIssue            Action = "economy.contenttip.policy.issue"
 	ActionEconomyContentTipPolicyRead             Action = "economy.contenttip.policy.read"
 	ActionEconomyContentTipReadSelf               Action = "economy.contenttip.read.self"
+	ActionEconomyMagicGamePlaySelf                Action = "economy.magicgame.play.self"
+	ActionEconomyMagicGameReadSelf                Action = "economy.magicgame.read.self"
+	ActionEconomyMagicShopPurchaseSelf            Action = "economy.magicshop.purchase.self"
+	ActionEconomyMagicShopReadSelf                Action = "economy.magicshop.read.self"
+	ActionEconomyMagicStoreManageRead             Action = "economy.magicstore.manage.read"
+	ActionEconomyMagicStoreUpdate                 Action = "economy.magicstore.update"
 	ActionEconomyMedalCreate                      Action = "economy.medal.create"
 	ActionEconomyMedalManageRead                  Action = "economy.medal.manage.read"
 	ActionEconomyMedalPurchaseSelf                Action = "economy.medal.purchase.self"
@@ -48,6 +54,7 @@ const (
 	ActionEconomyMemberGiftPolicyIssue            Action = "economy.membergift.policy.issue"
 	ActionEconomyMemberGiftPolicyRead             Action = "economy.membergift.policy.read"
 	ActionEconomyMemberGiftReadSelf               Action = "economy.membergift.read.self"
+	ActionEconomyNameStyleRead                    Action = "economy.namestyle.read"
 	ActionEconomyReadSelf                         Action = "economy.read.self"
 	ActionEconomySeedingRewardPolicyIssue         Action = "economy.seedingreward.policy.issue"
 	ActionEconomySeedingRewardPolicyRead          Action = "economy.seedingreward.policy.read"
@@ -363,6 +370,36 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
+		Action: ActionEconomyMagicGamePlaySelf, Description: "使用自己的整数魔力值参与刮刮乐、彩票和擂台", Risk: RiskMedium,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionEconomyMagicGameReadSelf, Description: "查看魔力游戏、奖池和自己的游戏记录", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionEconomyMagicShopPurchaseSelf, Description: "使用自己的整数魔力值购买商店道具并切换彩色 ID", Risk: RiskMedium,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionEconomyMagicShopReadSelf, Description: "查看魔力商店、自己的购买记录和彩色 ID", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionEconomyMagicStoreManageRead, Description: "读取魔力商店与魔力游戏配置和资金账户", Risk: RiskMedium,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionEconomyMagicStoreUpdate, Description: "修改魔力商店价格、限购和游戏赔率", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
 		Action: ActionEconomyMedalCreate, Description: "创建勋章定义", Risk: RiskHigh,
 		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
 		Grantable: true, Discoverable: true,
@@ -410,6 +447,11 @@ var permissionCatalog = []PermissionDefinition{
 	{
 		Action: ActionEconomyMemberGiftReadSelf, Description: "查看自己的成员赠送规则与收发记录", Risk: RiskLow,
 		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionEconomyNameStyleRead, Description: "读取全站有效的彩色用户名样式", Risk: RiskLow,
+		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},
 	{

@@ -318,3 +318,127 @@
     animation: none;
   }
 }
+
+/* Colored usernames bought in the magic shop. Keys mirror the Core catalog. */
+[data-name-style] {
+  font-weight: 600;
+}
+[data-name-style="crimson"] {
+  color: oklch(0.58 0.21 22);
+}
+[data-name-style="orange"] {
+  color: oklch(0.66 0.19 48);
+}
+[data-name-style="amber"] {
+  color: oklch(0.7 0.16 75);
+}
+[data-name-style="emerald"] {
+  color: oklch(0.6 0.15 160);
+}
+[data-name-style="teal"] {
+  color: oklch(0.6 0.11 190);
+}
+[data-name-style="sky"] {
+  color: oklch(0.62 0.15 235);
+}
+[data-name-style="indigo"] {
+  color: oklch(0.55 0.2 275);
+}
+[data-name-style="violet"] {
+  color: oklch(0.58 0.22 300);
+}
+[data-name-style="pink"] {
+  color: oklch(0.65 0.2 350);
+}
+.dark [data-name-style="crimson"] {
+  color: oklch(0.7 0.18 22);
+}
+.dark [data-name-style="indigo"] {
+  color: oklch(0.7 0.15 275);
+}
+.dark [data-name-style="violet"] {
+  color: oklch(0.72 0.17 300);
+}
+
+[data-name-style="sunset"],
+[data-name-style="ocean"],
+[data-name-style="aurora"],
+[data-name-style="flame"],
+[data-name-style="sakura"],
+[data-name-style="gold"],
+[data-name-style="rainbow"] {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-size: 200% auto;
+}
+[data-name-style="sunset"] {
+  background-image: linear-gradient(
+    90deg,
+    oklch(0.65 0.2 30),
+    oklch(0.7 0.18 70),
+    oklch(0.6 0.2 350)
+  );
+}
+[data-name-style="ocean"] {
+  background-image: linear-gradient(
+    90deg,
+    oklch(0.6 0.14 230),
+    oklch(0.65 0.12 195),
+    oklch(0.55 0.18 265)
+  );
+}
+[data-name-style="aurora"] {
+  background-image: linear-gradient(
+    90deg,
+    oklch(0.68 0.16 155),
+    oklch(0.62 0.14 215),
+    oklch(0.6 0.2 300)
+  );
+}
+[data-name-style="flame"] {
+  background-image: linear-gradient(
+    90deg,
+    oklch(0.6 0.22 25),
+    oklch(0.7 0.19 55),
+    oklch(0.78 0.16 90)
+  );
+}
+[data-name-style="sakura"] {
+  background-image: linear-gradient(
+    90deg,
+    oklch(0.72 0.14 350),
+    oklch(0.78 0.09 10),
+    oklch(0.68 0.16 325)
+  );
+}
+[data-name-style="gold"] {
+  background-image: linear-gradient(
+    90deg,
+    oklch(0.68 0.13 75),
+    oklch(0.82 0.13 95),
+    oklch(0.66 0.14 65)
+  );
+}
+[data-name-style="rainbow"] {
+  background-image: linear-gradient(
+    90deg,
+    oklch(0.63 0.22 25),
+    oklch(0.75 0.17 75),
+    oklch(0.68 0.17 145),
+    oklch(0.62 0.15 235),
+    oklch(0.58 0.22 300),
+    oklch(0.63 0.22 25)
+  );
+  animation: peergo-name-rainbow 6s linear infinite;
+}
+@keyframes peergo-name-rainbow {
+  to {
+    background-position: 200% center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-name-style="rainbow"] {
+    animation: none;
+  }
+}

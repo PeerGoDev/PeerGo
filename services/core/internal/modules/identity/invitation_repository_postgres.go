@@ -72,10 +72,17 @@ func (repository *PostgresInvitationRepository) Overview(ctx context.Context, us
 	if err != nil {
 		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, err
 	}
+	temporary, nextExpiry, err := TemporaryInvitationSummary(ctx, tx, userID, now)
+	if err != nil {
+		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return invitationIssuerSnapshot{}, nil, 0, InvitationNetwork{}, fmt.Errorf("commit invitation overview: %w", err)
 	}
-	return invitationSnapshotFromContext(contextRow, int(used), remaining), items, int(total), network, nil
+	snapshot := invitationSnapshotFromContext(contextRow, int(used), remaining)
+	snapshot.TemporaryInvites = temporary
+	snapshot.TemporaryInviteNextExpiry = nextExpiry
+	return snapshot, items, int(total), network, nil
 }
 
 func readInvitationBalance(ctx context.Context, tx pgx.Tx, userID uuid.UUID, forUpdate bool) (int, bool, error) {
@@ -576,6 +583,21 @@ func (repository *PostgresInvitationRepository) Issue(ctx context.Context, comma
 		return MemberInvitation{}, ErrInvitationInvariant
 	}
 	snapshot := invitationSnapshotFromLockedContext(contextRow, int(used), remaining)
+	var temporaryCreditID uuid.UUID
+	var temporaryExpiry time.Time
+	err = tx.QueryRow(ctx, `
+SELECT id, expires_at
+FROM identity.temporary_invitation_credits
+WHERE user_id = $1 AND invitation_id IS NULL AND expires_at > $2
+ORDER BY expires_at, id
+LIMIT 1
+FOR UPDATE`, command.UserID, command.OccurredAt).Scan(&temporaryCreditID, &temporaryExpiry)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return MemberInvitation{}, fmt.Errorf("lock temporary invitation credit: %w", err)
+	}
+	if temporaryCreditID != uuid.Nil {
+		snapshot.TemporaryInvites = 1
+	}
 	eligibility, err := invitationEligibility(snapshot, command.OccurredAt.UTC())
 	if err != nil {
 		return MemberInvitation{}, err
@@ -590,14 +612,35 @@ func (repository *PostgresInvitationRepository) Issue(ctx context.Context, comma
 			return MemberInvitation{}, ErrInvitationIneligible
 		}
 	}
+	expiresAt := command.OccurredAt.AddDate(0, 0, snapshot.InviteValidDays)
+	if temporaryCreditID != uuid.Nil && temporaryExpiry.Before(expiresAt) {
+		expiresAt = temporaryExpiry
+	}
 	row, err := queries.InsertMemberInvitation(ctx, identitydb.InsertMemberInvitationParams{
 		ID: command.ID, TokenSha256: command.TokenSHA256, EmailBindingHmac: command.EmailBindingHMAC,
-		ExpiresAt: invitationTimestamp(command.OccurredAt.AddDate(0, 0, snapshot.InviteValidDays)),
+		ExpiresAt: invitationTimestamp(expiresAt),
 		UserID:    invitationUUID(command.UserID), AuthorizationDecisionID: invitationUUID(command.Authorization.ID),
 		CreatedAt: invitationTimestamp(command.OccurredAt),
 	})
 	if err != nil {
 		return MemberInvitation{}, fmt.Errorf("insert member invitation: %w", err)
+	}
+	if temporaryCreditID != uuid.Nil {
+		if _, err := tx.Exec(ctx, `
+UPDATE identity.temporary_invitation_credits
+SET invitation_id = $2, updated_at = $3
+WHERE id = $1 AND invitation_id IS NULL`, temporaryCreditID, command.ID, command.OccurredAt); err != nil {
+			return MemberInvitation{}, fmt.Errorf("consume temporary invitation credit: %w", err)
+		}
+		item, err := memberInvitationFromIssue(row.ID, row.CreatedAt, row.ExpiresAt)
+		if err != nil {
+			return MemberInvitation{}, err
+		}
+		item.EmailBound = true
+		if err := tx.Commit(ctx); err != nil {
+			return MemberInvitation{}, fmt.Errorf("commit temporary invitation issue: %w", err)
+		}
+		return item, nil
 	}
 	if !accountExists {
 		return MemberInvitation{}, ErrInvitationQuota
@@ -671,6 +714,18 @@ RETURNING id, source_kind, created_at, expires_at, revoked_at,
 	if err != nil {
 		return MemberInvitation{}, fmt.Errorf("revoke member invitation: %w", err)
 	}
+	var returnedCredit uuid.UUID
+	err = tx.QueryRow(ctx, `
+UPDATE identity.temporary_invitation_credits
+SET invitation_id = NULL, updated_at = $2
+WHERE invitation_id = $1
+RETURNING id`, id, command.OccurredAt).Scan(&returnedCredit)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return MemberInvitation{}, fmt.Errorf("return temporary invitation credit: %w", err)
+	}
+	if returnedCredit != uuid.Nil {
+		return finishRevokedInvitation(ctx, tx, id, sourceKind, createdAt, expiresAt, revokedAt, emailBound)
+	}
 	var balanceAfter int
 	if err := tx.QueryRow(ctx, `
 UPDATE identity.invitation_accounts
@@ -694,6 +749,10 @@ INSERT INTO identity.invitation_balance_events (
 	); err != nil {
 		return MemberInvitation{}, fmt.Errorf("record invitation balance refund: %w", err)
 	}
+	return finishRevokedInvitation(ctx, tx, id, sourceKind, createdAt, expiresAt, revokedAt, emailBound)
+}
+
+func finishRevokedInvitation(ctx context.Context, tx pgx.Tx, id uuid.UUID, sourceKind string, createdAt, expiresAt, revokedAt pgtype.Timestamptz, emailBound bool) (MemberInvitation, error) {
 	item, err := memberInvitationFromIssue(id, createdAt, expiresAt)
 	if err != nil || !revokedAt.Valid {
 		return MemberInvitation{}, ErrInvitationInvariant

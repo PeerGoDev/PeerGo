@@ -173,7 +173,8 @@ func invitationEligibility(snapshot invitationIssuerSnapshot, now time.Time) (In
 		snapshot.MinimumInviteAccountAgeDays < 0 || snapshot.MinimumInviteAccountAgeDays > 3650 ||
 		snapshot.MinimumInviteLevel < 1 || snapshot.MinimumInviteLevel > 99 ||
 		snapshot.CurrentLevel < 1 || snapshot.UsedInvites < 0 || snapshot.RemainingInvites < 0 ||
-		snapshot.RemainingInvites > 1_000_000 || snapshot.CreatedAt.IsZero() || snapshot.CreatedAt.After(now) {
+		snapshot.RemainingInvites > 1_000_000 || snapshot.TemporaryInvites < 0 ||
+		snapshot.CreatedAt.IsZero() || snapshot.CreatedAt.After(now) {
 		return InvitationEligibility{}, ErrInvitationInvariant
 	}
 	accountAgeDays := int(now.Sub(snapshot.CreatedAt.UTC()) / (24 * time.Hour))
@@ -190,14 +191,16 @@ func invitationEligibility(snapshot invitationIssuerSnapshot, now time.Time) (In
 		blocker = InvitationBlockerAccountAge
 	case snapshot.CurrentLevel < snapshot.MinimumInviteLevel:
 		blocker = InvitationBlockerLevel
-	case remaining == 0 || (snapshot.MaxInvitesPerMember > 0 && snapshot.UsedInvites >= snapshot.MaxInvitesPerMember):
+	case remaining+snapshot.TemporaryInvites == 0 || (snapshot.MaxInvitesPerMember > 0 && snapshot.UsedInvites >= snapshot.MaxInvitesPerMember):
 		blocker = InvitationBlockerQuotaExhausted
 	}
 	return InvitationEligibility{
 		Enabled: snapshot.MemberInvitesEnabled, Eligible: blocker == InvitationBlockerNone,
 		Blocker: blocker, InviteValidDays: snapshot.InviteValidDays,
 		MaxInvitesPerMember: snapshot.MaxInvitesPerMember, UsedInvites: snapshot.UsedInvites,
-		RemainingInvites: remaining, MinimumAccountAgeDays: snapshot.MinimumInviteAccountAgeDays,
+		RemainingInvites: remaining, TemporaryInvites: snapshot.TemporaryInvites,
+		TemporaryInviteNextExpiry: snapshot.TemporaryInviteNextExpiry,
+		MinimumAccountAgeDays:     snapshot.MinimumInviteAccountAgeDays,
 		CurrentAccountAgeDays: accountAgeDays, MinimumLevel: snapshot.MinimumInviteLevel,
 		CurrentLevel: snapshot.CurrentLevel, EmailVerified: snapshot.EmailVerified,
 	}, nil

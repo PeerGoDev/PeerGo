@@ -387,6 +387,11 @@ function InvitationStats({ overview }: { overview: InvitationOverview }) {
         icon={TicketIcon}
         label="剩余邀请"
         value={formatInteger(overview.eligibility.remaining_invites)}
+        unit={
+          overview.eligibility.temporary_invites > 0
+            ? `+ 临时 ${overview.eligibility.temporary_invites}`
+            : undefined
+        }
       />
       <SummaryCard
         icon={UsersRoundIcon}

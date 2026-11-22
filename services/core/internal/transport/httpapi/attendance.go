@@ -69,6 +69,39 @@ func (h *Handler) ClaimMyAttendance(ctx context.Context, request generated.Claim
 	return generated.ClaimMyAttendance201JSONResponse(attendanceRecordDTO(record)), nil
 }
 
+func (h *Handler) MakeupMyAttendance(ctx context.Context, request generated.MakeupMyAttendanceRequestObject) (generated.MakeupMyAttendanceResponseObject, error) {
+	record, err := h.attendance.Makeup(ctx, sessionTokenFromContext(ctx), string(request.Params.XCSRFToken), request.Params.IdempotencyKey)
+	switch {
+	case errors.Is(err, attendance.ErrInput):
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_attendance_makeup", "补签请求无效", "请刷新签到状态后重试。")
+		return generated.MakeupMyAttendance400ApplicationProblemPlusJSONResponse{ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem)}, nil
+	case errors.Is(err, identity.ErrSessionNotFound):
+		problem := newProblemFromContext(ctx, http.StatusUnauthorized, "session_required", "需要登录", "请重新登录后补签。")
+		return generated.MakeupMyAttendance401ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, identity.ErrInvalidCSRF):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "csrf_invalid", "请求验证失败", "请刷新页面后重试。")
+		return generated.MakeupMyAttendance403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, authz.ErrForbidden):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "attendance_claim_denied", "暂时不能补签", "当前账号没有签到领取权限。")
+		return generated.MakeupMyAttendance403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, attendance.ErrPolicyNotFound), errors.Is(err, attendance.ErrDisabled):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "attendance_unavailable", "签到暂未开放", "当前没有已生效的签到政策。")
+		return generated.MakeupMyAttendance409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, attendance.ErrMakeupUnavailable), errors.Is(err, attendance.ErrAlreadyClaimed):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "attendance_makeup_unavailable", "没有可补签的日期", "补签只能补回最近一次签到之后、补签期限内的那一天，且需在今天签到之前使用。")
+		return generated.MakeupMyAttendance409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, attendance.ErrNoMakeupCard):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "attendance_makeup_card_missing", "没有补签卡", "请先在魔力商店购买补签卡。")
+		return generated.MakeupMyAttendance409ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, attendance.ErrIdempotencyConflict):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "attendance_idempotency_conflict", "请求标识已被使用", "请刷新签到状态后重新操作。")
+		return generated.MakeupMyAttendance409ApplicationProblemPlusJSONResponse(problem), nil
+	case err != nil:
+		return nil, err
+	}
+	return generated.MakeupMyAttendance201JSONResponse(attendanceRecordDTO(record)), nil
+}
+
 func (h *Handler) ListAttendancePolicies(ctx context.Context, request generated.ListAttendancePoliciesRequestObject) (generated.ListAttendancePoliciesResponseObject, error) {
 	session, problem, err := h.authenticateStaffRead(ctx)
 	if err != nil {
@@ -174,6 +207,13 @@ func attendanceOverviewDTO(overview attendance.Overview) generated.AttendanceOve
 	for _, record := range overview.History {
 		result.History = append(result.History, attendanceRecordDTO(record))
 	}
+	cards, window := int(overview.MakeupCards), overview.MakeupWindowDays
+	result.MakeupCards, result.MakeupWindowDays = &cards, &window
+	if overview.MakeupDate != nil {
+		if parsed, err := time.Parse(time.DateOnly, *overview.MakeupDate); err == nil {
+			result.MakeupDate = &openapi_types.Date{Time: parsed}
+		}
+	}
 	return result
 }
 
@@ -185,7 +225,7 @@ func attendanceRecordDTO(record attendance.Record) generated.AttendanceRecord {
 		StreakReward: strconv.FormatInt(record.StreakReward, 10), TotalReward: strconv.FormatInt(record.TotalReward, 10),
 		ExperienceReward: strconv.FormatInt(record.ExperienceReward, 10), CurrentStreak: int(record.CurrentStreak),
 		TotalDays: int(record.TotalDays), LongestStreak: int(record.LongestStreak),
-		PolicyRevision: record.PolicyRevision, OccurredAt: record.OccurredAt,
+		PolicyRevision: record.PolicyRevision, OccurredAt: record.OccurredAt, Makeup: &record.Makeup,
 	}
 }
 

@@ -420,6 +420,10 @@ func (unavailableAttendanceService) Claim(context.Context, string, string, uuid.
 	return attendance.Record{}, identity.ErrSessionNotFound
 }
 
+func (unavailableAttendanceService) Makeup(context.Context, string, string, uuid.UUID) (attendance.Record, error) {
+	return attendance.Record{}, identity.ErrSessionNotFound
+}
+
 func (unavailableAttendanceService) ListPolicies(context.Context, authz.StaffActor, int, int) (attendance.PolicyPage, error) {
 	return attendance.PolicyPage{}, authz.ErrForbidden
 }

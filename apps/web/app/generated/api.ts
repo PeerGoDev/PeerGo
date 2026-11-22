@@ -1120,6 +1120,197 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/attendance/makeup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 使用补签卡补回最近一次签到后的漏签日 */
+        post: operations["makeupMyAttendance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/magic-shop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看魔力商店、限购进度和自己的道具 */
+        get: operations["getMyMagicShop"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/magic-shop/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 用魔力值购买商店道具 */
+        post: operations["purchaseMagicShopItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/name-style": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 在已购买的档位内切换彩色 ID 样式 */
+        put: operations["setMyNameStyle"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/name-styles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 列出全站仍在有效期内的彩色 ID */
+        get: operations["listNameStyles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/magic-games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看刮刮乐、每日彩票和擂台 */
+        get: operations["getMyMagicGames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/magic-games/scratch-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 买一张刮刮乐并立即开奖 */
+        post: operations["playScratchCard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/magic-games/lottery/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 购买本期每日彩票 */
+        post: operations["buyLotteryTickets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/magic-games/pvp/challenges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 押上魔力值发起擂台 */
+        post: operations["createPvPChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/magic-games/pvp/challenges/{challenge_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                challenge_id: components["parameters"]["ChallengeIDParameter"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 应战并立即结算擂台 */
+        post: operations["acceptPvPChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/magic-games/pvp/challenges/{challenge_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                challenge_id: components["parameters"]["ChallengeIDParameter"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 撤回自己仍开放的擂台并退回赌注 */
+        post: operations["cancelPvPChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/workgroups": {
         parameters: {
             query?: never;
@@ -3661,6 +3852,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/settings/magic-store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取魔力商店与游戏配置、资金账户和修订历史 */
+        get: operations["getMagicStoreSettings"];
+        /** 修改魔力商店价格、限购和游戏赔率 */
+        put: operations["updateMagicStoreSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/settings/seeding-rewards/preview": {
         parameters: {
             query?: never;
@@ -4496,7 +4705,7 @@ export interface components {
             expected_state_version: number;
         };
         /** @enum {string} */
-        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.adjust" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.network.read" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
+        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.magicgame.play.self" | "economy.magicgame.read.self" | "economy.magicshop.purchase.self" | "economy.magicshop.read.self" | "economy.magicstore.manage.read" | "economy.magicstore.update" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.namestyle.read" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.adjust" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.network.read" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
         CapabilityScope: {
             /** @enum {string} */
             type: "site" | "category";
@@ -6749,6 +6958,8 @@ export interface components {
             policy_revision: string;
             /** Format: date-time */
             occurred_at: string;
+            /** @description 使用补签卡补回的签到。 */
+            makeup?: boolean;
         };
         AttendanceOverview: {
             policy?: components["schemas"]["AttendancePolicy"];
@@ -6760,11 +6971,18 @@ export interface components {
             longest_streak: number;
             today_record?: components["schemas"]["AttendanceRecord"];
             history: components["schemas"]["AttendanceRecord"][];
+            makeup_cards?: number;
+            makeup_window_days?: number;
+            /**
+             * Format: date
+             * @description 现在可以用补签卡补回的日期；没有可补日期时为空。
+             */
+            makeup_date?: string | null;
         };
         MagicStatementEntry: {
             sequence: components["schemas"]["UnsignedIntegerText"];
             /** @enum {string} */
-            transaction_type: "legacy_opening" | "seeding_reward" | "harem_reward" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "refund" | "adjustment";
+            transaction_type: "legacy_opening" | "seeding_reward" | "harem_reward" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "magic_shop_purchase" | "scratch_card_purchase" | "scratch_card_payout" | "lottery_ticket_purchase" | "lottery_payout" | "lottery_burn" | "pvp_stake" | "pvp_payout" | "pvp_refund" | "refund" | "adjustment";
             /** @enum {string} */
             entry_type: "legacy_opening" | "earn" | "spend" | "adjustment";
             amount: components["schemas"]["SignedIntegerText"];
@@ -7229,6 +7447,10 @@ export interface components {
             enabled: boolean;
             eligible: boolean;
             blocker: components["schemas"]["InvitationEligibilityBlocker"];
+            /** @description 魔力商店购买、尚未过期也未使用的临时邀请名额；发邀请时优先消耗。 */
+            temporary_invites: number;
+            /** Format: date-time */
+            temporary_invite_next_expiry?: string | null;
             invite_valid_days: number;
             max_invites_per_member: number;
             used_invites: number;
@@ -7583,7 +7805,7 @@ export interface components {
             /** @enum {string} */
             transition: "granted" | "renewed" | "revoked";
             /** @enum {string} */
-            origin: "legacy_migration" | "system_backfill" | "staff";
+            origin: "legacy_migration" | "system_backfill" | "staff" | "shop";
             reason_summary: string;
             enabled: boolean;
             /** Format: date-time */
@@ -8055,6 +8277,312 @@ export interface components {
         };
         CreateContentTipRequest: {
             amount: components["schemas"]["UnsignedIntegerText"];
+        };
+        /** Format: int64 */
+        MagicPrice: number;
+        LotteryTier: {
+            label: string;
+            winners: number;
+            /** Format: int64 */
+            share_bps: number;
+        };
+        MagicStoreSettings: {
+            timezone: string;
+            shop_enabled: boolean;
+            invite: {
+                enabled: boolean;
+                price: components["schemas"]["MagicPrice"];
+                /** @description 每自然月限购数量，0 表示不限。 */
+                monthly_limit: number;
+            };
+            temporary_invite: {
+                enabled: boolean;
+                price: components["schemas"]["MagicPrice"];
+                valid_days: number;
+                monthly_limit: number;
+            };
+            vip: {
+                enabled: boolean;
+                price: components["schemas"]["MagicPrice"];
+                duration_days: number;
+            };
+            name_color: {
+                enabled: boolean;
+                solid_price: components["schemas"]["MagicPrice"];
+                gradient_price: components["schemas"]["MagicPrice"];
+                duration_days: number;
+            };
+            makeup_card: {
+                enabled: boolean;
+                price: components["schemas"]["MagicPrice"];
+                window_days: number;
+                maximum_holding: number;
+            };
+            games_enabled: boolean;
+            scratch: {
+                enabled: boolean;
+                price: components["schemas"]["MagicPrice"];
+                daily_limit: number;
+                prizes: {
+                    label: string;
+                    /** Format: int64 */
+                    payout: number;
+                    /** Format: int64 */
+                    weight: number;
+                }[];
+            };
+            lottery: {
+                enabled: boolean;
+                ticket_price: components["schemas"]["MagicPrice"];
+                maximum_tickets_per_round: number;
+                draw_hour: number;
+                /** Format: int64 */
+                burn_bps: number;
+                tiers: components["schemas"]["LotteryTier"][];
+            };
+            pvp: {
+                enabled: boolean;
+                minimum_stake: components["schemas"]["MagicPrice"];
+                maximum_stake: components["schemas"]["MagicPrice"];
+                /** Format: int64 */
+                fee_bps: number;
+                maximum_open_per_member: number;
+                expiry_hours: number;
+            };
+        };
+        MagicShopVIPStatus: {
+            active: boolean;
+            permanent: boolean;
+            /** Format: date-time */
+            until?: string | null;
+        };
+        /** @enum {string} */
+        NameStyleTier: "solid" | "gradient";
+        NameStyleKey: string;
+        MemberNameStyle: {
+            /** Format: uuid */
+            user_id: string;
+            username: string;
+            tier: components["schemas"]["NameStyleTier"];
+            style_key: components["schemas"]["NameStyleKey"];
+            /** Format: date-time */
+            expires_at: string;
+        };
+        NameStyleOption: {
+            key: components["schemas"]["NameStyleKey"];
+            tier: components["schemas"]["NameStyleTier"];
+        };
+        /** @enum {string} */
+        MagicShopItemKey: "invite" | "temporary_invite" | "vip" | "name_color_solid" | "name_color_gradient" | "makeup_card";
+        MagicShopOrder: {
+            /** Format: uuid */
+            id: string;
+            item_key: components["schemas"]["MagicShopItemKey"];
+            quantity: number;
+            /** Format: int64 */
+            unit_price: number;
+            /** Format: int64 */
+            total_price: number;
+            style_key?: string | null;
+            /** Format: date-time */
+            effect_until?: string | null;
+            /** Format: date-time */
+            purchased_at: string;
+        };
+        MagicShopOverview: {
+            settings: components["schemas"]["MagicStoreSettings"];
+            /** Format: int64 */
+            settings_version: number;
+            magic_balance: components["schemas"]["SignedIntegerText"];
+            invites_purchased_this_month: number;
+            temporary_invites_purchased_this_month: number;
+            remaining_invites: number;
+            temporary_invites: number;
+            /** Format: date-time */
+            temporary_invite_next_expiry?: string | null;
+            /** @description 当前不能购买邀请名额的原因，取值同邀请资格的 blocker。 */
+            invite_blocker?: string | null;
+            vip: components["schemas"]["MagicShopVIPStatus"];
+            name_style?: components["schemas"]["MemberNameStyle"];
+            makeup_cards: number;
+            name_style_options: components["schemas"]["NameStyleOption"][];
+            recent_orders: components["schemas"]["MagicShopOrder"][];
+        };
+        PurchaseMagicShopItemRequest: {
+            item_key: components["schemas"]["MagicShopItemKey"];
+            quantity: number;
+            /**
+             * Format: int64
+             * @description 页面显示的商品单价。单价已变更时返回冲突，会员可按新单价重新确认。
+             */
+            expected_unit_price?: number;
+            style_key?: components["schemas"]["NameStyleKey"];
+        };
+        MagicShopPurchaseReceipt: {
+            order: components["schemas"]["MagicShopOrder"];
+            balance_after: components["schemas"]["SignedIntegerText"];
+            replayed: boolean;
+        };
+        SetNameStyleRequest: {
+            style_key: components["schemas"]["NameStyleKey"];
+        };
+        MemberNameStyleList: {
+            items: components["schemas"]["MemberNameStyle"][];
+        };
+        ScratchCard: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            price: number;
+            /** Format: int64 */
+            prize: number;
+            prize_index: number;
+            prize_label: string;
+            /** Format: date-time */
+            purchased_at: string;
+        };
+        LotteryWinner: {
+            draw_rank: number;
+            tier_index: number;
+            tier_label: string;
+            ticket_number: number;
+            username: string;
+            /** Format: int64 */
+            prize: number;
+        };
+        LotteryRound: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            round_number: number;
+            /** @enum {string} */
+            status: "open" | "drawn";
+            /** Format: int64 */
+            ticket_price: number;
+            maximum_tickets_per_member: number;
+            /** Format: int64 */
+            burn_bps: number;
+            tiers: components["schemas"]["LotteryTier"][];
+            /** Format: date-time */
+            opens_at: string;
+            /** Format: date-time */
+            draw_at: string;
+            /** @description 开奖前公布的种子摘要；开奖后可用 seed 校验。 */
+            seed_sha256: string;
+            /** @description 开奖后公开的随机种子。 */
+            seed?: string | null;
+            /** Format: int64 */
+            carried_in: number;
+            tickets_sold: number;
+            /** Format: int64 */
+            sales_total: number;
+            /** Format: int64 */
+            burned?: number | null;
+            /** Format: int64 */
+            paid_out?: number | null;
+            /** Format: int64 */
+            carried_out?: number | null;
+            /** Format: date-time */
+            drawn_at?: string | null;
+            estimated_prizes: number[];
+            my_tickets: number;
+            my_ticket_ranges: number[][];
+            /** Format: int64 */
+            my_prize: number;
+            winners: components["schemas"]["LotteryWinner"][];
+        };
+        /** @enum {string} */
+        PvPMode: "dice" | "rps";
+        PvPChallenge: {
+            /** Format: uuid */
+            id: string;
+            mode: components["schemas"]["PvPMode"];
+            /** @enum {string} */
+            status: "open" | "settled" | "cancelled" | "expired";
+            /** Format: uuid */
+            creator_id: string;
+            creator_username: string;
+            /**
+             * @description 发起人的出拳只对发起人本人和已结束的擂台可见。
+             * @enum {string|null}
+             */
+            creator_choice?: "rock" | "paper" | "scissors" | null;
+            /** Format: int64 */
+            stake: number;
+            /** Format: int64 */
+            fee_bps: number;
+            message?: string | null;
+            /** Format: uuid */
+            opponent_id?: string | null;
+            opponent_username?: string | null;
+            /** @enum {string|null} */
+            opponent_choice?: "rock" | "paper" | "scissors" | null;
+            creator_roll?: number | null;
+            opponent_roll?: number | null;
+            /** Format: uuid */
+            winner_id?: string | null;
+            /** Format: int64 */
+            fee?: number | null;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            closed_at?: string | null;
+            viewer_is_creator: boolean;
+        };
+        MagicGamesOverview: {
+            settings: components["schemas"]["MagicStoreSettings"];
+            /** Format: int64 */
+            settings_version: number;
+            magic_balance: components["schemas"]["SignedIntegerText"];
+            scratch_used_today: number;
+            /** Format: int64 */
+            scratch_expected_return_bps: number;
+            recent_scratch_cards: components["schemas"]["ScratchCard"][];
+            current_round?: components["schemas"]["LotteryRound"];
+            previous_round?: components["schemas"]["LotteryRound"];
+            open_challenges: components["schemas"]["PvPChallenge"][];
+            my_challenges: components["schemas"]["PvPChallenge"][];
+            recent_settled: components["schemas"]["PvPChallenge"][];
+        };
+        ScratchCardReceipt: {
+            card: components["schemas"]["ScratchCard"];
+            balance_after: components["schemas"]["SignedIntegerText"];
+            replayed: boolean;
+        };
+        BuyLotteryTicketsRequest: {
+            quantity: number;
+            /**
+             * Format: uuid
+             * @description 购票页面显示的期次 ID。此期停止售票时返回冲突，避免买入下一期。
+             */
+            round_id?: string;
+        };
+        LotteryTicketReceipt: {
+            /** Format: uuid */
+            round_id: string;
+            /** Format: int64 */
+            round_number: number;
+            quantity: number;
+            first_ticket: number;
+            last_ticket: number;
+            /** Format: int64 */
+            total_price: number;
+            balance_after: components["schemas"]["SignedIntegerText"];
+            replayed: boolean;
+        };
+        /** @enum {string} */
+        RPSChoice: "rock" | "paper" | "scissors";
+        CreatePvPChallengeRequest: {
+            mode: components["schemas"]["PvPMode"];
+            /** Format: int64 */
+            stake: number;
+            choice?: components["schemas"]["RPSChoice"];
+            message?: string;
+        };
+        AcceptPvPChallengeRequest: {
+            choice?: components["schemas"]["RPSChoice"];
         };
         /** @enum {string} */
         WorkgroupJoinMode: "staff_only" | "application";
@@ -9066,6 +9594,36 @@ export interface components {
         PromotionCampaignSource: "staff_schedule" | "member_purchase";
         /** @enum {string} */
         PromotionScope: "global" | "torrent";
+        MagicStoreSettingsRevision: {
+            /** Format: int64 */
+            version: number;
+            reason: string;
+            actor_username?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+        };
+        MagicStoreAdminOverview: {
+            settings: components["schemas"]["MagicStoreSettings"];
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            accounts: {
+                shop_sink: components["schemas"]["SignedIntegerText"];
+                game_house: components["schemas"]["SignedIntegerText"];
+                lottery_pool: components["schemas"]["SignedIntegerText"];
+                pvp_escrow: components["schemas"]["SignedIntegerText"];
+            };
+            /** Format: int64 */
+            scratch_expected_return_bps: number;
+            revisions: components["schemas"]["MagicStoreSettingsRevision"][];
+        };
+        UpdateMagicStoreSettingsRequest: {
+            settings: components["schemas"]["MagicStoreSettings"];
+            /** Format: int64 */
+            expected_version: number;
+            reason: string;
+        };
         SeedingRewardPolicyPreviewResult: {
             name: string;
             description: string;
@@ -9877,6 +10435,7 @@ export interface components {
         SocialPostIDPathParameter: string;
         /** @description 评论的稳定公开 UUID。 */
         CommentIDPathParameter: string;
+        ChallengeIDParameter: string;
         GroupKindPathParameter: components["schemas"]["WorkgroupKind"];
         AssignmentIDPathParameter: string;
         RSSSubscriptionIDPathParameter: string;
@@ -12103,6 +12662,334 @@ export interface operations {
             400: components["responses"]["ProblemResponse"];
             401: components["responses"]["ProblemResponse"];
             403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    makeupMyAttendance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 补签记录、奖励账本和补签卡消耗已原子提交。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecord"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMyMagicShop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前商店配置、余额、VIP、彩色 ID、补签卡与最近订单。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MagicShopOverview"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    purchaseMagicShopItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseMagicShopItemRequest"];
+            };
+        };
+        responses: {
+            /** @description 扣款、道具效果和订单回执已原子提交；重放返回同一订单。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MagicShopPurchaseReceipt"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    setMyNameStyle: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetNameStyleRequest"];
+            };
+        };
+        responses: {
+            /** @description 新样式已生效，到期时间不变。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberNameStyle"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listNameStyles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 用户名与样式键；前端据此渲染彩色用户名。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberNameStyleList"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMyMagicGames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 游戏配置、当前与上一期彩票、开放擂台和自己的游戏记录。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MagicGamesOverview"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    playScratchCard: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 购票和派奖账本已提交；重放返回同一张卡。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScratchCardReceipt"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    buyLotteryTickets: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BuyLotteryTicketsRequest"];
+            };
+        };
+        responses: {
+            /** @description 彩票号码段与奖池入账已提交。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotteryTicketReceipt"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    createPvPChallenge: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+                /** @description 浏览器为本次敏感变更生成并在安全重试时复用的 UUID。 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePvPChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description 赌注已托管，擂台开放到过期时间。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PvPChallenge"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    acceptPvPChallenge: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                challenge_id: components["parameters"]["ChallengeIDParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptPvPChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description 擂台已结算；平局双方退回赌注。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PvPChallenge"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    cancelPvPChallenge: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                challenge_id: components["parameters"]["ChallengeIDParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 擂台已撤回，赌注已退回。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PvPChallenge"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
             409: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
@@ -17874,6 +18761,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttendancePolicy"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMagicStoreSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前配置版本与系统账户余额。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MagicStoreAdminOverview"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    updateMagicStoreSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMagicStoreSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description 新配置已生效并追加不可变修订。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MagicStoreAdminOverview"];
                 };
             };
             400: components["responses"]["ProblemResponse"];

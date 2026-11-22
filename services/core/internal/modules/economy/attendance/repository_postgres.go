@@ -64,6 +64,31 @@ func (repository *PostgresRepository) Overview(ctx context.Context, userID uuid.
 	if userID == uuid.Nil || now.IsZero() || limit < 1 || limit > 100 {
 		return Overview{}, ErrInput
 	}
+	result, err := repository.overview(ctx, userID, now, limit)
+	if err != nil || result.Policy == nil {
+		return result, err
+	}
+	if result.MakeupCards, err = makeupCardBalance(ctx, repository.pool, userID); err != nil {
+		return Overview{}, err
+	}
+	window, err := makeupWindowDays(ctx, repository.pool)
+	if err != nil {
+		return Overview{}, err
+	}
+	result.MakeupWindowDays = window
+	if !result.ClaimedToday {
+		target, found, err := makeupTarget(ctx, repository.pool, userID, result.Today, window)
+		if err != nil {
+			return Overview{}, err
+		}
+		if found {
+			result.MakeupDate = &target
+		}
+	}
+	return result, nil
+}
+
+func (repository *PostgresRepository) overview(ctx context.Context, userID uuid.UUID, now time.Time, limit int) (Overview, error) {
 	policy, found, err := resolvePolicy(ctx, repository.pool, now)
 	if err != nil {
 		return Overview{}, err
@@ -89,7 +114,7 @@ SELECT
     mode, base_reward, streak_reward, total_reward, experience_reward,
     current_streak, total_days, longest_streak, policy_revision,
     payload_sha256, magic_transaction_id, experience_entry_id,
-    occurred_at, recorded_at
+    occurred_at, recorded_at, makeup
 FROM economy.attendance_records
 WHERE user_id = $1
 ORDER BY attendance_date DESC, recorded_at DESC
@@ -139,14 +164,16 @@ func (repository *PostgresRepository) Claim(ctx context.Context, command ClaimCo
 		(command.Mode != ModeFixed && command.Mode != ModeRandom) {
 		return Record{}, ErrInput
 	}
-	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return Record{}, fmt.Errorf("begin attendance claim: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	// A per-member lock keeps the replay check, local-day uniqueness check and
-	// streak calculation in one critical section without blocking other users.
+	// streak calculation in one critical section. Read committed takes the
+	// snapshot after waiting for this lock and lets the ledger lock its shared
+	// accounts independently of other members' claims.
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, "peergo-attendance:"+command.UserID.String()); err != nil {
 		return Record{}, fmt.Errorf("lock attendance member: %w", err)
 	}
@@ -154,7 +181,7 @@ func (repository *PostgresRepository) Claim(ctx context.Context, command ClaimCo
 		if err != nil {
 			return Record{}, err
 		}
-		if replay.UserID != command.UserID || replay.Mode != command.Mode {
+		if replay.UserID != command.UserID || replay.Mode != command.Mode || replay.Makeup {
 			return Record{}, ErrIdempotencyConflict
 		}
 		replay.Replayed = true
@@ -196,7 +223,175 @@ func (repository *PostgresRepository) Claim(ctx context.Context, command ClaimCo
 	} else if found && opening.LastAttendanceDate == attendanceDate {
 		return Record{}, ErrAlreadyClaimed
 	}
+	result, err := repository.settle(ctx, tx, command, policy, attendanceDate, false)
+	if err != nil {
+		return Record{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Record{}, classifyDatabaseError("commit attendance claim", err)
+	}
+	return result, nil
+}
 
+// Makeup spends one make-up card to fill the single missing day right after
+// the member's latest attendance, which keeps every record's streak derivable
+// from its predecessor.
+func (repository *PostgresRepository) Makeup(ctx context.Context, command ClaimCommand) (Record, error) {
+	command.Now = canonicalTime(command.Now)
+	if command.RequestID == uuid.Nil || command.UserID == uuid.Nil || command.Now.IsZero() {
+		return Record{}, ErrInput
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return Record{}, fmt.Errorf("begin attendance makeup: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, "peergo-attendance:"+command.UserID.String()); err != nil {
+		return Record{}, fmt.Errorf("lock attendance member: %w", err)
+	}
+	if replay, found, err := readRecord(ctx, tx, "WHERE request_id = $1", command.RequestID); found || err != nil {
+		if err != nil {
+			return Record{}, err
+		}
+		if replay.UserID != command.UserID || !replay.Makeup {
+			return Record{}, ErrIdempotencyConflict
+		}
+		replay.Replayed = true
+		if err := tx.Commit(ctx); err != nil {
+			return Record{}, classifyDatabaseError("commit attendance makeup replay", err)
+		}
+		return replay, nil
+	}
+	policy, found, err := resolvePolicy(ctx, tx, command.Now)
+	if err != nil {
+		return Record{}, err
+	}
+	if !found {
+		return Record{}, ErrPolicyNotFound
+	}
+	if !policy.Policy.Enabled {
+		return Record{}, ErrDisabled
+	}
+	command.Mode = ModeFixed
+	if !policy.Policy.FixedEnabled {
+		command.Mode = ModeRandom
+	}
+	location, err := time.LoadLocation(policy.Policy.DayBoundaryTimezone)
+	if err != nil {
+		return Record{}, ErrInvariant
+	}
+	today := command.Now.In(location).Format(time.DateOnly)
+	window, err := makeupWindowDays(ctx, tx)
+	if err != nil {
+		return Record{}, err
+	}
+	target, found, err := makeupTarget(ctx, tx, command.UserID, today, window)
+	if err != nil {
+		return Record{}, err
+	}
+	if !found {
+		return Record{}, ErrMakeupUnavailable
+	}
+	cards, err := makeupCardBalance(ctx, tx, command.UserID)
+	if err != nil {
+		return Record{}, err
+	}
+	if cards == 0 {
+		return Record{}, ErrNoMakeupCard
+	}
+	// Keep the ledger lock ahead of the inventory write, as in shop purchases.
+	result, err := repository.settle(ctx, tx, command, policy, target, true)
+	if err != nil {
+		return Record{}, err
+	}
+	var balance int32
+	err = tx.QueryRow(ctx, `
+UPDATE economy.member_item_balances
+SET quantity = quantity - 1, version = version + 1, updated_at = $2
+WHERE user_id = $1 AND item_key = 'makeup_card' AND quantity > 0
+RETURNING quantity`, command.UserID, command.Now).Scan(&balance)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Record{}, ErrNoMakeupCard
+	}
+	if err != nil {
+		return Record{}, fmt.Errorf("consume makeup card: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO economy.member_item_events (id, user_id, item_key, delta, balance_after, source_reference, occurred_at)
+VALUES ($1, $2, 'makeup_card', -1, $3, $4, $5)`,
+		uuid.NewSHA1(recordNamespace, []byte("makeup:"+command.RequestID.String())), command.UserID, balance,
+		"attendance-makeup:"+result.ID.String(), command.Now); err != nil {
+		return Record{}, classifyDatabaseError("record makeup card use", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Record{}, classifyDatabaseError("commit attendance makeup", err)
+	}
+	return result, nil
+}
+
+func makeupCardBalance(ctx context.Context, querier queryRower, userID uuid.UUID) (int32, error) {
+	var quantity int32
+	err := querier.QueryRow(ctx, `
+SELECT quantity FROM economy.member_item_balances
+WHERE user_id = $1 AND item_key = 'makeup_card'`, userID).Scan(&quantity)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("read makeup cards: %w", err)
+	}
+	return quantity, nil
+}
+
+func makeupWindowDays(ctx context.Context, querier queryRower) (int, error) {
+	var window int
+	err := querier.QueryRow(ctx, `
+SELECT COALESCE((document->'makeup_card'->>'window_days')::integer, 0)
+FROM economy.magic_store_settings WHERE singleton`).Scan(&window)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("read makeup window: %w", err)
+	}
+	return window, nil
+}
+
+// makeupTarget returns the day after the latest attendance when that day is
+// before today and inside the window. A member who never attended has no gap.
+func makeupTarget(ctx context.Context, querier queryRower, userID uuid.UUID, today string, window int) (string, bool, error) {
+	if window < 1 {
+		return "", false, nil
+	}
+	var latest string
+	err := querier.QueryRow(ctx, `
+SELECT attendance_date::text FROM economy.attendance_records
+WHERE user_id = $1 ORDER BY attendance_date DESC LIMIT 1`, userID).Scan(&latest)
+	if errors.Is(err, pgx.ErrNoRows) {
+		opening, found, err := readAttendanceOpening(ctx, querier, userID)
+		if err != nil || !found || opening.LastAttendanceDate == "" {
+			return "", false, err
+		}
+		latest = opening.LastAttendanceDate
+	} else if err != nil {
+		return "", false, fmt.Errorf("read latest attendance: %w", err)
+	}
+	latestDay, err := time.Parse(time.DateOnly, latest)
+	if err != nil {
+		return "", false, ErrInvariant
+	}
+	todayDay, err := time.Parse(time.DateOnly, today)
+	if err != nil {
+		return "", false, ErrInvariant
+	}
+	target := latestDay.AddDate(0, 0, 1)
+	if !target.Before(todayDay) || target.Before(todayDay.AddDate(0, 0, -window)) {
+		return "", false, nil
+	}
+	return target.Format(time.DateOnly), true, nil
+}
+
+func (repository *PostgresRepository) settle(ctx context.Context, tx pgx.Tx, command ClaimCommand, policy PublishedPolicy, attendanceDate string, makeup bool) (Record, error) {
 	currentStreak, totalDays, longestStreak, err := nextStatistics(ctx, tx, command.UserID, attendanceDate)
 	if err != nil {
 		return Record{}, err
@@ -279,7 +474,7 @@ func (repository *PostgresRepository) Claim(ctx context.Context, command ClaimCo
 		CurrentStreak: currentStreak, TotalDays: totalDays, LongestStreak: longestStreak,
 		PolicyRevision: policy.Policy.Revision, PayloadSHA256: payloadSHA256,
 		MagicTransactionID: magicTransaction.ID, ExperienceEntryID: experienceID,
-		OccurredAt: command.Now, RecordedAt: command.Now,
+		OccurredAt: command.Now, RecordedAt: command.Now, Makeup: makeup,
 	}
 	_, err = tx.Exec(ctx, `
 INSERT INTO economy.attendance_records (
@@ -287,20 +482,17 @@ INSERT INTO economy.attendance_records (
     mode, base_reward, streak_reward, total_reward, experience_reward,
     current_streak, total_days, longest_streak, policy_revision,
     payload_sha256, magic_transaction_id, experience_entry_id,
-    occurred_at, recorded_at
+    occurred_at, recorded_at, makeup
 ) VALUES (
     $1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10,
-    $11, $12, $13, $14, $15, $16, $17, $18, $19
+    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
 )`, result.ID, result.RequestID, result.UserID, result.AttendanceDate, result.DayBoundaryTimezone,
 		string(result.Mode), result.BaseReward, result.StreakReward, result.TotalReward, result.ExperienceReward,
 		result.CurrentStreak, result.TotalDays, result.LongestStreak, result.PolicyRevision,
 		result.PayloadSHA256[:], result.MagicTransactionID, result.ExperienceEntryID,
-		result.OccurredAt, result.RecordedAt)
+		result.OccurredAt, result.RecordedAt, result.Makeup)
 	if err != nil {
 		return Record{}, classifyDatabaseError("insert attendance receipt", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return Record{}, classifyDatabaseError("commit attendance claim", err)
 	}
 	return result, nil
 }
@@ -680,7 +872,7 @@ SELECT
     mode, base_reward, streak_reward, total_reward, experience_reward,
     current_streak, total_days, longest_streak, policy_revision,
     payload_sha256, magic_transaction_id, experience_entry_id,
-    occurred_at, recorded_at
+    occurred_at, recorded_at, makeup
 FROM economy.attendance_records `+suffix, arguments...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Record{}, false, nil
@@ -701,6 +893,7 @@ func scanRecord(scanner rowScanner) (Record, error) {
 		&mode, &result.BaseReward, &result.StreakReward, &result.TotalReward, &result.ExperienceReward,
 		&result.CurrentStreak, &result.TotalDays, &result.LongestStreak, &result.PolicyRevision,
 		&payload, &result.MagicTransactionID, &experienceID, &result.OccurredAt, &result.RecordedAt,
+		&result.Makeup,
 	)
 	if err != nil {
 		return Record{}, err

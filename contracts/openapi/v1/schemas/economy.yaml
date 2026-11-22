@@ -44,6 +44,15 @@ MagicStatementEntry:
           tip,
           social_red_packet_fund,
           social_red_packet_claim,
+          magic_shop_purchase,
+          scratch_card_purchase,
+          scratch_card_payout,
+          lottery_ticket_purchase,
+          lottery_payout,
+          lottery_burn,
+          pvp_stake,
+          pvp_payout,
+          pvp_refund,
           refund,
           adjustment,
         ]
@@ -726,6 +735,9 @@ AttendanceRecord:
     occurred_at:
       type: string
       format: date-time
+    makeup:
+      type: boolean
+      description: 使用补签卡补回的签到。
 
 AttendanceOverview:
   type: object
@@ -762,6 +774,17 @@ AttendanceOverview:
       maxItems: 100
       items:
         $ref: "#/AttendanceRecord"
+    makeup_cards:
+      type: integer
+      minimum: 0
+    makeup_window_days:
+      type: integer
+      minimum: 0
+    makeup_date:
+      type: string
+      format: date
+      nullable: true
+      description: 现在可以用补签卡补回的日期；没有可补日期时为空。
 
 SeedingRewardPolicyInput:
   type: object

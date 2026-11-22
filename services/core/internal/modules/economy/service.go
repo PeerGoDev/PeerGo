@@ -87,7 +87,10 @@ func validTransactionType(value TransactionType) bool {
 	switch value {
 	case TransactionSeedingReward, TransactionHaremReward, TransactionActivityReward, TransactionTorrentBuy,
 		TransactionPromotionBuy, TransactionMedalBuy, TransactionMemberGift, TransactionTip,
-		TransactionSocialRedPacketFund, TransactionSocialRedPacketClaim, TransactionRefund, TransactionAdjustment:
+		TransactionSocialRedPacketFund, TransactionSocialRedPacketClaim, TransactionRefund, TransactionAdjustment,
+		TransactionMagicShopPurchase, TransactionScratchCardPurchase, TransactionScratchCardPayout,
+		TransactionLotteryTicket, TransactionLotteryPayout, TransactionLotteryBurn,
+		TransactionPvPStake, TransactionPvPPayout, TransactionPvPRefund:
 		return true
 	default:
 		return false

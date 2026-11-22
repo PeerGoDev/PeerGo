@@ -135,7 +135,9 @@ func invitationOverviewDTO(overview identity.InvitationOverview) generated.Invit
 			MinimumAccountAgeDays: eligibility.MinimumAccountAgeDays,
 			CurrentAccountAgeDays: eligibility.CurrentAccountAgeDays,
 			MinimumLevel:          eligibility.MinimumLevel, CurrentLevel: eligibility.CurrentLevel,
-			EmailVerified: eligibility.EmailVerified,
+			EmailVerified:             eligibility.EmailVerified,
+			TemporaryInvites:          eligibility.TemporaryInvites,
+			TemporaryInviteNextExpiry: eligibility.TemporaryInviteNextExpiry,
 		},
 		Items: items,
 		Network: generated.InvitationNetwork{

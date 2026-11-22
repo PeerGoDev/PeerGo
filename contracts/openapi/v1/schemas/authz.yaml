@@ -28,6 +28,12 @@ CapabilityAction:
     - economy.contenttip.policy.issue
     - economy.contenttip.policy.read
     - economy.contenttip.read.self
+    - economy.magicgame.play.self
+    - economy.magicgame.read.self
+    - economy.magicshop.purchase.self
+    - economy.magicshop.read.self
+    - economy.magicstore.manage.read
+    - economy.magicstore.update
     - economy.medal.create
     - economy.medal.manage.read
     - economy.medal.purchase.self
@@ -38,6 +44,7 @@ CapabilityAction:
     - economy.membergift.policy.issue
     - economy.membergift.policy.read
     - economy.membergift.read.self
+    - economy.namestyle.read
     - economy.read.self
     - economy.seedingreward.policy.issue
     - economy.seedingreward.policy.read

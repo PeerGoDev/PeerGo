@@ -1,0 +1,512 @@
+MagicPrice:
+  type: integer
+  format: int64
+  minimum: 1
+  maximum: 100000000
+
+MagicShopItemKey:
+  type: string
+  enum: [invite, temporary_invite, vip, name_color_solid, name_color_gradient, makeup_card]
+
+NameStyleTier:
+  type: string
+  enum: [solid, gradient]
+
+NameStyleKey:
+  type: string
+  pattern: "^[a-z][a-z0-9-]{0,31}$"
+
+MagicStoreSettings:
+  type: object
+  additionalProperties: false
+  required:
+    [timezone, shop_enabled, invite, temporary_invite, vip, name_color, makeup_card, games_enabled, scratch, lottery, pvp]
+  properties:
+    timezone: { type: string, minLength: 1, maxLength: 64 }
+    shop_enabled: { type: boolean }
+    invite:
+      type: object
+      additionalProperties: false
+      required: [enabled, price, monthly_limit]
+      properties:
+        enabled: { type: boolean }
+        price: { $ref: "#/MagicPrice" }
+        monthly_limit: { type: integer, minimum: 0, maximum: 100, description: 每自然月限购数量，0 表示不限。 }
+    temporary_invite:
+      type: object
+      additionalProperties: false
+      required: [enabled, price, valid_days, monthly_limit]
+      properties:
+        enabled: { type: boolean }
+        price: { $ref: "#/MagicPrice" }
+        valid_days: { type: integer, minimum: 1, maximum: 90 }
+        monthly_limit: { type: integer, minimum: 0, maximum: 100 }
+    vip:
+      type: object
+      additionalProperties: false
+      required: [enabled, price, duration_days]
+      properties:
+        enabled: { type: boolean }
+        price: { $ref: "#/MagicPrice" }
+        duration_days: { type: integer, minimum: 1, maximum: 365 }
+    name_color:
+      type: object
+      additionalProperties: false
+      required: [enabled, solid_price, gradient_price, duration_days]
+      properties:
+        enabled: { type: boolean }
+        solid_price: { $ref: "#/MagicPrice" }
+        gradient_price: { $ref: "#/MagicPrice" }
+        duration_days: { type: integer, minimum: 1, maximum: 365 }
+    makeup_card:
+      type: object
+      additionalProperties: false
+      required: [enabled, price, window_days, maximum_holding]
+      properties:
+        enabled: { type: boolean }
+        price: { $ref: "#/MagicPrice" }
+        window_days: { type: integer, minimum: 1, maximum: 30 }
+        maximum_holding: { type: integer, minimum: 1, maximum: 100 }
+    games_enabled: { type: boolean }
+    scratch:
+      type: object
+      additionalProperties: false
+      required: [enabled, price, daily_limit, prizes]
+      properties:
+        enabled: { type: boolean }
+        price: { $ref: "#/MagicPrice" }
+        daily_limit: { type: integer, minimum: 1, maximum: 1000 }
+        prizes:
+          type: array
+          minItems: 2
+          maxItems: 12
+          items:
+            type: object
+            additionalProperties: false
+            required: [label, payout, weight]
+            properties:
+              label: { type: string, minLength: 1, maxLength: 20 }
+              payout: { type: integer, format: int64, minimum: 0, maximum: 100000000 }
+              weight: { type: integer, format: int64, minimum: 0, maximum: 1000000 }
+    lottery:
+      type: object
+      additionalProperties: false
+      required: [enabled, ticket_price, maximum_tickets_per_round, draw_hour, burn_bps, tiers]
+      properties:
+        enabled: { type: boolean }
+        ticket_price: { $ref: "#/MagicPrice" }
+        maximum_tickets_per_round: { type: integer, minimum: 1, maximum: 1000 }
+        draw_hour: { type: integer, minimum: 0, maximum: 23 }
+        burn_bps: { type: integer, format: int64, minimum: 0, maximum: 10000 }
+        tiers:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: { $ref: "#/LotteryTier" }
+    pvp:
+      type: object
+      additionalProperties: false
+      required: [enabled, minimum_stake, maximum_stake, fee_bps, maximum_open_per_member, expiry_hours]
+      properties:
+        enabled: { type: boolean }
+        minimum_stake: { $ref: "#/MagicPrice" }
+        maximum_stake: { $ref: "#/MagicPrice" }
+        fee_bps: { type: integer, format: int64, minimum: 0, maximum: 5000 }
+        maximum_open_per_member: { type: integer, minimum: 1, maximum: 20 }
+        expiry_hours: { type: integer, minimum: 1, maximum: 168 }
+
+LotteryTier:
+  type: object
+  additionalProperties: false
+  required: [label, winners, share_bps]
+  properties:
+    label: { type: string, minLength: 1, maxLength: 20 }
+    winners: { type: integer, minimum: 1, maximum: 100 }
+    share_bps: { type: integer, format: int64, minimum: 1, maximum: 10000 }
+
+NameStyleOption:
+  type: object
+  additionalProperties: false
+  required: [key, tier]
+  properties:
+    key: { $ref: "#/NameStyleKey" }
+    tier: { $ref: "#/NameStyleTier" }
+
+MemberNameStyle:
+  type: object
+  additionalProperties: false
+  required: [user_id, username, tier, style_key, expires_at]
+  properties:
+    user_id: { type: string, format: uuid }
+    username: { type: string, maxLength: 64 }
+    tier: { $ref: "#/NameStyleTier" }
+    style_key: { $ref: "#/NameStyleKey" }
+    expires_at: { type: string, format: date-time }
+
+MemberNameStyleList:
+  type: object
+  additionalProperties: false
+  required: [items]
+  properties:
+    items:
+      type: array
+      maxItems: 100000
+      items: { $ref: "#/MemberNameStyle" }
+
+SetNameStyleRequest:
+  type: object
+  additionalProperties: false
+  required: [style_key]
+  properties:
+    style_key: { $ref: "#/NameStyleKey" }
+
+MagicShopOrder:
+  type: object
+  additionalProperties: false
+  required: [id, item_key, quantity, unit_price, total_price, purchased_at]
+  properties:
+    id: { type: string, format: uuid }
+    item_key: { $ref: "#/MagicShopItemKey" }
+    quantity: { type: integer, minimum: 1, maximum: 100 }
+    unit_price: { type: integer, format: int64, minimum: 1 }
+    total_price: { type: integer, format: int64, minimum: 1 }
+    style_key: { type: string, nullable: true }
+    effect_until: { type: string, format: date-time, nullable: true }
+    purchased_at: { type: string, format: date-time }
+
+MagicShopVIPStatus:
+  type: object
+  additionalProperties: false
+  required: [active, permanent]
+  properties:
+    active: { type: boolean }
+    permanent: { type: boolean }
+    until: { type: string, format: date-time, nullable: true }
+
+MagicShopOverview:
+  type: object
+  additionalProperties: false
+  required:
+    - settings
+    - settings_version
+    - magic_balance
+    - invites_purchased_this_month
+    - temporary_invites_purchased_this_month
+    - remaining_invites
+    - temporary_invites
+    - vip
+    - makeup_cards
+    - name_style_options
+    - recent_orders
+  properties:
+    settings: { $ref: "#/MagicStoreSettings" }
+    settings_version: { type: integer, format: int64, minimum: 1 }
+    magic_balance: { $ref: "./economy.yaml#/SignedIntegerText" }
+    invites_purchased_this_month: { type: integer, minimum: 0 }
+    temporary_invites_purchased_this_month: { type: integer, minimum: 0 }
+    remaining_invites: { type: integer, minimum: 0 }
+    temporary_invites: { type: integer, minimum: 0 }
+    temporary_invite_next_expiry: { type: string, format: date-time, nullable: true }
+    invite_blocker:
+      type: string
+      nullable: true
+      description: 当前不能购买邀请名额的原因，取值同邀请资格的 blocker。
+    vip: { $ref: "#/MagicShopVIPStatus" }
+    name_style: { $ref: "#/MemberNameStyle" }
+    makeup_cards: { type: integer, minimum: 0 }
+    name_style_options:
+      type: array
+      maxItems: 64
+      items: { $ref: "#/NameStyleOption" }
+    recent_orders:
+      type: array
+      maxItems: 50
+      items: { $ref: "#/MagicShopOrder" }
+
+PurchaseMagicShopItemRequest:
+  type: object
+  additionalProperties: false
+  required: [item_key, quantity]
+  properties:
+    item_key: { $ref: "#/MagicShopItemKey" }
+    quantity: { type: integer, minimum: 1, maximum: 100 }
+    expected_unit_price:
+      type: integer
+      format: int64
+      minimum: 1
+      description: 页面显示的商品单价。单价已变更时返回冲突，会员可按新单价重新确认。
+    style_key: { $ref: "#/NameStyleKey" }
+
+MagicShopPurchaseReceipt:
+  type: object
+  additionalProperties: false
+  required: [order, balance_after, replayed]
+  properties:
+    order: { $ref: "#/MagicShopOrder" }
+    balance_after: { $ref: "./economy.yaml#/SignedIntegerText" }
+    replayed: { type: boolean }
+
+ScratchCard:
+  type: object
+  additionalProperties: false
+  required: [id, price, prize, prize_index, prize_label, purchased_at]
+  properties:
+    id: { type: string, format: uuid }
+    price: { type: integer, format: int64, minimum: 1 }
+    prize: { type: integer, format: int64, minimum: 0 }
+    prize_index: { type: integer, minimum: 0 }
+    prize_label: { type: string, maxLength: 20 }
+    purchased_at: { type: string, format: date-time }
+
+ScratchCardReceipt:
+  type: object
+  additionalProperties: false
+  required: [card, balance_after, replayed]
+  properties:
+    card: { $ref: "#/ScratchCard" }
+    balance_after: { $ref: "./economy.yaml#/SignedIntegerText" }
+    replayed: { type: boolean }
+
+LotteryWinner:
+  type: object
+  additionalProperties: false
+  required: [draw_rank, tier_index, tier_label, ticket_number, username, prize]
+  properties:
+    draw_rank: { type: integer, minimum: 1 }
+    tier_index: { type: integer, minimum: 0 }
+    tier_label: { type: string, maxLength: 20 }
+    ticket_number: { type: integer, minimum: 1 }
+    username: { type: string, maxLength: 64 }
+    prize: { type: integer, format: int64, minimum: 0 }
+
+LotteryRound:
+  type: object
+  additionalProperties: false
+  required:
+    - id
+    - round_number
+    - status
+    - ticket_price
+    - maximum_tickets_per_member
+    - burn_bps
+    - tiers
+    - opens_at
+    - draw_at
+    - seed_sha256
+    - carried_in
+    - tickets_sold
+    - sales_total
+    - estimated_prizes
+    - my_tickets
+    - my_ticket_ranges
+    - my_prize
+    - winners
+  properties:
+    id: { type: string, format: uuid }
+    round_number: { type: integer, format: int64, minimum: 1 }
+    status: { type: string, enum: [open, drawn] }
+    ticket_price: { type: integer, format: int64, minimum: 1 }
+    maximum_tickets_per_member: { type: integer, minimum: 1 }
+    burn_bps: { type: integer, format: int64, minimum: 0, maximum: 10000 }
+    tiers:
+      type: array
+      maxItems: 10
+      items: { $ref: "#/LotteryTier" }
+    opens_at: { type: string, format: date-time }
+    draw_at: { type: string, format: date-time }
+    seed_sha256:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+      description: 开奖前公布的种子摘要；开奖后可用 seed 校验。
+    seed:
+      type: string
+      nullable: true
+      pattern: "^[0-9a-f]{64}$"
+      description: 开奖后公开的随机种子。
+    carried_in: { type: integer, format: int64, minimum: 0 }
+    tickets_sold: { type: integer, minimum: 0 }
+    sales_total: { type: integer, format: int64, minimum: 0 }
+    burned: { type: integer, format: int64, minimum: 0, nullable: true }
+    paid_out: { type: integer, format: int64, minimum: 0, nullable: true }
+    carried_out: { type: integer, format: int64, minimum: 0, nullable: true }
+    drawn_at: { type: string, format: date-time, nullable: true }
+    estimated_prizes:
+      type: array
+      maxItems: 10
+      items: { type: integer, format: int64, minimum: 0 }
+    my_tickets: { type: integer, minimum: 0 }
+    my_ticket_ranges:
+      type: array
+      maxItems: 1000
+      items:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items: { type: integer, minimum: 1 }
+    my_prize: { type: integer, format: int64, minimum: 0 }
+    winners:
+      type: array
+      maxItems: 200
+      items: { $ref: "#/LotteryWinner" }
+
+BuyLotteryTicketsRequest:
+  type: object
+  additionalProperties: false
+  required: [quantity]
+  properties:
+    quantity: { type: integer, minimum: 1, maximum: 1000 }
+    round_id:
+      type: string
+      format: uuid
+      description: 购票页面显示的期次 ID。此期停止售票时返回冲突，避免买入下一期。
+
+LotteryTicketReceipt:
+  type: object
+  additionalProperties: false
+  required: [round_id, round_number, quantity, first_ticket, last_ticket, total_price, balance_after, replayed]
+  properties:
+    round_id: { type: string, format: uuid }
+    round_number: { type: integer, format: int64 }
+    quantity: { type: integer, minimum: 1 }
+    first_ticket: { type: integer, minimum: 1 }
+    last_ticket: { type: integer, minimum: 1 }
+    total_price: { type: integer, format: int64, minimum: 1 }
+    balance_after: { $ref: "./economy.yaml#/SignedIntegerText" }
+    replayed: { type: boolean }
+
+PvPMode:
+  type: string
+  enum: [dice, rps]
+
+RPSChoice:
+  type: string
+  enum: [rock, paper, scissors]
+
+PvPChallenge:
+  type: object
+  additionalProperties: false
+  required: [id, mode, status, creator_id, creator_username, stake, fee_bps, expires_at, created_at, viewer_is_creator]
+  properties:
+    id: { type: string, format: uuid }
+    mode: { $ref: "#/PvPMode" }
+    status: { type: string, enum: [open, settled, cancelled, expired] }
+    creator_id: { type: string, format: uuid }
+    creator_username: { type: string, maxLength: 64 }
+    creator_choice:
+      type: string
+      enum: [rock, paper, scissors]
+      nullable: true
+      description: 发起人的出拳只对发起人本人和已结束的擂台可见。
+    stake: { type: integer, format: int64, minimum: 1 }
+    fee_bps: { type: integer, format: int64, minimum: 0 }
+    message: { type: string, maxLength: 60, nullable: true }
+    opponent_id: { type: string, format: uuid, nullable: true }
+    opponent_username: { type: string, maxLength: 64, nullable: true }
+    opponent_choice:
+      type: string
+      enum: [rock, paper, scissors]
+      nullable: true
+    creator_roll: { type: integer, minimum: 1, maximum: 100, nullable: true }
+    opponent_roll: { type: integer, minimum: 1, maximum: 100, nullable: true }
+    winner_id: { type: string, format: uuid, nullable: true }
+    fee: { type: integer, format: int64, minimum: 0, nullable: true }
+    expires_at: { type: string, format: date-time }
+    created_at: { type: string, format: date-time }
+    closed_at: { type: string, format: date-time, nullable: true }
+    viewer_is_creator: { type: boolean }
+
+CreatePvPChallengeRequest:
+  type: object
+  additionalProperties: false
+  required: [mode, stake]
+  properties:
+    mode: { $ref: "#/PvPMode" }
+    stake: { type: integer, format: int64, minimum: 1, maximum: 100000000 }
+    choice: { $ref: "#/RPSChoice" }
+    message: { type: string, maxLength: 60 }
+
+AcceptPvPChallengeRequest:
+  type: object
+  additionalProperties: false
+  properties:
+    choice: { $ref: "#/RPSChoice" }
+
+MagicGamesOverview:
+  type: object
+  additionalProperties: false
+  required:
+    - settings
+    - settings_version
+    - magic_balance
+    - scratch_used_today
+    - scratch_expected_return_bps
+    - recent_scratch_cards
+    - open_challenges
+    - my_challenges
+    - recent_settled
+  properties:
+    settings: { $ref: "#/MagicStoreSettings" }
+    settings_version: { type: integer, format: int64, minimum: 1 }
+    magic_balance: { $ref: "./economy.yaml#/SignedIntegerText" }
+    scratch_used_today: { type: integer, minimum: 0 }
+    scratch_expected_return_bps: { type: integer, format: int64, minimum: 0 }
+    recent_scratch_cards:
+      type: array
+      maxItems: 50
+      items: { $ref: "#/ScratchCard" }
+    current_round: { $ref: "#/LotteryRound" }
+    previous_round: { $ref: "#/LotteryRound" }
+    open_challenges:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/PvPChallenge" }
+    my_challenges:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/PvPChallenge" }
+    recent_settled:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/PvPChallenge" }
+
+MagicStoreSettingsRevision:
+  type: object
+  additionalProperties: false
+  required: [version, reason, occurred_at]
+  properties:
+    version: { type: integer, format: int64, minimum: 1 }
+    reason: { type: string, maxLength: 500 }
+    actor_username: { type: string, maxLength: 64, nullable: true }
+    occurred_at: { type: string, format: date-time }
+
+MagicStoreAdminOverview:
+  type: object
+  additionalProperties: false
+  required: [settings, version, updated_at, accounts, scratch_expected_return_bps, revisions]
+  properties:
+    settings: { $ref: "#/MagicStoreSettings" }
+    version: { type: integer, format: int64, minimum: 1 }
+    updated_at: { type: string, format: date-time }
+    accounts:
+      type: object
+      additionalProperties: false
+      required: [shop_sink, game_house, lottery_pool, pvp_escrow]
+      properties:
+        shop_sink: { $ref: "./economy.yaml#/SignedIntegerText" }
+        game_house: { $ref: "./economy.yaml#/SignedIntegerText" }
+        lottery_pool: { $ref: "./economy.yaml#/SignedIntegerText" }
+        pvp_escrow: { $ref: "./economy.yaml#/SignedIntegerText" }
+    scratch_expected_return_bps: { type: integer, format: int64, minimum: 0 }
+    revisions:
+      type: array
+      maxItems: 100
+      items: { $ref: "#/MagicStoreSettingsRevision" }
+
+UpdateMagicStoreSettingsRequest:
+  type: object
+  additionalProperties: false
+  required: [settings, expected_version, reason]
+  properties:
+    settings: { $ref: "#/MagicStoreSettings" }
+    expected_version: { type: integer, format: int64, minimum: 1 }
+    reason: { type: string, minLength: 10, maxLength: 500 }

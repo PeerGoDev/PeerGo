@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/haremreward"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/magicstore"
 	"github.com/peergo/peergo/services/core/internal/modules/hnradmin"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/newcomer"
@@ -227,10 +228,20 @@ func main() {
 		logger.Error("compose harem reward runner", "error", err)
 		os.Exit(1)
 	}
+	magicStoreRepository, err := magicstore.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose magic store repository", "error", err)
+		os.Exit(1)
+	}
+	magicGameRunner, err := magicstore.NewRunner(magicStoreRepository, time.Minute, logger, time.Now)
+	if err != nil {
+		logger.Error("compose magic game runner", "error", err)
+		os.Exit(1)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	logger.Info("Core policy worker started", "controls", []string{"promotion", "hnr_policy", "workgroup_benefit", "vip_benefit", "ratio_watch", "newcomer_assessment", "hnr_enforcement", "workgroup_contribution_enforcement", "harem_reward"})
-	errors := make(chan error, 9)
+	logger.Info("Core policy worker started", "controls", []string{"promotion", "hnr_policy", "workgroup_benefit", "vip_benefit", "ratio_watch", "newcomer_assessment", "hnr_enforcement", "workgroup_contribution_enforcement", "harem_reward", "magic_games"})
+	errors := make(chan error, 10)
 	go func() { errors <- dispatcher.Run(ctx) }()
 	go func() { errors <- hnrDispatcher.Run(ctx) }()
 	go func() { errors <- benefitDispatcher.Run(ctx) }()
@@ -240,6 +251,7 @@ func main() {
 	go func() { errors <- hnrEnforcementRunner.Run(ctx) }()
 	go func() { errors <- workgroupEnforcementRunner.Run(ctx) }()
 	go func() { errors <- haremRewardRunner.Run(ctx) }()
+	go func() { errors <- magicGameRunner.Run(ctx) }()
 	if err := <-errors; err != nil {
 		logger.Error("Core policy worker stopped unexpectedly", "error", err)
 		os.Exit(1)

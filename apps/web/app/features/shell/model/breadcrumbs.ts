@@ -17,6 +17,8 @@ const topLevelPages: Record<string, string> = {
   "/social": "动态圈",
   "/workgroups": "工作组",
   "/medals": "勋章",
+  "/shop": "魔力商店",
+  "/games": "游戏中心",
   "/review": "种子审核",
   "/restrictions": "封禁记录与申诉",
   "/account": "账户设置",

@@ -2778,6 +2778,359 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/attendance/makeup:
+    post:
+      operationId: makeupMyAttendance
+      summary: 使用补签卡补回最近一次签到后的漏签日
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.attendance.claim.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      responses:
+        '201':
+          description: 补签记录、奖励账本和补签卡消耗已原子提交。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/magic-shop:
+    get:
+      operationId: getMyMagicShop
+      summary: 查看魔力商店、限购进度和自己的道具
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicshop.read.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 当前商店配置、余额、VIP、彩色 ID、补签卡与最近订单。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MagicShopOverview'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/magic-shop/orders:
+    post:
+      operationId: purchaseMagicShopItem
+      summary: 用魔力值购买商店道具
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicshop.purchase.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseMagicShopItemRequest'
+      responses:
+        '201':
+          description: 扣款、道具效果和订单回执已原子提交；重放返回同一订单。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MagicShopPurchaseReceipt'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/name-style:
+    put:
+      operationId: setMyNameStyle
+      summary: 在已购买的档位内切换彩色 ID 样式
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicshop.purchase.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetNameStyleRequest'
+      responses:
+        '200':
+          description: 新样式已生效，到期时间不变。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberNameStyle'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/name-styles:
+    get:
+      operationId: listNameStyles
+      summary: 列出全站仍在有效期内的彩色 ID
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.namestyle.read
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 用户名与样式键；前端据此渲染彩色用户名。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberNameStyleList'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/magic-games:
+    get:
+      operationId: getMyMagicGames
+      summary: 查看刮刮乐、每日彩票和擂台
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicgame.read.self
+      x-credential-audience: web-session
+      responses:
+        '200':
+          description: 游戏配置、当前与上一期彩票、开放擂台和自己的游戏记录。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MagicGamesOverview'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/magic-games/scratch-cards:
+    post:
+      operationId: playScratchCard
+      summary: 买一张刮刮乐并立即开奖
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicgame.play.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      responses:
+        '201':
+          description: 购票和派奖账本已提交；重放返回同一张卡。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScratchCardReceipt'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/magic-games/lottery/tickets:
+    post:
+      operationId: buyLotteryTickets
+      summary: 购买本期每日彩票
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicgame.play.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuyLotteryTicketsRequest'
+      responses:
+        '201':
+          description: 彩票号码段与奖池入账已提交。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LotteryTicketReceipt'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/magic-games/pvp/challenges:
+    post:
+      operationId: createPvPChallenge
+      summary: 押上魔力值发起擂台
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicgame.play.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePvPChallengeRequest'
+      responses:
+        '201':
+          description: 赌注已托管，擂台开放到过期时间。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PvPChallenge'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/magic-games/pvp/challenges/{challenge_id}/accept:
+    parameters:
+      - $ref: '#/components/parameters/ChallengeIDParameter'
+    post:
+      operationId: acceptPvPChallenge
+      summary: 应战并立即结算擂台
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicgame.play.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptPvPChallengeRequest'
+      responses:
+        '200':
+          description: 擂台已结算；平局双方退回赌注。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PvPChallenge'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/magic-games/pvp/challenges/{challenge_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/ChallengeIDParameter'
+    post:
+      operationId: cancelPvPChallenge
+      summary: 撤回自己仍开放的擂台并退回赌注
+      tags:
+        - economy
+      x-audience:
+        - member
+      x-owner: core-economy
+      x-permission: economy.magicgame.play.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      responses:
+        '200':
+          description: 擂台已撤回，赌注已退回。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PvPChallenge'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/me/workgroups:
     get:
       operationId: getMyWorkgroups
@@ -10055,6 +10408,65 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/settings/magic-store:
+    get:
+      operationId: getMagicStoreSettings
+      summary: 读取魔力商店与游戏配置、资金账户和修订历史
+      tags:
+        - economy
+      x-audience:
+        - staff
+      x-owner: core-economy
+      x-permission: economy.magicstore.manage.read
+      x-credential-audience: staff-session
+      responses:
+        '200':
+          description: 当前配置版本与系统账户余额。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MagicStoreAdminOverview'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    put:
+      operationId: updateMagicStoreSettings
+      summary: 修改魔力商店价格、限购和游戏赔率
+      tags:
+        - economy
+      x-audience:
+        - staff
+      x-owner: core-economy
+      x-permission: economy.magicstore.update
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMagicStoreSettingsRequest'
+      responses:
+        '200':
+          description: 新配置已生效并追加不可变修订。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MagicStoreAdminOverview'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/settings/seeding-rewards/preview:
     post:
       operationId: previewSeedingRewardPolicy
@@ -12287,6 +12699,12 @@ components:
         - economy.contenttip.policy.issue
         - economy.contenttip.policy.read
         - economy.contenttip.read.self
+        - economy.magicgame.play.self
+        - economy.magicgame.read.self
+        - economy.magicshop.purchase.self
+        - economy.magicshop.read.self
+        - economy.magicstore.manage.read
+        - economy.magicstore.update
         - economy.medal.create
         - economy.medal.manage.read
         - economy.medal.purchase.self
@@ -12297,6 +12715,7 @@ components:
         - economy.membergift.policy.issue
         - economy.membergift.policy.read
         - economy.membergift.read.self
+        - economy.namestyle.read
         - economy.read.self
         - economy.seedingreward.policy.issue
         - economy.seedingreward.policy.read
@@ -19064,6 +19483,9 @@ components:
         occurred_at:
           type: string
           format: date-time
+        makeup:
+          type: boolean
+          description: 使用补签卡补回的签到。
     AttendanceOverview:
       type: object
       additionalProperties: false
@@ -19099,6 +19521,17 @@ components:
           maxItems: 100
           items:
             $ref: '#/components/schemas/AttendanceRecord'
+        makeup_cards:
+          type: integer
+          minimum: 0
+        makeup_window_days:
+          type: integer
+          minimum: 0
+        makeup_date:
+          type: string
+          format: date
+          nullable: true
+          description: 现在可以用补签卡补回的日期；没有可补日期时为空。
     MagicStatementEntry:
       type: object
       additionalProperties: false
@@ -19128,6 +19561,15 @@ components:
             - tip
             - social_red_packet_fund
             - social_red_packet_claim
+            - magic_shop_purchase
+            - scratch_card_purchase
+            - scratch_card_payout
+            - lottery_ticket_purchase
+            - lottery_payout
+            - lottery_burn
+            - pvp_stake
+            - pvp_payout
+            - pvp_refund
             - refund
             - adjustment
         entry_type:
@@ -20330,6 +20772,7 @@ components:
         - max_invites_per_member
         - used_invites
         - remaining_invites
+        - temporary_invites
         - minimum_account_age_days
         - current_account_age_days
         - minimum_level
@@ -20342,6 +20785,15 @@ components:
           type: boolean
         blocker:
           $ref: '#/components/schemas/InvitationEligibilityBlocker'
+        temporary_invites:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          description: 魔力商店购买、尚未过期也未使用的临时邀请名额；发邀请时优先消耗。
+        temporary_invite_next_expiry:
+          type: string
+          format: date-time
+          nullable: true
         invite_valid_days:
           type: integer
           minimum: 1
@@ -21420,6 +21872,7 @@ components:
             - legacy_migration
             - system_backfill
             - staff
+            - shop
         reason_summary:
           type: string
           minLength: 10
@@ -22761,6 +23214,914 @@ components:
       properties:
         amount:
           $ref: '#/components/schemas/UnsignedIntegerText'
+    MagicPrice:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 100000000
+    LotteryTier:
+      type: object
+      additionalProperties: false
+      required:
+        - label
+        - winners
+        - share_bps
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 20
+        winners:
+          type: integer
+          minimum: 1
+          maximum: 100
+        share_bps:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000
+    MagicStoreSettings:
+      type: object
+      additionalProperties: false
+      required:
+        - timezone
+        - shop_enabled
+        - invite
+        - temporary_invite
+        - vip
+        - name_color
+        - makeup_card
+        - games_enabled
+        - scratch
+        - lottery
+        - pvp
+      properties:
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 64
+        shop_enabled:
+          type: boolean
+        invite:
+          type: object
+          additionalProperties: false
+          required:
+            - enabled
+            - price
+            - monthly_limit
+          properties:
+            enabled:
+              type: boolean
+            price:
+              $ref: '#/components/schemas/MagicPrice'
+            monthly_limit:
+              type: integer
+              minimum: 0
+              maximum: 100
+              description: 每自然月限购数量，0 表示不限。
+        temporary_invite:
+          type: object
+          additionalProperties: false
+          required:
+            - enabled
+            - price
+            - valid_days
+            - monthly_limit
+          properties:
+            enabled:
+              type: boolean
+            price:
+              $ref: '#/components/schemas/MagicPrice'
+            valid_days:
+              type: integer
+              minimum: 1
+              maximum: 90
+            monthly_limit:
+              type: integer
+              minimum: 0
+              maximum: 100
+        vip:
+          type: object
+          additionalProperties: false
+          required:
+            - enabled
+            - price
+            - duration_days
+          properties:
+            enabled:
+              type: boolean
+            price:
+              $ref: '#/components/schemas/MagicPrice'
+            duration_days:
+              type: integer
+              minimum: 1
+              maximum: 365
+        name_color:
+          type: object
+          additionalProperties: false
+          required:
+            - enabled
+            - solid_price
+            - gradient_price
+            - duration_days
+          properties:
+            enabled:
+              type: boolean
+            solid_price:
+              $ref: '#/components/schemas/MagicPrice'
+            gradient_price:
+              $ref: '#/components/schemas/MagicPrice'
+            duration_days:
+              type: integer
+              minimum: 1
+              maximum: 365
+        makeup_card:
+          type: object
+          additionalProperties: false
+          required:
+            - enabled
+            - price
+            - window_days
+            - maximum_holding
+          properties:
+            enabled:
+              type: boolean
+            price:
+              $ref: '#/components/schemas/MagicPrice'
+            window_days:
+              type: integer
+              minimum: 1
+              maximum: 30
+            maximum_holding:
+              type: integer
+              minimum: 1
+              maximum: 100
+        games_enabled:
+          type: boolean
+        scratch:
+          type: object
+          additionalProperties: false
+          required:
+            - enabled
+            - price
+            - daily_limit
+            - prizes
+          properties:
+            enabled:
+              type: boolean
+            price:
+              $ref: '#/components/schemas/MagicPrice'
+            daily_limit:
+              type: integer
+              minimum: 1
+              maximum: 1000
+            prizes:
+              type: array
+              minItems: 2
+              maxItems: 12
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - label
+                  - payout
+                  - weight
+                properties:
+                  label:
+                    type: string
+                    minLength: 1
+                    maxLength: 20
+                  payout:
+                    type: integer
+                    format: int64
+                    minimum: 0
+                    maximum: 100000000
+                  weight:
+                    type: integer
+                    format: int64
+                    minimum: 0
+                    maximum: 1000000
+        lottery:
+          type: object
+          additionalProperties: false
+          required:
+            - enabled
+            - ticket_price
+            - maximum_tickets_per_round
+            - draw_hour
+            - burn_bps
+            - tiers
+          properties:
+            enabled:
+              type: boolean
+            ticket_price:
+              $ref: '#/components/schemas/MagicPrice'
+            maximum_tickets_per_round:
+              type: integer
+              minimum: 1
+              maximum: 1000
+            draw_hour:
+              type: integer
+              minimum: 0
+              maximum: 23
+            burn_bps:
+              type: integer
+              format: int64
+              minimum: 0
+              maximum: 10000
+            tiers:
+              type: array
+              minItems: 1
+              maxItems: 10
+              items:
+                $ref: '#/components/schemas/LotteryTier'
+        pvp:
+          type: object
+          additionalProperties: false
+          required:
+            - enabled
+            - minimum_stake
+            - maximum_stake
+            - fee_bps
+            - maximum_open_per_member
+            - expiry_hours
+          properties:
+            enabled:
+              type: boolean
+            minimum_stake:
+              $ref: '#/components/schemas/MagicPrice'
+            maximum_stake:
+              $ref: '#/components/schemas/MagicPrice'
+            fee_bps:
+              type: integer
+              format: int64
+              minimum: 0
+              maximum: 5000
+            maximum_open_per_member:
+              type: integer
+              minimum: 1
+              maximum: 20
+            expiry_hours:
+              type: integer
+              minimum: 1
+              maximum: 168
+    MagicShopVIPStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - active
+        - permanent
+      properties:
+        active:
+          type: boolean
+        permanent:
+          type: boolean
+        until:
+          type: string
+          format: date-time
+          nullable: true
+    NameStyleTier:
+      type: string
+      enum:
+        - solid
+        - gradient
+    NameStyleKey:
+      type: string
+      pattern: ^[a-z][a-z0-9-]{0,31}$
+    MemberNameStyle:
+      type: object
+      additionalProperties: false
+      required:
+        - user_id
+        - username
+        - tier
+        - style_key
+        - expires_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        username:
+          type: string
+          maxLength: 64
+        tier:
+          $ref: '#/components/schemas/NameStyleTier'
+        style_key:
+          $ref: '#/components/schemas/NameStyleKey'
+        expires_at:
+          type: string
+          format: date-time
+    NameStyleOption:
+      type: object
+      additionalProperties: false
+      required:
+        - key
+        - tier
+      properties:
+        key:
+          $ref: '#/components/schemas/NameStyleKey'
+        tier:
+          $ref: '#/components/schemas/NameStyleTier'
+    MagicShopItemKey:
+      type: string
+      enum:
+        - invite
+        - temporary_invite
+        - vip
+        - name_color_solid
+        - name_color_gradient
+        - makeup_card
+    MagicShopOrder:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - item_key
+        - quantity
+        - unit_price
+        - total_price
+        - purchased_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        item_key:
+          $ref: '#/components/schemas/MagicShopItemKey'
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+        unit_price:
+          type: integer
+          format: int64
+          minimum: 1
+        total_price:
+          type: integer
+          format: int64
+          minimum: 1
+        style_key:
+          type: string
+          nullable: true
+        effect_until:
+          type: string
+          format: date-time
+          nullable: true
+        purchased_at:
+          type: string
+          format: date-time
+    MagicShopOverview:
+      type: object
+      additionalProperties: false
+      required:
+        - settings
+        - settings_version
+        - magic_balance
+        - invites_purchased_this_month
+        - temporary_invites_purchased_this_month
+        - remaining_invites
+        - temporary_invites
+        - vip
+        - makeup_cards
+        - name_style_options
+        - recent_orders
+      properties:
+        settings:
+          $ref: '#/components/schemas/MagicStoreSettings'
+        settings_version:
+          type: integer
+          format: int64
+          minimum: 1
+        magic_balance:
+          $ref: '#/components/schemas/SignedIntegerText'
+        invites_purchased_this_month:
+          type: integer
+          minimum: 0
+        temporary_invites_purchased_this_month:
+          type: integer
+          minimum: 0
+        remaining_invites:
+          type: integer
+          minimum: 0
+        temporary_invites:
+          type: integer
+          minimum: 0
+        temporary_invite_next_expiry:
+          type: string
+          format: date-time
+          nullable: true
+        invite_blocker:
+          type: string
+          nullable: true
+          description: 当前不能购买邀请名额的原因，取值同邀请资格的 blocker。
+        vip:
+          $ref: '#/components/schemas/MagicShopVIPStatus'
+        name_style:
+          $ref: '#/components/schemas/MemberNameStyle'
+        makeup_cards:
+          type: integer
+          minimum: 0
+        name_style_options:
+          type: array
+          maxItems: 64
+          items:
+            $ref: '#/components/schemas/NameStyleOption'
+        recent_orders:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/MagicShopOrder'
+    PurchaseMagicShopItemRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - item_key
+        - quantity
+      properties:
+        item_key:
+          $ref: '#/components/schemas/MagicShopItemKey'
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+        expected_unit_price:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 页面显示的商品单价。单价已变更时返回冲突，会员可按新单价重新确认。
+        style_key:
+          $ref: '#/components/schemas/NameStyleKey'
+    MagicShopPurchaseReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - order
+        - balance_after
+        - replayed
+      properties:
+        order:
+          $ref: '#/components/schemas/MagicShopOrder'
+        balance_after:
+          $ref: '#/components/schemas/SignedIntegerText'
+        replayed:
+          type: boolean
+    SetNameStyleRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - style_key
+      properties:
+        style_key:
+          $ref: '#/components/schemas/NameStyleKey'
+    MemberNameStyleList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          maxItems: 100000
+          items:
+            $ref: '#/components/schemas/MemberNameStyle'
+    ScratchCard:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - price
+        - prize
+        - prize_index
+        - prize_label
+        - purchased_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        price:
+          type: integer
+          format: int64
+          minimum: 1
+        prize:
+          type: integer
+          format: int64
+          minimum: 0
+        prize_index:
+          type: integer
+          minimum: 0
+        prize_label:
+          type: string
+          maxLength: 20
+        purchased_at:
+          type: string
+          format: date-time
+    LotteryWinner:
+      type: object
+      additionalProperties: false
+      required:
+        - draw_rank
+        - tier_index
+        - tier_label
+        - ticket_number
+        - username
+        - prize
+      properties:
+        draw_rank:
+          type: integer
+          minimum: 1
+        tier_index:
+          type: integer
+          minimum: 0
+        tier_label:
+          type: string
+          maxLength: 20
+        ticket_number:
+          type: integer
+          minimum: 1
+        username:
+          type: string
+          maxLength: 64
+        prize:
+          type: integer
+          format: int64
+          minimum: 0
+    LotteryRound:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - round_number
+        - status
+        - ticket_price
+        - maximum_tickets_per_member
+        - burn_bps
+        - tiers
+        - opens_at
+        - draw_at
+        - seed_sha256
+        - carried_in
+        - tickets_sold
+        - sales_total
+        - estimated_prizes
+        - my_tickets
+        - my_ticket_ranges
+        - my_prize
+        - winners
+      properties:
+        id:
+          type: string
+          format: uuid
+        round_number:
+          type: integer
+          format: int64
+          minimum: 1
+        status:
+          type: string
+          enum:
+            - open
+            - drawn
+        ticket_price:
+          type: integer
+          format: int64
+          minimum: 1
+        maximum_tickets_per_member:
+          type: integer
+          minimum: 1
+        burn_bps:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10000
+        tiers:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/LotteryTier'
+        opens_at:
+          type: string
+          format: date-time
+        draw_at:
+          type: string
+          format: date-time
+        seed_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: 开奖前公布的种子摘要；开奖后可用 seed 校验。
+        seed:
+          type: string
+          nullable: true
+          pattern: ^[0-9a-f]{64}$
+          description: 开奖后公开的随机种子。
+        carried_in:
+          type: integer
+          format: int64
+          minimum: 0
+        tickets_sold:
+          type: integer
+          minimum: 0
+        sales_total:
+          type: integer
+          format: int64
+          minimum: 0
+        burned:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        paid_out:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        carried_out:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        drawn_at:
+          type: string
+          format: date-time
+          nullable: true
+        estimated_prizes:
+          type: array
+          maxItems: 10
+          items:
+            type: integer
+            format: int64
+            minimum: 0
+        my_tickets:
+          type: integer
+          minimum: 0
+        my_ticket_ranges:
+          type: array
+          maxItems: 1000
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: integer
+              minimum: 1
+        my_prize:
+          type: integer
+          format: int64
+          minimum: 0
+        winners:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/LotteryWinner'
+    PvPMode:
+      type: string
+      enum:
+        - dice
+        - rps
+    PvPChallenge:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - mode
+        - status
+        - creator_id
+        - creator_username
+        - stake
+        - fee_bps
+        - expires_at
+        - created_at
+        - viewer_is_creator
+      properties:
+        id:
+          type: string
+          format: uuid
+        mode:
+          $ref: '#/components/schemas/PvPMode'
+        status:
+          type: string
+          enum:
+            - open
+            - settled
+            - cancelled
+            - expired
+        creator_id:
+          type: string
+          format: uuid
+        creator_username:
+          type: string
+          maxLength: 64
+        creator_choice:
+          type: string
+          enum:
+            - rock
+            - paper
+            - scissors
+          nullable: true
+          description: 发起人的出拳只对发起人本人和已结束的擂台可见。
+        stake:
+          type: integer
+          format: int64
+          minimum: 1
+        fee_bps:
+          type: integer
+          format: int64
+          minimum: 0
+        message:
+          type: string
+          maxLength: 60
+          nullable: true
+        opponent_id:
+          type: string
+          format: uuid
+          nullable: true
+        opponent_username:
+          type: string
+          maxLength: 64
+          nullable: true
+        opponent_choice:
+          type: string
+          enum:
+            - rock
+            - paper
+            - scissors
+          nullable: true
+        creator_roll:
+          type: integer
+          minimum: 1
+          maximum: 100
+          nullable: true
+        opponent_roll:
+          type: integer
+          minimum: 1
+          maximum: 100
+          nullable: true
+        winner_id:
+          type: string
+          format: uuid
+          nullable: true
+        fee:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        viewer_is_creator:
+          type: boolean
+    MagicGamesOverview:
+      type: object
+      additionalProperties: false
+      required:
+        - settings
+        - settings_version
+        - magic_balance
+        - scratch_used_today
+        - scratch_expected_return_bps
+        - recent_scratch_cards
+        - open_challenges
+        - my_challenges
+        - recent_settled
+      properties:
+        settings:
+          $ref: '#/components/schemas/MagicStoreSettings'
+        settings_version:
+          type: integer
+          format: int64
+          minimum: 1
+        magic_balance:
+          $ref: '#/components/schemas/SignedIntegerText'
+        scratch_used_today:
+          type: integer
+          minimum: 0
+        scratch_expected_return_bps:
+          type: integer
+          format: int64
+          minimum: 0
+        recent_scratch_cards:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ScratchCard'
+        current_round:
+          $ref: '#/components/schemas/LotteryRound'
+        previous_round:
+          $ref: '#/components/schemas/LotteryRound'
+        open_challenges:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/PvPChallenge'
+        my_challenges:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/PvPChallenge'
+        recent_settled:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/PvPChallenge'
+    ScratchCardReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - card
+        - balance_after
+        - replayed
+      properties:
+        card:
+          $ref: '#/components/schemas/ScratchCard'
+        balance_after:
+          $ref: '#/components/schemas/SignedIntegerText'
+        replayed:
+          type: boolean
+    BuyLotteryTicketsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        round_id:
+          type: string
+          format: uuid
+          description: 购票页面显示的期次 ID。此期停止售票时返回冲突，避免买入下一期。
+    LotteryTicketReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - round_id
+        - round_number
+        - quantity
+        - first_ticket
+        - last_ticket
+        - total_price
+        - balance_after
+        - replayed
+      properties:
+        round_id:
+          type: string
+          format: uuid
+        round_number:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          minimum: 1
+        first_ticket:
+          type: integer
+          minimum: 1
+        last_ticket:
+          type: integer
+          minimum: 1
+        total_price:
+          type: integer
+          format: int64
+          minimum: 1
+        balance_after:
+          $ref: '#/components/schemas/SignedIntegerText'
+        replayed:
+          type: boolean
+    RPSChoice:
+      type: string
+      enum:
+        - rock
+        - paper
+        - scissors
+    CreatePvPChallengeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - mode
+        - stake
+      properties:
+        mode:
+          $ref: '#/components/schemas/PvPMode'
+        stake:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 100000000
+        choice:
+          $ref: '#/components/schemas/RPSChoice'
+        message:
+          type: string
+          maxLength: 60
+    AcceptPvPChallengeRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        choice:
+          $ref: '#/components/schemas/RPSChoice'
     WorkgroupJoinMode:
       type: string
       enum:
@@ -25825,6 +27186,92 @@ components:
       enum:
         - global
         - torrent
+    MagicStoreSettingsRevision:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+        - reason
+        - occurred_at
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          maxLength: 500
+        actor_username:
+          type: string
+          maxLength: 64
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+    MagicStoreAdminOverview:
+      type: object
+      additionalProperties: false
+      required:
+        - settings
+        - version
+        - updated_at
+        - accounts
+        - scratch_expected_return_bps
+        - revisions
+      properties:
+        settings:
+          $ref: '#/components/schemas/MagicStoreSettings'
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        updated_at:
+          type: string
+          format: date-time
+        accounts:
+          type: object
+          additionalProperties: false
+          required:
+            - shop_sink
+            - game_house
+            - lottery_pool
+            - pvp_escrow
+          properties:
+            shop_sink:
+              $ref: '#/components/schemas/SignedIntegerText'
+            game_house:
+              $ref: '#/components/schemas/SignedIntegerText'
+            lottery_pool:
+              $ref: '#/components/schemas/SignedIntegerText'
+            pvp_escrow:
+              $ref: '#/components/schemas/SignedIntegerText'
+        scratch_expected_return_bps:
+          type: integer
+          format: int64
+          minimum: 0
+        revisions:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/MagicStoreSettingsRevision'
+    UpdateMagicStoreSettingsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - settings
+        - expected_version
+        - reason
+      properties:
+        settings:
+          $ref: '#/components/schemas/MagicStoreSettings'
+        expected_version:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
     SeedingRewardPolicyPreviewResult:
       type: object
       additionalProperties: false
@@ -28228,6 +29675,13 @@ components:
       in: path
       required: true
       description: 评论的稳定公开 UUID。
+      schema:
+        type: string
+        format: uuid
+    ChallengeIDParameter:
+      name: challenge_id
+      in: path
+      required: true
       schema:
         type: string
         format: uuid

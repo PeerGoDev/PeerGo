@@ -55,6 +55,8 @@ export default [
   route("account/permissions", "routes/account.permissions.tsx"),
   route("workgroups", "routes/workgroups.tsx"),
   route("medals", "routes/medals.tsx"),
+  route("shop", "routes/shop.tsx"),
+  route("games", "routes/games.tsx"),
   route("admin", "routes/legacy-admin.tsx"),
   route("staff", "routes/staff.tsx"),
   route("staff/setup", "routes/staff.setup.tsx"),
@@ -97,6 +99,7 @@ export default [
     "routes/staff.settings.progression.levels.tsx"
   ),
   route("staff/settings/medals", "routes/staff.settings.medals.tsx"),
+  route("staff/settings/magic-store", "routes/staff.settings.magic-store.tsx"),
   route(
     "staff/settings/activity-rewards",
     "routes/staff.settings.activity-rewards.tsx"

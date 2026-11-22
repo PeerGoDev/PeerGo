@@ -62,6 +62,11 @@ func (stub *repositoryStub) Claim(_ context.Context, command ClaimCommand) (Reco
 	return Record{TotalReward: 5}, nil
 }
 
+func (stub *repositoryStub) Makeup(_ context.Context, command ClaimCommand) (Record, error) {
+	stub.claimCommand = command
+	return Record{TotalReward: 5, Makeup: true}, nil
+}
+
 func (stub *repositoryStub) ListPolicies(context.Context, int, int) ([]PublishedPolicy, int64, error) {
 	return []PublishedPolicy{stub.latest}, 1, nil
 }

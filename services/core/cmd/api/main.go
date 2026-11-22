@@ -23,6 +23,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/economy"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/attendance"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/contenttip"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/magicstore"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/medals"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/membergift"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/seedingreward"
@@ -350,6 +351,21 @@ func main() {
 	memberMedalService, err := medals.NewMemberService(identityService, medalRepository, authorizationService, time.Now)
 	if err != nil {
 		logger.Error("compose member medal service", "error", err)
+		os.Exit(1)
+	}
+	magicStoreRepository, err := magicstore.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose magic store repository", "error", err)
+		os.Exit(1)
+	}
+	magicStoreService, err := magicstore.NewMemberService(identityService, magicStoreRepository, authorizationService, time.Now)
+	if err != nil {
+		logger.Error("compose magic store service", "error", err)
+		os.Exit(1)
+	}
+	magicStoreAdministrationService, err := magicstore.NewAdminService(magicStoreRepository, authorizationService, time.Now)
+	if err != nil {
+		logger.Error("compose magic store administration service", "error", err)
 		os.Exit(1)
 	}
 	operationsRepository, err := operations.NewPostgresRepository(
@@ -1093,6 +1109,8 @@ func main() {
 		ContributionExperience:      contributionExperienceService,
 		MedalAdministration:         medalAdministrationService,
 		MemberMedals:                memberMedalService,
+		MagicStore:                  magicStoreService,
+		MagicStoreAdministration:    magicStoreAdministrationService,
 		HNRPolicyAdministration:     hnrPolicyAdministrationService,
 		RatioWatchAdministration:    ratioWatchAdministrationService,
 		NewcomerAdministration:      newcomerAdministrationService,

@@ -14,6 +14,7 @@ import {
   ServerCogIcon,
   Settings2Icon,
   ShieldCheckIcon,
+  StoreIcon,
   UserRoundIcon,
   WalletCardsIcon,
 } from "lucide-react"
@@ -144,6 +145,13 @@ export const staffSettingsNavigationGroups: StaffSettingsNavigationGroup[] = [
         to: "/staff/settings/medals",
         icon: MedalIcon,
         action: "economy.medal.manage.read",
+      },
+      {
+        label: "魔力商店与游戏",
+        description: "商店价格与限购、刮刮乐、彩票和擂台规则。",
+        to: "/staff/settings/magic-store",
+        icon: StoreIcon,
+        action: "economy.magicstore.manage.read",
       },
       {
         label: "做种奖励",
