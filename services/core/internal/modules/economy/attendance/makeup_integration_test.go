@@ -130,4 +130,50 @@ VALUES ($1, $2, $3, $3, 'active', $4, $4)`, userID, uuid.New(), fmt.Sprintf("mak
 SELECT count(*) FROM economy.member_item_events WHERE user_id = $1 AND delta = -1`, userID).Scan(&events); err != nil || events != 2 {
 		t.Fatalf("makeup card events = %d, %v", events, err)
 	}
+
+	t.Run("granted streaks preserve daily claims", func(t *testing.T) {
+		newMember := uuid.New()
+		if _, err := pool.Exec(ctx, `
+INSERT INTO identity.users (id, credential_ref, username, display_name, status, created_at, updated_at)
+VALUES ($1, $2, $3, $3, 'active', $4, $4)`,
+			newMember, uuid.New(), fmt.Sprintf("streak-it-%s", newMember.String()[:8]), now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `
+INSERT INTO economy.attendance_streak_grants (user_id, effective_on, streak_days, reason, granted_at)
+VALUES ($1, $3::date, 730, 'integration test grant', $4),
+       ($2, $3::date, 730, 'integration test grant', $4)`,
+			userID, newMember, today.AttendanceDate, now); err != nil {
+			t.Fatal(err)
+		}
+
+		alreadyClaimed, err := repository.Overview(ctx, userID, now, 10)
+		if err != nil || !alreadyClaimed.ClaimedToday || alreadyClaimed.TotalDays != 4 ||
+			alreadyClaimed.CurrentStreak != 730 || alreadyClaimed.StreakGrantDays != 730 ||
+			alreadyClaimed.TodayRecord == nil || alreadyClaimed.TodayRecord.CurrentStreak != 4 {
+			t.Fatalf("grant with existing claim = %+v, %v", alreadyClaimed, err)
+		}
+		unclaimed, err := repository.Overview(ctx, newMember, now, 10)
+		if err != nil || unclaimed.ClaimedToday || unclaimed.TotalDays != 0 ||
+			unclaimed.CurrentStreak != 730 || len(unclaimed.History) != 0 {
+			t.Fatalf("grant without any claim = %+v, %v", unclaimed, err)
+		}
+		firstReal, err := repository.Claim(ctx, ClaimCommand{
+			RequestID: uuid.New(), UserID: newMember, Mode: ModeFixed, Now: now,
+		})
+		if err != nil || firstReal.CurrentStreak != 730 || firstReal.TotalDays != 1 {
+			t.Fatalf("first real claim on grant day = %+v, %v", firstReal, err)
+		}
+		next, err := repository.Claim(ctx, ClaimCommand{
+			RequestID: uuid.New(), UserID: userID, Mode: ModeFixed, Now: now.AddDate(0, 0, 1),
+		})
+		if err != nil || next.CurrentStreak != 731 || next.TotalDays != 5 {
+			t.Fatalf("first claim after grant = %+v, %v", next, err)
+		}
+		afterMiss, err := repository.Overview(ctx, userID, now.AddDate(0, 0, 3), 10)
+		if err != nil || afterMiss.CurrentStreak != 0 || afterMiss.LongestStreak != 731 ||
+			afterMiss.MakeupDate == nil || *afterMiss.MakeupDate <= next.AttendanceDate {
+			t.Fatalf("overview after a missed day = %+v, %v", afterMiss, err)
+		}
+	})
 }

@@ -6969,6 +6969,8 @@ export interface components {
             current_streak: number;
             total_days: number;
             longest_streak: number;
+            /** @description 站点发放的连续签到基线天数。 */
+            streak_grant_days?: number;
             today_record?: components["schemas"]["AttendanceRecord"];
             history: components["schemas"]["AttendanceRecord"][];
             makeup_cards?: number;

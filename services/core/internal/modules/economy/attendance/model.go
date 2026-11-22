@@ -102,6 +102,7 @@ type Overview struct {
 	CurrentStreak    int32
 	TotalDays        int32
 	LongestStreak    int32
+	StreakGrantDays  int32
 	TodayRecord      *Record
 	History          []Record
 	MakeupCards      int32

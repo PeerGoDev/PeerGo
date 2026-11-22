@@ -161,6 +161,11 @@ function AttendanceContent({
         </CardTitle>
         <CardDescription>
           已连续 {overview.current_streak} 天，累计签到 {overview.total_days} 天
+          {overview.streak_grant_days ? (
+            <span className="mt-1 block">
+              站点已赠送 {overview.streak_grant_days} 天连签基线
+            </span>
+          ) : null}
         </CardDescription>
         <CardAction>
           <Badge variant={overview.claimed_today ? "outline" : "secondary"}>

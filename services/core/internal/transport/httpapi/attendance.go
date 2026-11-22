@@ -200,6 +200,10 @@ func attendanceOverviewDTO(overview attendance.Overview) generated.AttendanceOve
 		value := attendancePolicyDTO(*overview.Policy)
 		result.Policy = &value
 	}
+	if overview.StreakGrantDays > 0 {
+		days := int(overview.StreakGrantDays)
+		result.StreakGrantDays = &days
+	}
 	if overview.TodayRecord != nil {
 		value := attendanceRecordDTO(*overview.TodayRecord)
 		result.TodayRecord = &value

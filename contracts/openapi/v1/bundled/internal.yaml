@@ -19514,6 +19514,10 @@ components:
         longest_streak:
           type: integer
           minimum: 0
+        streak_grant_days:
+          type: integer
+          minimum: 1
+          description: 站点发放的连续签到基线天数。
         today_record:
           $ref: '#/components/schemas/AttendanceRecord'
         history:

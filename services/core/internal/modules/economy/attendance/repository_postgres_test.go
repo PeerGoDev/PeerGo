@@ -40,3 +40,22 @@ func TestApplyAttendanceOpeningBlocksSameDayDuplicate(t *testing.T) {
 		t.Fatalf("overview = %+v", overview)
 	}
 }
+
+func TestApplyStreakGrantPreservesHigherCurrentAndLongest(t *testing.T) {
+	t.Parallel()
+	grant := attendanceStreakGrant{EffectiveOn: "2026-11-22", Days: 730}
+	previous := attendanceOpening{
+		LastAttendanceDate: "2026-11-21", CurrentStreak: 750, LongestStreak: 900, TotalDays: 1000,
+	}
+	projection, err := applyStreakGrant(previous, grant)
+	if err != nil || projection.CurrentStreak != 750 || projection.LongestStreak != 900 ||
+		projection.TotalDays != 1000 || projection.LastAttendanceDate != grant.EffectiveOn {
+		t.Fatalf("active streak projection = %+v, %v", projection, err)
+	}
+	previous.LastAttendanceDate = "2026-11-19"
+	projection, err = applyStreakGrant(previous, grant)
+	if err != nil || projection.CurrentStreak != 730 || projection.LongestStreak != 900 ||
+		projection.TotalDays != 1000 || projection.LastAttendanceDate != grant.EffectiveOn {
+		t.Fatalf("expired streak projection = %+v, %v", projection, err)
+	}
+}

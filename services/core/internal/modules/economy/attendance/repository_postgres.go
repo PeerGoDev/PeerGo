@@ -104,10 +104,6 @@ func (repository *PostgresRepository) overview(ctx context.Context, userID uuid.
 	}
 	today := now.In(location).Format(time.DateOnly)
 	result.Today = today
-	opening, openingFound, err := readAttendanceOpening(ctx, repository.pool, userID)
-	if err != nil {
-		return Overview{}, err
-	}
 	rows, err := repository.pool.Query(ctx, `
 SELECT
     id, request_id, user_id, attendance_date::text, day_boundary_timezone,
@@ -133,28 +129,36 @@ LIMIT $2`, userID, limit)
 	if err := rows.Err(); err != nil {
 		return Overview{}, fmt.Errorf("finish attendance history: %w", err)
 	}
+	rows.Close()
+	var last attendanceOpening
 	if len(result.History) == 0 {
-		if openingFound {
-			if err := applyAttendanceOpening(&result, opening, today); err != nil {
-				return Overview{}, err
-			}
+		last, _, err = readAttendanceOpening(ctx, repository.pool, userID)
+		if err != nil {
+			return Overview{}, err
 		}
-		return result, nil
+	} else {
+		latest := result.History[0]
+		last = attendanceOpening{
+			CurrentStreak: latest.CurrentStreak, TotalDays: latest.TotalDays,
+			LongestStreak: latest.LongestStreak, LastAttendanceDate: latest.AttendanceDate,
+		}
+		if latest.AttendanceDate == today {
+			result.TodayRecord = &latest
+		}
 	}
-	latest := result.History[0]
-	result.TotalDays = latest.TotalDays
-	result.LongestStreak = latest.LongestStreak
-	if latest.AttendanceDate == today {
-		result.ClaimedToday = true
-		result.CurrentStreak = latest.CurrentStreak
-		record := latest
-		result.TodayRecord = &record
-		return result, nil
+	grant, err := readAttendanceStreakGrant(ctx, repository.pool, userID, today)
+	if err != nil {
+		return Overview{}, err
 	}
-	yesterday := now.In(location).AddDate(0, 0, -1).Format(time.DateOnly)
-	if latest.AttendanceDate == yesterday {
-		result.CurrentStreak = latest.CurrentStreak
+	projected, err := applyStreakGrant(last, grant)
+	if err != nil {
+		return Overview{}, err
 	}
+	if err := applyAttendanceOpening(&result, projected, today); err != nil {
+		return Overview{}, err
+	}
+	result.ClaimedToday = last.LastAttendanceDate == today
+	result.StreakGrantDays = grant.Days
 	return result, nil
 }
 
@@ -368,13 +372,21 @@ func makeupTarget(ctx context.Context, querier queryRower, userID uuid.UUID, tod
 SELECT attendance_date::text FROM economy.attendance_records
 WHERE user_id = $1 ORDER BY attendance_date DESC LIMIT 1`, userID).Scan(&latest)
 	if errors.Is(err, pgx.ErrNoRows) {
-		opening, found, err := readAttendanceOpening(ctx, querier, userID)
-		if err != nil || !found || opening.LastAttendanceDate == "" {
+		opening, _, err := readAttendanceOpening(ctx, querier, userID)
+		if err != nil {
 			return "", false, err
 		}
 		latest = opening.LastAttendanceDate
 	} else if err != nil {
 		return "", false, fmt.Errorf("read latest attendance: %w", err)
+	}
+	grant, err := readAttendanceStreakGrant(ctx, querier, userID, today)
+	if err != nil {
+		return "", false, err
+	}
+	latest = max(latest, grant.EffectiveOn)
+	if latest == "" {
+		return "", false, nil
 	}
 	latestDay, err := time.Parse(time.DateOnly, latest)
 	if err != nil {
@@ -516,44 +528,34 @@ type recordPayload struct {
 }
 
 func nextStatistics(ctx context.Context, tx pgx.Tx, userID uuid.UUID, attendanceDate string) (int32, int32, int32, error) {
-	var previousDate string
-	var previousStreak, totalDays, longestStreak int32
+	var previous attendanceOpening
 	err := tx.QueryRow(ctx, `
 SELECT attendance_date::text, current_streak, total_days, longest_streak
 FROM economy.attendance_records
 WHERE user_id = $1
 ORDER BY attendance_date DESC
-LIMIT 1`, userID).Scan(&previousDate, &previousStreak, &totalDays, &longestStreak)
+LIMIT 1`, userID).Scan(&previous.LastAttendanceDate, &previous.CurrentStreak, &previous.TotalDays, &previous.LongestStreak)
 	if errors.Is(err, pgx.ErrNoRows) {
-		opening, found, err := readAttendanceOpening(ctx, tx, userID)
+		previous, _, err = readAttendanceOpening(ctx, tx, userID)
 		if err != nil {
 			return 0, 0, 0, err
 		}
-		if !found {
-			return 1, 1, 1, nil
-		}
-		return statisticsAfterOpening(opening, attendanceDate)
-	}
-	if err != nil {
+	} else if err != nil {
 		return 0, 0, 0, fmt.Errorf("read previous attendance: %w", err)
 	}
-	date, err := time.Parse(time.DateOnly, attendanceDate)
+	grant, err := readAttendanceStreakGrant(ctx, tx, userID, attendanceDate)
 	if err != nil {
-		return 0, 0, 0, ErrInvariant
+		return 0, 0, 0, err
 	}
-	previous, err := time.Parse(time.DateOnly, previousDate)
+	if grant.EffectiveOn == attendanceDate {
+		current, total, longest, err := statisticsAfterOpening(previous, attendanceDate)
+		return max(current, grant.Days), total, max(longest, grant.Days), err
+	}
+	projected, err := applyStreakGrant(previous, grant)
 	if err != nil {
-		return 0, 0, 0, ErrInvariant
+		return 0, 0, 0, err
 	}
-	currentStreak := int32(1)
-	if previous.Equal(date.AddDate(0, 0, -1)) {
-		currentStreak = previousStreak + 1
-	}
-	totalDays++
-	if currentStreak > longestStreak {
-		longestStreak = currentStreak
-	}
-	return currentStreak, totalDays, longestStreak, nil
+	return statisticsAfterOpening(projected, attendanceDate)
 }
 
 type attendanceOpening struct {
@@ -561,6 +563,47 @@ type attendanceOpening struct {
 	TotalDays          int32
 	LongestStreak      int32
 	LastAttendanceDate string
+}
+
+type attendanceStreakGrant struct {
+	EffectiveOn string
+	Days        int32
+}
+
+func readAttendanceStreakGrant(ctx context.Context, querier queryRower, userID uuid.UUID, through string) (attendanceStreakGrant, error) {
+	var grant attendanceStreakGrant
+	err := querier.QueryRow(ctx, `
+SELECT effective_on::text, streak_days
+FROM economy.attendance_streak_grants
+WHERE user_id = $1 AND effective_on <= $2::date
+ORDER BY effective_on DESC
+LIMIT 1`, userID, through).Scan(&grant.EffectiveOn, &grant.Days)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return attendanceStreakGrant{}, nil
+	}
+	if err != nil {
+		return attendanceStreakGrant{}, fmt.Errorf("read attendance streak grant: %w", err)
+	}
+	return grant, nil
+}
+
+// A grant supplies a streak baseline and an anchor for the next claim while
+// the recorded claim date and total still come from real attendance.
+func applyStreakGrant(previous attendanceOpening, grant attendanceStreakGrant) (attendanceOpening, error) {
+	previous.LongestStreak = max(previous.LongestStreak, grant.Days)
+	if previous.LastAttendanceDate > grant.EffectiveOn || grant.Days == 0 {
+		return previous, nil
+	}
+	effective, err := time.Parse(time.DateOnly, grant.EffectiveOn)
+	if err != nil {
+		return attendanceOpening{}, ErrInvariant
+	}
+	if previous.LastAttendanceDate < effective.AddDate(0, 0, -1).Format(time.DateOnly) {
+		previous.CurrentStreak = 0
+	}
+	previous.CurrentStreak = max(previous.CurrentStreak, grant.Days)
+	previous.LastAttendanceDate = grant.EffectiveOn
+	return previous, nil
 }
 
 func readAttendanceOpening(
