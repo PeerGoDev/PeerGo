@@ -84,6 +84,12 @@ describe("AppShell mobile navigation", () => {
     ).not.toBeInTheDocument()
     expect(navigation.querySelector('a[href="/"]')).not.toHaveFocus()
     expect(within(navigation).queryByText(/Powered by/)).not.toBeInTheDocument()
+    expect(
+      within(navigation).getByRole("link", { name: "魔力商店" })
+    ).toHaveAttribute("href", "/shop")
+    expect(
+      within(navigation).getByRole("link", { name: "游戏中心" })
+    ).toHaveAttribute("href", "/games")
 
     await user.click(within(navigation).getByRole("link", { name: "登录" }))
 
@@ -235,6 +241,15 @@ describe("AppShell mobile navigation", () => {
       .closest('[data-slot="sidebar-group"]')
     expect(primaryGroup).not.toBe(socialGroup)
     expect(socialGroup).toHaveTextContent("社区")
+    for (const [name, href] of [
+      ["魔力商店", "/shop"],
+      ["游戏中心", "/games"],
+    ]) {
+      const link = within(navigation).getByRole("link", { name })
+      expect(link).toHaveAttribute("href", href)
+      expect(link.closest('[data-slot="sidebar-group"]')).toBe(primaryGroup)
+      expect(link.closest('[data-slot="sidebar-menu-sub"]')).toBeNull()
+    }
     const wikiLink = within(navigation).getByRole("link", { name: "Wiki" })
     expect(wikiLink).toHaveAttribute("href", "https://wiki.example.com")
     expect(wikiLink).toHaveAttribute("target", "_blank")

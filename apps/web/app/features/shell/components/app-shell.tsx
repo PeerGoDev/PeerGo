@@ -127,6 +127,11 @@ type NavigationGroup = {
   icon?: LucideIcon
 }
 
+const magicNavigationItems: NavigationItem[] = [
+  { label: "魔力商店", to: "/shop", icon: StoreIcon },
+  { label: "游戏中心", to: "/games", icon: Gamepad2Icon },
+]
+
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -151,12 +156,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     capabilities.data?.items.some(
       (capability) => capability.action === "economy.medal.read.self"
     )
-  )
-  const canReadMagicShop = capabilities.data?.items.some(
-    (capability) => capability.action === "economy.magicshop.read.self"
-  )
-  const canReadMagicGames = capabilities.data?.items.some(
-    (capability) => capability.action === "economy.magicgame.read.self"
   )
   useNameStyles(
     Boolean(
@@ -336,24 +335,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           },
         ]
       : []),
-    ...(canReadMagicShop
-      ? [
-          {
-            label: "魔力商店",
-            to: "/shop",
-            icon: StoreIcon,
-          },
-        ]
-      : []),
-    ...(canReadMagicGames
-      ? [
-          {
-            label: "游戏中心",
-            to: "/games",
-            icon: Gamepad2Icon,
-          },
-        ]
-      : []),
     ...(canReadHNR
       ? [
           {
@@ -468,6 +449,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             },
           ],
         },
+        { label: "主要功能", items: magicNavigationItems },
         ...customNavigationGroups,
       ]
     : [
@@ -480,6 +462,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ...(canSubmitTorrent
               ? [{ label: "上传", to: "/upload", icon: UploadIcon }]
               : []),
+            ...magicNavigationItems,
           ],
         },
         {
@@ -1000,7 +983,7 @@ function AppNavigationGroup({
                   className={navigationButtonClass}
                 >
                   <item.icon />
-                  <span className="group-data-[collapsible=icon]:hidden">
+                  <span className="group-data-[collapsible=icon]:sr-only">
                     {item.label}
                   </span>
                   {item.badge ? (

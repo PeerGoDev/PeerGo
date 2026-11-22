@@ -67,7 +67,7 @@ test("second-factor challenge remains usable", async ({ page }) => {
   await expect(page.getByLabel("两步验证码（可选）")).toBeFocused()
 })
 
-test("authenticated navigation stays inside the mobile viewport", async ({
+test("authenticated navigation keeps primary links visible", async ({
   page,
 }) => {
   await mockPublicApi(page, { includeTorrent: true })
@@ -82,15 +82,31 @@ test("authenticated navigation stays inside the mobile viewport", async ({
   ).toBeVisible()
   expect(await hasHorizontalPageOverflow(page)).toBe(false)
 
+  const expectMagicLinks = async () => {
+    for (const [name, href] of [
+      ["魔力商店", "/shop"],
+      ["游戏中心", "/games"],
+    ]) {
+      const link = page.getByRole("link", { name, exact: true })
+      await expect(link).toBeVisible()
+      await expect(link).toHaveAttribute("href", href)
+    }
+  }
+
   if ((page.viewportSize()?.width ?? 0) < 1024) {
     await page.getByRole("button", { name: "切换侧栏" }).click()
     const mobileSidebar = page.locator(
       '[data-sidebar="sidebar"][data-mobile="true"]'
     )
     await expect(mobileSidebar).toBeVisible()
+    await expectMagicLinks()
     await mobileSidebar.getByRole("link", { name: "种子", exact: true }).click()
     await expect(mobileSidebar).toBeHidden()
   } else {
+    await expectMagicLinks()
+    await page.getByRole("button", { name: "收起侧栏", exact: true }).click()
+    await expectMagicLinks()
+    await page.getByRole("button", { name: "展开侧栏", exact: true }).click()
     await page.getByRole("link", { name: "种子", exact: true }).click()
   }
 
