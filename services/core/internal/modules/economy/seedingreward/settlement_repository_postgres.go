@@ -50,23 +50,29 @@ func (repository *PostgresSettlementRepository) Claim(ctx context.Context, now t
 		return nil, ErrInput
 	}
 	leaseToken := uuid.New()
+	// Each branch can use its status-specific partial index. Find the oldest
+	// incomplete window per user before consulting the historical primary index.
 	rows, err := repository.pool.Query(ctx, `
-WITH candidate AS (
+WITH incomplete AS (
+    SELECT window_start, user_id
+    FROM economy.seeding_reward_work_items
+    WHERE status IN ('pending', 'processing')
+    UNION ALL
+    SELECT window_start, user_id
+    FROM economy.seeding_reward_work_items
+    WHERE status = 'dead'
+), heads AS MATERIALIZED (
+    SELECT min(window_start) AS window_start, user_id
+    FROM incomplete
+    GROUP BY user_id
+), candidate AS (
     SELECT work.window_start, work.user_id
-    FROM economy.seeding_reward_work_items AS work
-    WHERE (
-        (work.status = 'pending' AND work.available_at <= $1)
-        OR (work.status = 'processing' AND work.lease_until <= $1)
-    )
-      AND NOT EXISTS (
-          SELECT 1
-          FROM economy.seeding_reward_work_items AS earlier
-          WHERE earlier.user_id = work.user_id
-            AND earlier.window_start < work.window_start
-            AND earlier.status <> 'completed'
-      )
+    FROM heads
+    JOIN economy.seeding_reward_work_items AS work USING (window_start, user_id)
+    WHERE (work.status = 'pending' AND work.available_at <= $1)
+       OR (work.status = 'processing' AND work.lease_until <= $1)
     ORDER BY work.window_start, work.user_id
-    FOR UPDATE SKIP LOCKED
+    FOR UPDATE OF work SKIP LOCKED
     LIMIT $2
 )
 UPDATE economy.seeding_reward_work_items AS work
