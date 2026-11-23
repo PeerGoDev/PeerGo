@@ -4,7 +4,7 @@
 OpenResty 时，PeerGo 只保留六个常驻容器：
 
 1. `peergo-api`：Core API、Settlement Control API、Email Relay；
-2. `peergo-worker`：22 个有序 worker/projector；
+2. `peergo-worker`：21 个后台进程，其中 `core-reward-worker` 运行做种奖励和贡献经验；
 3. `vault-api`：隐私与凭据隔离边界；
 4. `tracker`：高并发 Tracker 与 WAL 边界；
 5. `peergo-nats`：JetStream；
@@ -25,11 +25,11 @@ OpenResty 时，PeerGo 只保留六个常驻容器：
 - 对异常退出执行有上限的指数退避，连续失败达到阈值时让整个容器失败并由 Docker 重启；
 - 在 `:8099/livez`、`:8099/readyz` 和 `:8099/components` 暴露容器内健康状态；
 - API readiness 还会实际探测 Core、Settlement Control 和 Email Relay，而不是只检查 PID；
-- 保持原有二进制、数据库事务、JetStream durable 和有序消费边界不变。
+- 保留各任务的数据库事务、JetStream durable 和有序消费边界。
 
-这次合并减少的是容器与运维对象数量，不会假装把 22 个有独立一致性职责的进程变成一个
-线程，也不会删除消费位置或合并数据库权限。后续只有在各模块导出可共享连接池的 runner
-后，才应继续减少数据库连接；容器合并本身不能作为放松账本边界的理由。
+`core-reward-worker` 为做种奖励和贡献经验各启动一个 goroutine，共用 Core 数据库连接池。
+两项任务分别记录日志。任一任务意外退出时，进程会取消另一项任务，等待退出后交由
+supervisor 重启整个奖励进程。做种奖励仍逐条领取，同一用户的小时窗口按顺序结算。
 
 ## 单机配置与切换
 
@@ -44,7 +44,11 @@ PEERGO_DOCKER_LOG_MAX_FILES=3
 ```
 
 `scripts/production-compose.sh` 根据 `PEERGO_RUNTIME_LAYOUT` 只启用一个 runtime profile，
-避免紧凑和拆分布局同时运行。生产切换顺序为：
+避免紧凑和拆分布局同时运行。如果从仍使用两个奖励进程的拆分部署升级，在新镜像构建完成后，
+先从上一版发布目录按同一个 Compose project 停止 `core-seeding-reward-worker` 和
+`core-contribution-experience-worker`，再启动新版的 `core-reward-worker`。
+
+生产切换顺序为：
 
 ```bash
 make production-ready
@@ -63,12 +67,13 @@ make production-build
 `127.0.0.1:18084`，Tracker 继续使用 `127.0.0.1:18083`。必须先备份 1Panel 当前 vhost，
 并在 reload 前于容器内执行 `openresty -t`。
 
-验证紧凑容器后，再停止并移除旧的 `split-runtime` 容器；不要删除数据库、对象、Tracker、
-NATS 或审计卷。
+验证紧凑容器后，再停止并移除其余旧的 `split-runtime` 容器。保留数据库、对象、Tracker、
+NATS 和审计卷。
 
 ## 回滚
 
-旧布局保留在 `split-runtime` profile。需要回滚时先停止紧凑的 API/worker，恢复 OpenResty
+拆分布局保留在 `split-runtime` profile。回到使用两个独立奖励进程的版本前，先停止新版奖励进程。
+从紧凑切回拆分布局时先停止紧凑的 API/worker，恢复 OpenResty
 旧 vhost，把环境改为：
 
 ```dotenv

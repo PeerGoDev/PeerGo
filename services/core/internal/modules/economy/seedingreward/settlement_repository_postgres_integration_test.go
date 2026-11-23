@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/peergo/peergo/contracts/go/settlementseedingv1"
 	"github.com/peergo/peergo/services/core/internal/contracts/auditevent"
@@ -125,10 +127,57 @@ func TestIntegrationSettlesRewardAndExperienceAtomically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	settlementNow := afterWindowPublishedAt.Add(time.Minute)
 	worker, err := seedingreward.NewWorker(settlementRepository, seedingreward.WorkerConfig{
-		Now: func() time.Time { return afterWindowPublishedAt.Add(time.Minute) },
+		Now: func() time.Time { return settlementNow },
 	}, nil)
 	if err != nil {
+		t.Fatal(err)
+	}
+	lease := 30 * time.Second
+	claimed, err := settlementRepository.Claim(ctx, settlementNow, 1, lease)
+	if err != nil || len(claimed) != 1 || claimed[0].UserID != userID {
+		t.Fatalf("Claim() items=%v error=%v", claimed, err)
+	}
+	settlementNow = settlementNow.Add(lease)
+	if _, err := settlementRepository.Settle(ctx, claimed[0], settlementNow); !errors.Is(err, seedingreward.ErrWorkLease) {
+		t.Fatalf("Settle(expired lease) error=%v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+CREATE FUNCTION economy.test_seeding_reward_transaction_conflict() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'test settlement conflict' USING ERRCODE = TG_ARGV[0];
+END;
+$$`); err != nil {
+		t.Fatal(err)
+	}
+	for _, sqlState := range []string{"40001", "40P01"} {
+		if _, err := pool.Exec(ctx, fmt.Sprintf(`
+CREATE TRIGGER test_seeding_reward_transaction_conflict
+BEFORE UPDATE ON economy.seeding_reward_work_items
+FOR EACH ROW WHEN (NEW.status = 'completed')
+EXECUTE FUNCTION economy.test_seeding_reward_transaction_conflict('%s')`, sqlState)); err != nil {
+			t.Fatal(err)
+		}
+		processed, runErr := worker.RunOnce(ctx)
+		if _, err := pool.Exec(ctx, `DROP TRIGGER test_seeding_reward_transaction_conflict ON economy.seeding_reward_work_items`); err != nil {
+			t.Fatal(err)
+		}
+		var postgresError *pgconn.PgError
+		if processed != 1 || !errors.Is(runErr, seedingreward.ErrTransactionConflict) ||
+			errors.Is(runErr, seedingreward.ErrWorkLease) || !errors.As(runErr, &postgresError) || postgresError.Code != sqlState {
+			t.Fatalf("RunOnce(%s) processed=%d error=%v", sqlState, processed, runErr)
+		}
+		var status, errorCode string
+		if err := pool.QueryRow(ctx, `
+SELECT status, last_error_code FROM economy.seeding_reward_work_items
+WHERE window_start = $1 AND user_id = $2`, windowStart, userID).Scan(&status, &errorCode); err != nil ||
+			status != "pending" || errorCode != "transaction_conflict" {
+			t.Fatalf("work after conflict status=%s code=%s error=%v", status, errorCode, err)
+		}
+		settlementNow = settlementNow.Add(time.Minute)
+	}
+	if _, err := pool.Exec(ctx, `DROP FUNCTION economy.test_seeding_reward_transaction_conflict()`); err != nil {
 		t.Fatal(err)
 	}
 	processed, err := worker.RunOnce(ctx)
@@ -248,7 +297,7 @@ WHERE window_start = $1 AND user_id = $2`, windowStart, userID); err == nil {
 	if commandTag, err := pool.Exec(ctx, `
 UPDATE economy.seeding_reward_work_items
 SET status = 'dead', attempts = 10, available_at = $3,
-    last_error_code = 'invariant_failed', last_error_at = $3, updated_at = $3
+    last_error_code = 'lease_lost', last_error_at = $3, updated_at = $3
 WHERE window_start = $1 AND user_id = $2 AND status = 'pending'`,
 		deferredWindowStart, userID, deferredEvidenceNow); err != nil || commandTag.RowsAffected() != 1 {
 		t.Fatalf("prepare dead prepublication work rows=%d error=%v", commandTag.RowsAffected(), err)
@@ -268,14 +317,18 @@ WHERE window_start = $1 AND user_id = $2 AND status = 'pending'`,
 	}
 	retryID := uuid.New()
 	retryReason := "修复发布前做种产生零可奖励窗口后的结算误判。"
-	retryResult, err := retryRepository.RequeueDead(ctx, seedingreward.DeadWorkRetryCommand{
+	retryCommand := seedingreward.DeadWorkRetryCommand{
 		ID: retryID, WindowStart: deferredWindowStart, UserID: userID,
-		ExpectedAttempts: 10, ExpectedErrorCode: "invariant_failed",
+		ExpectedAttempts: 10, ExpectedErrorCode: "lease_lost",
 		OperatorReference: "integration:prepublication-zero-reward", Reason: retryReason,
 		OccurredAt: deferredEvidenceNow.Add(time.Minute),
-	})
-	if err != nil || retryResult.RetryID != retryID || retryResult.PreviousAttempts != 10 {
+	}
+	retryResult, err := retryRepository.RequeueDead(ctx, retryCommand)
+	if err != nil || retryResult.RetryID != retryID || retryResult.PreviousAttempts != 10 || retryResult.PreviousErrorCode != "lease_lost" {
 		t.Fatalf("RequeueDead() = %+v, %v", retryResult, err)
+	}
+	if _, err := retryRepository.RequeueDead(ctx, retryCommand); !errors.Is(err, seedingreward.ErrDeadWorkConflict) {
+		t.Fatalf("RequeueDead(replay) error=%v", err)
 	}
 	var retryAuditPayload string
 	if err := pool.QueryRow(ctx, `

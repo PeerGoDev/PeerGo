@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	ErrWorkLease       = errors.New("seeding reward work lease is no longer owned")
-	ErrBenefitNotFound = errors.New("seeding reward historical benefit was not found")
+	ErrWorkLease           = errors.New("seeding reward work lease is no longer owned")
+	ErrBenefitNotFound     = errors.New("seeding reward historical benefit was not found")
+	ErrTransactionConflict = errors.New("seeding reward settlement transaction conflicted")
 )
 
 type PendingReward struct {

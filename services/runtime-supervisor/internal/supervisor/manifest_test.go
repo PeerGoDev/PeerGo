@@ -4,7 +4,7 @@ import "testing"
 
 func TestComponentsHaveUniqueNamesAndExecutables(t *testing.T) {
 	t.Parallel()
-	for mode, expected := range map[Mode]int{ModeAPI: 3, ModeWorker: 22} {
+	for mode, expected := range map[Mode]int{ModeAPI: 3, ModeWorker: 21} {
 		components, err := Components(mode)
 		if err != nil {
 			t.Fatalf("components for %s: %v", mode, err)

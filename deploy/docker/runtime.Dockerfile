@@ -21,11 +21,10 @@ RUN mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-snapshot-publisher ./services/core/cmd/snapshot-builder && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-policy-worker ./services/core/cmd/promotion-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-image-derivative-worker ./services/core/cmd/image-derivative-worker && \
-    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-worker ./services/core/cmd/seeding-reward-worker && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-reward-worker ./services/core/cmd/reward-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-retry ./services/core/cmd/seeding-reward-retry && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-compensation-preview ./services/core/cmd/seeding-reward-compensation-preview && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-seeding-reward-compensation-apply ./services/core/cmd/seeding-reward-compensation-apply && \
-    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-contribution-experience-worker ./services/core/cmd/contribution-experience-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-progression-level-worker ./services/core/cmd/progression-level-worker && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-traffic-projector ./services/core/cmd/traffic-projector && \
     CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/core-storage-maintenance ./services/core/cmd/storage-maintenance && \

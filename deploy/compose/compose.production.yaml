@@ -433,16 +433,10 @@ services:
     command: ["core-image-derivative-worker"]
     depends_on: *core-migrated
 
-  core-seeding-reward-worker:
+  core-reward-worker:
     <<: *long-running
     profiles: ["split-runtime"]
-    command: ["core-seeding-reward-worker"]
-    depends_on: *core-migrated
-
-  core-contribution-experience-worker:
-    <<: *long-running
-    profiles: ["split-runtime"]
-    command: ["core-contribution-experience-worker"]
+    command: ["core-reward-worker"]
     depends_on: *core-migrated
 
   core-storage-maintenance:
