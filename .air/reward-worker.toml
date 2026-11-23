@@ -1,9 +1,9 @@
 root = "../.."
-tmp_dir = ".local/air/contribution-experience-worker"
+tmp_dir = ".local/air/reward-worker"
 
 [build]
-cmd = "go -C ../.. build -o ./.local/air/contribution-experience-worker/contribution-experience-worker ./services/core/cmd/contribution-experience-worker"
-entrypoint = ["./.local/air/contribution-experience-worker/contribution-experience-worker"]
+cmd = "go -C ../.. build -o ./.local/air/reward-worker/reward-worker ./services/core/cmd/reward-worker"
+entrypoint = ["./.local/air/reward-worker/reward-worker"]
 include_ext = ["go", "sql"]
 include_dir = ["services/core", "contracts/go"]
 exclude_regex = ["_test\\.go$"]

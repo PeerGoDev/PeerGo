@@ -13,6 +13,8 @@ import (
 
 type settlementRepositoryStub struct {
 	pending      []PendingReward
+	claimTimes   []time.Time
+	afterSettle  func()
 	settleResult SettlementResult
 	settleError  error
 	released     bool
@@ -20,11 +22,18 @@ type settlementRepositoryStub struct {
 	releaseDead  bool
 }
 
-func (stub *settlementRepositoryStub) Claim(context.Context, time.Time, int32, time.Duration) ([]PendingReward, error) {
-	return append([]PendingReward(nil), stub.pending...), nil
+func (stub *settlementRepositoryStub) Claim(_ context.Context, now time.Time, limit int32, _ time.Duration) ([]PendingReward, error) {
+	stub.claimTimes = append(stub.claimTimes, now)
+	count := min(len(stub.pending), int(limit))
+	claimed := stub.pending[:count]
+	stub.pending = stub.pending[count:]
+	return claimed, nil
 }
 
 func (stub *settlementRepositoryStub) Settle(context.Context, PendingReward, time.Time) (SettlementResult, error) {
+	if stub.afterSettle != nil {
+		stub.afterSettle()
+	}
 	return stub.settleResult, stub.settleError
 }
 
@@ -50,6 +59,46 @@ func TestWorkerCompletesClaimedReward(t *testing.T) {
 	processed, err := worker.RunOnce(context.Background())
 	if err != nil || processed != 1 || stub.released {
 		t.Fatalf("RunOnce() processed=%d released=%t error=%v", processed, stub.released, err)
+	}
+}
+
+func TestWorkerClaimsNextRewardAfterSlowSettlement(t *testing.T) {
+	start := time.Date(2026, 8, 16, 0, 0, 0, 0, time.UTC)
+	now := start
+	lease := 30 * time.Second
+	settlementTime := lease + time.Second
+	stub := &settlementRepositoryStub{
+		pending:     make([]PendingReward, 3),
+		afterSettle: func() { now = now.Add(settlementTime) },
+	}
+	worker, err := NewWorker(stub, WorkerConfig{
+		BatchSize: 2, LeaseDuration: lease, Now: func() time.Time { return now },
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	processed, err := worker.RunOnce(context.Background())
+	if err != nil || processed != 2 || len(stub.pending) != 1 {
+		t.Fatalf("RunOnce() processed=%d remaining=%d error=%v", processed, len(stub.pending), err)
+	}
+	if len(stub.claimTimes) != 2 || !stub.claimTimes[0].Equal(start) || !stub.claimTimes[1].Equal(start.Add(settlementTime)) {
+		t.Fatalf("claim times = %v, want a new claim after the first settlement ends", stub.claimTimes)
+	}
+}
+
+func TestWorkerReleasesTransactionConflictWithItsOwnCode(t *testing.T) {
+	stub := &settlementRepositoryStub{
+		pending:     []PendingReward{{Attempts: 1}},
+		settleError: ErrTransactionConflict,
+	}
+	worker, err := NewWorker(stub, WorkerConfig{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	processed, err := worker.RunOnce(context.Background())
+	if processed != 1 || !errors.Is(err, ErrTransactionConflict) || !stub.released || stub.releaseCode != "transaction_conflict" || stub.releaseDead {
+		t.Fatalf("RunOnce() processed=%d released=%t code=%s dead=%t error=%v",
+			processed, stub.released, stub.releaseCode, stub.releaseDead, err)
 	}
 }
 

@@ -50,23 +50,29 @@ func (repository *PostgresSettlementRepository) Claim(ctx context.Context, now t
 		return nil, ErrInput
 	}
 	leaseToken := uuid.New()
+	// Each branch can use its status-specific partial index. Find the oldest
+	// incomplete window per user before consulting the historical primary index.
 	rows, err := repository.pool.Query(ctx, `
-WITH candidate AS (
+WITH incomplete AS (
+    SELECT window_start, user_id
+    FROM economy.seeding_reward_work_items
+    WHERE status IN ('pending', 'processing')
+    UNION ALL
+    SELECT window_start, user_id
+    FROM economy.seeding_reward_work_items
+    WHERE status = 'dead'
+), heads AS MATERIALIZED (
+    SELECT min(window_start) AS window_start, user_id
+    FROM incomplete
+    GROUP BY user_id
+), candidate AS (
     SELECT work.window_start, work.user_id
-    FROM economy.seeding_reward_work_items AS work
-    WHERE (
-        (work.status = 'pending' AND work.available_at <= $1)
-        OR (work.status = 'processing' AND work.lease_until <= $1)
-    )
-      AND NOT EXISTS (
-          SELECT 1
-          FROM economy.seeding_reward_work_items AS earlier
-          WHERE earlier.user_id = work.user_id
-            AND earlier.window_start < work.window_start
-            AND earlier.status <> 'completed'
-      )
+    FROM heads
+    JOIN economy.seeding_reward_work_items AS work USING (window_start, user_id)
+    WHERE (work.status = 'pending' AND work.available_at <= $1)
+       OR (work.status = 'processing' AND work.lease_until <= $1)
     ORDER BY work.window_start, work.user_id
-    FOR UPDATE SKIP LOCKED
+    FOR UPDATE OF work SKIP LOCKED
     LIMIT $2
 )
 UPDATE economy.seeding_reward_work_items AS work
@@ -99,7 +105,13 @@ RETURNING work.window_start, work.user_id, work.attempts`, now, batchSize, lease
 	return result, nil
 }
 
-func (repository *PostgresSettlementRepository) Settle(ctx context.Context, pending PendingReward, now time.Time) (SettlementResult, error) {
+func (repository *PostgresSettlementRepository) Settle(ctx context.Context, pending PendingReward, now time.Time) (_ SettlementResult, err error) {
+	defer func() {
+		var postgresError *pgconn.PgError
+		if errors.As(err, &postgresError) && (postgresError.Code == "40001" || postgresError.Code == "40P01") {
+			err = fmt.Errorf("%w: %w", ErrTransactionConflict, err)
+		}
+	}()
 	now = canonicalTime(now)
 	pending.WindowStart = canonicalTime(pending.WindowStart)
 	if pending.WindowStart.IsZero() || pending.UserID == uuid.Nil || pending.LeaseToken == uuid.Nil || pending.Attempts < 1 || now.IsZero() {
@@ -113,16 +125,21 @@ func (repository *PostgresSettlementRepository) Settle(ctx context.Context, pend
 
 	var leaseUntil time.Time
 	var status string
+	// Once locked, the work row is skipped by competing claims until this
+	// transaction completes, even if the lease expires during settlement.
 	err = tx.QueryRow(ctx, `
 SELECT status, lease_until
 FROM economy.seeding_reward_work_items
 WHERE window_start = $1 AND user_id = $2 AND lease_token = $3
 FOR UPDATE`, pending.WindowStart, pending.UserID, pending.LeaseToken).Scan(&status, &leaseUntil)
-	if errors.Is(err, pgx.ErrNoRows) || status != "processing" || leaseUntil.Before(now) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return SettlementResult{}, ErrWorkLease
 	}
 	if err != nil {
 		return SettlementResult{}, fmt.Errorf("lock seeding reward work: %w", err)
+	}
+	if status != "processing" || !leaseUntil.After(now) {
+		return SettlementResult{}, ErrWorkLease
 	}
 
 	window, err := readRewardWindow(ctx, tx, pending.WindowStart)
@@ -228,7 +245,10 @@ SET status = 'completed', lease_token = NULL, lease_until = NULL,
 WHERE window_start = $1 AND user_id = $2
   AND status = 'processing' AND lease_token = $3`,
 		window.Start, pending.UserID, pending.LeaseToken, now)
-	if err != nil || commandTag.RowsAffected() != 1 {
+	if err != nil {
+		return SettlementResult{}, classifySettlementDatabaseError("complete seeding reward work", err)
+	}
+	if commandTag.RowsAffected() != 1 {
 		return SettlementResult{}, ErrWorkLease
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -290,11 +310,14 @@ FROM economy.seeding_reward_evidence_windows
 WHERE window_start = $1
 FOR SHARE`, start).Scan(&result.Start, &result.End, &evidence, &result.SnapshotID,
 		&result.SnapshotSequence, &result.SnapshotObservedAt, &status)
-	if errors.Is(err, pgx.ErrNoRows) || status != "complete" || len(evidence) != sha256.Size {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return rewardWindow{}, ErrInvariant
 	}
 	if err != nil {
 		return rewardWindow{}, fmt.Errorf("read complete seeding reward window: %w", err)
+	}
+	if status != "complete" || len(evidence) != sha256.Size {
+		return rewardWindow{}, ErrInvariant
 	}
 	copy(result.EvidenceSHA256[:], evidence)
 	result.Start, result.End = canonicalTime(result.Start), canonicalTime(result.End)
@@ -532,8 +555,11 @@ FROM progression.level_definitions
 WHERE policy_version = 'rousi-v1'
 ORDER BY minimum_experience, level
 LIMIT 1`).Scan(&policy, &level)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return "", 0, ErrBenefitNotFound
+	}
+	if err != nil {
+		return "", 0, fmt.Errorf("read initial seeding reward level: %w", err)
 	}
 	return policy, level, nil
 }
@@ -552,8 +578,6 @@ func classifySettlementDatabaseError(operation string, err error) error {
 		switch postgresError.Code {
 		case "23505":
 			return fmt.Errorf("%w: %s: %v", ErrEvidenceConflict, operation, err)
-		case "40001", "40P01":
-			return fmt.Errorf("%w: %s: %v", ErrWorkLease, operation, err)
 		case "P0001", "23503", "23514", "22003":
 			return fmt.Errorf("%w: %s: %v", ErrInvariant, operation, err)
 		}

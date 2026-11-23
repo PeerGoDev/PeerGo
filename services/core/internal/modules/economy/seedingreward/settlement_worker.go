@@ -16,7 +16,7 @@ const (
 )
 
 type WorkerConfig struct {
-	BatchSize       int32
+	BatchSize       int32 // Maximum number of tasks processed per RunOnce.
 	LeaseDuration   time.Duration
 	PollInterval    time.Duration
 	MaximumAttempts int32
@@ -60,33 +60,44 @@ func NewWorker(repository SettlementRepository, config WorkerConfig, logger *slo
 }
 
 func (worker *Worker) RunOnce(ctx context.Context) (int, error) {
-	now := worker.config.Now().UTC()
-	pending, err := worker.repository.Claim(ctx, now, worker.config.BatchSize, worker.config.LeaseDuration)
-	if err != nil {
-		return 0, err
-	}
+	processed := 0
 	var failures []error
-	for _, item := range pending {
+	for processed < int(worker.config.BatchSize) {
+		// A queued task must not spend its lease waiting for another settlement.
+		claimStarted := time.Now()
+		pending, err := worker.repository.Claim(ctx, worker.config.Now().UTC(), 1, worker.config.LeaseDuration)
+		if err != nil {
+			failures = append(failures, err)
+			break
+		}
+		if len(pending) == 0 {
+			break
+		}
+		item := pending[0]
+		processed++
+		settlementStarted := time.Now()
+		claimDuration := settlementStarted.Sub(claimStarted)
 		result, settleErr := worker.repository.Settle(ctx, item, worker.config.Now().UTC())
+		settlementDuration := time.Since(settlementStarted)
 		if settleErr == nil {
 			worker.logger.InfoContext(ctx, "seeding reward settled",
 				"window_start", result.WindowStart, "user_id", result.UserID,
 				"policy_revision", result.PolicyRevision, "reward", result.Reward,
-				"experience", result.ExperienceAmount)
+				"experience", result.ExperienceAmount, "claim_duration_ms", claimDuration.Milliseconds(),
+				"settlement_duration_ms", settlementDuration.Milliseconds())
 			continue
 		}
 		errorCode, indefinitelyRetryable := rewardErrorCode(settleErr)
 		terminal := !indefinitelyRetryable && item.Attempts >= worker.config.MaximumAttempts
 		next := worker.config.Now().UTC().Add(rewardRetryDelay(item.Attempts, indefinitelyRetryable))
+		failure := fmt.Errorf("settle reward %s/%s (%s, claim=%s, settle=%s): %w",
+			item.WindowStart.Format(time.RFC3339), item.UserID, errorCode, claimDuration, settlementDuration, settleErr)
 		if releaseErr := worker.repository.Release(ctx, item, next, errorCode, terminal); releaseErr != nil {
-			failures = append(failures, fmt.Errorf("settle reward %s/%s: %w; release: %v",
-				item.WindowStart.Format(time.RFC3339), item.UserID, settleErr, releaseErr))
-			continue
+			failure = fmt.Errorf("%w; release: %v", failure, releaseErr)
 		}
-		failures = append(failures, fmt.Errorf("settle reward %s/%s: %w",
-			item.WindowStart.Format(time.RFC3339), item.UserID, settleErr))
+		failures = append(failures, failure)
 	}
-	return len(pending), errors.Join(failures...)
+	return processed, errors.Join(failures...)
 }
 
 func (worker *Worker) Run(ctx context.Context) error {
@@ -118,6 +129,8 @@ func rewardErrorCode(err error) (string, bool) {
 		return "benefit_not_found", true
 	case errors.Is(err, ErrWorkLease):
 		return "lease_lost", false
+	case errors.Is(err, ErrTransactionConflict):
+		return "transaction_conflict", false
 	case errors.Is(err, ErrEvidenceConflict):
 		return "evidence_conflict", false
 	case errors.Is(err, ErrInput):

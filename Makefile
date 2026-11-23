@@ -1,4 +1,4 @@
-.PHONY: generate format test check check-postgres-time-parameters test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-seeding-reward-worker dev-seeding-reward-worker-watch dev-contribution-experience-worker dev-contribution-experience-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-storage-maintenance dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-storage-maintenance dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
+.PHONY: generate format test check check-postgres-time-parameters test-e2e release-check dev-web dev-core dev-core-watch dev-worker dev-image-derivative-worker dev-image-derivative-worker-watch dev-promotion-worker dev-promotion-worker-watch dev-settlement-control-worker dev-settlement-control-worker-watch dev-reward-worker dev-reward-worker-watch dev-progression-level-worker dev-progression-level-worker-watch dev-projector dev-snapshot-builder dev-snapshot-publisher dev-core-traffic-consumer dev-core-traffic-projector dev-core-storage-maintenance dev-core-seeding-evidence-consumer dev-core-seeding-evidence-projector dev-core-hnr-consumer dev-core-hnr-projector dev-core-swarm-consumers dev-core-swarm-projector tracker-snapshot-inspect dev-tracker-stream dev-tracker-swarm-stream dev-tracker dev-settlement-consumer dev-settlement dev-settlement-policy dev-settlement-storage-maintenance dev-settlement-seeding-snapshot-consumer dev-settlement-seeding-snapshot-projector dev-settlement-seeding-evidence-worker dev-settlement-seeding-evidence-stream dev-settlement-seeding-evidence-dispatcher dev-settlement-promotion-control dev-settlement-promotion-control-watch dev-settlement-policy-timeline dev-settlement-traffic-stream dev-settlement-traffic-dispatcher dev-settlement-hnr-policy-timeline dev-settlement-hnr-worker dev-settlement-hnr-stream dev-settlement-hnr-dispatcher dev-traffic-demo dev-vault dev-audit dev-object-storage dev-torrent-storage dev-torrent-upload-reconcile admin admin-revoke staff-bootstrap compose-up compose-down db-migrate db-status db-seed
 .PHONY: legacy-migrate rousi-restore-local rousi-restore-production-prepare rousi-restore-production-apply rousi-restore-production-status single-server-bootstrap production-config production-ready production-build production-log-rotation production-up production-prune-one-shots production-down production-status production-activation-check production-policy-bootstrap production-admin production-admin-revoke production-tracker-rate-policy production-seeding-reward-retry production-seeding-reward-compensation-preview production-seeding-reward-compensation-apply production-hnr-work-reconcile production-traffic-pipeline-reconfigure
 
 # These values are synthetic and limited to the loopback-only local Compose
@@ -313,30 +313,16 @@ dev-settlement-control-worker: dev-promotion-worker
 
 dev-settlement-control-worker-watch: dev-promotion-worker-watch
 
-# Reward settlement only receives the Core database credential.  It has no
-# Tracker Ledger, NATS, Vault, object-storage or HTTP control-plane access.
-dev-seeding-reward-worker:
+# Seeding rewards and contribution experience share a Core database pool.
+dev-reward-worker:
 	PEERGO_ENV=development \
 	PEERGO_CORE_DATABASE_URL="$(CORE_DATABASE_URL)" \
-	go run ./services/core/cmd/seeding-reward-worker
+	go run ./services/core/cmd/reward-worker
 
-dev-seeding-reward-worker-watch:
+dev-reward-worker-watch:
 	PEERGO_ENV=development \
 	PEERGO_CORE_DATABASE_URL="$(CORE_DATABASE_URL)" \
-	go -C tools/devtools tool air -c ../../.air/seeding-reward-worker.toml
-
-# Raw-upload GiB crossings, first torrent publication and complete account days
-# share one progression-only worker. It receives only the Core database URL;
-# Tracker evidence has already been privacy-minimized by the traffic projector.
-dev-contribution-experience-worker:
-	PEERGO_ENV=development \
-	PEERGO_CORE_DATABASE_URL="$(CORE_DATABASE_URL)" \
-	go run ./services/core/cmd/contribution-experience-worker
-
-dev-contribution-experience-worker-watch:
-	PEERGO_ENV=development \
-	PEERGO_CORE_DATABASE_URL="$(CORE_DATABASE_URL)" \
-	go -C tools/devtools tool air -c ../../.air/contribution-experience-worker.toml
+	go -C tools/devtools tool air -c ../../.air/reward-worker.toml
 
 # Level activation is deliberately separate from experience calculation. At a
 # scheduled boundary it atomically reprojects every account and records one
