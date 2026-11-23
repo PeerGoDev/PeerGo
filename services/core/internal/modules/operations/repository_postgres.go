@@ -252,13 +252,20 @@ SELECT
     0,
     (SELECT count(*) FROM audit.outbox WHERE delivered_at IS NOT NULL),
     min(created_at),
-    (SELECT left(last_error, 64) FROM audit.outbox WHERE last_error IS NOT NULL ORDER BY available_at DESC LIMIT 1),
+    (SELECT left(last_error, 64) FROM audit.outbox WHERE delivered_at IS NULL AND last_error IS NOT NULL ORDER BY available_at DESC LIMIT 1),
     NULL::timestamptz
 FROM audit.outbox
 WHERE delivered_at IS NULL`
 
 // Keep exact reward counters on narrow status/error indexes.
 const seedingRewardQueueStatusSQL = `
+WITH latest_unresolved_error AS (
+    SELECT last_error_code, last_error_at
+    FROM economy.seeding_reward_work_items
+    WHERE status <> 'completed' AND last_error_code IS NOT NULL
+    ORDER BY last_error_at DESC
+    LIMIT 1
+)
 SELECT
     count(*) FILTER (WHERE status = 'pending' AND attempts = 0),
     count(*) FILTER (WHERE status = 'processing'),
@@ -266,8 +273,8 @@ SELECT
     (SELECT count(*) FROM economy.seeding_reward_work_items WHERE status = 'dead'),
     (SELECT count(*) FROM economy.seeding_reward_work_items WHERE status = 'completed'),
     min(created_at),
-    (SELECT last_error_code FROM economy.seeding_reward_work_items WHERE last_error_code IS NOT NULL ORDER BY last_error_at DESC LIMIT 1),
-    (SELECT last_error_at FROM economy.seeding_reward_work_items WHERE last_error_code IS NOT NULL ORDER BY last_error_at DESC LIMIT 1)
+    (SELECT last_error_code FROM latest_unresolved_error),
+    (SELECT last_error_at FROM latest_unresolved_error)
 FROM economy.seeding_reward_work_items
 WHERE status IN ('pending', 'processing')`
 
@@ -296,7 +303,7 @@ SELECT
     0,
     count(*) FILTER (WHERE delivered_at IS NOT NULL),
     min(created_at) FILTER (WHERE delivered_at IS NULL),
-    (SELECT last_error_code FROM promotion.delivery_outbox WHERE last_error_code IS NOT NULL ORDER BY available_at DESC LIMIT 1),
+    (SELECT last_error_code FROM promotion.delivery_outbox WHERE delivered_at IS NULL AND last_error_code IS NOT NULL ORDER BY available_at DESC LIMIT 1),
     NULL::timestamptz
 FROM promotion.delivery_outbox`, "promotion_delivery", "优惠政策投递")
 	if err != nil {
@@ -312,7 +319,7 @@ SELECT
     0,
     count(*) FILTER (WHERE delivered_at IS NOT NULL),
     min(created_at) FILTER (WHERE delivered_at IS NULL),
-    (SELECT last_error_code FROM hnr_control.delivery_outbox WHERE last_error_code IS NOT NULL ORDER BY available_at DESC LIMIT 1),
+    (SELECT last_error_code FROM hnr_control.delivery_outbox WHERE delivered_at IS NULL AND last_error_code IS NOT NULL ORDER BY available_at DESC LIMIT 1),
     NULL::timestamptz
 FROM hnr_control.delivery_outbox`, "hnr_policy_delivery", "H&R 政策投递")
 	if err != nil {
@@ -337,7 +344,7 @@ SELECT
     0,
     count(*) FILTER (WHERE delivered_at IS NOT NULL),
     min(created_at) FILTER (WHERE delivered_at IS NULL),
-    (SELECT last_error_code FROM commands WHERE last_error_code IS NOT NULL ORDER BY available_at DESC LIMIT 1),
+    (SELECT last_error_code FROM commands WHERE delivered_at IS NULL AND last_error_code IS NOT NULL ORDER BY available_at DESC LIMIT 1),
     NULL::timestamptz
 FROM commands`, "entitlement_benefit_delivery", "用户权益结算投递")
 	if err != nil {
@@ -405,7 +412,7 @@ SELECT
     0,
     count(*) FILTER (WHERE projected_at IS NOT NULL),
     min(created_at) FILTER (WHERE projected_at IS NULL),
-    (SELECT last_error_code FROM tracker_control.outbox WHERE last_error_code IS NOT NULL ORDER BY available_at DESC LIMIT 1),
+    (SELECT last_error_code FROM tracker_control.outbox WHERE projected_at IS NULL AND last_error_code IS NOT NULL ORDER BY available_at DESC LIMIT 1),
     NULL::timestamptz
 FROM tracker_control.outbox`, "tracker_control", "Tracker 控制投影")
 	if err != nil {

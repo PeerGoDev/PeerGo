@@ -5192,7 +5192,7 @@ export interface components {
             /** @enum {string} */
             default_torrent_view: "list" | "poster";
             show_latest_announcement: boolean;
-            /** @description 已启用并按后台顺序排列的左侧自定义菜单。 */
+            /** @description 按后台顺序排列的已启用侧栏链接与公开申诉联系方式。 */
             custom_navigation_items: components["schemas"]["CustomNavigationItem"][];
         };
         SiteDisplaySettings: {
@@ -5234,12 +5234,15 @@ export interface components {
         CustomNavigationItem: {
             label: string;
             /**
-             * @description 站内绝对路径或不含凭据的 HTTPS 地址。
+             * @description 站内绝对路径、不含凭据的 HTTPS 地址或单一邮箱的 mailto 地址。申诉联系方式须使用 HTTPS 或 mailto 地址。
              * @example https://wiki.example.com
              */
             url: string;
             open_in_new_tab: boolean;
+            /** @description 是否在侧栏显示。 */
             enabled: boolean;
+            /** @description 是否作为公开联系方式显示在封禁申诉页。 */
+            show_on_appeal?: boolean;
         };
         RSSSubscription: {
             /** Format: uuid */

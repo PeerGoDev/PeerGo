@@ -36,6 +36,7 @@ import {
   submitAccountAccessAppeal,
 } from "~/features/auth/api/account-access"
 import { AuthEntryCard } from "~/features/auth/components/auth-entry-card"
+import { useSiteInfo } from "~/features/site/api/site.queries"
 import { ApiProblemError, requestErrorDescription } from "~/shared/api/problem"
 
 const proofSchema = z.object({
@@ -45,6 +46,10 @@ const proofSchema = z.object({
 })
 
 export function AccountAccessPage() {
+  const siteInfo = useSiteInfo()
+  const contacts = (siteInfo.data?.custom_navigation_items ?? []).filter(
+    (item) => item.show_on_appeal
+  )
   const formRef = React.useRef<HTMLFormElement>(null)
   const [status, setStatus] = React.useState<AccountAccessStatus>()
   const [statement, setStatement] = React.useState("")
@@ -241,6 +246,34 @@ export function AccountAccessPage() {
               </Field>
             ) : null}
           </div>
+        ) : null}
+        {contacts.length > 0 ? (
+          <section
+            aria-labelledby="appeal-contact-title"
+            className="mt-5 border-t pt-5"
+          >
+            <h2 id="appeal-contact-title" className="text-sm font-medium">
+              联系站务
+            </h2>
+            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              {contacts.map((contact) => {
+                const newTab =
+                  contact.open_in_new_tab && contact.url.startsWith("https://")
+                return (
+                  <li key={contact.url}>
+                    <a
+                      href={contact.url}
+                      className="break-all text-link underline-offset-4 hover:underline"
+                      target={newTab ? "_blank" : undefined}
+                      rel={newTab ? "noopener noreferrer" : undefined}
+                    >
+                      {contact.label}
+                    </a>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
         ) : null}
       </CardContent>
       <CardFooter className="justify-center border-t px-6 text-sm">

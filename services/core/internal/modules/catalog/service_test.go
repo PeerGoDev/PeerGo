@@ -33,21 +33,23 @@ func TestGetSiteInfoUsesServiceClock(t *testing.T) {
 	}
 }
 
-func TestGetSiteInfoOnlyPublishesEnabledCustomNavigationItems(t *testing.T) {
+func TestGetSiteInfoPublishesSidebarLinksAndAppealContacts(t *testing.T) {
 	t.Parallel()
 
 	wiki := CustomNavigationItem{Label: "Wiki", URL: "https://wiki.example.com", OpenInNewTab: true, Enabled: true}
+	contact := CustomNavigationItem{Label: "申诉邮箱", URL: "mailto:help@example.com", ShowOnAppeal: true}
 	repository := &recordingSiteInfoRepository{result: SiteInfo{
 		Name: "PeerGo",
 		CustomNavigationItems: []CustomNavigationItem{
 			wiki,
 			{Label: "Hidden", URL: "/hidden", Enabled: false},
+			contact,
 		},
 	}}
 	service := NewService(repository, time.Now)
 
 	got, err := service.GetSiteInfo(context.Background())
-	if err != nil || !reflect.DeepEqual(got.CustomNavigationItems, []CustomNavigationItem{wiki}) {
+	if err != nil || !reflect.DeepEqual(got.CustomNavigationItems, []CustomNavigationItem{wiki, contact}) {
 		t.Fatalf("GetSiteInfo() custom navigation = %+v, error=%v", got.CustomNavigationItems, err)
 	}
 }

@@ -231,8 +231,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       label: item.label,
       to: item.url,
       icon: ExternalLinkIcon,
-      external: item.url.startsWith("https://"),
-      openInNewTab: item.open_in_new_tab,
+      external: !item.url.startsWith("/"),
+      openInNewTab: item.open_in_new_tab && !item.url.startsWith("mailto:"),
     }))
   const customNavigationGroups: NavigationGroup[] =
     customNavigationItems.length > 0
@@ -449,7 +449,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             },
           ],
         },
-        { label: "主要功能", items: magicNavigationItems },
         ...customNavigationGroups,
       ]
     : [

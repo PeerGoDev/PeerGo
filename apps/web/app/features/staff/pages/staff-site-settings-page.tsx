@@ -708,7 +708,8 @@ function CustomNavigationItemsEditor({
         <FieldContent>
           <FieldLabel>菜单链接</FieldLabel>
           <FieldDescription className="text-xs">
-            最多 12 项；支持站内路径和 HTTPS 站外地址，不记录点击或访问历史。
+            最多 12 项。申诉联系方式可填写官方群的 HTTPS 地址，或使用
+            mailto:邮箱地址。
           </FieldDescription>
         </FieldContent>
         <Button
@@ -832,6 +833,25 @@ function CustomNavigationItemsEditor({
                     disabled={disabled}
                     onCheckedChange={(enabled) =>
                       updateItem(index, { enabled })
+                    }
+                  />
+                </Field>
+                <Field
+                  orientation="horizontal"
+                  data-disabled={disabled}
+                  className="min-h-10 rounded-md border px-3 py-2"
+                >
+                  <FieldContent>
+                    <FieldLabel htmlFor={`custom-navigation-appeal-${index}`}>
+                      在封禁申诉页公开显示
+                    </FieldLabel>
+                  </FieldContent>
+                  <Switch
+                    id={`custom-navigation-appeal-${index}`}
+                    checked={item.show_on_appeal ?? false}
+                    disabled={disabled}
+                    onCheckedChange={(showOnAppeal) =>
+                      updateItem(index, { show_on_appeal: showOnAppeal })
                     }
                   />
                 </Field>

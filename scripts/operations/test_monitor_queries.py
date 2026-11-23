@@ -91,15 +91,15 @@ INSERT INTO audit.outbox VALUES
  ('00000000-0000-0000-0000-000000000002',0,'2026-10-01Z',NULL,'2026-09-30Z',NULL,'2026-09-30Z'),
  ('00000000-0000-0000-0000-000000000003',1,'2026-10-01T01:00Z',NULL,'2026-09-30Z',NULL,'2026-09-30Z'),
  ('00000000-0000-0000-0000-000000000004',1,NULL,NULL,'2026-09-30Z','retry','2026-09-30Z'),
- ('00000000-0000-0000-0000-000000000005',2,'2026-10-01Z',NULL,'2026-09-30Z','expired','2026-09-30Z'),
+ ('00000000-0000-0000-0000-000000000005',2,'2026-10-01Z',NULL,'2026-09-30Z','expired','2026-09-30T01:00Z'),
  ('00000000-0000-0000-0000-000000000006',0,'2026-10-01T01:00Z',NULL,'2026-09-30Z',NULL,'2026-09-30Z'),
  ('00000000-0000-0000-0000-000000000007',3,NULL,'2026-09-30Z','2026-09-30Z',repeat('旧',70),'2026-10-01Z');
 ''')
 r = audit_result(audit)
-assert r == audit_result(old_audit), r
+assert r == {**audit_result(old_audit), 'error': 'expired'}, r
 assert [r[k] for k in ('pending','processing','retrying','dead','completed')] == [2,2,2,0,10001], r
-assert r['error'] == '旧'*64 and r['oldest'].startswith('2026-09-28'), r
-print('PASS audit: empty queue, leases, expiry boundary, retries, exact completed count, historical errors', flush=True)
+assert r['oldest'].startswith('2026-09-28'), r
+print('PASS audit: empty queue, leases, expiry boundary, retries, exact completed count, resolved errors excluded', flush=True)
 
 sql('''
 INSERT INTO workgroups.memberships SELECT md5(('m'||n)::text)::uuid,md5(('u'||n)::text)::uuid,'retention'
@@ -166,7 +166,12 @@ reward = re.search(r'const seedingRewardQueueStatusSQL = `([\s\S]+?)`',
 old_reward = (a.references / 'reward-before.sql').read_text()
 def reward_result(q):
  return json.loads(sql('WITH r(a,b,c,d,e,f,g,h) AS ('+q+') SELECT row_to_json(r) FROM r'))
-assert reward_result(reward)==reward_result(old_reward)
+r = reward_result(reward)
+assert r == {**reward_result(old_reward), 'g': 'dead', 'h': r['h']}, r
+assert r['h'].startswith('2026-10-03'), r
+sql("DELETE FROM economy.seeding_reward_work_items WHERE status <> 'completed'")
+r = reward_result(reward)
+assert r == {**reward_result(old_reward), 'g': None, 'h': None}, r
 sql('TRUNCATE economy.seeding_reward_work_items')
 assert reward_result(reward)==reward_result(old_reward)
 reward_migration=(a.root/'db/core/migrations/202610200002_core_reward_monitor_indexes.sql').read_text()
@@ -174,4 +179,4 @@ for direction in ['Up','Down','Up']:
  part=reward_migration.split('-- +goose '+direction,1)[1].split('-- +goose Down',1)[0]
  for command in part.split(';'):
   if command.strip():sql(command+';')
-print('PASS reward exact counters: empty queue, all states, terminal errors; concurrent index up/down/up',flush=True)
+print('PASS reward exact counters: empty queue, all states, resolved errors excluded; concurrent index up/down/up',flush=True)

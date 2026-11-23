@@ -3612,9 +3612,13 @@ func siteDisplaySettingsDTO(settings catalog.SiteDisplaySettings) generated.Site
 func customNavigationItemsDTO(items []catalog.CustomNavigationItem) []generated.CustomNavigationItem {
 	result := make([]generated.CustomNavigationItem, 0, len(items))
 	for _, item := range items {
-		result = append(result, generated.CustomNavigationItem{
+		dto := generated.CustomNavigationItem{
 			Label: item.Label, Url: item.URL, OpenInNewTab: item.OpenInNewTab, Enabled: item.Enabled,
-		})
+		}
+		if item.ShowOnAppeal {
+			dto.ShowOnAppeal = &item.ShowOnAppeal
+		}
+		result = append(result, dto)
 	}
 	return result
 }
@@ -3624,6 +3628,7 @@ func customNavigationItemsInput(items []generated.CustomNavigationItem) []catalo
 	for _, item := range items {
 		result = append(result, catalog.CustomNavigationItem{
 			Label: item.Label, URL: item.Url, OpenInNewTab: item.OpenInNewTab, Enabled: item.Enabled,
+			ShowOnAppeal: item.ShowOnAppeal != nil && *item.ShowOnAppeal,
 		})
 	}
 	return result

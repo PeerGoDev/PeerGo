@@ -128,6 +128,29 @@ func TestSiteDisplaySettingsRejectsInvalidInputBeforeAuthorization(t *testing.T)
 	}
 }
 
+func TestAppealContactURLs(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		url    string
+		appeal bool
+		valid  bool
+	}{
+		{url: "https://t.me/peergo_example", appeal: true, valid: true},
+		{url: "mailto:help@example.com", appeal: true, valid: true},
+		{url: "mailto:help@example.com", valid: true},
+		{url: "mailto:help@example.com?bcc=other@example.com", appeal: true},
+		{url: "mailto:help@example.com%0aBcc:other@example.com", appeal: true},
+		{url: "https://user:pass@example.com", appeal: true},
+		{url: "/account", appeal: true},
+		{url: "/wiki", valid: true},
+	} {
+		if got := validCustomNavigationURL(test.url, test.appeal); got != test.valid {
+			t.Errorf("validCustomNavigationURL(%q, %t) = %t, want %t", test.url, test.appeal, got, test.valid)
+		}
+	}
+}
+
 func TestSiteDisplaySettingsGeneratesDefaultReasonWhenBlank(t *testing.T) {
 	t.Parallel()
 

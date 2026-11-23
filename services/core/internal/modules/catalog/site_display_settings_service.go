@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -122,7 +123,7 @@ func normalizeCustomNavigationItems(items []CustomNavigationItem) ([]CustomNavig
 		if !utf8.ValidString(item.Label) || !utf8.ValidString(item.URL) ||
 			labelRunes < 1 || labelRunes > maxCustomNavigationLabel ||
 			urlRunes < 1 || urlRunes > maxCustomNavigationURL ||
-			!validCustomNavigationURL(item.URL) {
+			!validCustomNavigationURL(item.URL, item.ShowOnAppeal) {
 			return nil, ErrSiteDisplaySettingsInput
 		}
 		if _, duplicate := labels[labelKey]; duplicate {
@@ -138,13 +139,20 @@ func normalizeCustomNavigationItems(items []CustomNavigationItem) ([]CustomNavig
 	return normalized, nil
 }
 
-func validCustomNavigationURL(value string) bool {
+func validCustomNavigationURL(value string, showOnAppeal bool) bool {
+	if address, ok := strings.CutPrefix(value, "mailto:"); ok {
+		if strings.ContainsAny(address, "%?&#/\\\r\n\t") {
+			return false
+		}
+		parsed, err := mail.ParseAddress(address)
+		return err == nil && parsed.Name == "" && parsed.Address == address
+	}
 	parsed, err := url.ParseRequestURI(value)
 	if err != nil || parsed.User != nil || strings.Contains(value, "\\") {
 		return false
 	}
 	if strings.HasPrefix(value, "/") {
-		return !strings.HasPrefix(value, "//") && parsed.Host == "" && !parsed.IsAbs()
+		return !showOnAppeal && !strings.HasPrefix(value, "//") && parsed.Host == "" && !parsed.IsAbs()
 	}
 	return parsed.Scheme == "https" && parsed.Host != ""
 }

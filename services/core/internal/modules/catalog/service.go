@@ -117,7 +117,7 @@ func (s *Service) GetSiteInfo(ctx context.Context) (SiteInfo, error) {
 	}
 	items := make([]CustomNavigationItem, 0, len(info.CustomNavigationItems))
 	for _, item := range info.CustomNavigationItems {
-		if item.Enabled {
+		if item.Enabled || item.ShowOnAppeal {
 			items = append(items, item)
 		}
 	}

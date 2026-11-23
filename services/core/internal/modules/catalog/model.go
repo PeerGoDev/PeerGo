@@ -77,7 +77,7 @@ type SiteInfo struct {
 	CustomNavigationItems  []CustomNavigationItem
 }
 
-// CustomNavigationItem is one bounded operator-configured sidebar link. The
+// CustomNavigationItem is one bounded operator-configured site link. The
 // ordered slice is stored with the site singleton; Core never records clicks or
 // visits for these links.
 type CustomNavigationItem struct {
@@ -85,6 +85,7 @@ type CustomNavigationItem struct {
 	URL          string `json:"url"`
 	OpenInNewTab bool   `json:"open_in_new_tab"`
 	Enabled      bool   `json:"enabled"`
+	ShowOnAppeal bool   `json:"show_on_appeal,omitempty"`
 }
 
 type AnnouncementBodyFormat string

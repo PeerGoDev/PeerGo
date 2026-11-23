@@ -5,27 +5,29 @@ import type {
   SiteDisplaySettings,
 } from "~/features/staff/api/site-display-settings.queries"
 
-const customNavigationItemSchema = z.object({
-  label: z
-    .string()
-    .trim()
-    .refine((value) => runeLength(value) >= 1, "请输入菜单名称")
-    .refine((value) => runeLength(value) <= 32, "菜单名称不能超过 32 个字符"),
-  url: z
-    .string()
-    .trim()
-    .refine((value) => runeLength(value) >= 1, "请输入链接地址")
-    .refine(
-      (value) => runeLength(value) <= 2048,
-      "链接地址不能超过 2048 个字符"
-    )
-    .refine(
-      isCustomNavigationURL,
-      "请输入站内路径（如 /wiki）或不含账号凭据的 HTTPS 地址"
-    ),
-  open_in_new_tab: z.boolean(),
-  enabled: z.boolean(),
-})
+const customNavigationItemSchema = z
+  .object({
+    label: z
+      .string()
+      .trim()
+      .refine((value) => runeLength(value) >= 1, "请输入菜单名称")
+      .refine((value) => runeLength(value) <= 32, "菜单名称不能超过 32 个字符"),
+    url: z
+      .string()
+      .trim()
+      .refine((value) => runeLength(value) >= 1, "请输入链接地址")
+      .refine(
+        (value) => runeLength(value) <= 2048,
+        "链接地址不能超过 2048 个字符"
+      ),
+    open_in_new_tab: z.boolean(),
+    enabled: z.boolean(),
+    show_on_appeal: z.boolean().optional(),
+  })
+  .refine((item) => isCustomNavigationURL(item.url, item.show_on_appeal), {
+    path: ["url"],
+    message: "请输入有效的链接。申诉联系方式须使用 HTTPS 或 mailto 地址。",
+  })
 
 const customNavigationItemsSchema = z
   .array(customNavigationItemSchema)
@@ -179,19 +181,25 @@ function customNavigationItemsEqual(
         item.label === second[index]?.label &&
         item.url === second[index]?.url &&
         item.open_in_new_tab === second[index]?.open_in_new_tab &&
-        item.enabled === second[index]?.enabled
+        item.enabled === second[index]?.enabled &&
+        Boolean(item.show_on_appeal) === Boolean(second[index]?.show_on_appeal)
     )
   )
 }
 
 function customNavigationItemsLabel(items: CustomNavigationItem[]) {
   if (items.length === 0) return "（无）"
-  const enabled = items.filter((item) => item.enabled)
-  if (enabled.length === 0) return `${items.length} 项（均停用）`
-  return `${items.length} 项：${enabled.map((item) => item.label).join("、")}`
+  const visible = items.filter((item) => item.enabled || item.show_on_appeal)
+  if (visible.length === 0) return `${items.length} 项（均停用）`
+  const labels = visible.map((item) => {
+    if (!item.show_on_appeal) return item.label
+    const location = item.enabled ? "侧栏、申诉页" : "申诉页"
+    return `${item.label}（${location}）`
+  })
+  return `${items.length} 项：${labels.join("、")}`
 }
 
-export function isCustomNavigationURL(value: string) {
+export function isCustomNavigationURL(value: string, showOnAppeal = false) {
   if (
     value.includes("\\") ||
     /[\u0000-\u001f\u007f]/u.test(value) ||
@@ -199,7 +207,11 @@ export function isCustomNavigationURL(value: string) {
   ) {
     return false
   }
-  if (value.startsWith("/")) return true
+  if (value.startsWith("/")) return !showOnAppeal
+  if (value.startsWith("mailto:")) {
+    const address = value.slice("mailto:".length)
+    return !/[%?&#/]/u.test(address) && z.email().safeParse(address).success
+  }
   try {
     const parsed = new URL(value)
     return (

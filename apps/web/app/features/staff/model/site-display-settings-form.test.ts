@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   hasSiteDisplaySettingsChanges,
+  isCustomNavigationURL,
   siteDisplaySettingsDiff,
   siteDisplaySettingsFormSchema,
 } from "~/features/staff/model/site-display-settings-form"
@@ -20,6 +21,20 @@ const settings: SiteDisplaySettings = {
 }
 
 describe("siteDisplaySettingsFormSchema", () => {
+  it("accepts only web or email links as appeal contacts", () => {
+    expect(isCustomNavigationURL("https://t.me/peergo_example", true)).toBe(
+      true
+    )
+    expect(isCustomNavigationURL("mailto:help@example.com", true)).toBe(true)
+    expect(
+      isCustomNavigationURL(
+        "mailto:help@example.com?bcc=other@example.com",
+        true
+      )
+    ).toBe(false)
+    expect(isCustomNavigationURL("/account", true)).toBe(false)
+  })
+
   it("normalizes the typed settings section before review", () => {
     const result = siteDisplaySettingsFormSchema.parse({
       name: " PeerGo ",

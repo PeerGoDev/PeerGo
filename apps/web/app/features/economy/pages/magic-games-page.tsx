@@ -474,6 +474,9 @@ function CurrentRoundCard({
         <CardDescription>
           {formatCompactDateTime(round.draw_at)} 开奖 ·{" "}
           {closed ? "已截止，等待开奖" : `剩余 ${countdown}`}
+          <span className="block">
+            购票后获得号码，中奖奖励将在开奖后自动入账。
+          </span>
         </CardDescription>
         <CardAction>
           <Badge variant="warning" className="font-mono tabular-nums">
@@ -517,12 +520,10 @@ function CurrentRoundCard({
           </TableBody>
         </Table>
         <TicketNumbers ranges={round.my_ticket_ranges} />
-        <p className="font-mono text-[11px] break-all text-faint">
-          种子摘要 SHA-256：{round.seed_sha256}
-        </p>
+        <LotteryVerificationDetails digest={round.seed_sha256} />
         <p className="text-xs text-muted-foreground">
           销售额的 {formatBPS(round.burn_bps)}{" "}
-          从奖池扣除，未派出的奖金滚入下一期。中奖后自动入账。
+          从奖池扣除，未派出的奖金滚入下一期。
         </p>
         {buy.error ? (
           <p className="text-sm text-destructive">
@@ -668,11 +669,10 @@ function PreviousRoundCard({ round }: { round: LotteryRound }) {
         </div>
         {round.seed ? (
           <div className="flex flex-col items-start gap-2">
-            <p className="font-mono text-xs break-all text-muted-foreground">
-              开奖种子：{round.seed}
-              <br />
-              种子摘要：{round.seed_sha256}
-            </p>
+            <LotteryVerificationDetails
+              digest={round.seed_sha256}
+              seed={round.seed}
+            />
             <Button
               variant="outline"
               size="sm"
@@ -697,6 +697,34 @@ function PreviousRoundCard({ round }: { round: LotteryRound }) {
         ) : null}
       </CardContent>
     </Card>
+  )
+}
+
+function LotteryVerificationDetails({
+  digest,
+  seed,
+}: {
+  digest: string
+  seed?: string
+}) {
+  return (
+    <details className="w-full text-xs text-muted-foreground">
+      <summary className="w-fit cursor-pointer underline-offset-4 hover:underline">
+        {seed ? "查看上期开奖校验数据" : "查看本期开奖校验摘要"}
+      </summary>
+      <dl className="mt-2 space-y-2 break-all">
+        {seed ? (
+          <div>
+            <dt>开奖种子</dt>
+            <dd className="font-mono">{seed}</dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>种子摘要 SHA-256</dt>
+          <dd className="font-mono">{digest}</dd>
+        </div>
+      </dl>
+    </details>
   )
 }
 

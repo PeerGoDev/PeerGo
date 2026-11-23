@@ -85,11 +85,14 @@ describe("AppShell mobile navigation", () => {
     expect(navigation.querySelector('a[href="/"]')).not.toHaveFocus()
     expect(within(navigation).queryByText(/Powered by/)).not.toBeInTheDocument()
     expect(
-      within(navigation).getByRole("link", { name: "魔力商店" })
-    ).toHaveAttribute("href", "/shop")
+      within(navigation).getByRole("link", { name: "封禁记录与申诉" })
+    ).toHaveAttribute("href", "/restrictions")
     expect(
-      within(navigation).getByRole("link", { name: "游戏中心" })
-    ).toHaveAttribute("href", "/games")
+      within(navigation).queryByRole("link", { name: "魔力商店" })
+    ).not.toBeInTheDocument()
+    expect(
+      within(navigation).queryByRole("link", { name: "游戏中心" })
+    ).not.toBeInTheDocument()
 
     await user.click(within(navigation).getByRole("link", { name: "登录" }))
 

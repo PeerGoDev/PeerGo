@@ -97,8 +97,13 @@ function OperationIncidentsContent() {
             任务异常与审计
           </h1>
           <p className="text-xs text-muted-foreground">
-            汇总持续重试、死信和审计投递积压；正常排队任务仍在 Worker
-            状态页查看。
+            汇总所有用户和时段的任务异常。正常排队任务可在 Worker 状态页查看。
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            状态更新于{" "}
+            <time dateTime={data.generated_at}>
+              {formatCompactDateTime(data.generated_at)}
+            </time>
           </p>
         </div>
         <Button
@@ -150,7 +155,8 @@ function OperationIncidentsContent() {
         <ShieldCheckIcon />
         <AlertTitle>本页只读，不提供跳过或清空任务</AlertTitle>
         <AlertDescription>
-          错误码和时间用于定位故障；重新执行、冲正或解除人工处理状态必须由受审计的专用命令完成。
+          Worker
+          会自动重试仍可继续的任务。标记为「需要人工处理」的任务已停止自动重试，站务需先排查原因，再通过受审计的专用命令恢复。
         </AlertDescription>
       </Alert>
 
@@ -158,7 +164,7 @@ function OperationIncidentsContent() {
         <CardHeader className="p-6 pb-4">
           <CardTitle>需要关注的任务</CardTitle>
           <CardDescription>
-            这里只列出持续重试、死信或保留最近错误证据的队列。
+            这里只列出正在重试、已停止重试或还有未解决错误的队列。
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
