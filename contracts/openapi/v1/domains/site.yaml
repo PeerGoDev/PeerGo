@@ -147,8 +147,10 @@ LatestAnnouncementPath:
     x-audience: [web]
     x-owner: core-catalog
     x-permission: announcement.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: 最新已发布公告；没有公告时返回 204。
         content:
@@ -170,11 +172,13 @@ AnnouncementsPath:
     x-audience: [web]
     x-owner: core-catalog
     x-permission: announcement.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/AnnouncementLimitQueryParameter"
       - $ref: "#/AnnouncementOffsetQueryParameter"
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: 按实际公开时间倒序排列的公告摘要；草稿、未到期排期和已撤回公告不会出现。
         content:
@@ -196,10 +200,12 @@ AnnouncementDetailPath:
     x-audience: [web]
     x-owner: core-catalog
     x-permission: announcement.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/AnnouncementIDPathParameter"
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: 已发布公告正文和稳定元数据。
         content:

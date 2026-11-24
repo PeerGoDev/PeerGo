@@ -113,11 +113,7 @@ export function AccountAccessPage() {
   }
 
   return (
-    <AuthEntryCard
-      viewport="shell"
-      className="max-w-xl"
-      aria-labelledby="restriction-title"
-    >
+    <AuthEntryCard className="max-w-xl" aria-labelledby="restriction-title">
       <CardHeader className="gap-2 px-6">
         <CardTitle>
           <h1

@@ -54,8 +54,19 @@ func (unavailableIdentityService) Login(context.Context, identity.LoginInput) (i
 	return identity.WebSession{}, identity.ErrInvalidCredentials
 }
 
-func (unavailableIdentityService) CurrentSession(context.Context, string) (identity.WebSession, error) {
+const memberBrowsingTestToken = "member-browsing-test"
+
+func (unavailableIdentityService) CurrentSession(_ context.Context, token string) (identity.WebSession, error) {
+	if token == memberBrowsingTestToken {
+		return identity.WebSession{}, nil
+	}
 	return identity.WebSession{}, identity.ErrSessionNotFound
+}
+
+func memberBrowsingRequest(path string) *http.Request {
+	request := httptest.NewRequest(http.MethodGet, path, nil)
+	request.AddCookie(&http.Cookie{Name: "peergo_session", Value: memberBrowsingTestToken})
+	return request
 }
 
 func (unavailableIdentityService) AuthenticateWrite(context.Context, string, string) (identity.WebSession, error) {
@@ -1072,7 +1083,7 @@ func (unavailableTorrentReadService) Cover(context.Context, torrents.TorrentID) 
 	return torrents.PublicCover{}, torrents.ErrTorrentCoverNotFound
 }
 
-func (unavailableTorrentReadService) Screenshot(context.Context, torrents.TorrentID, int) (torrents.PublicScreenshot, error) {
+func (unavailableTorrentReadService) Screenshot(context.Context, torrents.TorrentID, int, bool) (torrents.PublicScreenshot, error) {
 	return torrents.PublicScreenshot{}, torrents.ErrTorrentScreenshotNotFound
 }
 
@@ -1147,7 +1158,7 @@ func (service *recordingTorrentReadService) Cover(_ context.Context, id torrents
 	return service.cover, nil
 }
 
-func (service *recordingTorrentReadService) Screenshot(_ context.Context, id torrents.TorrentID, position int) (torrents.PublicScreenshot, error) {
+func (service *recordingTorrentReadService) Screenshot(_ context.Context, id torrents.TorrentID, position int, _ bool) (torrents.PublicScreenshot, error) {
 	service.screenshotID, service.screenshotPos = id, position
 	return service.screenshot, nil
 }
@@ -2338,7 +2349,7 @@ func TestCatalogEndpointsUseGeneratedContract(t *testing.T) {
 	t.Parallel()
 
 	handler := testHandler(t)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/torrents?query=orchestra&limit=5&offset=0&category_id=music&promotion=none", nil)
+	request := memberBrowsingRequest("/api/v1/torrents?query=orchestra&limit=5&offset=0&category_id=music&promotion=none")
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -2358,7 +2369,7 @@ func TestCatalogEndpointsUseGeneratedContract(t *testing.T) {
 		t.Fatalf("unexpected response: %+v", body)
 	}
 
-	announcementListRequest := httptest.NewRequest(http.MethodGet, "/api/v1/announcements?limit=20&offset=0", nil)
+	announcementListRequest := memberBrowsingRequest("/api/v1/announcements?limit=20&offset=0")
 	announcementListResponse := httptest.NewRecorder()
 	handler.ServeHTTP(announcementListResponse, announcementListRequest)
 	if announcementListResponse.Code != http.StatusOK {
@@ -2372,7 +2383,7 @@ func TestCatalogEndpointsUseGeneratedContract(t *testing.T) {
 		t.Fatalf("unexpected announcement page: %+v", announcementPage)
 	}
 
-	announcementRequest := httptest.NewRequest(http.MethodGet, "/api/v1/announcements/welcome-to-peergo", nil)
+	announcementRequest := memberBrowsingRequest("/api/v1/announcements/welcome-to-peergo")
 	announcementResponse := httptest.NewRecorder()
 	handler.ServeHTTP(announcementResponse, announcementRequest)
 	if announcementResponse.Code != http.StatusOK {
@@ -2387,7 +2398,7 @@ func TestCatalogEndpointsUseGeneratedContract(t *testing.T) {
 		t.Fatalf("unexpected announcement: %+v", announcement)
 	}
 
-	missingRequest := httptest.NewRequest(http.MethodGet, "/api/v1/announcements/not-published", nil)
+	missingRequest := memberBrowsingRequest("/api/v1/announcements/not-published")
 	missingResponse := httptest.NewRecorder()
 	handler.ServeHTTP(missingResponse, missingRequest)
 	if missingResponse.Code != http.StatusNotFound || !strings.Contains(missingResponse.Body.String(), "announcement_not_found") {
@@ -2886,7 +2897,32 @@ func TestTorrentDownloadUsesBinaryContractAndKeepsCredentialOutOfTheRequest(t *t
 	}
 }
 
-func TestTorrentReadEndpointsKeepPublicAndPrivateProjectionsSeparate(t *testing.T) {
+func TestGuestsCannotReadMemberContentEvenWithAnInvalidCookie(t *testing.T) {
+	t.Parallel()
+	handler := testHandlerWithIdentity(t, unavailableIdentityService{})
+	for _, path := range []string{
+		"/api/v1/torrents", "/api/v1/torrents/42", "/api/v1/torrents/42/content",
+		"/api/v1/torrents/42/related", "/api/v1/torrents/42/swarm", "/api/v1/torrents/42/files",
+		"/api/v1/torrents/42/cover", "/api/v1/torrents/42/screenshots/0?play=true", "/api/v1/torrents/42/comments",
+		"/api/v1/categories", "/api/v1/categories/movies/facets",
+		"/api/v1/announcements/latest", "/api/v1/announcements", "/api/v1/announcements/welcome",
+		"/api/v1/announcements/welcome/comments", "/api/v1/wiki/pages", "/api/v1/wiki/pages/welcome",
+	} {
+		for _, token := range []string{"", "invalid-cookie"} {
+			request := httptest.NewRequest(http.MethodGet, path, nil)
+			if token != "" {
+				request.AddCookie(&http.Cookie{Name: "peergo_session", Value: token})
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusUnauthorized || response.Header().Get("Cache-Control") != "private, no-store" {
+				t.Errorf("%s with cookie %q: status=%d cache=%q body=%s", path, token, response.Code, response.Header().Get("Cache-Control"), response.Body.String())
+			}
+		}
+	}
+}
+
+func TestTorrentReadEndpointsKeepMemberAndUploaderProjectionsSeparate(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, time.August, 9, 16, 0, 0, 0, time.UTC)
@@ -2951,8 +2987,8 @@ func TestTorrentReadEndpointsKeepPublicAndPrivateProjectionsSeparate(t *testing.
 	))
 
 	detailResponse := httptest.NewRecorder()
-	handler.ServeHTTP(detailResponse, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/torrents/%d", torrentID), nil))
-	if detailResponse.Code != http.StatusOK || detailResponse.Header().Get("Cache-Control") != "" {
+	handler.ServeHTTP(detailResponse, memberBrowsingRequest(fmt.Sprintf("/api/v1/torrents/%d", torrentID)))
+	if detailResponse.Code != http.StatusOK || detailResponse.Header().Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("detail status=%d cache=%q body=%s", detailResponse.Code, detailResponse.Header().Get("Cache-Control"), detailResponse.Body.String())
 	}
 	var detail generated.TorrentPublicDetail
@@ -2963,10 +2999,10 @@ func TestTorrentReadEndpointsKeepPublicAndPrivateProjectionsSeparate(t *testing.
 	}
 
 	screenshotResponse := httptest.NewRecorder()
-	handler.ServeHTTP(screenshotResponse, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/torrents/%d/screenshots/1", torrentID), nil))
+	handler.ServeHTTP(screenshotResponse, memberBrowsingRequest(fmt.Sprintf("/api/v1/torrents/%d/screenshots/1", torrentID)))
 	if screenshotResponse.Code != http.StatusOK || screenshotResponse.Header().Get("Content-Type") != "image/webp" ||
 		screenshotResponse.Header().Get("ETag") != `"sha256-screenshot-fixture"` ||
-		screenshotResponse.Header().Get("Cache-Control") != "public, max-age=300, stale-while-revalidate=86400" ||
+		screenshotResponse.Header().Get("Cache-Control") != "private, no-store" ||
 		screenshotResponse.Body.String() != "valid-webp-screenshot" || service.screenshotID != torrentID || service.screenshotPos != 1 {
 		t.Fatalf("screenshot status=%d type=%q etag=%q cache=%q body=%q id=%d position=%d", screenshotResponse.Code,
 			screenshotResponse.Header().Get("Content-Type"), screenshotResponse.Header().Get("ETag"),
@@ -2977,10 +3013,10 @@ func TestTorrentReadEndpointsKeepPublicAndPrivateProjectionsSeparate(t *testing.
 	}
 
 	coverResponse := httptest.NewRecorder()
-	handler.ServeHTTP(coverResponse, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/torrents/%d/cover", torrentID), nil))
+	handler.ServeHTTP(coverResponse, memberBrowsingRequest(fmt.Sprintf("/api/v1/torrents/%d/cover", torrentID)))
 	if coverResponse.Code != http.StatusOK || coverResponse.Header().Get("Content-Type") != "image/png" ||
 		coverResponse.Header().Get("ETag") != `"sha256-cover-fixture"` ||
-		coverResponse.Header().Get("Cache-Control") != "public, max-age=300, stale-while-revalidate=86400" ||
+		coverResponse.Header().Get("Cache-Control") != "private, no-store" ||
 		coverResponse.Body.String() != "valid-png-fixture" || service.coverID != torrentID {
 		t.Fatalf("cover status=%d type=%q etag=%q cache=%q body=%q id=%d", coverResponse.Code,
 			coverResponse.Header().Get("Content-Type"), coverResponse.Header().Get("ETag"),
@@ -2988,7 +3024,7 @@ func TestTorrentReadEndpointsKeepPublicAndPrivateProjectionsSeparate(t *testing.
 	}
 
 	contentResponse := httptest.NewRecorder()
-	handler.ServeHTTP(contentResponse, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/torrents/%d/content", torrentID), nil))
+	handler.ServeHTTP(contentResponse, memberBrowsingRequest(fmt.Sprintf("/api/v1/torrents/%d/content", torrentID)))
 	var content generated.TorrentPublicContent
 	if err := json.NewDecoder(contentResponse.Body).Decode(&content); err != nil || contentResponse.Code != http.StatusOK ||
 		content.TorrentId != int64(torrentID) || content.Description != "**发布说明**" || content.MediaInfo == "" {
@@ -2999,7 +3035,7 @@ func TestTorrentReadEndpointsKeepPublicAndPrivateProjectionsSeparate(t *testing.
 	}
 
 	relatedResponse := httptest.NewRecorder()
-	handler.ServeHTTP(relatedResponse, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/torrents/%d/related", torrentID), nil))
+	handler.ServeHTTP(relatedResponse, memberBrowsingRequest(fmt.Sprintf("/api/v1/torrents/%d/related", torrentID)))
 	var related generated.TorrentRelatedVersions
 	if err := json.NewDecoder(relatedResponse.Body).Decode(&related); err != nil || relatedResponse.Code != http.StatusOK ||
 		len(related.Items) != 1 || related.Items[0].Name != "Release 2026 4K" {
@@ -3010,7 +3046,7 @@ func TestTorrentReadEndpointsKeepPublicAndPrivateProjectionsSeparate(t *testing.
 	}
 
 	swarmResponse := httptest.NewRecorder()
-	handler.ServeHTTP(swarmResponse, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/torrents/%d/swarm", torrentID), nil))
+	handler.ServeHTTP(swarmResponse, memberBrowsingRequest(fmt.Sprintf("/api/v1/torrents/%d/swarm", torrentID)))
 	var swarm generated.TorrentSwarmOverview
 	if err := json.NewDecoder(swarmResponse.Body).Decode(&swarm); err != nil || swarmResponse.Code != http.StatusOK ||
 		swarm.TorrentId != int64(torrentID) || swarm.Seeders != 18 || swarm.Leechers != 5 || swarm.Completed != 61 ||
@@ -3019,7 +3055,7 @@ func TestTorrentReadEndpointsKeepPublicAndPrivateProjectionsSeparate(t *testing.
 	}
 
 	filesResponse := httptest.NewRecorder()
-	handler.ServeHTTP(filesResponse, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/torrents/%d/files?limit=2&offset=1", torrentID), nil))
+	handler.ServeHTTP(filesResponse, memberBrowsingRequest(fmt.Sprintf("/api/v1/torrents/%d/files?limit=2&offset=1", torrentID)))
 	var files generated.TorrentFilePage
 	if err := json.NewDecoder(filesResponse.Body).Decode(&files); err != nil || filesResponse.Code != http.StatusOK ||
 		files.TorrentId != int64(torrentID) || files.Limit != 2 || files.Offset != 1 || len(files.Items) != 1 {
@@ -3311,7 +3347,7 @@ func TestGetPublicUserProfileUsesMemberSessionAndReturnsOnlyPublicProjection(t *
 	if identityService.profileToken != "member-token" || identityService.profileName != "legacy-user" {
 		t.Fatalf("PublicProfile token=%q username=%q", identityService.profileToken, identityService.profileName)
 	}
-	if response.Header().Get("Cache-Control") != "private, max-age=60" {
+	if response.Header().Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("cache-control=%q", response.Header().Get("Cache-Control"))
 	}
 	var body generated.PublicUserProfile
@@ -3333,7 +3369,7 @@ func TestOpenAPIValidationAcceptsCatalogLimit100AndRejects101(t *testing.T) {
 
 	handler := testHandler(t)
 	accepted := httptest.NewRecorder()
-	handler.ServeHTTP(accepted, httptest.NewRequest(http.MethodGet, "/api/v1/torrents?limit=100", nil))
+	handler.ServeHTTP(accepted, memberBrowsingRequest("/api/v1/torrents?limit=100"))
 	if accepted.Code != http.StatusOK {
 		t.Fatalf("limit=100 status = %d, want %d; body=%s", accepted.Code, http.StatusOK, accepted.Body.String())
 	}
@@ -3711,7 +3747,7 @@ func TestUserAvatarEndpointsUseBinaryContractAndPrivateVerifiedResponse(t *testi
 	readResponse := httptest.NewRecorder()
 	handler.ServeHTTP(readResponse, read)
 	if readResponse.Code != http.StatusOK || readResponse.Header().Get("Content-Type") != "image/jpeg" ||
-		readResponse.Header().Get("Cache-Control") != "private, no-cache" ||
+		readResponse.Header().Get("Cache-Control") != "private, no-store" ||
 		readResponse.Header().Get("ETag") != `"`+strings.Repeat("a", 64)+`"` ||
 		readResponse.Body.String() != "verified-avatar" || identityService.publicAvatarToken != "web-avatar-token" || identityService.publicAvatarName != "member" {
 		t.Fatalf("read status=%d headers=%v service=%+v body=%s", readResponse.Code, readResponse.Header(), identityService, readResponse.Body.String())
@@ -4826,7 +4862,7 @@ func TestTorrentBookmarksUsePrivateBatchReadAndIdempotentWrites(t *testing.T) {
 	}
 }
 
-func TestTorrentCommentsUsePublicReadsAndAuthenticatedOwnedWrites(t *testing.T) {
+func TestTorrentCommentsUseMemberReadsAndAuthenticatedOwnedWrites(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, time.August, 9, 17, 0, 0, 0, time.UTC)
@@ -4846,7 +4882,7 @@ func TestTorrentCommentsUsePublicReadsAndAuthenticatedOwnedWrites(t *testing.T) 
 	}
 	handler := testHandlerWithComments(t, service)
 
-	listRequest := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/torrents/%d/comments?limit=10&offset=2", torrentID), nil)
+	listRequest := memberBrowsingRequest(fmt.Sprintf("/api/v1/torrents/%d/comments?limit=10&offset=2", torrentID))
 	listResponse := httptest.NewRecorder()
 	handler.ServeHTTP(listResponse, listRequest)
 	if listResponse.Code != http.StatusOK || service.listTorrentID != torrentID || service.listLimit != 10 || service.listOffset != 2 ||
@@ -4893,7 +4929,7 @@ func TestTorrentCommentsUsePublicReadsAndAuthenticatedOwnedWrites(t *testing.T) 
 	}
 }
 
-func TestAnnouncementCommentsReusePublicReadsAndAuthenticatedOwnedWrites(t *testing.T) {
+func TestAnnouncementCommentsReuseMemberReadsAndAuthenticatedOwnedWrites(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, time.August, 10, 14, 0, 0, 0, time.UTC)
@@ -4912,7 +4948,7 @@ func TestAnnouncementCommentsReusePublicReadsAndAuthenticatedOwnedWrites(t *test
 	}
 	handler := testHandlerWithComments(t, service)
 
-	listRequest := httptest.NewRequest(http.MethodGet, "/api/v1/announcements/"+announcementID+"/comments?limit=20&offset=0", nil)
+	listRequest := memberBrowsingRequest("/api/v1/announcements/" + announcementID + "/comments?limit=20&offset=0")
 	listResponse := httptest.NewRecorder()
 	handler.ServeHTTP(listResponse, listRequest)
 	if listResponse.Code != http.StatusOK || service.listAnnouncementID != announcementID ||

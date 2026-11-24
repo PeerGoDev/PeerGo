@@ -4,3 +4,10 @@ ProblemResponse:
     application/problem+json:
       schema:
         $ref: "./schemas/problem.yaml#/Problem"
+
+MemberSessionRequired:
+  description: 浏览站内内容需要有效的会员会话。
+  content:
+    application/problem+json:
+      schema:
+        $ref: "./schemas/problem.yaml#/Problem"

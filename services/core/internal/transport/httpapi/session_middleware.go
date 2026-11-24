@@ -54,11 +54,13 @@ func EnforceSameOrigin(allowedOrigins []string) func(http.Handler) http.Handler 
 	}
 }
 
-// PrivateResponseHeaders prevents browser/proxy caches from retaining CSRF,
-// session profile or authorization capability responses.
+// PrivateResponseHeaders keeps member data and session responses out of caches.
 func PrivateResponseHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/session" || r.URL.Path == "/api/v1/me/capabilities" ||
+		if strings.HasPrefix(r.URL.Path, "/api/v1/") {
+			w.Header().Set("Cache-Control", "private, no-store")
+		}
+		if r.URL.Path == "/api/v1/site" || r.URL.Path == "/api/v1/session" || r.URL.Path == "/api/v1/me/capabilities" ||
 			strings.HasPrefix(r.URL.Path, "/api/v1/me/api-key") ||
 			r.URL.Path == "/api/v1/me/avatar" ||
 			r.URL.Path == "/api/v1/me/profile" || r.URL.Path == "/api/v1/me/security" || strings.HasPrefix(r.URL.Path, "/api/v1/me/download-restriction") || r.URL.Path == "/api/v1/me/traffic" || r.URL.Path == "/api/v1/me/hit-and-runs" ||

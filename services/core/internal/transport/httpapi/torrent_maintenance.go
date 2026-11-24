@@ -456,7 +456,7 @@ func (h *Handler) GetManagedPublishedTorrentScreenshotChangeImage(ctx context.Co
 	case err != nil:
 		return nil, err
 	}
-	headers := generated.GetManagedPublishedTorrentScreenshotChangeImage200ResponseHeaders{CacheControl: "private, max-age=60", ETag: image.ETag}
+	headers := generated.GetManagedPublishedTorrentScreenshotChangeImage200ResponseHeaders{CacheControl: "private, no-store", ETag: image.ETag}
 	reader, length := bytes.NewReader(image.Data), int64(len(image.Data))
 	switch image.ContentType {
 	case "image/jpeg":

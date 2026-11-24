@@ -252,8 +252,8 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionAnnouncementRead, Description: "读取公开公告", Risk: RiskLow,
-		Relationship: RelationshipNone, CredentialAudience: AudienceAnonymous,
+		Action: ActionAnnouncementRead, Description: "读取已发布公告", Risk: RiskLow,
+		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
 	},
 	{
 		Action: ActionAnnouncementUpdate, Description: "追加公告草稿版本", Risk: RiskMedium,
@@ -306,8 +306,8 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionCategoryRead, Description: "读取公开种子分类", Risk: RiskLow,
-		Relationship: RelationshipNone, CredentialAudience: AudienceAnonymous,
+		Action: ActionCategoryRead, Description: "读取种子分类", Risk: RiskLow,
+		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
 	},
 	{
 		Action: ActionCategoryUpdate, Description: "更新或停用种子分类", Risk: RiskHigh,
@@ -895,8 +895,8 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionTorrentRead, Description: "读取公开种子摘要", Risk: RiskLow,
-		Relationship: RelationshipNone, CredentialAudience: AudienceAnonymous,
+		Action: ActionTorrentRead, Description: "读取已发布种子", Risk: RiskLow,
+		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
 	},
 	{
 		Action: ActionTorrentReportCreateSelf, Description: "举报一条他人已发布的种子", Risk: RiskLow,
@@ -1074,8 +1074,8 @@ var permissionCatalog = []PermissionDefinition{
 		Grantable: true, Discoverable: true,
 	},
 	{
-		Action: ActionWikiPageRead, Description: "查看公开 Wiki 页面", Risk: RiskLow,
-		Relationship: RelationshipNone, CredentialAudience: AudienceAnonymous,
+		Action: ActionWikiPageRead, Description: "查看已发布 Wiki 页面", Risk: RiskLow,
+		Relationship: RelationshipNone, CredentialAudience: AudienceWebSession,
 	},
 	{
 		Action: ActionWikiPageReadMember, Description: "查看仅站内成员可见的 Wiki 页面", Risk: RiskLow,

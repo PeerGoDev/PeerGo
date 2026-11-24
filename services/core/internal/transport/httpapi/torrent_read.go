@@ -197,12 +197,8 @@ func (h *Handler) GetTorrentScreenshot(ctx context.Context, request generated.Ge
 	case err != nil:
 		return nil, err
 	}
-	cacheControl := "public, max-age=300, stale-while-revalidate=86400"
-	if screenshot.Private {
-		cacheControl = "private, no-store"
-	}
 	headers := generated.GetTorrentScreenshot200ResponseHeaders{
-		CacheControl: cacheControl,
+		CacheControl: "private, no-store",
 		ETag:         screenshot.ETag,
 	}
 	reader := bytes.NewReader(screenshot.Data)
@@ -243,12 +239,8 @@ func (h *Handler) GetTorrentCover(ctx context.Context, request generated.GetTorr
 	case err != nil:
 		return nil, err
 	}
-	cacheControl := "public, max-age=300, stale-while-revalidate=86400"
-	if cover.Private {
-		cacheControl = "private, no-store"
-	}
 	headers := generated.GetTorrentCover200ResponseHeaders{
-		CacheControl: cacheControl,
+		CacheControl: "private, no-store",
 		ETag:         cover.ETag,
 	}
 	reader := bytes.NewReader(cover.Data)

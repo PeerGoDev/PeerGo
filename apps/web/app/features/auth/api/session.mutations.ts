@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query"
 
 import type { components } from "~/generated/api"
+import { siteKeys } from "~/features/site/api/site.queries"
 import { apiClient } from "~/shared/api/client"
 import { ApiProblemError } from "~/shared/api/problem"
 
@@ -52,6 +53,7 @@ export function useCreateWebSession() {
     },
     onSuccess: (session) => {
       queryClient.setQueryData(sessionKeys.current(), session)
+      void queryClient.invalidateQueries({ queryKey: siteKeys.info() })
     },
   })
 }
@@ -69,6 +71,9 @@ export function useDeleteWebSession() {
     },
     onSuccess: () => {
       queryClient.setQueryData(sessionKeys.current(), null)
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== sessionKeys.all[0],
+      })
     },
   })
 }

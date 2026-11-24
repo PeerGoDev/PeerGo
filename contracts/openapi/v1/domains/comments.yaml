@@ -6,7 +6,7 @@ TorrentCommentsPath:
     x-audience: [web]
     x-owner: core-social
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "../domains/torrents.yaml#/TorrentIDPathParameter"
       - name: limit
@@ -28,6 +28,8 @@ TorrentCommentsPath:
           maximum: 99999
           default: 0
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: 按发表时间从早到晚排列的评论与回复；删除项保留墓碑。
         content:
@@ -90,7 +92,7 @@ AnnouncementCommentsPath:
     x-audience: [web]
     x-owner: core-social
     x-permission: announcement.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "../domains/site.yaml#/AnnouncementIDPathParameter"
       - name: limit
@@ -110,6 +112,8 @@ AnnouncementCommentsPath:
           maximum: 99999
           default: 0
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: 按发表时间从早到晚排列的公告评论与回复；删除项保留墓碑。
         content:

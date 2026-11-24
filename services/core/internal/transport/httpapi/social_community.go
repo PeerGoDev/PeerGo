@@ -88,7 +88,7 @@ func (h *Handler) GetSocialMedia(ctx context.Context, request generated.GetSocia
 	if err != nil {
 		return nil, err
 	}
-	cache := "private, max-age=86400, immutable"
+	cache := "private, no-store"
 	etag := "\"" + hex.EncodeToString(result.SHA256[:]) + "\""
 	headers := generated.GetSocialMedia200ResponseHeaders{CacheControl: &cache, ETag: &etag}
 	reader := bytes.NewReader(result.Payload)

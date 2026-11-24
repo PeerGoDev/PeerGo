@@ -75,12 +75,6 @@ function AuthBrandPanel() {
         {site ? (
           <dl className="mt-2 flex gap-7 border-t pt-5">
             <div className="flex flex-col-reverse gap-1">
-              <dt className="text-2xs text-faint">在线</dt>
-              <dd className="font-mono text-lg font-medium tabular-nums">
-                {site.online_users.toLocaleString("zh-CN")}
-              </dd>
-            </div>
-            <div className="flex flex-col-reverse gap-1">
               <dt className="text-2xs text-faint">注册方式</dt>
               <dd className="text-lg font-medium">
                 {registrationModeLabels[site.registration_mode]}

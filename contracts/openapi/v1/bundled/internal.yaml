@@ -5979,7 +5979,7 @@ paths:
         - web
       x-owner: core-catalog
       x-permission: announcement.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/AnnouncementLimitQueryParameter'
         - $ref: '#/components/parameters/AnnouncementOffsetQueryParameter'
@@ -5992,6 +5992,8 @@ paths:
                 $ref: '#/components/schemas/AnnouncementPage'
         '400':
           $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '429':
           $ref: '#/components/responses/ProblemResponse'
         default:
@@ -6006,7 +6008,7 @@ paths:
         - web
       x-owner: core-catalog
       x-permission: announcement.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       responses:
         '200':
           description: 最新已发布公告；没有公告时返回 204。
@@ -6016,6 +6018,8 @@ paths:
                 $ref: '#/components/schemas/AnnouncementSummary'
         '204':
           description: 当前没有已发布公告。
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '429':
           $ref: '#/components/responses/ProblemResponse'
         default:
@@ -6030,7 +6034,7 @@ paths:
         - web
       x-owner: core-catalog
       x-permission: announcement.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/AnnouncementIDPathParameter'
       responses:
@@ -6040,6 +6044,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnnouncementDetail'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -6056,7 +6062,7 @@ paths:
         - web
       x-owner: core-social
       x-permission: announcement.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/AnnouncementIDPathParameter'
         - name: limit
@@ -6084,6 +6090,8 @@ paths:
                 $ref: '#/components/schemas/AnnouncementCommentPage'
         '400':
           $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -6144,7 +6152,7 @@ paths:
       x-visibility-permissions:
         public: wiki.page.read
         members: wiki.page.read.member
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/WikiQueryParameter'
         - $ref: '#/components/parameters/WikiLimitParameter'
@@ -6177,7 +6185,7 @@ paths:
       x-visibility-permissions:
         public: wiki.page.read
         members: wiki.page.read.member
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/WikiSlugPathParameter'
       responses:
@@ -6461,7 +6469,7 @@ paths:
         - web
       x-owner: core-catalog
       x-permission: category.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       responses:
         '200':
           description: 按展示顺序排列的分类。
@@ -6471,6 +6479,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CategoryWithCount'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '429':
           $ref: '#/components/responses/ProblemResponse'
         default:
@@ -6485,7 +6495,7 @@ paths:
         - web
       x-owner: core-catalog
       x-permission: category.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - name: category_id
           in: path
@@ -6500,6 +6510,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CategoryFacetList'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -6923,7 +6935,7 @@ paths:
         - web
       x-owner: core-catalog
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - name: limit
           in: query
@@ -7012,6 +7024,8 @@ paths:
                 $ref: '#/components/schemas/TorrentList'
         '400':
           $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
         '429':
           $ref: '#/components/responses/ProblemResponse'
         default:
@@ -7069,7 +7083,7 @@ paths:
         - web
       x-owner: core-torrents
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
       responses:
@@ -7079,6 +7093,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TorrentPublicDetail'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -7095,7 +7111,7 @@ paths:
         - web
       x-owner: core-torrents
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
       responses:
@@ -7103,7 +7119,7 @@ paths:
           description: 服务端从当前已配置的本地或对象存储读取首张截图，按 PostgreSQL 中的不可变长度与 SHA-256 证据完整校验后返回。对象键、后端位置、 版本号和存储凭据不会暴露给浏览器。
           headers:
             Cache-Control:
-              description: 短期公共缓存；未来显式封面替换无需沿用旧对象。
+              description: 会员图片禁止存储在浏览器和代理缓存中。
               required: true
               schema:
                 type: string
@@ -7129,6 +7145,8 @@ paths:
               schema:
                 type: string
                 format: binary
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -7145,7 +7163,7 @@ paths:
         - web
       x-owner: core-torrents
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
         - name: position
@@ -7166,7 +7184,7 @@ paths:
           description: 服务端从当前已配置的本地或对象存储读取指定截图，并按 PostgreSQL 中的不可变长度与 SHA-256 证据完整校验后返回。物理存储信息不暴露给浏览器。
           headers:
             Cache-Control:
-              description: 短期公共缓存，并允许后台重新验证。
+              description: 会员图片禁止存储在浏览器和代理缓存中。
               required: true
               schema:
                 type: string
@@ -7192,6 +7210,8 @@ paths:
               schema:
                 type: string
                 format: binary
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -7208,7 +7228,7 @@ paths:
         - web
       x-owner: core-torrents
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
       responses:
@@ -7218,6 +7238,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TorrentPublicContent'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -7234,7 +7256,7 @@ paths:
         - web
       x-owner: core-torrents
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
       responses:
@@ -7244,6 +7266,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TorrentRelatedVersions'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -7260,7 +7284,7 @@ paths:
         - web
       x-owner: core-catalog
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
       responses:
@@ -7270,6 +7294,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TorrentSwarmOverview'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -7324,7 +7350,7 @@ paths:
         - web
       x-owner: core-torrents
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
         - name: limit
@@ -7354,6 +7380,8 @@ paths:
                 $ref: '#/components/schemas/TorrentFilePage'
         '400':
           $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -7370,7 +7398,7 @@ paths:
         - web
       x-owner: core-social
       x-permission: torrent.read
-      x-credential-audience: anonymous
+      x-credential-audience: web-session
       parameters:
         - $ref: '#/components/parameters/TorrentIDPathParameter'
         - name: limit
@@ -7400,6 +7428,8 @@ paths:
                 $ref: '#/components/schemas/TorrentCommentPage'
         '400':
           $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/MemberSessionRequired'
         '404':
           $ref: '#/components/responses/ProblemResponse'
         '429':
@@ -29628,6 +29658,12 @@ components:
   responses:
     ProblemResponse:
       description: 使用稳定 code 和 request_id 表达的 API 错误。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    MemberSessionRequired:
+      description: 浏览站内内容需要有效的会员会话。
       content:
         application/problem+json:
           schema:

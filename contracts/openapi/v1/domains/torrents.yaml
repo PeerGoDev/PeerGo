@@ -6,7 +6,7 @@ TorrentsPath:
     x-audience: [web]
     x-owner: core-catalog
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - name: limit
         in: query
@@ -80,6 +80,8 @@ TorrentsPath:
             [published_desc, published_asc, size_desc, size_asc, completed_desc]
           default: published_desc
     responses:
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
       "400":
         $ref: "../responses.yaml#/ProblemResponse"
       "200":
@@ -584,10 +586,12 @@ TorrentDetailPath:
     x-audience: [web]
     x-owner: core-torrents
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/TorrentIDPathParameter"
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: >-
           已发布种子的稳定元数据；文件、评论、审核和实时 swarm 状态由独立查询边界提供。
@@ -610,10 +614,12 @@ TorrentCoverPath:
     x-audience: [web]
     x-owner: core-torrents
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/TorrentIDPathParameter"
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: >-
           服务端从当前已配置的本地或对象存储读取首张截图，按 PostgreSQL
@@ -621,7 +627,7 @@ TorrentCoverPath:
           版本号和存储凭据不会暴露给浏览器。
         headers:
           Cache-Control:
-            description: 短期公共缓存；未来显式封面替换无需沿用旧对象。
+            description: 会员图片禁止存储在浏览器和代理缓存中。
             required: true
             schema:
               type: string
@@ -662,7 +668,7 @@ TorrentScreenshotPath:
     x-audience: [web]
     x-owner: core-torrents
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/TorrentIDPathParameter"
       - name: position
@@ -679,13 +685,15 @@ TorrentScreenshotPath:
         schema:
           type: boolean
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: >-
           服务端从当前已配置的本地或对象存储读取指定截图，并按 PostgreSQL
           中的不可变长度与 SHA-256 证据完整校验后返回。物理存储信息不暴露给浏览器。
         headers:
           Cache-Control:
-            description: 短期公共缓存，并允许后台重新验证。
+            description: 会员图片禁止存储在浏览器和代理缓存中。
             required: true
             schema:
               type: string
@@ -726,10 +734,12 @@ TorrentContentPath:
     x-audience: [web]
     x-owner: core-torrents
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/TorrentIDPathParameter"
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: >-
           已发布种子的描述与原始 MediaInfo/BDInfo。长文本独立于首屏元数据读取，
@@ -753,10 +763,12 @@ TorrentRelatedVersionsPath:
     x-audience: [web]
     x-owner: core-torrents
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/TorrentIDPathParameter"
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: >-
           只返回同一受控资源组内的其它已发布种子，复用公开目录摘要，
@@ -780,10 +792,12 @@ TorrentSwarmPath:
     x-audience: [web]
     x-owner: core-catalog
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/TorrentIDPathParameter"
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: 最近一次异步汇总的做种、下载和完成数量；统计不可用或过期不影响种子详情。
         content:
@@ -843,7 +857,7 @@ TorrentFilesPath:
     x-audience: [web]
     x-owner: core-torrents
     x-permission: torrent.read
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/TorrentIDPathParameter"
       - name: limit
@@ -865,6 +879,8 @@ TorrentFilesPath:
           maximum: 99999
           default: 0
     responses:
+      "401":
+        $ref: "../responses.yaml#/MemberSessionRequired"
       "200":
         description: 按原始 metainfo 文件序号排序的不可变文件清单分页。
         content:

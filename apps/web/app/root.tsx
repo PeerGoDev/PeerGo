@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, type ReactNode } from "react"
 import {
   Links,
   Meta,
+  Navigate,
   Outlet,
   Scripts,
   ScrollRestoration,
@@ -13,6 +14,7 @@ import {
 import type { Route } from "./+types/root"
 import "~/shared/polyfills/crypto-random-uuid"
 import { AppProviders } from "~/shared/providers/app-providers"
+import { useWebSession } from "~/features/auth/api/session.mutations"
 import { SiteDocumentTitle } from "~/features/site/components/site-document-title"
 import {
   AppLoadingSkeleton,
@@ -45,6 +47,7 @@ const authShellPathPrefixes = [
   "/forgot-password",
   "/reset-password",
   "/verify-email",
+  "/restrictions",
 ]
 
 export function isAuthShellPathname(pathname: string) {
@@ -107,23 +110,35 @@ export function Layout({ children }: { children: ReactNode }) {
 
 export default function App() {
   const location = useLocation()
-  const Shell = location.pathname.startsWith("/staff")
-    ? LazyStaffShell
-    : isAuthShellPathname(location.pathname)
-      ? LazyAuthShell
-      : LazyAppShell
+  const publicRoute = isAuthShellPathname(location.pathname)
+  const Shell =
+    location.pathname === "/staff" || location.pathname.startsWith("/staff/")
+      ? LazyStaffShell
+      : publicRoute
+        ? LazyAuthShell
+        : LazyAppShell
   useStaleAssetRecovery()
 
+  const content = (
+    <Shell>
+      <RoutedContent />
+    </Shell>
+  )
   return (
     <AppProviders>
       <SiteDocumentTitle />
       <Suspense fallback={<AppLoadingSkeleton />}>
-        <Shell>
-          <RoutedContent />
-        </Shell>
+        {publicRoute ? content : <RequireMember>{content}</RequireMember>}
       </Suspense>
     </AppProviders>
   )
+}
+
+export function RequireMember({ children }: { children: ReactNode }) {
+  const session = useWebSession()
+  if (session.isPending) return <AppLoadingSkeleton />
+  if (!session.data) return <Navigate to="/login" replace />
+  return children
 }
 
 function RoutedContent() {

@@ -10425,6 +10425,15 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description 浏览站内内容需要有效的会员会话。 */
+        MemberSessionRequired: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
     };
     parameters: {
         /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
@@ -15283,6 +15292,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["MemberSessionRequired"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
@@ -15312,6 +15322,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["MemberSessionRequired"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
@@ -15337,6 +15348,7 @@ export interface operations {
                     "application/json": components["schemas"]["AnnouncementDetail"];
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -15367,6 +15379,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -15707,6 +15720,7 @@ export interface operations {
                     "application/json": components["schemas"]["CategoryWithCount"][];
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
@@ -15731,6 +15745,7 @@ export interface operations {
                     "application/json": components["schemas"]["CategoryFacetList"];
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -16130,6 +16145,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
@@ -16191,6 +16207,7 @@ export interface operations {
                     "application/json": components["schemas"]["TorrentPublicDetail"];
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -16211,7 +16228,7 @@ export interface operations {
             /** @description 服务端从当前已配置的本地或对象存储读取首张截图，按 PostgreSQL 中的不可变长度与 SHA-256 证据完整校验后返回。对象键、后端位置、 版本号和存储凭据不会暴露给浏览器。 */
             200: {
                 headers: {
-                    /** @description 短期公共缓存；未来显式封面替换无需沿用旧对象。 */
+                    /** @description 会员图片禁止存储在浏览器和代理缓存中。 */
                     "Cache-Control": string;
                     /** @description 由不可变内容 SHA-256 生成的强校验标签。 */
                     ETag: string;
@@ -16224,6 +16241,7 @@ export interface operations {
                     "image/gif": string;
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -16249,7 +16267,7 @@ export interface operations {
             /** @description 服务端从当前已配置的本地或对象存储读取指定截图，并按 PostgreSQL 中的不可变长度与 SHA-256 证据完整校验后返回。物理存储信息不暴露给浏览器。 */
             200: {
                 headers: {
-                    /** @description 短期公共缓存，并允许后台重新验证。 */
+                    /** @description 会员图片禁止存储在浏览器和代理缓存中。 */
                     "Cache-Control": string;
                     /** @description 由不可变内容 SHA-256 生成的强校验标签。 */
                     ETag: string;
@@ -16262,6 +16280,7 @@ export interface operations {
                     "image/gif": string;
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -16288,6 +16307,7 @@ export interface operations {
                     "application/json": components["schemas"]["TorrentPublicContent"];
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -16314,6 +16334,7 @@ export interface operations {
                     "application/json": components["schemas"]["TorrentRelatedVersions"];
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -16340,6 +16361,7 @@ export interface operations {
                     "application/json": components["schemas"]["TorrentSwarmOverview"];
                 };
             };
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -16402,6 +16424,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
@@ -16434,6 +16457,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["MemberSessionRequired"];
             404: components["responses"]["ProblemResponse"];
             429: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];

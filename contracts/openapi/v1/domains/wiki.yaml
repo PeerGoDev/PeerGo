@@ -9,7 +9,7 @@ WikiPagesPath:
     x-visibility-permissions:
       public: wiki.page.read
       members: wiki.page.read.member
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/WikiQueryParameter"
       - $ref: "#/WikiLimitParameter"
@@ -37,7 +37,7 @@ WikiPagePath:
     x-visibility-permissions:
       public: wiki.page.read
       members: wiki.page.read.member
-    x-credential-audience: anonymous
+    x-credential-audience: web-session
     parameters:
       - $ref: "#/WikiSlugPathParameter"
     responses:

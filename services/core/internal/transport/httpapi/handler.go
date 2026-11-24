@@ -694,7 +694,7 @@ func (h *Handler) GetPublicUserProfile(ctx context.Context, request generated.Ge
 	case err != nil:
 		return nil, err
 	}
-	cacheControl := "private, max-age=60"
+	cacheControl := "private, no-store"
 	return generated.GetPublicUserProfile200JSONResponse{
 		Body: publicUserProfileDTO(profile),
 		Headers: generated.GetPublicUserProfile200ResponseHeaders{
@@ -809,7 +809,7 @@ func (h *Handler) GetPublicUserAvatar(ctx context.Context, request generated.Get
 	case err != nil:
 		return nil, err
 	}
-	headers := generated.GetPublicUserAvatar200ResponseHeaders{CacheControl: "private, no-cache", ETag: `"` + avatar.Revision + `"`}
+	headers := generated.GetPublicUserAvatar200ResponseHeaders{CacheControl: "private, no-store", ETag: `"` + avatar.Revision + `"`}
 	reader := bytes.NewReader(avatar.Data)
 	switch avatar.ContentType {
 	case "image/jpeg":
@@ -3162,6 +3162,14 @@ func (h *Handler) DeleteStaffSession(ctx context.Context, request generated.Dele
 
 // GetSiteInfo implements generated.StrictServerInterface.
 func (h *Handler) GetSiteInfo(ctx context.Context, _ generated.GetSiteInfoRequestObject) (generated.GetSiteInfoResponseObject, error) {
+	member := false
+	if token := sessionTokenFromContext(ctx); token != "" {
+		_, err := h.identity.CurrentSession(ctx, token)
+		if err != nil && !errors.Is(err, identity.ErrSessionNotFound) {
+			return nil, err
+		}
+		member = err == nil
+	}
 	result, err := h.catalog.GetSiteInfo(ctx)
 	if err != nil {
 		return nil, err
@@ -3171,6 +3179,19 @@ func (h *Handler) GetSiteInfo(ctx context.Context, _ generated.GetSiteInfoReques
 		return nil, err
 	}
 
+	navigationItems := customNavigationItemsDTO(result.CustomNavigationItems)
+	if !member {
+		result.OnlineUsers = 0
+		result.DefaultTorrentView = "list"
+		result.ShowLatestAnnouncement = false
+		publicContacts := make([]generated.CustomNavigationItem, 0, len(navigationItems))
+		for _, item := range navigationItems {
+			if item.ShowOnAppeal != nil && *item.ShowOnAppeal {
+				publicContacts = append(publicContacts, item)
+			}
+		}
+		navigationItems = publicContacts
+	}
 	return generated.GetSiteInfo200JSONResponse{
 		Name: result.Name, Description: result.Description,
 		RegistrationMode:                  generated.RegistrationMode(registrationPolicy.Mode),
@@ -3187,7 +3208,7 @@ func (h *Handler) GetSiteInfo(ctx context.Context, _ generated.GetSiteInfoReques
 		OnlineUsers:            result.OnlineUsers,
 		DefaultTorrentView:     generated.SiteInfoDefaultTorrentView(result.DefaultTorrentView),
 		ShowLatestAnnouncement: result.ShowLatestAnnouncement,
-		CustomNavigationItems:  customNavigationItemsDTO(result.CustomNavigationItems),
+		CustomNavigationItems:  navigationItems,
 	}, nil
 }
 
