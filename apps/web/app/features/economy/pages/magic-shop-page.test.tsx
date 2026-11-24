@@ -110,6 +110,10 @@ it("checks quantity and submits the displayed unit price for a bulk purchase", a
     </QueryClientProvider>
   )
 
+  expect(screen.getByRole("link", { name: "前往签到补签" })).toHaveAttribute(
+    "href",
+    "/account/economy?tab=attendance"
+  )
   const quantity = screen.getByRole("spinbutton", { name: "补签卡购买数量" })
   fireEvent.change(quantity, { target: { value: "1.5" } })
   expect(

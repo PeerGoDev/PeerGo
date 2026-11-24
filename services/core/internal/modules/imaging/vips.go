@@ -97,6 +97,17 @@ func (transformer *VipsTransformer) Transform(ctx context.Context, kind SourceKi
 	if extension == "" {
 		return Output{}, ErrInput
 	}
+	animate := false
+	if kind == SourceTorrentScreenshot && variant == VariantLarge && (extension == ".gif" || IsAnimatedWebP(raw)) {
+		config, format, configErr := image.DecodeConfig(bytes.NewReader(raw))
+		if configErr == nil {
+			frames, frameErr := ScreenshotFrameCount(raw, format, config.Width, config.Height)
+			animate = frameErr == nil && frames > 1
+		}
+	}
+	if animate {
+		profile = TransformProfile{MaxWidth: 960, MaxHeight: 960, Quality: 74}
+	}
 	input, err := os.CreateTemp(transformer.tempDir, "peergo-image-source-*"+extension)
 	if err != nil {
 		return Output{}, errors.New("create private image derivative input")
@@ -121,11 +132,15 @@ func (transformer *VipsTransformer) Transform(ctx context.Context, kind SourceKi
 	transformCtx, cancel := context.WithTimeout(ctx, transformer.timeout)
 	defer cancel()
 	outputOption := fmt.Sprintf("%s[Q=%d,effort=4,keep=none]", outputName, profile.Quality)
+	inputOption := inputName
+	if animate {
+		inputOption += "[n=-1]"
+	}
 	arguments := make([]string, 0, 10)
 	if transformer.concurrency > 0 {
 		arguments = append(arguments, fmt.Sprintf("--vips-concurrency=%d", transformer.concurrency))
 	}
-	arguments = append(arguments, "thumbnail", inputName, outputOption,
+	arguments = append(arguments, "thumbnail", inputOption, outputOption,
 		fmt.Sprintf("%d", profile.MaxWidth), "--height", fmt.Sprintf("%d", profile.MaxHeight),
 		"--size", "down", "--fail-on", "warning",
 	)
@@ -152,6 +167,9 @@ func (transformer *VipsTransformer) Transform(ctx context.Context, kind SourceKi
 		configuration.Width > profile.MaxWidth || configuration.Height > profile.MaxHeight {
 		return Output{}, errors.New("libvips produced an invalid WebP derivative")
 	}
+	if animate && !IsAnimatedWebP(contents) {
+		return Output{}, errors.New("libvips lost the screenshot animation")
+	}
 	digest := objectstorage.SHA256(sha256.Sum256(contents))
 	return Output{
 		Descriptor: objectstorage.Descriptor{SHA256: digest, ByteLength: int64(len(contents))},
@@ -168,9 +186,6 @@ func canonicalSourceExtension(value string) string {
 	case ".webp":
 		return ".webp"
 	case ".gif":
-		// Runtime variants are intentionally static previews. The immutable GIF
-		// remains available from the original endpoint and is never flattened in
-		// place or deleted after this job succeeds.
 		return ".gif"
 	default:
 		return ""

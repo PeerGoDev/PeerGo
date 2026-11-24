@@ -25,7 +25,7 @@ import (
 type TorrentReadService interface {
 	Detail(context.Context, torrents.TorrentID) (torrents.PublicDetail, error)
 	Cover(context.Context, torrents.TorrentID) (torrents.PublicCover, error)
-	Screenshot(context.Context, torrents.TorrentID, int) (torrents.PublicScreenshot, error)
+	Screenshot(context.Context, torrents.TorrentID, int, bool) (torrents.PublicScreenshot, error)
 	Content(context.Context, torrents.TorrentID) (torrents.PublicContent, error)
 	RelatedVersions(context.Context, torrents.TorrentID) ([]catalog.TorrentSummary, error)
 	Files(context.Context, torrents.TorrentID, int, int) (torrents.PublicFilePage, error)
@@ -44,7 +44,7 @@ type TorrentReadService interface {
 type TorrentViewerReadService interface {
 	DetailForViewer(context.Context, string, torrents.TorrentID) (torrents.PublicDetail, error)
 	CoverForViewer(context.Context, string, torrents.TorrentID) (torrents.PublicCover, error)
-	ScreenshotForViewer(context.Context, string, torrents.TorrentID, int) (torrents.PublicScreenshot, error)
+	ScreenshotForViewer(context.Context, string, torrents.TorrentID, int, bool) (torrents.PublicScreenshot, error)
 	ContentForViewer(context.Context, string, torrents.TorrentID) (torrents.PublicContent, error)
 	FilesForViewer(context.Context, string, torrents.TorrentID, int, int) (torrents.PublicFilePage, error)
 }
@@ -174,12 +174,13 @@ func userTrackerActivityDTO(activity torrents.UserTrackerActivity) generated.Use
 func (h *Handler) GetTorrentScreenshot(ctx context.Context, request generated.GetTorrentScreenshotRequestObject) (generated.GetTorrentScreenshotResponseObject, error) {
 	var screenshot torrents.PublicScreenshot
 	var err error
+	play := request.Params.Play != nil && *request.Params.Play
 	if viewer, ok := h.torrentRead.(TorrentViewerReadService); ok {
 		screenshot, err = viewer.ScreenshotForViewer(
-			ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId), request.Position,
+			ctx, sessionTokenFromContext(ctx), torrents.TorrentID(request.TorrentId), request.Position, play,
 		)
 	} else {
-		screenshot, err = h.torrentRead.Screenshot(ctx, torrents.TorrentID(request.TorrentId), request.Position)
+		screenshot, err = h.torrentRead.Screenshot(ctx, torrents.TorrentID(request.TorrentId), request.Position, play)
 	}
 	switch {
 	case errors.Is(err, torrents.ErrTorrentScreenshotNotFound),

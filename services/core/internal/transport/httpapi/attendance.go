@@ -91,7 +91,7 @@ func (h *Handler) MakeupMyAttendance(ctx context.Context, request generated.Make
 		problem := newProblemFromContext(ctx, http.StatusConflict, "attendance_makeup_unavailable", "没有可补签的日期", "补签只能补回最近一次签到之后、补签期限内的那一天，且需在今天签到之前使用。")
 		return generated.MakeupMyAttendance409ApplicationProblemPlusJSONResponse(problem), nil
 	case errors.Is(err, attendance.ErrNoMakeupCard):
-		problem := newProblemFromContext(ctx, http.StatusConflict, "attendance_makeup_card_missing", "没有补签卡", "请先在魔力商店购买补签卡。")
+		problem := newProblemFromContext(ctx, http.StatusConflict, "attendance_makeup_card_missing", "没有补签卡", "当前没有可用的补签卡。")
 		return generated.MakeupMyAttendance409ApplicationProblemPlusJSONResponse(problem), nil
 	case errors.Is(err, attendance.ErrIdempotencyConflict):
 		problem := newProblemFromContext(ctx, http.StatusConflict, "attendance_idempotency_conflict", "请求标识已被使用", "请刷新签到状态后重新操作。")

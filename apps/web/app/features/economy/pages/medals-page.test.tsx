@@ -32,6 +32,7 @@ describe("MedalsPage", () => {
     expect(screen.getByText("10,000")).toBeVisible()
     expect(screen.getByText("2/3 已佩戴")).toBeVisible()
     expect(screen.getByText("转种组")).toBeVisible()
+    expect(screen.getByRole("img", { name: "转种组" })).toBeVisible()
     expect(
       screen.getByRole("button", { name: "工作组权益自动生效" })
     ).toBeDisabled()

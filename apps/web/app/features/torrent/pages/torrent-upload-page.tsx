@@ -368,7 +368,7 @@ function TorrentUploadWorkspace({
     const accepted: TorrentScreenshotItem[] = []
     for (const file of incoming.slice(0, remaining)) {
       if (!torrentScreenshotTypes.has(file.type)) {
-        setScreenshotError("截图仅支持 JPEG、PNG 或 WebP 格式")
+        setScreenshotError("截图仅支持 JPEG、PNG、WebP 或 GIF 格式")
         continue
       }
       if (file.size < 1 || file.size > 5 * 1024 * 1024) {
@@ -902,7 +902,7 @@ function TorrentUploadWorkspace({
                       id="torrent-screenshots"
                       className="sr-only"
                       type="file"
-                      accept="image/jpeg,image/png,image/webp"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
                       multiple
                       aria-label="截图"
                       aria-invalid={Boolean(screenshotError)}
@@ -1094,6 +1094,7 @@ const torrentScreenshotTypes = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/gif",
 ])
 
 function TorrentUploadPreviewDialog({

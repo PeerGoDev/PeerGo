@@ -5,6 +5,7 @@ import (
 	"context"
 	"image"
 	"image/color"
+	"image/gif"
 	"image/png"
 	"os/exec"
 	"testing"
@@ -64,6 +65,51 @@ func TestImageProfilesAreBoundedBySourceKind(t *testing.T) {
 	}
 	if screenshot.MaxWidth != 320 || screenshot.MaxHeight != 480 || avatar.MaxWidth != 64 || avatar.MaxHeight != 64 {
 		t.Fatalf("unexpected profiles: screenshot=%+v avatar=%+v", screenshot, avatar)
+	}
+}
+
+func TestVipsTransformerKeepsAnimationOnlyInLargeScreenshot(t *testing.T) {
+	t.Parallel()
+	binary, err := exec.LookPath("vips")
+	if err != nil {
+		t.Skip("libvips is not installed in this test environment")
+	}
+	palette := color.Palette{color.Black, color.White}
+	bounds := image.Rect(0, 0, 1000, 12)
+	black := image.NewPaletted(bounds, palette)
+	white := image.NewPaletted(bounds, palette)
+	for i := range white.Pix {
+		white.Pix[i] = 1
+	}
+	var source bytes.Buffer
+	if err := gif.EncodeAll(&source, &gif.GIF{
+		Image: []*image.Paletted{black, white},
+		Delay: []int{8, 16},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	transformer, err := NewVipsTransformer(VipsConfig{Binary: binary, TempDir: t.TempDir(), Concurrency: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	preview, err := transformer.Transform(ctx, SourceTorrentScreenshot, VariantThumbnail, source.Bytes(), ".gif")
+	if err != nil || IsAnimatedWebP(preview.Bytes) {
+		t.Fatalf("preview must contain only the first frame: %v", err)
+	}
+	playback, err := transformer.Transform(ctx, SourceTorrentScreenshot, VariantLarge, source.Bytes(), ".gif")
+	if err != nil {
+		t.Fatal(err)
+	}
+	transcoded, err := transformer.Transform(ctx, SourceTorrentScreenshot, VariantLarge, playback.Bytes, ".webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range []Output{playback, transcoded} {
+		frames, err := ScreenshotFrameCount(output.Bytes, "webp", output.Width, output.Height)
+		if err != nil || frames != 2 || output.Width != 960 || output.Height > 12 {
+			t.Fatalf("playback: %d frames at %dx%d (%v)", frames, output.Width, output.Height, err)
+		}
 	}
 }
 

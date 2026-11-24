@@ -16,12 +16,13 @@ const maximumScreenshotCount = 6
 export function TorrentScreenshotsCard({
   torrentId,
   screenshotCount,
-  screenshotUrl = torrentScreenshotUrl,
+  screenshotUrl,
 }: {
   torrentId: number
   screenshotCount: number
   screenshotUrl?: (torrentId: number, position: number) => string
 }) {
+  const previewUrl = screenshotUrl ?? torrentScreenshotUrl
   const [selectedPosition, setSelectedPosition] = React.useState<number | null>(
     null
   )
@@ -98,7 +99,7 @@ export function TorrentScreenshotsCard({
                 failed={failedPositions.has(position)}
                 onFailure={() => recordFailure(position)}
                 onSelect={() => setSelectedPosition(position)}
-                screenshotUrl={screenshotUrl}
+                screenshotUrl={previewUrl}
               />
             ))}
           </div>
@@ -133,7 +134,11 @@ export function TorrentScreenshotsCard({
                 </button>
               ) : null}
               <img
-                src={screenshotUrl(torrentId, selectedPosition)}
+                src={
+                  screenshotUrl
+                    ? screenshotUrl(torrentId, selectedPosition)
+                    : torrentScreenshotUrl(torrentId, selectedPosition, true)
+                }
                 alt={`截图 ${selectedPosition + 1} 大图`}
                 className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
                 onError={() => {
@@ -183,7 +188,6 @@ function ScreenshotThumbnail({
       aria-label={`查看截图 ${position + 1}`}
       className="relative aspect-video w-56 shrink-0 snap-start overflow-hidden rounded-lg border bg-muted text-muted-foreground transition-opacity hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none sm:w-auto"
       onClick={onSelect}
-      disabled={failed}
     >
       {position === 0 ? (
         <Badge className="absolute top-1.5 left-1.5 z-10 h-4 rounded-sm px-1.5 text-[0.625rem] font-medium">
@@ -208,8 +212,12 @@ function ScreenshotThumbnail({
   )
 }
 
-function torrentScreenshotUrl(torrentId: number, position: number) {
+function torrentScreenshotUrl(
+  torrentId: number,
+  position: number,
+  play = false
+) {
   return resolveApiUrl(
-    `/api/v1/torrents/${encodeURIComponent(torrentId)}/screenshots/${position}`
+    `/api/v1/torrents/${encodeURIComponent(torrentId)}/screenshots/${position}${play ? "?play=true" : ""}`
   )
 }

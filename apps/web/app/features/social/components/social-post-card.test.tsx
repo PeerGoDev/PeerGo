@@ -192,7 +192,7 @@ describe("SocialPostCard", () => {
                 title: "演示资源",
                 subtitle: "完整演示副标题",
                 size_bytes: 1024,
-                cover_available: false,
+                cover_available: true,
               },
               created_at: "2026-08-13T06:00:00Z",
               updated_at: "2026-08-13T06:00:00Z",
@@ -209,6 +209,9 @@ describe("SocialPostCard", () => {
       `/torrents/${torrentId}`
     )
     expect(screen.getByText("完整演示副标题")).toBeVisible()
+    expect(
+      screen.getByRole("img", { name: "演示资源封面" }).getAttribute("src")
+    ).toMatch(new RegExp(`/api/v1/torrents/${torrentId}/cover$`))
     expect(screen.getByText("1 KB")).toBeVisible()
     expect(screen.getByRole("button", { name: "点赞" })).toHaveClass("border-0")
     expect(screen.getByRole("button", { name: "评论" })).toHaveClass("border-0")

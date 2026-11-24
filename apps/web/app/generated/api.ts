@@ -16231,7 +16231,10 @@ export interface operations {
     };
     getTorrentScreenshot: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 点开截图时请求动画播放版本。默认返回静态预览。 */
+                play?: boolean;
+            };
             header?: never;
             path: {
                 /** @description 种子的唯一正整数 ID；迁移数据保留旧站 ID，新数据从当前最大值继续递增。 */

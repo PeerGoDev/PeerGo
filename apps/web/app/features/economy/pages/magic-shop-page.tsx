@@ -380,7 +380,10 @@ function ShopContent({
             ],
           ]}
           footer={
-            <Link to="/economy" className="text-xs text-link hover:underline">
+            <Link
+              to="/account/economy?tab=attendance"
+              className="text-xs text-link hover:underline"
+            >
               前往签到补签
             </Link>
           }

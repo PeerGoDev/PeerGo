@@ -45,7 +45,12 @@ type EditorItem =
 
 const maxScreenshots = 6
 const maxScreenshotBytes = 2 * 1024 * 1024
-const acceptedTypes = new Set(["image/jpeg", "image/png", "image/webp"])
+const acceptedTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+])
 
 export function TorrentPublishedScreenshotDialog({
   submission,
@@ -101,7 +106,7 @@ export function TorrentPublishedScreenshotDialog({
       (file) => !acceptedTypes.has(file.type) || file.size > maxScreenshotBytes
     )
     if (invalid) {
-      setInputError("仅支持不超过 2 MiB 的 JPEG、PNG 或 WebP 原图。")
+      setInputError("截图仅支持 JPEG、PNG、WebP 或 GIF，每张不超过 2 MiB。")
       return
     }
     setInputError("")
@@ -264,7 +269,7 @@ export function TorrentPublishedScreenshotDialog({
               <Input
                 id="published-screenshot-files"
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 multiple
                 disabled={items.length >= maxScreenshots || mutation.isPending}
                 onChange={(event) => {

@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"image"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"net/http"
 
 	"github.com/google/uuid"
 	_ "golang.org/x/image/webp"
+
+	"github.com/peergo/peergo/services/core/internal/modules/imaging"
 )
 
 const (
@@ -83,6 +86,9 @@ func prepareTorrentScreenshots(inputs []TorrentScreenshotInput, newUUID func() u
 			int64(config.Width)*int64(config.Height) > maxScreenshotPixels {
 			return nil, validationFailure(CodeInvalidScreenshot, "screenshots", position, "invalid screenshot dimensions or encoding")
 		}
+		if _, err := imaging.ScreenshotFrameCount(raw, format, config.Width, config.Height); err != nil {
+			return nil, validationFailure(CodeInvalidScreenshot, "screenshots", position, "invalid screenshot animation or frame limits exceeded")
+		}
 		digest := ObjectSHA256(sha256.Sum256(raw))
 		if _, duplicate := seen[digest]; duplicate {
 			return nil, validationFailure(CodeInvalidScreenshot, "screenshots", position, "duplicate screenshot")
@@ -108,15 +114,14 @@ func supportedScreenshotType(contentType string) (extension, format string, ok b
 		return ".png", "png", true
 	case "image/webp":
 		return ".webp", "webp", true
+	case "image/gif":
+		return ".gif", "gif", true
 	default:
 		return "", "", false
 	}
 }
 
 func supportedStoredScreenshotType(contentType string) bool {
-	if contentType == "image/gif" {
-		return true
-	}
 	_, _, ok := supportedScreenshotType(contentType)
 	return ok
 }

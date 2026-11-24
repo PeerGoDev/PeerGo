@@ -142,7 +142,7 @@ export function TorrentShareToSocial({
               <div className="flex gap-3">
                 {screenshotCount > 0 ? (
                   <img
-                    src={`/api/v1/torrents/${encodeURIComponent(torrentId)}/screenshots/0`}
+                    src={`/api/v1/torrents/${encodeURIComponent(torrentId)}/cover`}
                     alt=""
                     className="h-20 w-16 shrink-0 rounded object-cover"
                   />

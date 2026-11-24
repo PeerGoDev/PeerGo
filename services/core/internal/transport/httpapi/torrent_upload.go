@@ -173,7 +173,7 @@ func torrentUploadErrorResponse(ctx context.Context, err error) (generated.Submi
 			return generated.SubmitTorrent413ApplicationProblemPlusJSONResponse(problem), true
 		}
 		if validationCode == torrents.CodeInvalidScreenshot {
-			problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_torrent_screenshot", "截图无效", "请上传可正确解码且尺寸合规的 JPEG、PNG 或 WebP 图片。")
+			problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_torrent_screenshot", "截图无效", "请上传符合尺寸和帧数限制的 JPEG、PNG、WebP 或 GIF 图片。")
 			return generated.SubmitTorrent400ApplicationProblemPlusJSONResponse{
 				ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 			}, true

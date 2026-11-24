@@ -1,0 +1,12 @@
+@keyframes medal-glow {
+  0%,
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+
+  50% {
+    filter: brightness(1.13);
+    transform: scale(1.045);
+  }
+}

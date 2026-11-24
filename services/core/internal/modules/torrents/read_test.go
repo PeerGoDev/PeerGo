@@ -115,6 +115,7 @@ func (rejectingTorrentReadAuthorizer) Authorize(context.Context, authz.Request) 
 
 type torrentDerivativeFixture struct {
 	ready    imaging.ReadyDerivative
+	large    *imaging.ReadyDerivative
 	err      error
 	sourceID uuid.UUID
 	variant  imaging.Variant
@@ -122,6 +123,9 @@ type torrentDerivativeFixture struct {
 
 func (fixture *torrentDerivativeFixture) ReadyForTorrentScreenshot(_ context.Context, sourceID uuid.UUID, variant imaging.Variant) (imaging.ReadyDerivative, error) {
 	fixture.sourceID, fixture.variant = sourceID, variant
+	if variant == imaging.VariantLarge && fixture.large != nil {
+		return *fixture.large, fixture.err
+	}
 	return fixture.ready, fixture.err
 }
 
@@ -185,12 +189,12 @@ func TestTorrentReadKeepsPublicQueriesAnonymousAndBounded(t *testing.T) {
 		cover.ETag != `"sha256-`+coverDigest.Hex()+`"` || repository.coverID != torrentID {
 		t.Fatalf("Cover() = %+v, %v", cover, err)
 	}
-	screenshot, err := service.Screenshot(context.Background(), torrentID, 1)
+	screenshot, err := service.Screenshot(context.Background(), torrentID, 1, false)
 	if err != nil || !bytes.Equal(screenshot.Data, coverBytes) || screenshot.ContentType != "image/png" ||
 		screenshot.ETag != `"sha256-`+coverDigest.Hex()+`"` || repository.screenshotID != torrentID || repository.screenshotPos != 1 {
 		t.Fatalf("Screenshot() = %+v, %v", screenshot, err)
 	}
-	if _, err := service.Screenshot(context.Background(), torrentID, MaxTorrentScreenshots); !errors.Is(err, ErrTorrentReadInput) {
+	if _, err := service.Screenshot(context.Background(), torrentID, MaxTorrentScreenshots, false); !errors.Is(err, ErrTorrentReadInput) {
 		t.Fatalf("Screenshot() invalid position error = %v", err)
 	}
 
@@ -393,7 +397,7 @@ func TestTorrentReadRejectsAnonymousActivePeerLookup(t *testing.T) {
 	}
 }
 
-func TestTorrentReadPrefersVerifiedWebPDerivative(t *testing.T) {
+func TestTorrentReadPrefersWebPCoverAndPreservesGIFScreenshot(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, time.August, 18, 1, 0, 0, 0, time.UTC)
 	sourceObjectID := uuid.New()
@@ -434,6 +438,46 @@ func TestTorrentReadPrefersVerifiedWebPDerivative(t *testing.T) {
 	}
 	if derivatives.sourceID != sourceObjectID || derivatives.variant != imaging.VariantThumbnail {
 		t.Fatalf("derivative request = %s %s", derivatives.sourceID, derivatives.variant)
+	}
+
+	screenshotBytes := screenshotGIF(t, 2)
+	screenshotDigest := ObjectSHA256(sha256.Sum256(screenshotBytes))
+	screenshotKey := TorrentScreenshotObjectKey(screenshotDigest, ".gif")
+	store.objects[screenshotKey] = screenshotBytes
+	descriptor := StoredObjectDescriptor{
+		SHA256: screenshotDigest, ByteLength: int64(len(screenshotBytes)),
+	}
+	repository.screenshot = PublicScreenshotSource{
+		TorrentID: 42, Position: 0, ObjectID: sourceObjectID, ContentType: "image/gif",
+		Width: 1, Height: 1, Descriptor: descriptor,
+		Locations: []ReadableObjectLocation{{
+			ID: uuid.New(), BackendID: "local-primary", ObjectKey: screenshotKey,
+			Descriptor: descriptor, VerifiedAt: now,
+		}},
+	}
+	preview, err := service.Screenshot(context.Background(), 42, 0, false)
+	if err != nil || preview.ContentType != "image/webp" || !bytes.Equal(preview.Data, derivativeBytes) {
+		t.Fatalf("Screenshot() preview = %+v, %v", preview, err)
+	}
+	screenshot, err := service.Screenshot(context.Background(), 42, 0, true)
+	if err != nil || screenshot.ContentType != "image/gif" || !bytes.Equal(screenshot.Data, screenshotBytes) {
+		t.Fatalf("Screenshot() original playback = %+v, %v", screenshot, err)
+	}
+	animated := screenshotAnimatedWebP(t)
+	animatedKey, err := objectstorage.ParseKey("image-derivatives/webp-v1/sha256/bb/animated.webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.objects[animatedKey] = animated
+	derivatives.large = &imaging.ReadyDerivative{
+		Descriptor: objectstorage.Descriptor{
+			SHA256: objectstorage.SHA256(sha256.Sum256(animated)), ByteLength: int64(len(animated)),
+		},
+		Locations: []imaging.Location{{BackendID: "local-primary", ObjectKey: animatedKey}},
+	}
+	playback, err := service.Screenshot(context.Background(), 42, 0, true)
+	if err != nil || playback.ContentType != "image/webp" || !bytes.Equal(playback.Data, animated) {
+		t.Fatalf("Screenshot() processed playback = %+v, %v", playback, err)
 	}
 }
 

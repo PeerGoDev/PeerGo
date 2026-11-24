@@ -33,7 +33,7 @@ export function HeaderAttendanceButton({
   if (overview.claimed_today) {
     return (
       <Button
-        render={<Link to="/account/economy" />}
+        render={<Link to="/account/economy?tab=attendance" />}
         nativeButton={false}
         variant="ghost"
         size="sm"
@@ -42,6 +42,18 @@ export function HeaderAttendanceButton({
       >
         <CalendarCheck2Icon />
         已签到 {overview.current_streak} 天
+      </Button>
+    )
+  }
+  if (overview.makeup_date && (overview.makeup_cards ?? 0) > 0) {
+    return (
+      <Button
+        render={<Link to="/account/economy?tab=attendance" />}
+        nativeButton={false}
+        size="sm"
+      >
+        <CalendarCheck2Icon />
+        签到与补签
       </Button>
     )
   }

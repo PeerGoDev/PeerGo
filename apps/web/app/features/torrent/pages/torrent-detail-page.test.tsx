@@ -203,7 +203,10 @@ describe("TorrentDetailPage", () => {
     })
     expect(firstScreenshot).toHaveClass("w-56", "sm:w-auto")
     await user.click(firstScreenshot)
-    expect(screen.getByRole("img", { name: "截图 1 大图" })).toBeVisible()
+    expect(screen.getByRole("img", { name: "截图 1 大图" })).toHaveAttribute(
+      "src",
+      `http://localhost:3000/api/v1/torrents/${torrentId}/screenshots/0?play=true`
+    )
     expect(screen.getByText("1 / 2")).toBeVisible()
     await user.click(screen.getByRole("button", { name: "下一张截图" }))
     expect(screen.getByRole("img", { name: "截图 2 大图" })).toBeVisible()

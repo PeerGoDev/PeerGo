@@ -673,6 +673,11 @@ TorrentScreenshotPath:
           type: integer
           minimum: 0
           maximum: 5
+      - name: play
+        in: query
+        description: 点开截图时请求动画播放版本。默认返回静态预览。
+        schema:
+          type: boolean
     responses:
       "200":
         description: >-

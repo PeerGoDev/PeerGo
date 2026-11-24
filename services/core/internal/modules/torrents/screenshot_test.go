@@ -3,8 +3,10 @@ package torrents
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"image"
 	"image/color"
+	"image/gif"
 	"image/png"
 	"testing"
 
@@ -47,6 +49,25 @@ func TestPrepareTorrentScreenshotsRejectsSourceAboveTwoMiB(t *testing.T) {
 	}}, uuid.New)
 	if code, ok := ValidationCodeOf(err); !ok || code != CodeObjectTooLarge {
 		t.Fatalf("prepareTorrentScreenshots() error = %v, code=%q", err, code)
+	}
+}
+
+func TestPrepareTorrentScreenshotsAcceptsGIFAndAnimatedWebP(t *testing.T) {
+	t.Parallel()
+	animation := screenshotAnimatedWebP(t)
+	prepared, err := prepareTorrentScreenshots([]TorrentScreenshotInput{
+		{Raw: screenshotGIF(t, 2)},
+		{Raw: animation},
+	}, uuid.New)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepared[0].Extension != ".gif" || prepared[1].Extension != ".webp" {
+		t.Fatalf("invalid prepared screenshot formats: %q, %q", prepared[0].Extension, prepared[1].Extension)
+	}
+	_, err = prepareTorrentScreenshots([]TorrentScreenshotInput{{Raw: screenshotGIF(t, 121)}}, uuid.New)
+	if code, _ := ValidationCodeOf(err); code != CodeInvalidScreenshot {
+		t.Fatalf("excessive animation frame count error = %v", err)
 	}
 }
 
@@ -108,4 +129,31 @@ func screenshotPNG(t *testing.T, width, height int, fill color.Color) []byte {
 		t.Fatal(err)
 	}
 	return buffer.Bytes()
+}
+
+func screenshotGIF(t *testing.T, frames int) []byte {
+	t.Helper()
+	animation := gif.GIF{}
+	for i := 0; i < frames; i++ {
+		frame := image.NewPaletted(image.Rect(0, 0, 1, 1), color.Palette{color.Black, color.White})
+		frame.SetColorIndex(0, 0, uint8(i%2))
+		animation.Image = append(animation.Image, frame)
+		animation.Delay = append(animation.Delay, 8)
+	}
+	var buffer bytes.Buffer
+	if err := gif.EncodeAll(&buffer, &animation); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+func screenshotAnimatedWebP(t *testing.T) []byte {
+	t.Helper()
+	// One-pixel animation sample from the WebP format's browser support example.
+	const sample = "UklGRlIAAABXRUJQVlA4WAoAAAASAAAAAAAAAAAAQU5JTQYAAAD/////AABBTk1GJgAAAAAAAAAAAAAAAAAAAGQAAABWUDhMDQAAAC8AAAAQBxAREYiI/gcA"
+	data, err := base64.StdEncoding.DecodeString(sample)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }

@@ -421,6 +421,9 @@ func (service *TorrentReadService) readCoverSource(ctx context.Context, source P
 	if err != nil {
 		return PublicCover{}, ErrTorrentCoverConflict
 	}
+	if isAnimatedScreenshot(data, source.ContentType) {
+		return PublicCover{}, ErrTorrentCoverUnavailable
+	}
 	return PublicCover{
 		Data:        data,
 		ContentType: source.ContentType,
@@ -432,7 +435,7 @@ func (service *TorrentReadService) readCoverSource(ctx context.Context, source P
 // upload position. It deliberately repeats the cover integrity boundary: every
 // response is revalidated against the database descriptor after resolving the
 // current local/S3 read priority.
-func (service *TorrentReadService) Screenshot(ctx context.Context, torrentID TorrentID, position int) (PublicScreenshot, error) {
+func (service *TorrentReadService) Screenshot(ctx context.Context, torrentID TorrentID, position int, play bool) (PublicScreenshot, error) {
 	if torrentID < 1 || position < 0 || position >= MaxTorrentScreenshots {
 		return PublicScreenshot{}, ErrTorrentReadInput
 	}
@@ -440,20 +443,19 @@ func (service *TorrentReadService) Screenshot(ctx context.Context, torrentID Tor
 	if err != nil {
 		return PublicScreenshot{}, err
 	}
-	return service.readScreenshotSource(ctx, source)
+	return service.readScreenshotSource(ctx, source, play)
 }
 
-func (service *TorrentReadService) readScreenshotSource(ctx context.Context, source PublicScreenshotSource) (PublicScreenshot, error) {
-	if service.derivatives != nil {
-		derivative, derivativeErr := service.derivatives.ReadyForTorrentScreenshot(ctx, source.ObjectID, imaging.VariantDisplay)
-		if derivativeErr == nil {
-			if data, readErr := imaging.ReadReady(ctx, service.stores, derivative); readErr == nil {
-				return PublicScreenshot{
-					Data: data, ContentType: "image/webp",
-					ETag: `"sha256-` + derivative.Descriptor.SHA256.Hex() + `"`,
-				}, nil
-			}
+func (service *TorrentReadService) readScreenshotSource(ctx context.Context, source PublicScreenshotSource, play bool) (PublicScreenshot, error) {
+	canAnimate := source.ContentType == "image/gif" || source.ContentType == "image/webp"
+	if play && canAnimate {
+		if large, ok := service.readScreenshotDerivative(ctx, source.ObjectID, imaging.VariantLarge); ok && imaging.IsAnimatedWebP(large.Data) {
+			return large, nil
 		}
+	}
+	preview, hasPreview := service.readScreenshotDerivative(ctx, source.ObjectID, imaging.VariantDisplay)
+	if hasPreview && (!play || !canAnimate) {
+		return preview, nil
 	}
 	data, err := readVerifiedStoredObject(
 		ctx,
@@ -462,17 +464,49 @@ func (service *TorrentReadService) readScreenshotSource(ctx context.Context, sou
 		source.Locations,
 		MaxStoredTorrentScreenshotBytes,
 	)
+	if err != nil && hasPreview {
+		return preview, nil
+	}
 	if errors.Is(err, ErrReadableObjectUnavailable) {
 		return PublicScreenshot{}, ErrTorrentScreenshotUnavailable
 	}
 	if err != nil {
 		return PublicScreenshot{}, ErrTorrentScreenshotConflict
 	}
+	animated := isAnimatedScreenshot(data, source.ContentType)
+	if animated && !play {
+		return PublicScreenshot{}, ErrTorrentScreenshotUnavailable
+	}
+	if !animated && hasPreview {
+		return preview, nil
+	}
 	return PublicScreenshot{
 		Data:        data,
 		ContentType: source.ContentType,
 		ETag:        `"sha256-` + source.Descriptor.SHA256.Hex() + `"`,
 	}, nil
+}
+
+func (service *TorrentReadService) readScreenshotDerivative(ctx context.Context, sourceID uuid.UUID, variant imaging.Variant) (PublicScreenshot, bool) {
+	if service.derivatives == nil {
+		return PublicScreenshot{}, false
+	}
+	derivative, err := service.derivatives.ReadyForTorrentScreenshot(ctx, sourceID, variant)
+	if err != nil {
+		return PublicScreenshot{}, false
+	}
+	data, err := imaging.ReadReady(ctx, service.stores, derivative)
+	if err != nil {
+		return PublicScreenshot{}, false
+	}
+	return PublicScreenshot{
+		Data: data, ContentType: "image/webp",
+		ETag: `"sha256-` + derivative.Descriptor.SHA256.Hex() + `"`,
+	}, true
+}
+
+func isAnimatedScreenshot(data []byte, contentType string) bool {
+	return contentType == "image/gif" || (contentType == "image/webp" && imaging.IsAnimatedWebP(data))
 }
 
 func (service *TorrentReadService) PendingReviewEvidence(ctx context.Context, torrentID TorrentID) (PendingReviewEvidence, error) {
@@ -513,6 +547,10 @@ func (service *TorrentReadService) PendingReviewCover(ctx context.Context, torre
 }
 
 func (service *TorrentReadService) PendingReviewScreenshot(ctx context.Context, torrentID TorrentID, position int) (PublicScreenshot, error) {
+	return service.pendingReviewScreenshot(ctx, torrentID, position, false)
+}
+
+func (service *TorrentReadService) pendingReviewScreenshot(ctx context.Context, torrentID TorrentID, position int, play bool) (PublicScreenshot, error) {
 	if torrentID < 1 || position < 0 || position >= MaxTorrentScreenshots {
 		return PublicScreenshot{}, ErrTorrentReadInput
 	}
@@ -524,7 +562,7 @@ func (service *TorrentReadService) PendingReviewScreenshot(ctx context.Context, 
 	if err != nil {
 		return PublicScreenshot{}, err
 	}
-	return service.readScreenshotSource(ctx, source)
+	return service.readScreenshotSource(ctx, source, play)
 }
 
 func (service *TorrentReadService) Detail(ctx context.Context, torrentID TorrentID) (PublicDetail, error) {
@@ -642,15 +680,15 @@ func (service *TorrentReadService) CoverForViewer(ctx context.Context, cookieTok
 	return cover, err
 }
 
-func (service *TorrentReadService) ScreenshotForViewer(ctx context.Context, cookieToken string, torrentID TorrentID, position int) (PublicScreenshot, error) {
-	screenshot, err := service.Screenshot(ctx, torrentID, position)
+func (service *TorrentReadService) ScreenshotForViewer(ctx context.Context, cookieToken string, torrentID TorrentID, position int, play bool) (PublicScreenshot, error) {
+	screenshot, err := service.Screenshot(ctx, torrentID, position, play)
 	if err == nil || (!errors.Is(err, ErrTorrentReadNotFound) && !errors.Is(err, ErrTorrentScreenshotNotFound)) {
 		return screenshot, err
 	}
 	if err := service.authorizePendingReviewOwner(ctx, cookieToken, torrentID); err != nil {
 		return PublicScreenshot{}, err
 	}
-	screenshot, err = service.PendingReviewScreenshot(ctx, torrentID, position)
+	screenshot, err = service.pendingReviewScreenshot(ctx, torrentID, position, play)
 	if err == nil {
 		screenshot.Private = true
 	}

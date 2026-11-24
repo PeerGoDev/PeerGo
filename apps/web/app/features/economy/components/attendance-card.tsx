@@ -40,6 +40,7 @@ import {
 } from "~/features/economy/api/attendance.queries"
 import {
   isMagicRequestUncertain,
+  useMagicShop,
   useMakeupAttendance,
 } from "~/features/economy/api/magic-store.queries"
 import { requestErrorDescription } from "~/shared/api/problem"
@@ -57,6 +58,9 @@ export function AttendanceCard({
   const mutation = useClaimAttendance(userId)
   const makeup = useMakeupAttendance()
   const retryMakeup = makeup.isError && isMagicRequestUncertain(makeup.error)
+  const needsCard =
+    query.data?.makeup_date && (query.data.makeup_cards ?? 0) === 0
+  const shop = useMagicShop(needsCard ? userId : undefined)
 
   if (query.isPending) {
     return <Skeleton className="h-64 rounded-lg" />
@@ -88,6 +92,10 @@ export function AttendanceCard({
       error={mutation.error ?? makeup.error}
       makeupPending={makeup.isPending}
       retryMakeup={retryMakeup}
+      canBuyMakeupCard={Boolean(
+        shop.data?.settings.shop_enabled &&
+        shop.data.settings.makeup_card.enabled
+      )}
       onClaim={(mode) => {
         makeup.reset()
         mutation.mutate({
@@ -115,6 +123,7 @@ function AttendanceContent({
   error,
   makeupPending,
   retryMakeup,
+  canBuyMakeupCard,
   onClaim,
   onMakeup,
 }: {
@@ -123,6 +132,7 @@ function AttendanceContent({
   error: Error | null
   makeupPending: boolean
   retryMakeup: boolean
+  canBuyMakeupCard: boolean
   onClaim: (mode: AttendanceMode) => void
   onMakeup: () => void
 }) {
@@ -279,14 +289,14 @@ function AttendanceContent({
                   )}
                   {retryMakeup ? "确认上次补签" : "使用补签卡"}
                 </Button>
-              ) : (
+              ) : canBuyMakeupCard ? (
                 <Link
                   to="/shop"
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   购买补签卡
                 </Link>
-              )
+              ) : null
             ) : null}
           </div>
         ) : null}

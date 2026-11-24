@@ -53,6 +53,7 @@ import {
   useUpdateMedalPriority,
   useUpdateMedalWearing,
 } from "~/features/economy/api/medals.queries"
+import { MedalArtwork } from "~/features/economy/components/medal-artwork"
 import { cn } from "~/lib/utils"
 import { requestErrorDescription } from "~/shared/api/problem"
 import { PageLayout } from "~/shared/components/page-layout"
@@ -435,18 +436,7 @@ function MedalCard({
     >
       <CardHeader className="grid-cols-[4rem_1fr_auto] gap-x-4 gap-y-1 has-data-[slot=card-action]:grid-cols-[4rem_1fr_auto]">
         <div className="row-span-2 flex size-16 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-          {image ? (
-            <img
-              src={image}
-              alt={medal.name}
-              className="size-16 object-contain"
-            />
-          ) : (
-            <AwardIcon
-              className="size-8 text-muted-foreground"
-              aria-hidden="true"
-            />
-          )}
+          <MedalArtwork name={medal.name} image={image} />
         </div>
         <CardTitle className="col-start-2 row-start-1 min-w-0 break-words">
           {medal.name}
