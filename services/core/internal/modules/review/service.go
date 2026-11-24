@@ -264,7 +264,7 @@ func (service *Service) Decide(ctx context.Context, actor authz.StaffActor, inpu
 	if err != nil {
 		return DecisionResult{}, err
 	}
-	now := service.now().UTC()
+	now := service.now().UTC().Truncate(time.Microsecond)
 	decision, err := authz.AuthorizeStaffAction(ctx, service.authorizer, actor, authz.ActionTorrentReview, authz.SiteScope(), now, "torrent-review")
 	if err != nil {
 		return DecisionResult{}, err
