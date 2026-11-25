@@ -30,4 +30,17 @@ describe("user administration filters", () => {
     expect(managedUserPageNumbers(6, 12)).toEqual([4, 5, 6, 7, 8])
     expect(managedUserPageNumbers(1, 3)).toEqual([1, 2, 3])
   })
+
+  it("preserves the requested sort across pages", () => {
+    const params = new URLSearchParams(
+      "filter=active&page=3&sort=downloaded_bytes&direction=asc"
+    )
+    const filters = parseManagedUserFilters(params)
+    expect(filters).toMatchObject({
+      sort: "downloaded_bytes",
+      direction: "asc",
+      page: 3,
+    })
+    expect(managedUserSearchParams(filters).toString()).toBe(params.toString())
+  })
 })

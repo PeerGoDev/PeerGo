@@ -1,4 +1,12 @@
 -- name: ListPendingTorrentReviews :many
+WITH queue_page AS (
+    SELECT torrent.id, torrent.version, torrent.state_changed_at, count(*) OVER ()::bigint AS total_count
+    FROM torrents.torrents AS torrent
+    WHERE torrent.state = 'pending_review'
+    ORDER BY torrent.state_changed_at, torrent.id
+    LIMIT sqlc.arg(result_limit)::integer
+    OFFSET sqlc.arg(result_offset)::bigint
+)
 SELECT
     torrent.id,
     torrent.uploader_id,
@@ -14,13 +22,28 @@ SELECT
     torrent.version,
     torrent.submitted_at,
     torrent.state_changed_at AS review_requested_at,
-    count(*) OVER ()::bigint AS total_count
-FROM torrents.torrents AS torrent
+    queue_page.total_count,
+    COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+            'decision', vote.decision, 'reason_code', vote.reason_code,
+            'reason', vote.reason, 'voted_at', vote.occurred_at
+        ) ORDER BY vote.occurred_at, vote.id)
+        FROM review.torrent_review_votes AS vote
+        WHERE vote.round_id = round.id
+    ), '[]'::jsonb)::jsonb AS votes
+FROM queue_page
+JOIN torrents.torrents AS torrent ON torrent.id = queue_page.id
 JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
 JOIN catalog.categories AS category ON category.id = torrent.category_id
-WHERE torrent.state = 'pending_review'
-ORDER BY torrent.state_changed_at, torrent.id
-LIMIT sqlc.arg(result_limit)::integer;
+LEFT JOIN review.torrent_review_rounds AS round
+  ON round.torrent_id = queue_page.id
+ AND round.expected_torrent_version = queue_page.version
+ORDER BY queue_page.state_changed_at, queue_page.id;
+
+-- name: CountPendingTorrentReviews :one
+SELECT count(*)::bigint
+FROM torrents.torrents AS torrent
+WHERE torrent.state = 'pending_review';
 
 -- name: ListTorrentReviewAssignments :many
 SELECT

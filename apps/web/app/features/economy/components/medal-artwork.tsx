@@ -31,9 +31,11 @@ const artworkByName = new Map([
 export function MedalArtwork({
   name,
   image,
+  className,
 }: {
   name: string
   image?: string | null
+  className?: string
 }) {
   const [failedImage, setFailedImage] = useState<string>()
   if (image && failedImage !== image) {
@@ -42,7 +44,7 @@ export function MedalArtwork({
         src={image}
         alt={name}
         loading="lazy"
-        className="size-full object-contain"
+        className={cn("size-full object-contain", className)}
         onError={() => setFailedImage(image)}
       />
     )
@@ -58,7 +60,8 @@ export function MedalArtwork({
       className={cn(
         "block size-14 shrink-0 bg-no-repeat",
         name.endsWith("周年纪念高级勋章") &&
-          "motion-safe:animate-[medal-glow_3s_ease-in-out_infinite]"
+          "motion-safe:animate-[medal-glow_3s_ease-in-out_infinite]",
+        className
       )}
       style={{
         backgroundImage: `url(${medalAtlas})`,

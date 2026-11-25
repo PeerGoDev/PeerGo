@@ -191,6 +191,7 @@ func (service *UserAdministrationService) List(ctx context.Context, actor authz.
 		Query: normalized.Query, Filter: normalized.Filter,
 		Page: normalized.Page, PageSize: normalized.PageSize,
 		Offset: (normalized.Page - 1) * normalized.PageSize, AsOf: now,
+		Sort: normalized.Sort, Direction: normalized.Direction,
 	})
 	if err != nil {
 		return ManagedUserPage{}, fmt.Errorf("list managed users: %w", err)
@@ -479,8 +480,11 @@ func normalizeManagedUserListInput(input ListManagedUsersInput) (ListManagedUser
 		input.Filter == ManagedUserFilterBanned || input.Filter == ManagedUserFilterPending ||
 		input.Filter == ManagedUserFilterVIP || input.Filter == ManagedUserFilterDownloadRestricted ||
 		input.Filter == ManagedUserFilterUnverified
+	validSort := input.Sort == "" || input.Sort == "created_at" || input.Sort == "uploaded_bytes" ||
+		input.Sort == "downloaded_bytes" || input.Sort == "magic_balance" || input.Sort == "level"
+	validDirection := input.Direction == "" || input.Direction == "asc" || input.Direction == "desc"
 	if !utf8.ValidString(input.Query) || utf8.RuneCountInString(input.Query) > maxManagedUserQueryRunes ||
-		!validFilter || input.Page < 1 || input.Page > maxManagedUserPage ||
+		!validFilter || !validSort || !validDirection || input.Page < 1 || input.Page > maxManagedUserPage ||
 		input.PageSize < 1 || input.PageSize > maxManagedUserPageSize {
 		return ListManagedUsersInput{}, ErrUserAdministrationInput
 	}

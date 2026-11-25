@@ -21,7 +21,7 @@ type TorrentReviewService interface {
 	AssignmentCover(context.Context, string, torrents.TorrentID) (torrents.PublicCover, error)
 	AssignmentScreenshot(context.Context, string, torrents.TorrentID, int) (torrents.PublicScreenshot, error)
 	Vote(context.Context, string, string, review.VoteInput) (review.VoteResult, error)
-	ListPending(context.Context, authz.StaffActor, int) (review.PendingTorrentPage, error)
+	ListPending(context.Context, authz.StaffActor, int, int) (review.PendingTorrentPage, error)
 	Decide(context.Context, authz.StaffActor, review.DecideInput) (review.DecisionResult, error)
 }
 
@@ -256,9 +256,13 @@ func (h *Handler) ListPendingTorrentReviews(ctx context.Context, request generat
 	if request.Params.Limit != nil {
 		limit = *request.Params.Limit
 	}
-	page, err := h.torrentReview.ListPending(ctx, staffActor(session), limit)
+	pageNumber := 1
+	if request.Params.Page != nil {
+		pageNumber = *request.Params.Page
+	}
+	page, err := h.torrentReview.ListPending(ctx, staffActor(session), limit, pageNumber)
 	if errors.Is(err, review.ErrTorrentReviewInput) {
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_torrent_review_query", "审核队列参数无效", "limit 必须位于 1 到 50 之间。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_torrent_review_query", "审核队列参数无效", "请检查页码和每页条数。")
 		return generated.ListPendingTorrentReviews400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil
@@ -270,9 +274,9 @@ func (h *Handler) ListPendingTorrentReviews(ctx context.Context, request generat
 	if err != nil {
 		return nil, err
 	}
-	items := make([]generated.PendingTorrentReview, 0, len(page.Items))
+	items := make([]generated.StaffPendingTorrentReview, 0, len(page.Items))
 	for _, item := range page.Items {
-		items = append(items, pendingTorrentReviewDTO(item))
+		items = append(items, staffPendingTorrentReviewDTO(item))
 	}
 	return generated.ListPendingTorrentReviews200JSONResponse{Items: items, Total: page.Total}, nil
 }
@@ -354,6 +358,25 @@ func pendingTorrentReviewDTO(item review.PendingTorrent) generated.PendingTorren
 		Subtitle: item.Subtitle, ContentName: item.ContentName, InfoHashV1: item.InfoHashV1.Hex(),
 		TotalSizeBytes: item.TotalSizeBytes, FileCount: item.FileCount, Version: item.Version,
 		SubmittedAt: item.SubmittedAt, ReviewRequestedAt: item.ReviewRequestedAt,
+	}
+}
+
+func staffPendingTorrentReviewDTO(item review.StaffPendingTorrent) generated.StaffPendingTorrentReview {
+	pending := pendingTorrentReviewDTO(item.PendingTorrent)
+	votes := make([]generated.StaffTorrentReviewVote, 0, len(item.Votes))
+	for _, vote := range item.Votes {
+		votes = append(votes, generated.StaffTorrentReviewVote{
+			Decision:   generated.StaffTorrentReviewVoteDecision(vote.Decision),
+			ReasonCode: generated.StaffTorrentReviewVoteReasonCode(vote.ReasonCode),
+			Reason:     vote.Reason, VotedAt: vote.VotedAt,
+		})
+	}
+	return generated.StaffPendingTorrentReview{
+		Id: pending.Id, UploaderId: pending.UploaderId, UploaderDisplayName: pending.UploaderDisplayName,
+		CategoryId: pending.CategoryId, CategoryName: pending.CategoryName, Title: pending.Title,
+		Subtitle: pending.Subtitle, ContentName: pending.ContentName, InfoHashV1: pending.InfoHashV1,
+		TotalSizeBytes: pending.TotalSizeBytes, FileCount: pending.FileCount, Version: pending.Version,
+		SubmittedAt: pending.SubmittedAt, ReviewRequestedAt: pending.ReviewRequestedAt, Votes: votes,
 	}
 }
 

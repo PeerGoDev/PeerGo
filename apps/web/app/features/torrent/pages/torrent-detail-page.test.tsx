@@ -196,7 +196,7 @@ describe("TorrentDetailPage", () => {
     expect(screen.getByRole("img", { name: "截图 2" })).toBeVisible()
     expect(screen.getByRole("img", { name: "截图 1" })).toHaveAttribute(
       "src",
-      `http://localhost:3000/api/v1/torrents/${torrentId}/screenshots/0`
+      `http://localhost:3000/api/v1/torrents/${torrentId}/screenshots/0?play=true`
     )
     const firstScreenshot = screen.getByRole("button", {
       name: "查看截图 1",

@@ -1,4 +1,11 @@
-import { Settings2Icon, ShieldAlertIcon, UsersRoundIcon } from "lucide-react"
+import {
+  ArrowDownIcon,
+  ArrowDownUpIcon,
+  ArrowUpIcon,
+  Settings2Icon,
+  ShieldAlertIcon,
+  UsersRoundIcon,
+} from "lucide-react"
 
 import { Badge } from "~/components/ui/badge"
 import { Button } from "~/components/ui/button"
@@ -18,7 +25,11 @@ import {
   TableRow,
 } from "~/components/ui/table"
 import type { ManagedUserSummary } from "~/features/staff/api/user-administration.queries"
-import { managedUserStatusLabel } from "~/features/staff/model/user-administration"
+import {
+  type ManagedUserSortDirection,
+  type ManagedUserSortField,
+  managedUserStatusLabel,
+} from "~/features/staff/model/user-administration"
 import { formatBytes } from "~/shared/formatters/bytes"
 import { formatDateTime } from "~/shared/formatters/date-time"
 import { formatInteger } from "~/shared/formatters/integer"
@@ -28,10 +39,16 @@ export function ManagedUserTable({
   users,
   hasFilters,
   onSelect,
+  sort,
+  direction,
+  onSort,
 }: {
   users: ManagedUserSummary[]
   hasFilters: boolean
   onSelect: (userId: string) => void
+  sort: ManagedUserSortField
+  direction: ManagedUserSortDirection
+  onSort: (field: ManagedUserSortField) => void
 }) {
   if (users.length === 0) {
     return (
@@ -51,6 +68,7 @@ export function ManagedUserTable({
     )
   }
 
+  const sortControls = { sort, direction, onSort }
   return (
     <div className="overflow-hidden rounded-lg border">
       <p className="border-b bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground md:hidden">
@@ -65,11 +83,42 @@ export function ManagedUserTable({
             </TableHead>
             <TableHead className="w-[230px]">用户</TableHead>
             <TableHead className="w-[120px]">角色</TableHead>
-            <TableHead className="w-[180px] text-right">上传 / 下载</TableHead>
-            <TableHead className="w-[120px]">魔力值</TableHead>
-            <TableHead className="w-16 text-center">等级</TableHead>
+            <SortableUserHeader
+              className="w-[90px] text-right"
+              field="uploaded_bytes"
+              {...sortControls}
+            >
+              上传
+            </SortableUserHeader>
+            <SortableUserHeader
+              className="w-[90px] text-right"
+              field="downloaded_bytes"
+              {...sortControls}
+            >
+              下载
+            </SortableUserHeader>
+            <SortableUserHeader
+              className="w-[120px]"
+              field="magic_balance"
+              {...sortControls}
+            >
+              魔力值
+            </SortableUserHeader>
+            <SortableUserHeader
+              className="w-16 text-center"
+              field="level"
+              {...sortControls}
+            >
+              等级
+            </SortableUserHeader>
             <TableHead className="w-[130px]">最后活跃</TableHead>
-            <TableHead className="w-[130px]">注册时间</TableHead>
+            <SortableUserHeader
+              className="w-[130px]"
+              field="created_at"
+              {...sortControls}
+            >
+              注册时间
+            </SortableUserHeader>
             <TableHead className="w-[105px]">状态</TableHead>
             <TableHead className="px-2 text-center">操作</TableHead>
           </TableRow>
@@ -91,8 +140,11 @@ export function ManagedUserTable({
               <TableCell className="px-2 py-2.5">
                 <RoleBadges roles={user.role_names} />
               </TableCell>
-              <TableCell className="px-2 py-2.5 text-right">
-                <TransferAmounts user={user} />
+              <TableCell className="px-2 py-2.5 text-right text-sm font-medium whitespace-nowrap text-success-foreground tabular-nums">
+                {formatBytes(user.uploaded_bytes)}
+              </TableCell>
+              <TableCell className="px-2 py-2.5 text-right text-sm font-medium whitespace-nowrap text-info tabular-nums">
+                {formatBytes(user.downloaded_bytes)}
               </TableCell>
               <TableCell className="px-2 py-2.5 text-sm font-medium text-warning-foreground tabular-nums">
                 {formatInteger(user.magic_balance)}
@@ -142,15 +194,53 @@ export function ManagedUserTable({
   )
 }
 
-function TransferAmounts({ user }: { user: ManagedUserSummary }) {
+function SortableUserHeader({
+  children,
+  className,
+  field,
+  sort,
+  direction,
+  onSort,
+}: {
+  children: string
+  className: string
+  field: ManagedUserSortField
+  sort: ManagedUserSortField
+  direction: ManagedUserSortDirection
+  onSort: (field: ManagedUserSortField) => void
+}) {
+  const activeDirection = field === sort ? direction : undefined
+  const Icon =
+    activeDirection === "asc"
+      ? ArrowUpIcon
+      : activeDirection === "desc"
+        ? ArrowDownIcon
+        : ArrowDownUpIcon
   return (
-    <span className="inline-flex items-center justify-end gap-1 text-sm font-medium whitespace-nowrap tabular-nums">
-      <span className="text-success-foreground">
-        {formatBytes(user.uploaded_bytes)}
-      </span>
-      <span className="text-muted-foreground">/</span>
-      <span className="text-info">{formatBytes(user.downloaded_bytes)}</span>
-    </span>
+    <TableHead
+      className={className}
+      aria-sort={
+        activeDirection
+          ? activeDirection === "asc"
+            ? "ascending"
+            : "descending"
+          : undefined
+      }
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="-mx-2"
+        onClick={() => onSort(field)}
+      >
+        {children}
+        <Icon
+          data-icon="inline-end"
+          className={activeDirection ? "text-primary" : "text-muted-foreground"}
+        />
+      </Button>
+    </TableHead>
   )
 }
 

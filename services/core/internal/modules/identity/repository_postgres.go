@@ -575,6 +575,7 @@ func (r *PostgresRepository) ListManagedUsers(ctx context.Context, query Managed
 	rows, err := r.queries.ListManagedUsers(ctx, identitydb.ListManagedUsersParams{
 		AsOf: timestamp(query.AsOf), SearchQuery: query.Query,
 		DirectoryFilter: string(query.Filter), PageOffset: int32(query.Offset), PageSize: int32(query.PageSize),
+		SortField: query.Sort, SortDirection: query.Direction,
 	})
 	if err != nil {
 		return ManagedUserPage{}, fmt.Errorf("list managed users: %w", err)

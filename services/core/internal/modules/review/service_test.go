@@ -16,6 +16,7 @@ import (
 
 type recordingRepository struct {
 	listLimit  int32
+	listOffset int64
 	page       PendingTorrentPage
 	assignment ReviewAssignment
 	command    DecideCommand
@@ -23,8 +24,9 @@ type recordingRepository struct {
 	err        error
 }
 
-func (repository *recordingRepository) ListPending(_ context.Context, limit int32) (PendingTorrentPage, error) {
+func (repository *recordingRepository) ListPending(_ context.Context, limit int32, offset int64) (PendingTorrentPage, error) {
 	repository.listLimit = limit
+	repository.listOffset = offset
 	return repository.page, repository.err
 }
 
@@ -108,9 +110,9 @@ func TestServiceListsPendingWithTypedStaffAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := service.ListPending(context.Background(), actor, 20)
-	if err != nil || page.Total != 3 || repository.listLimit != 20 {
-		t.Fatalf("ListPending() page=%+v limit=%d error=%v", page, repository.listLimit, err)
+	page, err := service.ListPending(context.Background(), actor, 20, 2)
+	if err != nil || page.Total != 3 || repository.listLimit != 20 || repository.listOffset != 20 {
+		t.Fatalf("ListPending() page=%+v limit=%d offset=%d error=%v", page, repository.listLimit, repository.listOffset, err)
 	}
 	request := authorizer.request
 	if request.Action != authz.ActionTorrentReview || request.CredentialAudience != authz.AudienceStaffSession ||

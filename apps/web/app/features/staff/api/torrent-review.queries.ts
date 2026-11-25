@@ -8,7 +8,8 @@ import type { components } from "~/generated/api"
 import { apiClient } from "~/shared/api/client"
 import { ApiProblemError } from "~/shared/api/problem"
 
-export type PendingTorrentReview = components["schemas"]["PendingTorrentReview"]
+export type PendingTorrentReview =
+  components["schemas"]["StaffPendingTorrentReview"]
 export type PendingTorrentReviewPage =
   components["schemas"]["PendingTorrentReviewPage"]
 export type TorrentReviewDecisionRequest =
@@ -18,17 +19,20 @@ export type TorrentReviewDecisionResult =
 
 export const torrentReviewKeys = {
   all: ["staff", "torrent-reviews"] as const,
-  pending: (limit: number) =>
-    [...torrentReviewKeys.all, "pending", { limit }] as const,
+  pending: (limit: number, page?: number) =>
+    [...torrentReviewKeys.all, "pending", { limit, page }] as const,
 }
 
-export function pendingTorrentReviewsQueryOptions(limit: number) {
+export function pendingTorrentReviewsQueryOptions(
+  limit: number,
+  page?: number
+) {
   return queryOptions({
-    queryKey: torrentReviewKeys.pending(limit),
+    queryKey: torrentReviewKeys.pending(limit, page),
     queryFn: async (): Promise<PendingTorrentReviewPage> => {
       const { data, error, response } = await apiClient.GET(
         "/api/v1/admin/torrent-reviews",
-        { params: { query: { limit } } }
+        { params: { query: { limit, page } } }
       )
       if (!response.ok || !data) {
         throw new ApiProblemError(response.status, error)

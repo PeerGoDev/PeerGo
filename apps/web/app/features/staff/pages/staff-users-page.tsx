@@ -326,6 +326,19 @@ function UsersContent({
             users={users.data.items}
             hasFilters={Boolean(filters.query) || filters.status !== "all"}
             onSelect={setSelectedUserId}
+            sort={filters.sort ?? "created_at"}
+            direction={filters.direction ?? "desc"}
+            onSort={(sort) =>
+              updateFilters({
+                sort,
+                direction:
+                  (filters.sort ?? "created_at") === sort &&
+                  filters.direction !== "asc"
+                    ? "asc"
+                    : "desc",
+                page: 1,
+              })
+            }
           />
 
           {totalPages > 1 ? (

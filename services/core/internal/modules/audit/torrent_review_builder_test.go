@@ -26,7 +26,7 @@ func TestTorrentReviewEventHashesHumanTextAndPseudonymizesPeople(t *testing.T) {
 	}
 	reason := "已核对文件树、分类和发布规范，同意本次发布。"
 	torrentID := torrents.TorrentID(44)
-	event, err := builder.BuildTorrentReviewEvent(review.TorrentReviewAuditInput{
+	input := review.TorrentReviewAuditInput{
 		DecisionID: uuid.New(), ReviewerID: uuid.New(), UploaderID: uuid.New(),
 		Decision: review.DecisionApprove, ReasonCode: review.ReasonMeetsRequirements,
 		Reason: reason, OccurredAt: now, Authorization: authz.Decision{
@@ -36,7 +36,8 @@ func TestTorrentReviewEventHashesHumanTextAndPseudonymizesPeople(t *testing.T) {
 		},
 		Before: review.TorrentReviewAuditState{TorrentID: torrentID, State: torrents.StatePendingReview, Version: 1},
 		After:  review.TorrentReviewAuditState{TorrentID: torrentID, State: torrents.StatePublished, Version: 2},
-	})
+	}
+	event, err := builder.BuildTorrentReviewEvent(input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,5 +51,15 @@ func TestTorrentReviewEventHashesHumanTextAndPseudonymizesPeople(t *testing.T) {
 	if payload.TorrentID != int64(torrentID) || payload.ReasonSHA256 == "" || payload.ReviewerPseudonym == "" ||
 		payload.UploaderPseudonym == "" || payload.BeforeSHA256 == payload.AfterSHA256 {
 		t.Fatalf("payload = %+v", payload)
+	}
+
+	input.ReviewerID = input.UploaderID
+	if _, err := builder.BuildTorrentReviewEvent(input); err == nil {
+		t.Fatal("manual self-review was accepted")
+	}
+	membershipTransitionID := uuid.New()
+	input.MembershipTransitionID = &membershipTransitionID
+	if _, err := builder.BuildTorrentReviewEvent(input); err != nil {
+		t.Fatalf("trusted workgroup publish with membership evidence: %v", err)
 	}
 }

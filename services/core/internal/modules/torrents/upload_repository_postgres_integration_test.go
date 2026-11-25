@@ -78,14 +78,14 @@ INSERT INTO catalog.facet_options (
 	}
 	if _, err := pool.Exec(ctx, `
 INSERT INTO catalog.category_facets (
-    category_id, facet_id, selection_mode, required, display_order, created_at
-) VALUES ($1, $2, 'single_option', true, 10, $3)`, categoryID, facetID, now); err != nil {
+    category_id, facet_id, selection_mode, required, display_order, created_at, updated_at
+) VALUES ($1, $2, 'single_option', true, 10, $3, $3)`, categoryID, facetID, now); err != nil {
 		t.Fatalf("insert integration category facet: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `
 INSERT INTO catalog.category_facet_options (
-    category_id, facet_id, option_key, selection_mode, created_at
-) VALUES ($1, $2, 'selected', 'single_option', $3)`, categoryID, facetID, now); err != nil {
+    category_id, facet_id, option_key, selection_mode, created_at, updated_at
+) VALUES ($1, $2, 'selected', 'single_option', $3, $3)`, categoryID, facetID, now); err != nil {
 		t.Fatalf("insert integration category facet option: %v", err)
 	}
 	// Upload, object and file rows are deliberately immutable. This integration
@@ -236,7 +236,8 @@ WHERE torrent.id = $1`, result.ID).Scan(
 	}
 	failedInput := TorrentUploadInput{
 		ID: failedUploadID, CategoryID: categoryID, Title: "Interrupted integration release",
-		RawMetainfo: validSingleFixture(fmt.Sprintf("orphan-%s.bin", failedUploadID.String()[:8]), 7, 16*1024),
+		FacetSelections: input.FacetSelections,
+		RawMetainfo:     validSingleFixture(fmt.Sprintf("orphan-%s.bin", failedUploadID.String()[:8]), 7, 16*1024),
 	}
 	if _, err := failingService.Submit(ctx, "cookie", "csrf", failedInput); !errors.Is(err, errIntegrationFinalization) {
 		t.Fatalf("interrupted Submit() error = %v", err)
@@ -273,7 +274,8 @@ WHERE torrent.id = $1`, result.ID).Scan(
 	orphanUploadID := uuid.New()
 	orphanInput := TorrentUploadInput{
 		ID: orphanUploadID, CategoryID: categoryID, Title: "Orphaned integration release",
-		RawMetainfo: validSingleFixture(fmt.Sprintf("cleanup-%s.bin", orphanUploadID.String()[:8]), 9, 16*1024),
+		FacetSelections: input.FacetSelections,
+		RawMetainfo:     validSingleFixture(fmt.Sprintf("cleanup-%s.bin", orphanUploadID.String()[:8]), 9, 16*1024),
 	}
 	if _, err := failingService.Submit(ctx, "cookie", "csrf", orphanInput); !errors.Is(err, errIntegrationFinalization) {
 		t.Fatalf("orphan Submit() error = %v", err)

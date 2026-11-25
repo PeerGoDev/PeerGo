@@ -1170,7 +1170,6 @@ TorrentBookmarkState:
 
 PendingTorrentReview:
   type: object
-  additionalProperties: false
   required:
     - id
     - uploader_id
@@ -1240,6 +1239,36 @@ PendingTorrentReview:
       format: date-time
       description: 本轮进入审核队列的时间；首次提交时与 submitted_at 相同。
 
+StaffPendingTorrentReview:
+  allOf:
+    - $ref: "#/PendingTorrentReview"
+    - type: object
+      required: [votes]
+      properties:
+        votes:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/StaffTorrentReviewVote"
+
+StaffTorrentReviewVote:
+  type: object
+  additionalProperties: false
+  required: [decision, reason_code, reason, voted_at]
+  properties:
+    decision:
+      type: string
+      enum: [approve, reject]
+    reason_code:
+      type: string
+      enum: [meets_requirements, metadata_incomplete, duplicate_or_superseded, content_policy_violation, quality_requirements_not_met, uploader_action_required, other]
+    reason:
+      type: string
+      maxLength: 1000
+    voted_at:
+      type: string
+      format: date-time
+
 PendingTorrentReviewPage:
   type: object
   additionalProperties: false
@@ -1249,7 +1278,7 @@ PendingTorrentReviewPage:
       type: array
       maxItems: 50
       items:
-        $ref: "#/PendingTorrentReview"
+        $ref: "#/StaffPendingTorrentReview"
     total:
       type: integer
       format: int64

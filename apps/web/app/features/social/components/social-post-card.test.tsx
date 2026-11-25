@@ -83,6 +83,7 @@ describe("SocialPostCard", () => {
                     name: "首批成员",
                     image_path: "/uploads/medals/founding.webp",
                   },
+                  { id: 8, name: "转种组", image_path: null },
                 ],
               },
               board: {
@@ -128,7 +129,11 @@ describe("SocialPostCard", () => {
     )
     expect(screen.getByText("管理员")).toBeVisible()
     expect(screen.getByText("VIP")).toBeVisible()
-    expect(screen.getByLabelText("勋章：首批成员")).toBeVisible()
+    expect(screen.getByRole("img", { name: "首批成员" })).toHaveAttribute(
+      "src",
+      "/uploads/medals/founding.webp"
+    )
+    expect(screen.getByRole("img", { name: "转种组" })).toBeVisible()
     expect(screen.getByLabelText("演示用户在线")).toBeVisible()
     expect(metadata?.querySelector("[title]")).toBeInTheDocument()
     const paragraph = screen
@@ -211,7 +216,7 @@ describe("SocialPostCard", () => {
     expect(screen.getByText("完整演示副标题")).toBeVisible()
     expect(
       screen.getByRole("img", { name: "演示资源封面" }).getAttribute("src")
-    ).toMatch(new RegExp(`/api/v1/torrents/${torrentId}/cover$`))
+    ).toContain(`/api/v1/torrents/${torrentId}/screenshots/0?play=true`)
     expect(screen.getByText("1 KB")).toBeVisible()
     expect(screen.getByRole("button", { name: "点赞" })).toHaveClass("border-0")
     expect(screen.getByRole("button", { name: "评论" })).toHaveClass("border-0")

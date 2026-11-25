@@ -1099,6 +1099,19 @@ ManagedUsersPath:
         description: 按正常、封禁、待激活、当前 VIP、下载受限或邮箱未验证筛选。
         schema:
           $ref: "../schemas/identity.yaml#/ManagedUserDirectoryFilter"
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum: [uploaded_bytes, downloaded_bytes, magic_balance, level, created_at]
+          x-enum-varnames: [ManagedUserSortUploadedBytes, ManagedUserSortDownloadedBytes, ManagedUserSortMagicBalance, ManagedUserSortLevel, ManagedUserSortCreatedAt]
+          default: created_at
+      - name: direction
+        in: query
+        schema:
+          type: string
+          enum: [asc, desc]
+          default: desc
       - name: page
         in: query
         schema:

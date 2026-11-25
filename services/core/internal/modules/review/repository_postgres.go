@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -53,15 +54,23 @@ func NewPostgresRepository(
 	}, nil
 }
 
-func (repository *PostgresRepository) ListPending(ctx context.Context, limit int32) (PendingTorrentPage, error) {
-	if limit < 1 || limit > maxPendingReviewLimit {
+func (repository *PostgresRepository) ListPending(ctx context.Context, limit int32, offset int64) (PendingTorrentPage, error) {
+	if limit < 1 || limit > maxPendingReviewLimit || offset < 0 {
 		return PendingTorrentPage{}, ErrTorrentReviewInput
 	}
-	rows, err := repository.queries.ListPendingTorrentReviews(ctx, limit)
+	rows, err := repository.queries.ListPendingTorrentReviews(ctx, reviewdb.ListPendingTorrentReviewsParams{
+		ResultLimit: limit, ResultOffset: offset,
+	})
 	if err != nil {
 		return PendingTorrentPage{}, fmt.Errorf("query pending torrent reviews: %w", err)
 	}
-	page := PendingTorrentPage{Items: make([]PendingTorrent, 0, len(rows))}
+	page := PendingTorrentPage{Items: make([]StaffPendingTorrent, 0, len(rows))}
+	if len(rows) == 0 && offset > 0 {
+		page.Total, err = repository.queries.CountPendingTorrentReviews(ctx)
+		if err != nil {
+			return PendingTorrentPage{}, fmt.Errorf("count pending torrent reviews: %w", err)
+		}
+	}
 	for _, row := range rows {
 		item, conversionErr := pendingTorrentFromValues(
 			row.ID, row.UploaderID, row.UploaderDisplayName, row.CategoryID, row.CategoryName,
@@ -71,7 +80,11 @@ func (repository *PostgresRepository) ListPending(ctx context.Context, limit int
 		if conversionErr != nil {
 			return PendingTorrentPage{}, conversionErr
 		}
-		page.Items = append(page.Items, item)
+		var votes []StaffReviewVote
+		if err := json.Unmarshal(row.Votes, &votes); err != nil {
+			return PendingTorrentPage{}, fmt.Errorf("decode pending torrent review votes: %w", err)
+		}
+		page.Items = append(page.Items, StaffPendingTorrent{PendingTorrent: item, Votes: votes})
 		page.Total = row.TotalCount
 	}
 	return page, nil
@@ -224,6 +237,12 @@ func (repository *PostgresRepository) PublishTrusted(ctx context.Context, comman
 		return torrents.TrustedPublishResult{}, fmt.Errorf("lock trusted torrent publish target: %w", err)
 	}
 	if locked.UploaderID != command.UploaderID || locked.State != string(torrents.StatePendingReview) || locked.Version != 1 {
+		if result, found, replayErr := resumeTorrentReviewDecision(ctx, queries, decideCommand); found || replayErr != nil {
+			if replayErr != nil {
+				return torrents.TrustedPublishResult{}, trustedPublishError(replayErr)
+			}
+			return torrents.TrustedPublishResult{TorrentID: result.TorrentID, State: result.State, Version: result.Version}, nil
+		}
 		return torrents.TrustedPublishResult{}, torrents.ErrTorrentUploadStateConflict
 	}
 	if !locked.CategoryEnabled {
@@ -393,7 +412,8 @@ func (repository *PostgresRepository) finalizeLocked(
 	before := TorrentReviewAuditState{TorrentID: pending.ID, State: torrents.StatePendingReview, Version: command.ExpectedVersion}
 	auditEvent, err := repository.auditBuilder.BuildTorrentReviewEvent(TorrentReviewAuditInput{
 		DecisionID: command.DecisionID, ReviewerID: command.ReviewerID, UploaderID: pending.UploaderID,
-		Decision: command.Decision, ReasonCode: command.ReasonCode, Reason: command.Reason,
+		MembershipTransitionID: command.MembershipTransitionID,
+		Decision:               command.Decision, ReasonCode: command.ReasonCode, Reason: command.Reason,
 		OccurredAt: command.OccurredAt, Authorization: command.Authorization,
 		Before: before, After: TorrentReviewAuditState{TorrentID: pending.ID, State: aggregate.State, Version: aggregate.Version},
 	})

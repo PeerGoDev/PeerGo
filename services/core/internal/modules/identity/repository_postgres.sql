@@ -1452,7 +1452,22 @@ AND (
 )
 GROUP BY users.id, traffic.user_id, magic.user_id, magic.balance, progress.user_id,
     activity.user_id, access.user_id, role_projection.role_names
-ORDER BY users.created_at DESC, users.id DESC
+ORDER BY
+    CASE WHEN sqlc.arg(sort_direction)::text = 'asc' THEN CASE sqlc.arg(sort_field)::text
+        WHEN 'uploaded_bytes' THEN COALESCE(traffic.raw_uploaded, 0)
+        WHEN 'downloaded_bytes' THEN COALESCE(traffic.raw_downloaded, 0)
+        WHEN 'magic_balance' THEN COALESCE(magic.balance, 0)
+        WHEN 'level' THEN COALESCE(progress.level, 1)
+    END END ASC,
+    CASE WHEN sqlc.arg(sort_direction)::text <> 'asc' THEN CASE sqlc.arg(sort_field)::text
+        WHEN 'uploaded_bytes' THEN COALESCE(traffic.raw_uploaded, 0)
+        WHEN 'downloaded_bytes' THEN COALESCE(traffic.raw_downloaded, 0)
+        WHEN 'magic_balance' THEN COALESCE(magic.balance, 0)
+        WHEN 'level' THEN COALESCE(progress.level, 1)
+    END END DESC,
+    CASE WHEN sqlc.arg(sort_direction)::text = 'asc' AND sqlc.arg(sort_field)::text IN ('', 'created_at')
+         THEN users.created_at END ASC,
+    users.created_at DESC, users.id DESC
 LIMIT sqlc.arg(page_size)::integer
 OFFSET sqlc.arg(page_offset)::integer;
 

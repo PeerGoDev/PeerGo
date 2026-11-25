@@ -899,7 +899,7 @@ TorrentFilesPath:
 TorrentReviewsPath:
   get:
     operationId: listPendingTorrentReviews
-    summary: 获取最早提交的待审核种子
+    summary: 分页获取待审核种子及本轮投票意见
     tags: [review]
     x-audience: [staff]
     x-owner: core-review
@@ -915,6 +915,14 @@ TorrentReviewsPath:
           minimum: 1
           maximum: 50
           default: 20
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          default: 1
     responses:
       "200":
         description: 脱敏审核队列；不包含邮箱、IP、passkey、流量或凭据字段。

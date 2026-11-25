@@ -69,8 +69,20 @@ type PendingTorrent struct {
 }
 
 type PendingTorrentPage struct {
-	Items []PendingTorrent
+	Items []StaffPendingTorrent
 	Total int64
+}
+
+type StaffPendingTorrent struct {
+	PendingTorrent
+	Votes []StaffReviewVote
+}
+
+type StaffReviewVote struct {
+	Decision   Decision   `json:"decision"`
+	ReasonCode ReasonCode `json:"reason_code"`
+	Reason     string     `json:"reason"`
+	VotedAt    time.Time  `json:"voted_at"`
 }
 
 const (
@@ -201,16 +213,17 @@ type TorrentReviewAuditState struct {
 }
 
 type TorrentReviewAuditInput struct {
-	DecisionID    uuid.UUID
-	ReviewerID    uuid.UUID
-	UploaderID    uuid.UUID
-	Decision      Decision
-	ReasonCode    ReasonCode
-	Reason        string
-	OccurredAt    time.Time
-	Authorization authz.Decision
-	Before        TorrentReviewAuditState
-	After         TorrentReviewAuditState
+	DecisionID             uuid.UUID
+	ReviewerID             uuid.UUID
+	UploaderID             uuid.UUID
+	MembershipTransitionID *uuid.UUID
+	Decision               Decision
+	ReasonCode             ReasonCode
+	Reason                 string
+	OccurredAt             time.Time
+	Authorization          authz.Decision
+	Before                 TorrentReviewAuditState
+	After                  TorrentReviewAuditState
 }
 
 // Event builders are injected so the review transaction can atomically append

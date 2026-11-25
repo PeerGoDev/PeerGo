@@ -1038,6 +1038,12 @@ func (h *Handler) ListManagedUsers(ctx context.Context, request generated.ListMa
 	if request.Params.Filter != nil {
 		input.Filter = identity.ManagedUserDirectoryFilter(*request.Params.Filter)
 	}
+	if request.Params.Sort != nil {
+		input.Sort = string(*request.Params.Sort)
+	}
+	if request.Params.Direction != nil {
+		input.Direction = string(*request.Params.Direction)
+	}
 	if request.Params.Page != nil {
 		input.Page = *request.Params.Page
 	}
@@ -1046,7 +1052,7 @@ func (h *Handler) ListManagedUsers(ctx context.Context, request generated.ListMa
 	}
 	result, err := h.userAdministration.List(ctx, staffActor(session), input)
 	if errors.Is(err, identity.ErrUserAdministrationInput) {
-		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_query", "账户查询无效", "请检查搜索词、状态和分页参数。")
+		problem := newProblemFromContext(ctx, http.StatusBadRequest, "invalid_user_query", "账户查询无效", "请检查搜索词、状态、排序和分页参数。")
 		return generated.ListManagedUsers400ApplicationProblemPlusJSONResponse{
 			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
 		}, nil

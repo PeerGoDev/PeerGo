@@ -76,6 +76,41 @@ INSERT INTO identity.account_restrictions (
 		t.Fatalf("ListManagedUsers() = %+v", page)
 	}
 
+	otherUserID := uuid.New()
+	if _, err := pool.Exec(ctx, `
+INSERT INTO identity.users (id, credential_ref, username, display_name, status)
+VALUES ($1, $2, $3, '集成测试账户', 'active')`, otherUserID, uuid.New(), "managed-peer-"+userID.String()[:8]); err != nil {
+		t.Fatalf("insert second user: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM economy.magic_accounts WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM identity.users WHERE id = $1`, otherUserID)
+	})
+	if _, err := pool.Exec(ctx, `
+INSERT INTO economy.magic_accounts (id, user_id, account_kind, account_code, balance, updated_at)
+VALUES ($1::uuid, $1::uuid, 'member', 'member:' || ($1::uuid)::text, 9007199254740993, $2)`, userID, now); err != nil {
+		t.Fatalf("insert magic balance: %v", err)
+	}
+	sortedQuery := identity.ManagedUserListQuery{
+		Query: userID.String()[:8], Page: 1, PageSize: 1, AsOf: now, Sort: "magic_balance", Direction: "desc",
+	}
+	sorted, err := repository.ListManagedUsers(ctx, sortedQuery)
+	if err != nil || sorted.Total != 2 || len(sorted.Items) != 1 || sorted.Items[0].ID != userID {
+		t.Fatalf("first sorted page=%+v error=%v", sorted, err)
+	}
+	sortedQuery.Page, sortedQuery.Offset = 2, 1
+	sorted, err = repository.ListManagedUsers(ctx, sortedQuery)
+	if err != nil || len(sorted.Items) != 1 || sorted.Items[0].ID != otherUserID {
+		t.Fatalf("second sorted page=%+v error=%v", sorted, err)
+	}
+	sortedQuery.Direction = "asc"
+	sorted, err = repository.ListManagedUsers(ctx, sortedQuery)
+	if err != nil || len(sorted.Items) != 1 || sorted.Items[0].ID != userID {
+		t.Fatalf("second ascending page=%+v error=%v", sorted, err)
+	}
+
 	detail, err := repository.GetManagedUser(ctx, userID, now)
 	if err != nil {
 		t.Fatalf("GetManagedUser() error = %v", err)

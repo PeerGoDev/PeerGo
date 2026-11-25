@@ -23,7 +23,7 @@ const (
 )
 
 type Repository interface {
-	ListPending(context.Context, int32) (PendingTorrentPage, error)
+	ListPending(context.Context, int32, int64) (PendingTorrentPage, error)
 	ListAssignments(context.Context, uuid.UUID, int32) (ReviewAssignmentPage, error)
 	GetAssignment(context.Context, uuid.UUID, torrents.TorrentID) (ReviewAssignment, error)
 	ListReviewed(context.Context, uuid.UUID, int32) (ReviewedTorrentPage, error)
@@ -244,15 +244,15 @@ func (service *Service) Vote(ctx context.Context, cookieToken, csrfToken string,
 	return result, nil
 }
 
-func (service *Service) ListPending(ctx context.Context, actor authz.StaffActor, limit int) (PendingTorrentPage, error) {
-	if limit < 1 || limit > maxPendingReviewLimit {
+func (service *Service) ListPending(ctx context.Context, actor authz.StaffActor, limit, pageNumber int) (PendingTorrentPage, error) {
+	if limit < 1 || limit > maxPendingReviewLimit || pageNumber < 1 || pageNumber > 100_000 {
 		return PendingTorrentPage{}, ErrTorrentReviewInput
 	}
 	now := service.now().UTC()
 	if _, err := authz.AuthorizeStaffAction(ctx, service.authorizer, actor, authz.ActionTorrentReview, authz.SiteScope(), now, "torrent-review"); err != nil {
 		return PendingTorrentPage{}, err
 	}
-	page, err := service.repository.ListPending(ctx, int32(limit))
+	page, err := service.repository.ListPending(ctx, int32(limit), int64(pageNumber-1)*int64(limit))
 	if err != nil {
 		return PendingTorrentPage{}, fmt.Errorf("list pending torrent reviews: %w", err)
 	}

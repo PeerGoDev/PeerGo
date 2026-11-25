@@ -12,6 +12,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countPendingTorrentReviews = `-- name: CountPendingTorrentReviews :one
+SELECT count(*)::bigint
+FROM torrents.torrents AS torrent
+WHERE torrent.state = 'pending_review'
+`
+
+func (q *Queries) CountPendingTorrentReviews(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingTorrentReviews)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getPendingTorrentReviewForUpdate = `-- name: GetPendingTorrentReviewForUpdate :one
 SELECT
     torrent.id,
@@ -350,6 +363,14 @@ func (q *Queries) InsertTorrentReviewDecision(ctx context.Context, arg InsertTor
 }
 
 const listPendingTorrentReviews = `-- name: ListPendingTorrentReviews :many
+WITH queue_page AS (
+    SELECT torrent.id, torrent.version, torrent.state_changed_at, count(*) OVER ()::bigint AS total_count
+    FROM torrents.torrents AS torrent
+    WHERE torrent.state = 'pending_review'
+    ORDER BY torrent.state_changed_at, torrent.id
+    LIMIT $2::integer
+    OFFSET $1::bigint
+)
 SELECT
     torrent.id,
     torrent.uploader_id,
@@ -365,14 +386,29 @@ SELECT
     torrent.version,
     torrent.submitted_at,
     torrent.state_changed_at AS review_requested_at,
-    count(*) OVER ()::bigint AS total_count
-FROM torrents.torrents AS torrent
+    queue_page.total_count,
+    COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+            'decision', vote.decision, 'reason_code', vote.reason_code,
+            'reason', vote.reason, 'voted_at', vote.occurred_at
+        ) ORDER BY vote.occurred_at, vote.id)
+        FROM review.torrent_review_votes AS vote
+        WHERE vote.round_id = round.id
+    ), '[]'::jsonb)::jsonb AS votes
+FROM queue_page
+JOIN torrents.torrents AS torrent ON torrent.id = queue_page.id
 JOIN identity.users AS uploader ON uploader.id = torrent.uploader_id
 JOIN catalog.categories AS category ON category.id = torrent.category_id
-WHERE torrent.state = 'pending_review'
-ORDER BY torrent.state_changed_at, torrent.id
-LIMIT $1::integer
+LEFT JOIN review.torrent_review_rounds AS round
+  ON round.torrent_id = queue_page.id
+ AND round.expected_torrent_version = queue_page.version
+ORDER BY queue_page.state_changed_at, queue_page.id
 `
+
+type ListPendingTorrentReviewsParams struct {
+	ResultOffset int64
+	ResultLimit  int32
+}
 
 type ListPendingTorrentReviewsRow struct {
 	ID                  int64
@@ -390,10 +426,11 @@ type ListPendingTorrentReviewsRow struct {
 	SubmittedAt         pgtype.Timestamptz
 	ReviewRequestedAt   pgtype.Timestamptz
 	TotalCount          int64
+	Votes               []byte
 }
 
-func (q *Queries) ListPendingTorrentReviews(ctx context.Context, resultLimit int32) ([]ListPendingTorrentReviewsRow, error) {
-	rows, err := q.db.Query(ctx, listPendingTorrentReviews, resultLimit)
+func (q *Queries) ListPendingTorrentReviews(ctx context.Context, arg ListPendingTorrentReviewsParams) ([]ListPendingTorrentReviewsRow, error) {
+	rows, err := q.db.Query(ctx, listPendingTorrentReviews, arg.ResultOffset, arg.ResultLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -417,6 +454,7 @@ func (q *Queries) ListPendingTorrentReviews(ctx context.Context, resultLimit int
 			&i.SubmittedAt,
 			&i.ReviewRequestedAt,
 			&i.TotalCount,
+			&i.Votes,
 		); err != nil {
 			return nil, err
 		}

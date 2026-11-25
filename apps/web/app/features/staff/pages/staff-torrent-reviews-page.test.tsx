@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
 import { describe, expect, it } from "vitest"
 
@@ -49,7 +50,7 @@ describe("StaffTorrentReviewsPage", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("renders the real review center queue for an active reviewer", () => {
+  it("renders the real review center queue and opens the second page", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -92,10 +93,10 @@ describe("StaffTorrentReviewsPage", () => {
       ],
     })
     queryClient.setQueryData(torrentReviewKeys.pending(20), {
-      total: 1,
+      total: 28,
       items: [
         {
-          id: "0198f20a-6da8-7e51-9c64-222222222222",
+          id: 7,
           uploader_id: "0198f20a-6da8-7e51-9c64-333333333333",
           uploader_display_name: "上传者",
           category_id: "movies",
@@ -109,8 +110,16 @@ describe("StaffTorrentReviewsPage", () => {
           version: 1,
           submitted_at: "2026-08-09T10:00:00Z",
           review_requested_at: "2026-08-09T10:00:00Z",
+          votes: [],
         },
       ],
+    })
+    const firstPage = queryClient.getQueryData<{
+      items: Record<string, unknown>[]
+    }>(torrentReviewKeys.pending(20))!
+    queryClient.setQueryData(torrentReviewKeys.pending(20, 2), {
+      total: 28,
+      items: [{ ...firstPage.items[0], id: 8, title: "第二页的种子" }],
     })
 
     render(
@@ -144,5 +153,11 @@ describe("StaffTorrentReviewsPage", () => {
     ).toHaveLength(3)
     expect(screen.queryByText("reviewer@example.com")).not.toBeInTheDocument()
     expect(screen.queryByText("127.0.0.1")).not.toBeInTheDocument()
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "下一页" }))
+    expect(screen.getByText("第二页的种子")).toBeVisible()
+    expect(screen.getByText("第 2 / 2 页")).toBeVisible()
+    expect(screen.getByRole("button", { name: "下一页" })).toBeDisabled()
   })
 })

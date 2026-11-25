@@ -1,6 +1,8 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CircleAlertIcon,
   ClipboardCheckIcon,
   Clock3Icon,
@@ -67,10 +69,29 @@ export function StaffTorrentReviewsPage() {
 }
 
 function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
+  const [page, setPage] = React.useState(1)
   const [decisionTarget, setDecisionTarget] =
     React.useState<PendingTorrentReview>()
   const [successMessage, setSuccessMessage] = React.useState("")
-  const reviews = useQuery(pendingTorrentReviewsQueryOptions(reviewQueueLimit))
+  const reviews = useQuery(
+    pendingTorrentReviewsQueryOptions(
+      reviewQueueLimit,
+      page > 1 ? page : undefined
+    )
+  )
+  const lastPage = reviews.data
+    ? Math.max(1, Math.ceil(reviews.data.total / reviewQueueLimit))
+    : undefined
+  const latestDecisionTarget =
+    reviews.data?.items.find(
+      (item) =>
+        item.id === decisionTarget?.id &&
+        item.version === decisionTarget.version
+    ) ?? decisionTarget
+
+  React.useEffect(() => {
+    if (lastPage !== undefined && page > lastPage) setPage(lastPage)
+  }, [lastPage, page])
 
   return (
     <div className="flex flex-col gap-4">
@@ -136,7 +157,7 @@ function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
         </Alert>
       ) : null}
 
-      {reviews.data ? (
+      {reviews.data && lastPage !== undefined && page <= lastPage ? (
         <section aria-label="待审核种子" className="flex flex-col gap-3">
           {reviews.data.items.length === 0 ? (
             <Empty className="min-h-60 border">
@@ -206,12 +227,42 @@ function TorrentReviewQueueContent({ csrfToken }: { csrfToken: string }) {
               ))}
             </div>
           )}
+          {lastPage > 1 ? (
+            <nav
+              aria-label="种子审核队列分页"
+              className="flex items-center justify-center gap-3"
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page === 1}
+                onClick={() => setPage(page - 1)}
+              >
+                <ChevronLeftIcon data-icon="inline-start" />
+                上一页
+              </Button>
+              <span className="text-sm tabular-nums">
+                第 {page} / {lastPage} 页
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page === lastPage}
+                onClick={() => setPage(page + 1)}
+              >
+                下一页
+                <ChevronRightIcon data-icon="inline-end" />
+              </Button>
+            </nav>
+          ) : null}
         </section>
       ) : null}
 
-      {decisionTarget ? (
+      {latestDecisionTarget ? (
         <TorrentReviewDecisionDialog
-          torrent={decisionTarget}
+          torrent={latestDecisionTarget}
           csrfToken={csrfToken}
           onOpenChange={(open) => {
             if (!open) setDecisionTarget(undefined)

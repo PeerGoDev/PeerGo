@@ -1,15 +1,24 @@
-import type { components } from "~/generated/api"
+import type { components, operations } from "~/generated/api"
 
 export type ManagedUserStatus = components["schemas"]["ManagedUserStatus"]
 export type ManagedUserDirectoryFilter =
   components["schemas"]["ManagedUserDirectoryFilter"]
 export type ManagedUserStatusFilter = ManagedUserDirectoryFilter | "all"
+type ManagedUserListQuery = NonNullable<
+  operations["listManagedUsers"]["parameters"]["query"]
+>
+export type ManagedUserSortField = NonNullable<ManagedUserListQuery["sort"]>
+export type ManagedUserSortDirection = NonNullable<
+  ManagedUserListQuery["direction"]
+>
 
 export interface ManagedUserFilters {
   query: string
   status: ManagedUserStatusFilter
   page: number
   pageSize: number
+  sort?: ManagedUserSortField
+  direction?: ManagedUserSortDirection
 }
 
 export const managedUserPageSize = 20
@@ -22,6 +31,13 @@ const managedUserStatuses = new Set<ManagedUserDirectoryFilter>([
   "download_restricted",
   "unverified",
 ])
+const managedUserSortFields = new Set<ManagedUserSortField>([
+  "uploaded_bytes",
+  "downloaded_bytes",
+  "magic_balance",
+  "level",
+  "created_at",
+])
 
 export function parseManagedUserFilters(
   searchParams: URLSearchParams
@@ -29,6 +45,8 @@ export function parseManagedUserFilters(
   const query = (searchParams.get("query") ?? "").trim()
   const rawStatus = searchParams.get("filter") ?? "all"
   const rawPage = Number.parseInt(searchParams.get("page") ?? "1", 10)
+  const sort = searchParams.get("sort") as ManagedUserSortField
+  const direction = searchParams.get("direction")
   return {
     query,
     status: managedUserStatuses.has(rawStatus as ManagedUserDirectoryFilter)
@@ -39,6 +57,8 @@ export function parseManagedUserFilters(
         ? rawPage
         : 1,
     pageSize: managedUserPageSize,
+    ...(managedUserSortFields.has(sort) && { sort }),
+    ...(direction === "asc" && { direction }),
   }
 }
 
@@ -55,6 +75,9 @@ export function managedUserSearchParams(
   if (filters.page > 1) {
     next.set("page", filters.page.toString())
   }
+  if (filters.sort && filters.sort !== "created_at")
+    next.set("sort", filters.sort)
+  if (filters.direction === "asc") next.set("direction", filters.direction)
   return next
 }
 

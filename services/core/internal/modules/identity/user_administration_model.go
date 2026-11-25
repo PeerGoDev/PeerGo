@@ -303,19 +303,23 @@ type ManagedUserDirectorySummary struct {
 }
 
 type ListManagedUsersInput struct {
-	Query    string
-	Filter   ManagedUserDirectoryFilter
-	Page     int
-	PageSize int
+	Query     string
+	Filter    ManagedUserDirectoryFilter
+	Page      int
+	PageSize  int
+	Sort      string
+	Direction string
 }
 
 type ManagedUserListQuery struct {
-	Query    string
-	Filter   ManagedUserDirectoryFilter
-	Page     int
-	PageSize int
-	Offset   int
-	AsOf     time.Time
+	Query     string
+	Filter    ManagedUserDirectoryFilter
+	Page      int
+	PageSize  int
+	Offset    int
+	AsOf      time.Time
+	Sort      string
+	Direction string
 }
 
 type CreateAccountRestrictionInput struct {

@@ -43,6 +43,7 @@ import {
 import { Spinner } from "~/components/ui/spinner"
 import { Textarea } from "~/components/ui/textarea"
 import { ContentTipDialog } from "~/features/economy/components/content-tip-dialog"
+import { MedalArtwork } from "~/features/economy/components/medal-artwork"
 import { useNameStyle } from "~/features/economy/components/name-style"
 import {
   type SocialPost,
@@ -283,20 +284,12 @@ export function SocialPostCard({
                   key={medal.id}
                   className="flex size-4 shrink-0 items-center justify-center"
                   title={medal.name}
-                  aria-label={`勋章：${medal.name}`}
                 >
-                  {medal.image_path ? (
-                    <img
-                      src={medal.image_path}
-                      alt=""
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  ) : (
-                    <SparklesIcon
-                      className="size-3.5 text-warning-foreground"
-                      aria-hidden="true"
-                    />
-                  )}
+                  <MedalArtwork
+                    name={medal.name}
+                    image={medal.image_path}
+                    className="size-4"
+                  />
                 </span>
               ))}
             </div>
@@ -785,6 +778,7 @@ function SharedTorrentCard({
             <TorrentCoverImage
               torrentId={torrent.id}
               title={torrent.title}
+              source="screenshot"
               className="size-full object-cover"
               fallbackClassName="[&_svg]:size-5"
             />

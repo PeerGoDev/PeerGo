@@ -49,6 +49,14 @@ describe("TorrentReviewDecisionDialog", () => {
             version: 1,
             submitted_at: "2026-08-16T08:00:00Z",
             review_requested_at: "2026-08-16T08:00:00Z",
+            votes: [
+              {
+                decision: "reject",
+                reason_code: "metadata_incomplete",
+                reason: "请补两张原始截图，并注明音轨语言。",
+                voted_at: "2026-08-16T08:15:00Z",
+              },
+            ],
           }}
           csrfToken={"s".repeat(43)}
           onOpenChange={() => {}}
@@ -57,6 +65,8 @@ describe("TorrentReviewDecisionDialog", () => {
       </QueryClientProvider>
     )
 
+    expect(screen.getByText("请补两张原始截图，并注明音轨语言。")).toBeVisible()
+    expect(screen.getByText("元数据不完整")).toBeVisible()
     await user.click(screen.getByRole("button", { name: "确认通过" }))
 
     expect(

@@ -109,6 +109,8 @@ export function managedUserListQueryOptions(filters: ManagedUserFilters) {
               filter: filters.status === "all" ? undefined : filters.status,
               page: filters.page,
               page_size: filters.pageSize,
+              sort: filters.sort,
+              direction: filters.direction,
             },
           },
         }

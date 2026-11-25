@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CountPendingTorrentReviews(ctx context.Context) (int64, error)
 	GetEnabledTorrentResubmissionCategory(ctx context.Context, categoryID string) (string, error)
 	GetPendingTorrentReviewForUpdate(ctx context.Context, torrentID int64) (GetPendingTorrentReviewForUpdateRow, error)
 	GetRejectedTorrentForResubmissionForUpdate(ctx context.Context, torrentID int64) (GetRejectedTorrentForResubmissionForUpdateRow, error)
@@ -20,7 +21,7 @@ type Querier interface {
 	InsertPublishedTorrentCatalogProjection(ctx context.Context, arg InsertPublishedTorrentCatalogProjectionParams) error
 	InsertTorrentResubmission(ctx context.Context, arg InsertTorrentResubmissionParams) error
 	InsertTorrentReviewDecision(ctx context.Context, arg InsertTorrentReviewDecisionParams) error
-	ListPendingTorrentReviews(ctx context.Context, resultLimit int32) ([]ListPendingTorrentReviewsRow, error)
+	ListPendingTorrentReviews(ctx context.Context, arg ListPendingTorrentReviewsParams) ([]ListPendingTorrentReviewsRow, error)
 	ListReviewedTorrentReviews(ctx context.Context, arg ListReviewedTorrentReviewsParams) ([]ListReviewedTorrentReviewsRow, error)
 	ListTorrentReviewAssignments(ctx context.Context, arg ListTorrentReviewAssignmentsParams) ([]ListTorrentReviewAssignmentsRow, error)
 	PublishReviewedTorrent(ctx context.Context, arg PublishReviewedTorrentParams) (PublishReviewedTorrentRow, error)

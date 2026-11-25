@@ -481,7 +481,9 @@ function ImagePathField({
         placeholder="/uploads/medals/example.webp"
         onChange={(event) => onChange(event.target.value)}
       />
-      <FieldDescription>支持站内 / 路径或 HTTPS 地址。</FieldDescription>
+      <FieldDescription>
+        支持站内 / 路径或 HTTPS 图片直链，可用 GIF 或动态 WebP。
+      </FieldDescription>
       {error ? <FieldError>{error}</FieldError> : null}
     </Field>
   )

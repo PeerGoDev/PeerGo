@@ -15,7 +15,6 @@ import {
   RefreshCwIcon,
   ReplyIcon,
   SendIcon,
-  SparklesIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -79,6 +78,7 @@ import { OffsetPagination } from "~/shared/components/offset-pagination"
 import { UserAvatar } from "~/shared/components/user-avatar"
 import { CommentReportDialog } from "~/features/social/components/comment-report-dialog"
 import { ContentTipDialog } from "~/features/economy/components/content-tip-dialog"
+import { MedalArtwork } from "~/features/economy/components/medal-artwork"
 import { useNameStyle } from "~/features/economy/components/name-style"
 import { formatRelativeTime } from "~/features/torrent/model/format"
 import { ApiProblemError, requestErrorDescription } from "~/shared/api/problem"
@@ -1203,20 +1203,12 @@ function CommentRow({
                 key={medal.id}
                 className="flex size-4 shrink-0 items-center justify-center"
                 title={medal.name}
-                aria-label={`勋章：${medal.name}`}
               >
-                {medal.image_path ? (
-                  <img
-                    src={medal.image_path}
-                    alt=""
-                    className="max-h-full max-w-full object-contain"
-                  />
-                ) : (
-                  <SparklesIcon
-                    className="size-3.5 text-warning-foreground"
-                    aria-hidden="true"
-                  />
-                )}
+                <MedalArtwork
+                  name={medal.name}
+                  image={medal.image_path}
+                  className="size-4"
+                />
               </span>
             ))}
           </span>

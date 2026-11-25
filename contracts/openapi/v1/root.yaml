@@ -926,6 +926,10 @@ components:
       $ref: "./schemas/social.yaml#/SocialPostModerationDecisionResult"
     PendingTorrentReview:
       $ref: "./schemas/torrents.yaml#/PendingTorrentReview"
+    StaffPendingTorrentReview:
+      $ref: "./schemas/torrents.yaml#/StaffPendingTorrentReview"
+    StaffTorrentReviewVote:
+      $ref: "./schemas/torrents.yaml#/StaffTorrentReviewVote"
     PendingTorrentReviewPage:
       $ref: "./schemas/torrents.yaml#/PendingTorrentReviewPage"
     MyTorrentReviewDetail:

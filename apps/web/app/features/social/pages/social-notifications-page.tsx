@@ -10,7 +10,6 @@ import {
   MessageCircleIcon,
   RefreshCwIcon,
   Repeat2Icon,
-  SparklesIcon,
   UserPlusIcon,
 } from "lucide-react"
 
@@ -28,6 +27,7 @@ import { Skeleton } from "~/components/ui/skeleton"
 import { Spinner } from "~/components/ui/spinner"
 import { useWebSession } from "~/features/auth/api/session.mutations"
 import { useCapabilities } from "~/features/authz/api/capabilities.queries"
+import { MedalArtwork } from "~/features/economy/components/medal-artwork"
 import {
   type SocialNotification,
   type SocialNotificationCategory,
@@ -330,15 +330,11 @@ function SocialNotificationRow({
                 className="flex size-4 items-center justify-center"
                 title={medal.name}
               >
-                {medal.image_path ? (
-                  <img
-                    src={medal.image_path}
-                    alt=""
-                    className="max-h-full max-w-full object-contain"
-                  />
-                ) : (
-                  <SparklesIcon className="size-3.5 text-warning-foreground" />
-                )}
+                <MedalArtwork
+                  name={medal.name}
+                  image={medal.image_path}
+                  className="size-4"
+                />
               </span>
             ))}
             <span className="text-sm text-muted-foreground">

@@ -134,11 +134,7 @@ export function TorrentScreenshotsCard({
                 </button>
               ) : null}
               <img
-                src={
-                  screenshotUrl
-                    ? screenshotUrl(torrentId, selectedPosition)
-                    : torrentScreenshotUrl(torrentId, selectedPosition, true)
-                }
+                src={previewUrl(torrentId, selectedPosition)}
                 alt={`截图 ${selectedPosition + 1} 大图`}
                 className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
                 onError={() => {
@@ -212,12 +208,8 @@ function ScreenshotThumbnail({
   )
 }
 
-function torrentScreenshotUrl(
-  torrentId: number,
-  position: number,
-  play = false
-) {
+function torrentScreenshotUrl(torrentId: number, position: number) {
   return resolveApiUrl(
-    `/api/v1/torrents/${encodeURIComponent(torrentId)}/screenshots/${position}${play ? "?play=true" : ""}`
+    `/api/v1/torrents/${encodeURIComponent(torrentId)}/screenshots/${position}?play=true`
   )
 }

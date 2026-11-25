@@ -3376,7 +3376,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 获取最早提交的待审核种子 */
+        /** 分页获取待审核种子及本轮投票意见 */
         get: operations["listPendingTorrentReviews"];
         put?: never;
         post?: never;
@@ -6496,8 +6496,20 @@ export interface components {
              */
             review_requested_at: string;
         };
+        StaffPendingTorrentReview: components["schemas"]["PendingTorrentReview"] & {
+            votes: components["schemas"]["StaffTorrentReviewVote"][];
+        };
+        StaffTorrentReviewVote: {
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            /** @enum {string} */
+            reason_code: "meets_requirements" | "metadata_incomplete" | "duplicate_or_superseded" | "content_policy_violation" | "quality_requirements_not_met" | "uploader_action_required" | "other";
+            reason: string;
+            /** Format: date-time */
+            voted_at: string;
+        };
         PendingTorrentReviewPage: {
-            items: components["schemas"]["PendingTorrentReview"][];
+            items: components["schemas"]["StaffPendingTorrentReview"][];
             /** Format: int64 */
             total: number;
         };
@@ -11446,6 +11458,8 @@ export interface operations {
                 query?: string;
                 /** @description 按正常、封禁、待激活、当前 VIP、下载受限或邮箱未验证筛选。 */
                 filter?: components["schemas"]["ManagedUserDirectoryFilter"];
+                sort?: "uploaded_bytes" | "downloaded_bytes" | "magic_balance" | "level" | "created_at";
+                direction?: "asc" | "desc";
                 page?: number;
                 page_size?: number;
             };
@@ -17787,6 +17801,7 @@ export interface operations {
             query?: {
                 /** @description 本次返回的待审核对象上限。 */
                 limit?: number;
+                page?: number;
             };
             header?: never;
             path?: never;

@@ -37,7 +37,7 @@ export function TorrentCoverImage({
   const canReadCover = available && isTorrentId(torrentId) && !failed
   const imageSource = resolveApiUrl(
     source === "screenshot"
-      ? `/api/v1/torrents/${encodeURIComponent(torrentId)}/screenshots/0`
+      ? `/api/v1/torrents/${encodeURIComponent(torrentId)}/screenshots/0?play=true`
       : `/api/v1/torrents/${encodeURIComponent(torrentId)}/cover`
   )
 
@@ -75,6 +75,7 @@ export function TorrentCoverImage({
       <img
         src={imageSource}
         alt={obscured ? `${title}封面已隐藏` : `${title}封面`}
+        loading={source === "screenshot" ? "lazy" : undefined}
         className={cn(
           className,
           obscured && "scale-110 blur-xl group-hover:scale-110"

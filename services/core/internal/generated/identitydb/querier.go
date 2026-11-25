@@ -108,6 +108,8 @@ type Querier interface {
 	RevokeWebSession(ctx context.Context, arg RevokeWebSessionParams) (int64, error)
 	SetCurrentUserAvatar(ctx context.Context, arg SetCurrentUserAvatarParams) (int64, error)
 	SetRegistrationCredential(ctx context.Context, arg SetRegistrationCredentialParams) (IdentityRegistration, error)
+	// Record real authenticated web activity in the shared current projection.
+	// Both writes are atomic and coalesced; no per-request history is created.
 	// Activity writes are coalesced to five-minute buckets. This keeps the user
 	// projection useful without turning every authenticated request into a row
 	// update or collecting a detailed browsing timeline.

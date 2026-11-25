@@ -80,13 +80,21 @@ func (builder *TorrentReviewEventBuilder) BuildTorrentReviewEvent(input review.T
 func validateTorrentReviewAuditInput(input review.TorrentReviewAuditInput) error {
 	decision := input.Authorization
 	if input.DecisionID == uuid.Nil || input.ReviewerID == uuid.Nil || input.UploaderID == uuid.Nil ||
-		input.ReviewerID == input.UploaderID || input.Reason == "" || input.OccurredAt.IsZero() ||
+		input.Reason == "" || input.OccurredAt.IsZero() ||
 		input.Before.TorrentID < 1 || input.Before.TorrentID != input.After.TorrentID ||
 		input.Before.State != torrents.StatePendingReview || input.Before.Version < 1 ||
 		input.After.Version != input.Before.Version+1 || !decision.Allow || decision.Reason != authz.ReasonAllowed ||
 		decision.ID == uuid.Nil || decision.PolicyVersion == "" || decision.GrantID == uuid.Nil ||
 		decision.GrantVersion < 1 || decision.RoleID == "" || decision.MandateID == uuid.Nil || decision.EffectiveUntil.IsZero() {
 		return errors.New("torrent review audit event is missing required metadata")
+	}
+	if input.MembershipTransitionID != nil {
+		if *input.MembershipTransitionID == uuid.Nil || input.ReviewerID != input.UploaderID ||
+			input.Decision != review.DecisionApprove || input.Before.Version != 1 {
+			return errors.New("trusted torrent publish audit event has invalid membership evidence")
+		}
+	} else if input.ReviewerID == input.UploaderID {
+		return errors.New("torrent review audit event cannot record a self-review")
 	}
 	if (input.Decision == review.DecisionApprove && input.ReasonCode == review.ReasonMeetsRequirements && input.After.State == torrents.StatePublished) ||
 		(input.Decision == review.DecisionReject && input.ReasonCode != review.ReasonMeetsRequirements && input.After.State == torrents.StateRejected) {

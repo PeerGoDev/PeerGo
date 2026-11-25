@@ -22,6 +22,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/review"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	"github.com/peergo/peergo/services/core/internal/modules/trackercontrol"
+	"github.com/peergo/peergo/services/core/internal/modules/workgroups"
 	platformpostgres "github.com/peergo/peergo/services/core/internal/platform/postgres"
 )
 
@@ -73,12 +74,45 @@ VALUES ($1, '审核集成测试', 100000 + abs(hashtext($1)) % 900000, true, $2,
 	}
 
 	approved := insertPendingReviewTorrent(t, ctx, pool, uploaderID, categoryID, now.Add(-10*time.Minute))
-	page, err := repository.ListPending(ctx, 50)
+	var reviewerNumericID int64
+	if err := pool.QueryRow(ctx, `SELECT numeric_id FROM identity.users WHERE id = $1`, reviewerID).Scan(&reviewerNumericID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workgroups.NewPostgresRepository(pool).GrantMembership(ctx, workgroups.GrantMembershipCommand{
+		TransitionID: uuid.New(), GroupKind: workgroups.GroupReview, UserNumericID: reviewerNumericID,
+		ActorID: uploaderID, Reason: "测试种审组投票资格", AuthorizationDecisionID: uuid.New(), OccurredAt: now.Add(-time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	voteReason := "请补充原始截图，并写明音轨语言。"
+	if _, err := repository.Vote(ctx, review.VoteCommand{
+		VoteInput: review.VoteInput{
+			VoteID: uuid.New(), TorrentID: torrents.TorrentID(approved.torrentID), ExpectedVersion: 1,
+			Decision: review.DecisionReject, ReasonCode: review.ReasonMetadataIncomplete, Reason: voteReason,
+		},
+		VoterID: reviewerID, OccurredAt: now.Add(-time.Second), Authorization: reviewIntegrationDecision(now),
+	}); err != nil {
+		t.Fatalf("Vote() error=%v", err)
+	}
+	page, err := repository.ListPending(ctx, 50, 0)
 	if err != nil {
 		t.Fatalf("ListPending() error = %v", err)
 	}
 	if !pendingPageContains(page, approved.torrentID) {
 		t.Fatalf("pending page does not contain %d: %+v", approved.torrentID, page)
+	}
+	for index, item := range page.Items {
+		if int64(item.ID) != approved.torrentID {
+			continue
+		}
+		secondPage, err := repository.ListPending(ctx, 1, int64(index))
+		if err != nil || secondPage.Total != page.Total || len(secondPage.Items) != 1 || secondPage.Items[0].ID != item.ID {
+			t.Fatalf("paginated review queue=%+v error=%v", secondPage, err)
+		}
+		votes := secondPage.Items[0].Votes
+		if len(votes) != 1 || votes[0].Decision != review.DecisionReject || votes[0].Reason != voteReason {
+			t.Fatalf("current round votes=%+v", votes)
+		}
 	}
 
 	decisionID := uuid.New()
@@ -303,11 +337,11 @@ WHERE torrent.id = $1`, approved.torrentID, audit.TorrentReviewEventType).Scan(
 		t.Fatal("immutable torrent resubmission unexpectedly accepted an update")
 	}
 	assertReviewGraph(t, ctx, pool, rejected, string(torrents.StatePendingReview), 3, 1, 1, 2, 0)
-	resubmittedPage, err := repository.ListPending(ctx, 50)
+	resubmittedPage, err := repository.ListPending(ctx, 50, 0)
 	if err != nil {
 		t.Fatalf("ListPending(after resubmission) error=%v", err)
 	}
-	var queuedResubmission *review.PendingTorrent
+	var queuedResubmission *review.StaffPendingTorrent
 	for index := range resubmittedPage.Items {
 		if int64(resubmittedPage.Items[index].ID) == rejected.torrentID {
 			queuedResubmission = &resubmittedPage.Items[index]
@@ -333,6 +367,40 @@ WHERE torrent.id = $1`, approved.torrentID, audit.TorrentReviewEventType).Scan(
 		t.Fatalf("self review error = %v", err)
 	}
 	assertReviewGraph(t, ctx, pool, selfReviewed, string(torrents.StatePendingReview), 1, 0, 0, 0, 0)
+
+	trusted := insertPendingReviewTorrent(t, ctx, pool, uploaderID, categoryID, now.Add(-6*time.Minute))
+	trustedCommand := torrents.TrustedPublishCommand{
+		DecisionID: uuid.New(), TorrentID: torrents.TorrentID(trusted.torrentID), UploaderID: uploaderID,
+		OccurredAt: now.Add(4 * time.Second), Authorization: reviewIntegrationDecision(now),
+	}
+	if _, err := repository.PublishTrusted(ctx, trustedCommand); !errors.Is(err, torrents.ErrTorrentUploadStateConflict) {
+		t.Fatalf("PublishTrusted(without membership) error=%v", err)
+	}
+	var numericID int64
+	if err := pool.QueryRow(ctx, `SELECT numeric_id FROM identity.users WHERE id = $1`, uploaderID).Scan(&numericID); err != nil {
+		t.Fatal(err)
+	}
+	membershipTransitionID := uuid.New()
+	if _, err := workgroups.NewPostgresRepository(pool).GrantMembership(ctx, workgroups.GrantMembershipCommand{
+		TransitionID: membershipTransitionID, GroupKind: workgroups.GroupReseed, UserNumericID: numericID,
+		ActorID: reviewerID, Reason: "测试转种组可信发布资格", AuthorizationDecisionID: uuid.New(), OccurredAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	trustedResult, err := repository.PublishTrusted(ctx, trustedCommand)
+	if err != nil || trustedResult.State != torrents.StatePublished || trustedResult.Version != 2 {
+		t.Fatalf("PublishTrusted()=%+v error=%v", trustedResult, err)
+	}
+	if replay, err := repository.PublishTrusted(ctx, trustedCommand); err != nil || replay != trustedResult {
+		t.Fatalf("PublishTrusted(replay)=%+v error=%v", replay, err)
+	}
+	var trustedTransitionID uuid.UUID
+	if err := pool.QueryRow(ctx, `
+SELECT membership_transition_id FROM review.torrent_decisions
+WHERE id = $1 AND resolution_source = 'trusted_workgroup'`, trustedCommand.DecisionID).Scan(&trustedTransitionID); err != nil || trustedTransitionID != membershipTransitionID {
+		t.Fatalf("trusted publish membership=%v error=%v", trustedTransitionID, err)
+	}
+	assertReviewGraph(t, ctx, pool, trusted, string(torrents.StatePublished), 2, 1, 1, 1, 1)
 
 	rollbackTarget := insertPendingReviewTorrent(t, ctx, pool, uploaderID, categoryID, now.Add(-7*time.Minute))
 	failingRepository, err := review.NewPostgresRepository(

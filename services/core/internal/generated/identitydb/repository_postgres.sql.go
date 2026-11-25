@@ -2971,15 +2971,32 @@ AND (
 )
 GROUP BY users.id, traffic.user_id, magic.user_id, magic.balance, progress.user_id,
     activity.user_id, access.user_id, role_projection.role_names
-ORDER BY users.created_at DESC, users.id DESC
-LIMIT $5::integer
-OFFSET $4::integer
+ORDER BY
+    CASE WHEN $4::text = 'asc' THEN CASE $5::text
+        WHEN 'uploaded_bytes' THEN COALESCE(traffic.raw_uploaded, 0)
+        WHEN 'downloaded_bytes' THEN COALESCE(traffic.raw_downloaded, 0)
+        WHEN 'magic_balance' THEN COALESCE(magic.balance, 0)
+        WHEN 'level' THEN COALESCE(progress.level, 1)
+    END END ASC,
+    CASE WHEN $4::text <> 'asc' THEN CASE $5::text
+        WHEN 'uploaded_bytes' THEN COALESCE(traffic.raw_uploaded, 0)
+        WHEN 'downloaded_bytes' THEN COALESCE(traffic.raw_downloaded, 0)
+        WHEN 'magic_balance' THEN COALESCE(magic.balance, 0)
+        WHEN 'level' THEN COALESCE(progress.level, 1)
+    END END DESC,
+    CASE WHEN $4::text = 'asc' AND $5::text IN ('', 'created_at')
+         THEN users.created_at END ASC,
+    users.created_at DESC, users.id DESC
+LIMIT $7::integer
+OFFSET $6::integer
 `
 
 type ListManagedUsersParams struct {
 	AsOf            pgtype.Timestamptz
 	SearchQuery     string
 	DirectoryFilter string
+	SortDirection   string
+	SortField       string
 	PageOffset      int32
 	PageSize        int32
 }
@@ -3014,6 +3031,8 @@ func (q *Queries) ListManagedUsers(ctx context.Context, arg ListManagedUsersPara
 		arg.AsOf,
 		arg.SearchQuery,
 		arg.DirectoryFilter,
+		arg.SortDirection,
+		arg.SortField,
 		arg.PageOffset,
 		arg.PageSize,
 	)
@@ -4383,6 +4402,8 @@ type TouchActiveWebSessionParams struct {
 	TokenHash []byte
 }
 
+// Record real authenticated web activity in the shared current projection.
+// Both writes are atomic and coalesced; no per-request history is created.
 // Activity writes are coalesced to five-minute buckets. This keeps the user
 // projection useful without turning every authenticated request into a row
 // update or collecting a detailed browsing timeline.

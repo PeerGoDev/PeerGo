@@ -37,6 +37,7 @@ import {
   useDecideTorrentReview,
 } from "~/features/staff/api/torrent-review.queries"
 import { formatBytes } from "~/shared/formatters/bytes"
+import { formatDateTime } from "~/shared/formatters/date-time"
 import { ApiProblemError } from "~/shared/api/problem"
 
 type ReviewDecision = TorrentReviewDecisionRequest["decision"]
@@ -120,7 +121,7 @@ export function TorrentReviewDecisionDialog({
         if (!open && !decide.isPending) onOpenChange(false)
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>审核种子</DialogTitle>
           <DialogDescription>
@@ -141,6 +142,49 @@ export function TorrentReviewDecisionDialog({
                 {torrent.uploader_display_name}
               </p>
             </div>
+
+            <section aria-label="本轮投票意见" className="flex flex-col gap-2">
+              <h3 className="text-sm font-medium">本轮投票意见</h3>
+              {torrent.votes?.length ? (
+                <ul className="flex flex-col gap-2">
+                  {torrent.votes.map((vote, index) => (
+                    <li key={index} className="rounded-md border p-3">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <Badge
+                          variant={
+                            vote.decision === "reject"
+                              ? "destructive"
+                              : "secondary"
+                          }
+                        >
+                          {vote.decision === "reject" ? "驳回" : "通过"}
+                        </Badge>
+                        <span>
+                          {vote.reason_code === "meets_requirements"
+                            ? "符合发布要求"
+                            : rejectionReasonOptions.find(
+                                (option) => option.value === vote.reason_code
+                              )?.label}
+                        </span>
+                        <time
+                          dateTime={vote.voted_at}
+                          className="text-muted-foreground"
+                        >
+                          {formatDateTime(vote.voted_at)}
+                        </time>
+                      </div>
+                      <p className="mt-2 text-sm wrap-break-word whitespace-pre-wrap">
+                        {vote.reason}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  本轮暂无工作组投票。
+                </p>
+              )}
+            </section>
 
             <Alert>
               <ShieldCheckIcon />

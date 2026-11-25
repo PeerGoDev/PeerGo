@@ -8,6 +8,7 @@ describe("ManagedUserTable", () => {
   it("renders authorized operational state and opens detail by UUID", async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
+    const onSort = vi.fn()
     render(
       <ManagedUserTable
         users={[
@@ -37,6 +38,9 @@ describe("ManagedUserTable", () => {
         ]}
         hasFilters={false}
         onSelect={onSelect}
+        sort="created_at"
+        direction="desc"
+        onSort={onSort}
       />
     )
 
@@ -57,6 +61,11 @@ describe("ManagedUserTable", () => {
       "min-w-[1120px]",
       "lg:min-w-[1480px]"
     )
+    expect(
+      screen.getByRole("columnheader", { name: "注册时间" })
+    ).toHaveAttribute("aria-sort", "descending")
+    await user.click(screen.getByRole("button", { name: "下载" }))
+    expect(onSort).toHaveBeenCalledWith("downloaded_bytes")
     await user.click(
       screen.getByRole("button", { name: "管理账户 demo-target" })
     )
@@ -66,7 +75,16 @@ describe("ManagedUserTable", () => {
   })
 
   it("explains an empty filtered result", () => {
-    render(<ManagedUserTable users={[]} hasFilters onSelect={vi.fn()} />)
+    render(
+      <ManagedUserTable
+        users={[]}
+        hasFilters
+        onSelect={vi.fn()}
+        sort="created_at"
+        direction="desc"
+        onSort={vi.fn()}
+      />
+    )
     expect(screen.getByText("没有匹配账户")).toBeInTheDocument()
   })
 
@@ -99,6 +117,9 @@ describe("ManagedUserTable", () => {
         ]}
         hasFilters={false}
         onSelect={vi.fn()}
+        sort="created_at"
+        direction="desc"
+        onSort={vi.fn()}
       />
     )
 

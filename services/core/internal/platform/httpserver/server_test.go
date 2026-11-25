@@ -1320,7 +1320,7 @@ func (unavailableTorrentReviewService) Vote(context.Context, string, string, rev
 	return review.VoteResult{}, authz.ErrForbidden
 }
 
-func (unavailableTorrentReviewService) ListPending(context.Context, authz.StaffActor, int) (review.PendingTorrentPage, error) {
+func (unavailableTorrentReviewService) ListPending(context.Context, authz.StaffActor, int, int) (review.PendingTorrentPage, error) {
 	return review.PendingTorrentPage{}, authz.ErrForbidden
 }
 
@@ -1332,6 +1332,7 @@ type recordingTorrentReviewService struct {
 	page        review.PendingTorrentPage
 	listActor   authz.StaffActor
 	listLimit   int
+	listPage    int
 	decideActor authz.StaffActor
 	decideInput review.DecideInput
 	result      review.DecisionResult
@@ -1366,9 +1367,10 @@ func (service *recordingTorrentReviewService) Vote(context.Context, string, stri
 	return review.VoteResult{}, service.err
 }
 
-func (service *recordingTorrentReviewService) ListPending(_ context.Context, actor authz.StaffActor, limit int) (review.PendingTorrentPage, error) {
+func (service *recordingTorrentReviewService) ListPending(_ context.Context, actor authz.StaffActor, limit, page int) (review.PendingTorrentPage, error) {
 	service.listActor = actor
 	service.listLimit = limit
+	service.listPage = page
 	return service.page, service.err
 }
 
@@ -3095,12 +3097,15 @@ func TestTorrentReviewUsesStaffAudienceIdempotencyAndOptimisticVersion(t *testin
 		WebAuthnAuthenticatedAt: now.Add(-time.Minute),
 	}}
 	reviewService := &recordingTorrentReviewService{
-		page: review.PendingTorrentPage{Total: 1, Items: []review.PendingTorrent{{
-			ID: torrentID, UploaderID: uploaderID, UploaderDisplayName: "上传者",
-			CategoryID: "movies", CategoryName: "电影", Title: "Release 2026",
-			Subtitle: "First edition", ContentName: "release.bin", InfoHashV1: infoHash,
-			TotalSizeBytes: 42, FileCount: 1, Version: 1, SubmittedAt: now.Add(-time.Hour),
-			ReviewRequestedAt: now.Add(-time.Hour),
+		page: review.PendingTorrentPage{Total: 11, Items: []review.StaffPendingTorrent{{
+			PendingTorrent: review.PendingTorrent{
+				ID: torrentID, UploaderID: uploaderID, UploaderDisplayName: "上传者",
+				CategoryID: "movies", CategoryName: "电影", Title: "Release 2026",
+				Subtitle: "First edition", ContentName: "release.bin", InfoHashV1: infoHash,
+				TotalSizeBytes: 42, FileCount: 1, Version: 1, SubmittedAt: now.Add(-time.Hour),
+				ReviewRequestedAt: now.Add(-time.Hour),
+			},
+			Votes: []review.StaffReviewVote{{Decision: review.DecisionReject, ReasonCode: review.ReasonMetadataIncomplete, Reason: "请补齐截图", VotedAt: now}},
 		}}},
 		result: review.DecisionResult{
 			DecisionID: decisionID, TorrentID: torrentID,
@@ -3110,15 +3115,16 @@ func TestTorrentReviewUsesStaffAudienceIdempotencyAndOptimisticVersion(t *testin
 	}
 	handler := testHandlerWithTorrentReview(t, staffService, reviewService)
 
-	listRequest := httptest.NewRequest(http.MethodGet, "/api/v1/admin/torrent-reviews?limit=10", nil)
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/v1/admin/torrent-reviews?limit=10&page=2", nil)
 	listRequest.AddCookie(&http.Cookie{Name: "peergo_staff_session", Value: "staff-token"})
 	listResponse := httptest.NewRecorder()
 	handler.ServeHTTP(listResponse, listRequest)
-	if listResponse.Code != http.StatusOK || listResponse.Header().Get("Cache-Control") != "no-store" || !strings.Contains(listResponse.Body.String(), infoHash.Hex()) {
+	if listResponse.Code != http.StatusOK || listResponse.Header().Get("Cache-Control") != "no-store" ||
+		!strings.Contains(listResponse.Body.String(), infoHash.Hex()) || !strings.Contains(listResponse.Body.String(), "请补齐截图") {
 		t.Fatalf("list status=%d cache=%q body=%s", listResponse.Code, listResponse.Header().Get("Cache-Control"), listResponse.Body.String())
 	}
-	if reviewService.listLimit != 10 || reviewService.listActor.Subject.ID != reviewerID || staffService.currentStaffToken != "staff-token" {
-		t.Fatalf("list boundary limit=%d actor=%+v token=%q", reviewService.listLimit, reviewService.listActor, staffService.currentStaffToken)
+	if reviewService.listLimit != 10 || reviewService.listPage != 2 || reviewService.listActor.Subject.ID != reviewerID || staffService.currentStaffToken != "staff-token" {
+		t.Fatalf("list boundary limit=%d page=%d actor=%+v token=%q", reviewService.listLimit, reviewService.listPage, reviewService.listActor, staffService.currentStaffToken)
 	}
 	reviewService.err = review.ErrTorrentReviewInput
 	invalidListRequest := httptest.NewRequest(http.MethodGet, "/api/v1/admin/torrent-reviews?limit=10", nil)
