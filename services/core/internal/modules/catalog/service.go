@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/peergo/peergo/services/core/internal/modules/economy/reseedreward"
 )
 
 const (
@@ -14,7 +16,7 @@ const (
 	maxTorrentLimit          = 100
 	maxTorrentOffset         = 1_000_000
 	maxQueryRunes            = 100
-	swarmFreshness           = 5 * time.Minute
+	SwarmFreshness           = 5 * time.Minute
 	defaultAnnouncementLimit = 20
 	maxAnnouncementLimit     = 50
 	maxAnnouncementOffset    = 1_000_000
@@ -61,6 +63,7 @@ type Repository interface {
 	ListCategories(ctx context.Context) ([]CategorySummary, error)
 	CategoryFacets(ctx context.Context, categoryID string) ([]CategoryFacet, error)
 	ListTorrents(ctx context.Context, filter TorrentFilter) ([]Torrent, int, error)
+	ListOpenTorrentReseedRequests(ctx context.Context, limit, offset int, excludeNSFW bool) ([]OpenTorrentReseedRequest, int, error)
 	TorrentSwarm(ctx context.Context, torrentID int64) (SwarmStats, bool, error)
 }
 
@@ -84,9 +87,12 @@ func (s *Service) GetTorrentSwarm(ctx context.Context, torrentID int64) (Torrent
 	if !available {
 		return overview, nil
 	}
-	overview.Stale = s.now().Sub(stats.ObservedAt) > swarmFreshness
+	overview.Stale = s.now().Sub(stats.ObservedAt) > SwarmFreshness
 	if overview.Stale {
 		overview.Confidence = SwarmConfidenceStale
+		if overview.ReseedReward != nil && overview.ReseedReward.Status == reseedreward.OfferUpcoming {
+			overview.ReseedReward = nil
+		}
 	} else {
 		overview.Confidence = SwarmConfidenceFresh
 	}
@@ -223,19 +229,9 @@ func (s *Service) ListCategoryFacets(ctx context.Context, categoryID string) ([]
 // HTTP, workers, and future CLI entry points. A nil limit means the contract
 // default; explicit out-of-range values fail instead of being silently clamped.
 func (s *Service) ListTorrents(ctx context.Context, request TorrentListRequest) (TorrentPage, error) {
-	resolvedLimit := defaultTorrentLimit
-	if request.Limit != nil {
-		resolvedLimit = *request.Limit
-	}
-	if resolvedLimit < 1 || resolvedLimit > maxTorrentLimit {
-		return TorrentPage{}, ErrInvalidLimit
-	}
-	resolvedOffset := 0
-	if request.Offset != nil {
-		resolvedOffset = *request.Offset
-	}
-	if resolvedOffset < 0 || resolvedOffset > maxTorrentOffset {
-		return TorrentPage{}, ErrInvalidTorrentPage
+	resolvedLimit, resolvedOffset, err := torrentPageBounds(request.Limit, request.Offset)
+	if err != nil {
+		return TorrentPage{}, err
 	}
 
 	normalizedQuery := strings.TrimSpace(request.Query)
@@ -287,6 +283,23 @@ func (s *Service) ListTorrents(ctx context.Context, request TorrentListRequest) 
 	return TorrentPage{Items: summaries, Total: total, Limit: resolvedLimit, Offset: resolvedOffset}, nil
 }
 
+func torrentPageBounds(limit, offset *int) (int, int, error) {
+	resolvedLimit, resolvedOffset := defaultTorrentLimit, 0
+	if limit != nil {
+		resolvedLimit = *limit
+	}
+	if resolvedLimit < 1 || resolvedLimit > maxTorrentLimit {
+		return 0, 0, ErrInvalidLimit
+	}
+	if offset != nil {
+		resolvedOffset = *offset
+	}
+	if resolvedOffset < 0 || resolvedOffset > maxTorrentOffset {
+		return 0, 0, ErrInvalidTorrentPage
+	}
+	return resolvedLimit, resolvedOffset, nil
+}
+
 // SummarizeTorrent applies the catalog-owned freshness rule to a public row.
 // Detail-adjacent reads such as resource-group siblings reuse this function so
 // list and detail never disagree about the same asynchronous swarm timestamp.
@@ -296,6 +309,6 @@ func SummarizeTorrent(item Torrent, now time.Time) TorrentSummary {
 	// Web availability to a Tracker timing fault.
 	return TorrentSummary{
 		Torrent:    item,
-		SwarmStale: now.Sub(item.Swarm.ObservedAt) > swarmFreshness,
+		SwarmStale: now.Sub(item.Swarm.ObservedAt) > SwarmFreshness,
 	}
 }

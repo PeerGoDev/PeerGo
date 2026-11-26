@@ -73,6 +73,7 @@ import {
 } from "~/features/staff/api/seeding-reward-administration.queries"
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
+import { ReseedRewardSettingsCard } from "~/features/staff/components/reseed-reward-settings-card"
 import { hasCapability } from "~/features/staff/model/capability"
 import {
   recommendedSeedingRewardPolicy,
@@ -445,6 +446,8 @@ function SeedingRewardPolicyEditor({
         </div>
         <Badge variant="outline">已调整 {formatInteger(page.total)} 次</Badge>
       </header>
+
+      <ReseedRewardSettingsCard csrfToken={csrfToken} canIssue={canIssue} />
 
       <Alert>
         <Clock3Icon />

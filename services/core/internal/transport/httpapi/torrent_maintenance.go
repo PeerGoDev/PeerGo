@@ -29,8 +29,39 @@ type TorrentMaintenanceService interface {
 	ListTorrentWithdrawals(context.Context, authz.StaffActor, torrents.TorrentWithdrawalQuery) (torrents.ManagedTorrentWithdrawalPage, error)
 	DecideTorrentWithdrawal(context.Context, authz.StaffActor, torrents.DecideTorrentWithdrawalInput) (torrents.TorrentWithdrawalDecisionResult, error)
 	CreateTorrentReport(context.Context, string, string, torrents.CreateTorrentReportInput) (torrents.TorrentReportReceipt, error)
+	RequestTorrentReseed(context.Context, string, string, torrents.TorrentID) error
 	ListTorrentReportCases(context.Context, authz.StaffActor, torrents.TorrentReportCaseQuery) (torrents.ManagedTorrentReportCasePage, error)
 	DecideTorrentReportCase(context.Context, authz.StaffActor, torrents.DecideTorrentReportCaseInput) (torrents.TorrentReportDecisionResult, error)
+}
+
+func (h *Handler) RequestTorrentReseed(ctx context.Context, request generated.RequestTorrentReseedRequestObject) (generated.RequestTorrentReseedResponseObject, error) {
+	err := h.torrentMaintenance.RequestTorrentReseed(ctx, sessionTokenFromContext(ctx), string(request.Params.XCSRFToken), torrents.TorrentID(request.TorrentId))
+	switch {
+	case err == nil:
+		return generated.RequestTorrentReseed204Response{}, nil
+	case errors.Is(err, identity.ErrSessionNotFound):
+		problem := newProblemFromContext(ctx, http.StatusUnauthorized, "web_session_required", "需要登录", "请登录后请求补种。")
+		return generated.RequestTorrentReseed401ApplicationProblemPlusJSONResponse{
+			ProblemResponseApplicationProblemPlusJSONResponse: generated.ProblemResponseApplicationProblemPlusJSONResponse(problem),
+		}, nil
+	case errors.Is(err, identity.ErrInvalidCSRF):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "csrf_invalid", "请求验证失败", "请刷新页面后重试。")
+		return generated.RequestTorrentReseed403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrTorrentReseedEmailUnverified):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "verified_email_required", "需要先验证邮箱", "验证当前账户邮箱后即可请求补种。")
+		return generated.RequestTorrentReseed403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, authz.ErrForbidden):
+		problem := newProblemFromContext(ctx, http.StatusForbidden, "torrent_reseed_denied", "无法请求补种", "当前账户缺少请求补种的权限。")
+		return generated.RequestTorrentReseed403ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrTorrentReseedNotFound):
+		problem := newProblemFromContext(ctx, http.StatusNotFound, "torrent_not_found", "种子不可用", "请返回种子列表刷新后重试。")
+		return generated.RequestTorrentReseed404ApplicationProblemPlusJSONResponse(problem), nil
+	case errors.Is(err, torrents.ErrTorrentReseedUnavailable):
+		problem := newProblemFromContext(ctx, http.StatusConflict, "torrent_reseed_unavailable", "当前无法请求补种", "请刷新做种状态。有近期的无种记录时可请求补种。")
+		return generated.RequestTorrentReseed409ApplicationProblemPlusJSONResponse(problem), nil
+	default:
+		return nil, err
+	}
 }
 
 func (h *Handler) CreateTorrentReport(ctx context.Context, request generated.CreateTorrentReportRequestObject) (generated.CreateTorrentReportResponseObject, error) {

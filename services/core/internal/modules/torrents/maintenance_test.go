@@ -86,6 +86,10 @@ func (stub *torrentMaintenanceRepositoryStub) DecideTorrentWithdrawal(_ context.
 	return stub.withdrawalDecisionResult, nil
 }
 
+func (stub *torrentMaintenanceRepositoryStub) RequestTorrentReseed(context.Context, TorrentID, uuid.UUID, time.Time) error {
+	return nil
+}
+
 func (stub *torrentMaintenanceRepositoryStub) CreateTorrentReport(_ context.Context, command CreateTorrentReportCommand) (TorrentReportReceipt, error) {
 	stub.reportCommand = command
 	return stub.reportReceipt, nil

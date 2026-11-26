@@ -36,6 +36,7 @@ MagicStatementEntry:
           legacy_opening,
           seeding_reward,
           harem_reward,
+          reseed_reward,
           activity_reward,
           torrent_purchase,
           promotion_product_purchase,
@@ -165,6 +166,37 @@ ProgressOverview:
       type: string
       format: date-time
       nullable: true
+
+ReseedRewardOffer:
+  type: object
+  additionalProperties: false
+  description: 补种恢复前展示当前条件，恢复后展示该轮锁定的条件及领取状态。
+  required: [status, required_hours, magic_amount]
+  properties:
+    status: { type: string, enum: [upcoming, active, awarded, ended] }
+    required_hours: { type: integer, format: int32, minimum: 1, maximum: 720 }
+    magic_amount: { type: integer, format: int64, minimum: 1, maximum: 1000000 }
+
+ReseedRewardSettings:
+  type: object
+  additionalProperties: false
+  required: [revision, enabled, required_hours, magic_amount, issued_at]
+  properties:
+    revision: { type: integer, format: int64, minimum: 1 }
+    enabled: { type: boolean }
+    required_hours: { type: integer, format: int32, minimum: 1, maximum: 720 }
+    magic_amount: { type: integer, format: int64, minimum: 1, maximum: 1000000 }
+    issued_at: { type: string, format: date-time }
+
+UpdateReseedRewardSettingsRequest:
+  type: object
+  additionalProperties: false
+  required: [expected_revision, enabled, required_hours, magic_amount]
+  properties:
+    expected_revision: { type: integer, format: int64, minimum: 1 }
+    enabled: { type: boolean }
+    required_hours: { type: integer, format: int32, minimum: 1, maximum: 720 }
+    magic_amount: { type: integer, format: int64, minimum: 1, maximum: 1000000 }
 
 EconomyOverview:
   type: object

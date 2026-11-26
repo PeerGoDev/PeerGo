@@ -55,6 +55,11 @@ const nestedPages: Array<{
   label: string
 }> = [
   {
+    pattern: /^\/torrents\/reseed$/,
+    parent: { label: "种子", to: "/torrents" },
+    label: "补种专区",
+  },
+  {
     pattern: /^\/torrents?\/[^/]+$/,
     parent: { label: "种子", to: "/torrents" },
     label: "种子详情",

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/peergo/peergo/services/core/internal/modules/economy/contenttip"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/reseedreward"
 	"github.com/peergo/peergo/services/core/internal/modules/ratiowatch"
 	"github.com/peergo/peergo/services/core/internal/modules/review"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
@@ -31,14 +32,17 @@ var (
 type Kind string
 
 const (
-	KindTorrentReview         Kind = "torrent_review"
-	KindRatioWatch            Kind = "ratio_watch"
-	KindRatioAppeal           Kind = "ratio_appeal"
-	KindHNR                   Kind = "hnr"
-	KindHNRAppeal             Kind = "hnr_appeal"
-	KindWorkgroupContribution Kind = "workgroup_contribution"
-	KindMemberGift            Kind = "member_gift"
-	KindContentTip            Kind = "content_tip"
+	KindTorrentReview          Kind = "torrent_review"
+	KindRatioWatch             Kind = "ratio_watch"
+	KindRatioAppeal            Kind = "ratio_appeal"
+	KindHNR                    Kind = "hnr"
+	KindHNRAppeal              Kind = "hnr_appeal"
+	KindWorkgroupContribution  Kind = "workgroup_contribution"
+	KindMemberGift             Kind = "member_gift"
+	KindContentTip             Kind = "content_tip"
+	KindTorrentReseedRequested Kind = "torrent_reseed_requested"
+	KindTorrentReseedRestored  Kind = "torrent_reseed_restored"
+	KindTorrentReseedRewarded  Kind = "torrent_reseed_rewarded"
 )
 
 // Notification is a private inbox envelope around exactly one typed source.
@@ -57,6 +61,13 @@ type Notification struct {
 	WorkgroupContribution *WorkgroupContributionNotification
 	MemberGift            *MemberGiftNotification
 	ContentTip            *ContentTipNotification
+	TorrentReseed         *TorrentReseedNotification
+}
+
+type TorrentReseedNotification struct {
+	TorrentID    torrents.TorrentID
+	TorrentTitle string
+	Reward       *reseedreward.Offer
 }
 
 type TorrentReviewNotification struct {

@@ -10,6 +10,9 @@ MyNotificationKind:
       workgroup_contribution,
       member_gift,
       content_tip,
+      torrent_reseed_requested,
+      torrent_reseed_restored,
+      torrent_reseed_rewarded,
     ]
 
 MyRatioWatchNotificationStatus:
@@ -53,6 +56,8 @@ MyNotification:
       type: string
       minLength: 1
       maxLength: 240
+    reseed_reward:
+      $ref: "../schemas/economy.yaml#/ReseedRewardOffer"
     outcome:
       type: string
       enum: [published, rejected]

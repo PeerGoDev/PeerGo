@@ -33,6 +33,7 @@ import {
   PinIcon,
   SearchIcon,
   ServerIcon,
+  RefreshCwIcon,
   ShoppingBagIcon,
   ShieldAlertIcon,
   SettingsIcon,
@@ -457,6 +458,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           items: [
             { label: "首页", to: "/", icon: HomeIcon },
             { label: "种子", to: "/torrents", icon: ListIcon },
+            { label: "补种专区", to: "/torrents/reseed", icon: RefreshCwIcon },
             { label: "搜索", to: "/search", icon: SearchIcon },
             ...(canSubmitTorrent
               ? [{ label: "上传", to: "/upload", icon: UploadIcon }]
@@ -1071,7 +1073,10 @@ function navigationItemIsActive(
     )
   }
   if (target === "/torrents") {
-    return pathname === "/torrents" || pathname.startsWith("/torrents/")
+    return (
+      (pathname === "/torrents" || pathname.startsWith("/torrents/")) &&
+      pathname !== "/torrents/reseed"
+    )
   }
   if (target === "/announcements") {
     return (

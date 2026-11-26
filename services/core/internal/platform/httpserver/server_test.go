@@ -1436,6 +1436,10 @@ func (unavailableTorrentMaintenanceService) CreateTorrentReport(context.Context,
 	return torrents.TorrentReportReceipt{}, authz.ErrForbidden
 }
 
+func (unavailableTorrentMaintenanceService) RequestTorrentReseed(context.Context, string, string, torrents.TorrentID) error {
+	return authz.ErrForbidden
+}
+
 func (unavailableTorrentMaintenanceService) ListTorrentReportCases(context.Context, authz.StaffActor, torrents.TorrentReportCaseQuery) (torrents.ManagedTorrentReportCasePage, error) {
 	return torrents.ManagedTorrentReportCasePage{}, authz.ErrForbidden
 }
@@ -1595,7 +1599,15 @@ type recordingTorrentMaintenanceService struct {
 	reportDecideActor     authz.StaffActor
 	reportDecideInput     torrents.DecideTorrentReportCaseInput
 	reportDecision        torrents.TorrentReportDecisionResult
+	reseedTorrentID       torrents.TorrentID
 	err                   error
+}
+
+func (service *recordingTorrentMaintenanceService) RequestTorrentReseed(_ context.Context, cookieToken, csrfToken string, torrentID torrents.TorrentID) error {
+	service.cookieToken = cookieToken
+	service.csrfToken = csrfToken
+	service.reseedTorrentID = torrentID
+	return service.err
 }
 
 func (service *recordingTorrentMaintenanceService) SubmitPublishedScreenshotChange(_ context.Context, cookieToken string, csrfToken string, input torrents.SubmitPublishedScreenshotChangeInput) (torrents.PublishedScreenshotChange, error) {
@@ -2853,6 +2865,25 @@ func TestTorrentReportUsesWebSessionBoundaryAndReturnsSafeReceipt(t *testing.T) 
 	}
 }
 
+func TestTorrentReseedUsesWebSessionAndSavedTorrentID(t *testing.T) {
+	t.Parallel()
+	service := &recordingTorrentMaintenanceService{}
+	handler := testHandlerWithTorrentMaintenance(t, service)
+	csrf := strings.Repeat("c", 43)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/torrents/42/reseed-requests", nil)
+	request.Header.Set("Origin", "http://peergo.test")
+	request.Header.Set("X-CSRF-Token", csrf)
+	request.AddCookie(&http.Cookie{Name: "peergo_session", Value: "web-token"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || response.Body.Len() != 0 {
+		t.Fatalf("response status=%d body=%s", response.Code, response.Body.String())
+	}
+	if service.reseedTorrentID != 42 || service.cookieToken != "web-token" || service.csrfToken != csrf {
+		t.Fatal("reseed did not forward the authenticated write inputs")
+	}
+}
+
 func TestTorrentDownloadUsesBinaryContractAndKeepsCredentialOutOfTheRequest(t *testing.T) {
 	t.Parallel()
 
@@ -2903,7 +2934,7 @@ func TestGuestsCannotReadMemberContentEvenWithAnInvalidCookie(t *testing.T) {
 	t.Parallel()
 	handler := testHandlerWithIdentity(t, unavailableIdentityService{})
 	for _, path := range []string{
-		"/api/v1/torrents", "/api/v1/torrents/42", "/api/v1/torrents/42/content",
+		"/api/v1/torrents", "/api/v1/torrents/reseed-requests", "/api/v1/torrents/42", "/api/v1/torrents/42/content",
 		"/api/v1/torrents/42/related", "/api/v1/torrents/42/swarm", "/api/v1/torrents/42/files",
 		"/api/v1/torrents/42/cover", "/api/v1/torrents/42/screenshots/0?play=true", "/api/v1/torrents/42/comments",
 		"/api/v1/categories", "/api/v1/categories/movies/facets",
@@ -2921,6 +2952,20 @@ func TestGuestsCannotReadMemberContentEvenWithAnInvalidCookie(t *testing.T) {
 				t.Errorf("%s with cookie %q: status=%d cache=%q body=%s", path, token, response.Code, response.Header().Get("Cache-Control"), response.Body.String())
 			}
 		}
+	}
+}
+
+func TestMemberCanReadBoundedReseedDirectory(t *testing.T) {
+	t.Parallel()
+	handler := testHandlerWithIdentity(t, &recordingIdentityService{})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/torrents/reseed-requests?limit=3&offset=7", nil)
+	request.AddCookie(&http.Cookie{Name: "peergo_session", Value: "web-token"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	var page generated.OpenTorrentReseedRequestPage
+	if err := json.NewDecoder(response.Body).Decode(&page); err != nil || response.Code != http.StatusOK ||
+		page.Items == nil || len(page.Items) != 0 || page.Total != 0 || page.Limit != 3 || page.Offset != 7 {
+		t.Fatalf("directory status=%d, page=%+v, error=%v", response.Code, page, err)
 	}
 }
 

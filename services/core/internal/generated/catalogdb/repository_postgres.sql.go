@@ -791,7 +791,10 @@ SELECT
     coalesce(swarm.leechers, 0)::integer AS leechers,
     coalesce(completion.completed, swarm.completed, 0)::integer AS completed,
     swarm.observed_at,
-    (swarm.torrent_id IS NOT NULL)::boolean AS stats_available
+    (swarm.torrent_id IS NOT NULL)::boolean AS stats_available,
+    coalesce(reward.status, CASE WHEN upcoming.required_hours IS NOT NULL THEN 'upcoming' END, '')::text AS reseed_reward_status,
+    coalesce(reward.required_hours, upcoming.required_hours, 0)::integer AS reseed_reward_required_hours,
+    coalesce(reward.magic_amount, upcoming.magic_amount, 0)::bigint AS reseed_reward_magic_amount
 FROM catalog.torrents AS torrent
 JOIN torrents.torrents AS aggregate
   ON aggregate.id = torrent.id
@@ -800,16 +803,23 @@ LEFT JOIN catalog.torrent_swarm_stats AS swarm
     ON swarm.torrent_id = torrent.id
 LEFT JOIN catalog.torrent_completion_stats AS completion
     ON completion.torrent_id = torrent.id
+LEFT JOIN economy.reseed_reward_round_offers AS reward
+    ON reward.torrent_id = torrent.id AND reward.ended_at IS NULL
+LEFT JOIN economy.current_reseed_reward_offer AS upcoming
+    ON swarm.seeders = 0 AND reward.request_id IS NULL
 WHERE torrent.id = $1::bigint
 `
 
 type GetPublishedTorrentSwarmRow struct {
-	ID             int64
-	Seeders        int32
-	Leechers       int32
-	Completed      int32
-	ObservedAt     pgtype.Timestamptz
-	StatsAvailable bool
+	ID                        int64
+	Seeders                   int32
+	Leechers                  int32
+	Completed                 int32
+	ObservedAt                pgtype.Timestamptz
+	StatsAvailable            bool
+	ReseedRewardStatus        string
+	ReseedRewardRequiredHours int32
+	ReseedRewardMagicAmount   int64
 }
 
 func (q *Queries) GetPublishedTorrentSwarm(ctx context.Context, torrentID int64) (GetPublishedTorrentSwarmRow, error) {
@@ -822,6 +832,9 @@ func (q *Queries) GetPublishedTorrentSwarm(ctx context.Context, torrentID int64)
 		&i.Completed,
 		&i.ObservedAt,
 		&i.StatsAvailable,
+		&i.ReseedRewardStatus,
+		&i.ReseedRewardRequiredHours,
+		&i.ReseedRewardMagicAmount,
 	)
 	return i, err
 }
@@ -1885,6 +1898,79 @@ func (q *Queries) ListManagedCategoryFacets(ctx context.Context) ([]ListManagedC
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.TorrentCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOpenTorrentReseedRequests = `-- name: ListOpenTorrentReseedRequests :many
+WITH open_requests AS MATERIALIZED (
+    SELECT request.id AS request_id, torrent.id AS torrent_id, torrent.name AS torrent_title, request.opened_at
+    FROM torrents.reseed_requests AS request
+    JOIN catalog.torrents AS torrent ON torrent.id = request.torrent_id
+    JOIN torrents.torrents AS aggregate ON aggregate.id = torrent.id AND aggregate.state = 'published'
+    JOIN catalog.categories AS category ON category.id = torrent.category_id AND category.enabled
+    WHERE request.restored_at IS NULL
+      AND (NOT $1::boolean OR NOT category.nsfw)
+), selected AS (
+    SELECT request.torrent_id, request.torrent_title, request.opened_at, membership.requester_count
+    FROM open_requests AS request
+    CROSS JOIN LATERAL (
+        SELECT count(*) AS requester_count
+        FROM torrents.reseed_request_members AS member WHERE member.request_id = request.request_id
+    ) AS membership
+    ORDER BY membership.requester_count DESC, request.opened_at, request.torrent_id
+    LIMIT $3::integer OFFSET $2::integer
+)
+SELECT coalesce(selected.torrent_id, 0)::bigint AS torrent_id,
+       coalesce(selected.torrent_title, '')::text AS torrent_title,
+       coalesce(selected.requester_count, 0)::bigint AS requester_count,
+       coalesce(reward.required_hours, 0)::integer AS reward_required_hours,
+       coalesce(reward.magic_amount, 0)::bigint AS reward_magic_amount,
+       totals.total
+FROM (SELECT count(*)::bigint AS total FROM open_requests) AS totals
+LEFT JOIN selected ON true
+LEFT JOIN economy.current_reseed_reward_offer AS reward ON selected.torrent_id IS NOT NULL
+ORDER BY selected.requester_count DESC, selected.opened_at, selected.torrent_id
+`
+
+type ListOpenTorrentReseedRequestsParams struct {
+	ExcludeNsfw bool
+	PageOffset  int32
+	PageLimit   int32
+}
+
+type ListOpenTorrentReseedRequestsRow struct {
+	TorrentID           int64
+	TorrentTitle        string
+	RequesterCount      int64
+	RewardRequiredHours int32
+	RewardMagicAmount   int64
+	Total               int64
+}
+
+func (q *Queries) ListOpenTorrentReseedRequests(ctx context.Context, arg ListOpenTorrentReseedRequestsParams) ([]ListOpenTorrentReseedRequestsRow, error) {
+	rows, err := q.db.Query(ctx, listOpenTorrentReseedRequests, arg.ExcludeNsfw, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOpenTorrentReseedRequestsRow{}
+	for rows.Next() {
+		var i ListOpenTorrentReseedRequestsRow
+		if err := rows.Scan(
+			&i.TorrentID,
+			&i.TorrentTitle,
+			&i.RequesterCount,
+			&i.RewardRequiredHours,
+			&i.RewardMagicAmount,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}

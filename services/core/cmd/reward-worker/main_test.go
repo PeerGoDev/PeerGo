@@ -28,6 +28,9 @@ func TestRunWorkersCancelsPeerOnUnexpectedExit(t *testing.T) {
 				<-ctx.Done()
 				close(peerStopped)
 				return nil
+			}, func(ctx context.Context) error {
+				<-ctx.Done()
+				return nil
 			})
 			if err == nil || !strings.Contains(err.Error(), "seeding reward worker") ||
 				(returnErr != nil && !errors.Is(err, returnErr)) {
@@ -45,11 +48,11 @@ func TestRunWorkersCancelsPeerOnUnexpectedExit(t *testing.T) {
 	}
 }
 
-func TestRunWorkersWaitsForBothOnShutdown(t *testing.T) {
+func TestRunWorkersWaitsForAllOnShutdown(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	started := make(chan struct{}, 2)
-	stopped := make(chan struct{}, 2)
+	started := make(chan struct{}, 3)
+	stopped := make(chan struct{}, 3)
 	run := func(ctx context.Context) error {
 		started <- struct{}{}
 		<-ctx.Done()
@@ -57,18 +60,18 @@ func TestRunWorkersWaitsForBothOnShutdown(t *testing.T) {
 		return nil
 	}
 	done := make(chan error, 1)
-	go func() { done <- runWorkers(ctx, run, run) }()
-	for i := 0; i < 2; i++ {
+	go func() { done <- runWorkers(ctx, run, run, run) }()
+	for range 3 {
 		select {
 		case <-started:
 		case <-ctx.Done():
-			t.Fatal("both workers did not start")
+			t.Fatal("workers did not all start")
 		}
 	}
 	cancel()
 	select {
 	case err := <-done:
-		if err != nil || len(stopped) != 2 {
+		if err != nil || len(stopped) != 3 {
 			t.Fatalf("runWorkers() stopped=%d error=%v", len(stopped), err)
 		}
 	case <-time.After(5 * time.Second):

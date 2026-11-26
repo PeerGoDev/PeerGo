@@ -59,6 +59,7 @@ import {
 } from "~/components/ui/field"
 import { Input } from "~/components/ui/input"
 import { Textarea } from "~/components/ui/textarea"
+import { TorrentReseedReward } from "~/features/torrent/components/torrent-reseed-reward"
 import {
   Empty,
   EmptyContent,
@@ -649,6 +650,20 @@ function notificationPresentation(
 ): NotificationPresentation {
   const torrentTitle = notification.torrent_title ?? "种子"
   switch (notification.kind) {
+    case "torrent_reseed_requested":
+    case "torrent_reseed_restored":
+    case "torrent_reseed_rewarded":
+      return {
+        category: "补种",
+        icon:
+          notification.kind === "torrent_reseed_rewarded"
+            ? CoinsIcon
+            : RefreshCwIcon,
+        tone:
+          notification.kind === "torrent_reseed_requested" ? "info" : "success",
+        title: notificationListTitle(notification),
+        sender: "系统",
+      }
     case "content_tip":
       return {
         category: "魔力值",
@@ -809,6 +824,13 @@ function NotificationListItem({
         >
           {notificationListTitle(notification)}
         </span>
+        {notification.reseed_reward ? (
+          <span className="text-xs text-muted-foreground">
+            {notification.reseed_reward.status === "upcoming" ? "预计 " : ""}
+            {formatInteger(notification.reseed_reward.required_hours)} 小时 ·{" "}
+            {formatInteger(notification.reseed_reward.magic_amount)} 魔力值
+          </span>
+        ) : null}
       </span>
       {unread ? (
         <span
@@ -903,6 +925,10 @@ function NotificationDetailBody({
   notification: MyNotification
 }) {
   switch (notification.kind) {
+    case "torrent_reseed_requested":
+    case "torrent_reseed_restored":
+    case "torrent_reseed_rewarded":
+      return <TorrentReseedNotificationDetail notification={notification} />
     case "content_tip":
       return <ContentTipNotificationDetail notification={notification} />
     case "member_gift":
@@ -983,6 +1009,47 @@ function DetailNote({
 
 function DetailActions({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-wrap gap-2">{children}</div>
+}
+
+function TorrentReseedNotificationDetail({
+  notification,
+}: {
+  notification: MyNotification
+}) {
+  const rewarded = notification.kind === "torrent_reseed_rewarded"
+
+  return (
+    <>
+      <DetailText>
+        {notification.kind === "torrent_reseed_requested"
+          ? "有成员请求补种。如果你仍保留完整文件，可以重新打开原来的种子任务继续做种。"
+          : rewarded
+            ? "你为该种子的有效做种时长已达标，奖励已记入魔力明细。"
+            : "Tracker 已观测到该种子重新有人做种。你可以在客户端继续下载。"}
+      </DetailText>
+      {notification.reseed_reward ? (
+        <TorrentReseedReward reward={notification.reseed_reward} />
+      ) : null}
+      <DetailActions>
+        {notification.torrent_id ? (
+          <Link
+            to={`/torrents/${notification.torrent_id}`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            查看种子
+          </Link>
+        ) : null}
+        {rewarded ? (
+          <Link
+            to="/account/economy"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            查看魔力明细
+          </Link>
+        ) : null}
+      </DetailActions>
+    </>
+  )
 }
 
 function TorrentReviewNotificationDetail({
@@ -1300,6 +1367,15 @@ function RatioWatchNotificationDetail({
 }
 
 function notificationListTitle(notification: MyNotification) {
+  if (notification.kind === "torrent_reseed_requested") {
+    return `有人请求补种「${notification.torrent_title ?? "种子"}」`
+  }
+  if (notification.kind === "torrent_reseed_restored") {
+    return `「${notification.torrent_title ?? "种子"}」已恢复做种`
+  }
+  if (notification.kind === "torrent_reseed_rewarded") {
+    return `「${notification.torrent_title ?? "种子"}」复活奖励已到账`
+  }
   if (notification.kind === "content_tip") {
     const sender =
       notification.content_tip_sender_display_name ??

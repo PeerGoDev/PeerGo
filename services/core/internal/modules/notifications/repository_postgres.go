@@ -15,6 +15,7 @@ import (
 
 	"github.com/peergo/peergo/services/core/internal/generated/notificationdb"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/contenttip"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/reseedreward"
 	"github.com/peergo/peergo/services/core/internal/modules/ratiowatch"
 	"github.com/peergo/peergo/services/core/internal/modules/review"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
@@ -186,6 +187,15 @@ func (repository *PostgresRepository) List(ctx context.Context, userID uuid.UUID
 				return Page{}, ErrInvariant
 			}
 			item.MemberGift = payload
+		case KindTorrentReseedRequested, KindTorrentReseedRestored, KindTorrentReseedRewarded:
+			if !row.ReseedTorrentID.Valid || row.ReseedTorrentID.Int64 < 1 ||
+				!row.ReseedTorrentTitle.Valid || strings.TrimSpace(row.ReseedTorrentTitle.String) == "" {
+				return Page{}, ErrInvariant
+			}
+			item.TorrentReseed = &TorrentReseedNotification{
+				TorrentID: torrents.TorrentID(row.ReseedTorrentID.Int64), TorrentTitle: row.ReseedTorrentTitle.String,
+				Reward: reseedreward.OfferFromProjection(row.ReseedRewardStatus, row.ReseedRewardRequiredHours, row.ReseedRewardMagicAmount),
+			}
 		case KindContentTip:
 			if !row.ContentTipSenderNumericID.Valid || !row.ContentTipSenderUsername.Valid ||
 				!row.ContentTipSenderDisplayName.Valid || !row.ContentTipNetAmount.Valid ||

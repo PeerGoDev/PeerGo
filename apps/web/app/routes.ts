@@ -11,6 +11,7 @@ export default [
   route("upload", "routes/upload.tsx"),
   route("search", "routes/search.tsx"),
   route("torrents", "routes/torrents.tsx"),
+  route("torrents/reseed", "routes/torrents.reseed.tsx"),
   route("torrents/:torrentId", "routes/torrents.$torrentId.tsx"),
   route("list", "routes/legacy-list.tsx"),
   route("torrent/:torrentId", "routes/legacy-torrent.$torrentId.tsx"),

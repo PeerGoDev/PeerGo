@@ -60,6 +60,7 @@ type Querier interface {
 	ListManagedCategories(ctx context.Context) ([]ListManagedCategoriesRow, error)
 	ListManagedCategoryFacetOptions(ctx context.Context) ([]ListManagedCategoryFacetOptionsRow, error)
 	ListManagedCategoryFacets(ctx context.Context) ([]ListManagedCategoryFacetsRow, error)
+	ListOpenTorrentReseedRequests(ctx context.Context, arg ListOpenTorrentReseedRequestsParams) ([]ListOpenTorrentReseedRequestsRow, error)
 	ListPublishedAnnouncements(ctx context.Context, arg ListPublishedAnnouncementsParams) ([]ListPublishedAnnouncementsRow, error)
 	// catalog.torrents supplies the denormalized public presentation, while the
 	// aggregate join is the publication authority. Never publish projection-only

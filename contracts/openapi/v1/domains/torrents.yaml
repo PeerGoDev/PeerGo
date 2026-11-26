@@ -2005,6 +2005,65 @@ TorrentCatalogIDPathParameter:
     format: int64
     minimum: 1
 
+OpenTorrentReseedRequestsPath:
+  get:
+    operationId: listOpenTorrentReseedRequests
+    summary: 读取仍在等待补种的已发布种子
+    tags: [catalog]
+    x-audience: [web]
+    x-owner: core-catalog
+    x-permission: torrent.read
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+      - name: exclude_nsfw
+        in: query
+        schema: { type: boolean, default: true }
+    responses:
+      "200":
+        description: 等待补种的种子，按请求人数降序及请求时间升序排列。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/torrents.yaml#/OpenTorrentReseedRequestPage"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
+TorrentReseedRequestsPath:
+  post:
+    operationId: requestTorrentReseed
+    summary: 请求为暂无做种者的种子补种，或加入该种子的进行中请求
+    tags: [torrents]
+    x-audience: [web]
+    x-owner: core-torrents
+    x-permission: torrent.reseed.request.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "#/TorrentIDPathParameter"
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    responses:
+      "204":
+        description: 已订阅本次补种恢复通知。同一用户的重复请求合并。
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "404":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
 TorrentReportsPath:
   post:
     operationId: createTorrentReport

@@ -505,6 +505,7 @@ type Handler struct {
 	contentTips                 ContentTipService
 	workgroups                  WorkgroupService
 	seedingRewardAdministration SeedingRewardAdministrationService
+	reseedRewardAdministration  ReseedRewardAdministrationService
 	levelPolicyAdministration   LevelPolicyAdministrationService
 	contributionExperience      ContributionExperiencePolicyService
 	medalAdministration         MedalAdministrationService
@@ -3451,7 +3452,8 @@ func (h *Handler) GetTorrentSwarm(ctx context.Context, request generated.GetTorr
 		TorrentId: request.TorrentId,
 		Seeders:   result.Seeders, Leechers: result.Leechers, Completed: result.Completed,
 		ObservedAt: observedAt, Stale: result.Stale,
-		Confidence: generated.TorrentSwarmOverviewConfidence(result.Confidence),
+		Confidence:   generated.TorrentSwarmOverviewConfidence(result.Confidence),
+		ReseedReward: reseedRewardOfferDTO(result.ReseedReward),
 	}, nil
 }
 

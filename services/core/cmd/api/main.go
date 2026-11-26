@@ -26,6 +26,7 @@ import (
 	"github.com/peergo/peergo/services/core/internal/modules/economy/magicstore"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/medals"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/membergift"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/reseedreward"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/seedingreward"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/torrentpurchase"
 	"github.com/peergo/peergo/services/core/internal/modules/hnradmin"
@@ -316,6 +317,16 @@ func main() {
 	seedingRewardAdministrationService, err := seedingreward.NewAdministrationService(seedingRewardTimelineRepository, authorizationService, time.Now)
 	if err != nil {
 		logger.Error("compose seeding reward administration service", "error", err)
+		os.Exit(1)
+	}
+	reseedRewardRepository, err := reseedreward.NewPostgresRepository(pool)
+	if err != nil {
+		logger.Error("compose reseed reward repository", "error", err)
+		os.Exit(1)
+	}
+	reseedRewardAdministrationService, err := reseedreward.NewAdministration(reseedRewardRepository, authorizationService)
+	if err != nil {
+		logger.Error("compose reseed reward administration service", "error", err)
 		os.Exit(1)
 	}
 	levelPolicyRepository, err := progression.NewPostgresLevelPolicyRepository(pool)
@@ -1105,6 +1116,7 @@ func main() {
 		ContentTips:                 contentTipService,
 		Workgroups:                  workgroupService,
 		SeedingRewardAdministration: seedingRewardAdministrationService,
+		ReseedRewardAdministration:  reseedRewardAdministrationService,
 		LevelPolicyAdministration:   levelPolicyAdministrationService,
 		ContributionExperience:      contributionExperienceService,
 		MedalAdministration:         medalAdministrationService,

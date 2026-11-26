@@ -35,6 +35,7 @@ type Querier interface {
 	InsertSwarmSnapshotRun(ctx context.Context, arg InsertSwarmSnapshotRunParams) (uuid.UUID, error)
 	MarkSwarmSnapshotApplied(ctx context.Context, arg MarkSwarmSnapshotAppliedParams) (int64, error)
 	ResolvePublishedTorrentForCompletion(ctx context.Context, arg ResolvePublishedTorrentForCompletionParams) (int64, error)
+	ResolveTorrentReseedRequests(ctx context.Context, arg ResolveTorrentReseedRequestsParams) error
 	SupersedeOlderSwarmSnapshotRuns(ctx context.Context, arg SupersedeOlderSwarmSnapshotRunsParams) error
 	SyncTorrentSwarmCompleted(ctx context.Context, arg SyncTorrentSwarmCompletedParams) error
 }

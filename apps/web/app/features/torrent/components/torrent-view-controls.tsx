@@ -45,9 +45,6 @@ export function TorrentViewControls({
   hideNsfw: boolean
   onHideNsfwChange: (hide: boolean) => void
 }) {
-  const [confirmationOpen, setConfirmationOpen] = React.useState(false)
-  const switchId = React.useId()
-
   return (
     <div className="flex shrink-0 items-center gap-3">
       <ToggleGroup
@@ -75,6 +72,26 @@ export function TorrentViewControls({
         ))}
       </ToggleGroup>
 
+      <TorrentNsfwControl
+        hideNsfw={hideNsfw}
+        onHideNsfwChange={onHideNsfwChange}
+      />
+    </div>
+  )
+}
+
+export function TorrentNsfwControl({
+  hideNsfw,
+  onHideNsfwChange,
+}: {
+  hideNsfw: boolean
+  onHideNsfwChange: (hide: boolean) => void
+}) {
+  const [confirmationOpen, setConfirmationOpen] = React.useState(false)
+  const switchId = React.useId()
+
+  return (
+    <>
       <span className="flex items-center gap-1.5 text-xs text-faint">
         <label
           htmlFor={switchId}
@@ -121,6 +138,6 @@ export function TorrentViewControls({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   )
 }

@@ -132,6 +132,7 @@ CapabilityAction:
     - torrent.purchase.read.self
     - torrent.report.create.self
     - torrent.report.review
+    - torrent.reseed.request.self
     - torrent.review
     - torrent.review.vote
     - torrent.submission.read.self

@@ -594,6 +594,59 @@ func (q *Queries) ResolvePublishedTorrentForCompletion(ctx context.Context, arg 
 	return id, err
 }
 
+const resolveTorrentReseedRequests = `-- name: ResolveTorrentReseedRequests :exec
+WITH closed_rounds AS (
+    UPDATE economy.reseed_reward_rounds AS round
+    SET ended_at = $1::timestamptz
+    WHERE round.ended_at IS NULL
+      AND round.started_at <= $1::timestamptz
+      AND NOT EXISTS (
+          SELECT 1
+          FROM catalog.torrent_swarm_stats AS stats
+          JOIN torrents.torrents AS torrent ON torrent.id = stats.torrent_id AND torrent.state = 'published'
+          WHERE stats.torrent_id = round.torrent_id
+            AND stats.observed_at = $1::timestamptz AND stats.seeders > 0
+      )
+), recovered AS (
+    UPDATE torrents.reseed_requests AS request
+    SET restored_at = greatest(request.opened_at, $2::timestamptz)
+    FROM catalog.torrent_swarm_stats AS stats
+    JOIN torrents.torrents AS torrent ON torrent.id = stats.torrent_id AND torrent.state = 'published'
+    WHERE request.torrent_id = stats.torrent_id
+      AND request.restored_at IS NULL
+      AND $3::boolean
+      AND stats.seeders > 0
+      AND stats.observed_at = $1::timestamptz
+      AND stats.observed_at > request.zero_observed_at
+    RETURNING request.id, request.torrent_id, request.restored_at
+), opened_rounds AS (
+    INSERT INTO economy.reseed_reward_rounds (request_id, torrent_id, policy_revision, started_at)
+    SELECT recovered.id, recovered.torrent_id, policy.revision, $1::timestamptz
+    FROM recovered
+    CROSS JOIN (
+        SELECT revision, enabled FROM economy.reseed_reward_policies
+        WHERE issued_at <= $1::timestamptz
+        ORDER BY revision DESC LIMIT 1
+    ) AS policy
+    WHERE policy.enabled
+)
+INSERT INTO community.torrent_reseed_notifications (request_id, recipient_user_id, kind, created_at)
+SELECT recovered.id, member.user_id, 'torrent_reseed_restored', recovered.restored_at
+FROM recovered
+JOIN torrents.reseed_request_members AS member ON member.request_id = recovered.id
+`
+
+type ResolveTorrentReseedRequestsParams struct {
+	ObservedAt    pgtype.Timestamptz
+	AppliedAt     pgtype.Timestamptz
+	AllowRecovery bool
+}
+
+func (q *Queries) ResolveTorrentReseedRequests(ctx context.Context, arg ResolveTorrentReseedRequestsParams) error {
+	_, err := q.db.Exec(ctx, resolveTorrentReseedRequests, arg.ObservedAt, arg.AppliedAt, arg.AllowRecovery)
+	return err
+}
+
 const supersedeOlderSwarmSnapshotRuns = `-- name: SupersedeOlderSwarmSnapshotRuns :exec
 UPDATE catalog.swarm_snapshot_runs
 SET status = 'superseded'

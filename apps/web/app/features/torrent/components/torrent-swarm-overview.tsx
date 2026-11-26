@@ -3,23 +3,21 @@ import { RefreshCwIcon } from "lucide-react"
 import { Badge } from "~/components/ui/badge"
 import { Button } from "~/components/ui/button"
 import { Skeleton } from "~/components/ui/skeleton"
-import { useTorrentSwarm } from "~/features/torrent/api/torrent.queries"
+import type { useTorrentSwarm } from "~/features/torrent/api/torrent.queries"
 import { cn } from "~/lib/utils"
 import { formatDateTime } from "~/shared/formatters/date-time"
 
 export function TorrentSwarmOverview({
-  torrentId,
+  swarm,
   compact = false,
   showFreshness = true,
   className,
 }: {
-  torrentId: number
+  swarm: ReturnType<typeof useTorrentSwarm>
   compact?: boolean
   showFreshness?: boolean
   className?: string
 }) {
-  const swarm = useTorrentSwarm(torrentId)
-
   return (
     <section
       aria-labelledby="torrent-swarm-title"

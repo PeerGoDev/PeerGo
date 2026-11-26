@@ -4057,6 +4057,77 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/torrents/{torrent_id}/reseed-requests:
+    post:
+      operationId: requestTorrentReseed
+      summary: 请求为暂无做种者的种子补种，或加入该种子的进行中请求
+      tags:
+        - torrents
+      x-audience:
+        - web
+      x-owner: core-torrents
+      x-permission: torrent.reseed.request.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/TorrentIDPathParameter'
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      responses:
+        '204':
+          description: 已订阅本次补种恢复通知。同一用户的重复请求合并。
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/torrents/reseed-requests:
+    get:
+      operationId: listOpenTorrentReseedRequests
+      summary: 读取仍在等待补种的已发布种子
+      tags:
+        - catalog
+      x-audience:
+        - web
+      x-owner: core-catalog
+      x-permission: torrent.read
+      x-credential-audience: web-session
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000000
+            default: 0
+        - name: exclude_nsfw
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: 等待补种的种子，按请求人数降序及请求时间升序排列。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenTorrentReseedRequestPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/me/torrent-bookmarks:
     get:
       operationId: listMyTorrentBookmarks
@@ -10397,6 +10468,65 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/settings/reseed-reward:
+    get:
+      operationId: getReseedRewardSettings
+      summary: 读取种子复活奖励设置
+      tags:
+        - economy
+      x-audience:
+        - staff
+      x-owner: core-economy
+      x-permission: economy.seedingreward.policy.read
+      x-credential-audience: staff-session
+      responses:
+        '200':
+          description: 当前复活奖励设置。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReseedRewardSettings'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    put:
+      operationId: updateReseedRewardSettings
+      summary: 更新后续种子复活轮次采用的奖励设置
+      tags:
+        - economy
+      x-audience:
+        - staff
+      x-owner: core-economy
+      x-permission: economy.seedingreward.policy.issue
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReseedRewardSettingsRequest'
+      responses:
+        '200':
+          description: 复活奖励设置已保存。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReseedRewardSettings'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/settings/attendance:
     get:
       operationId: listAttendancePolicies
@@ -12871,6 +13001,7 @@ components:
         - torrent.purchase.read.self
         - torrent.report.create.self
         - torrent.report.review
+        - torrent.reseed.request.self
         - torrent.review
         - torrent.review.vote
         - torrent.submission.read.self
@@ -16084,6 +16215,8 @@ components:
             - stale
             - unavailable
           description: fresh 为近期完整统计，stale 为过期完整统计，unavailable 为尚无完整统计。
+        reseed_reward:
+          $ref: '#/components/schemas/ReseedRewardOffer'
     TorrentFile:
       type: object
       additionalProperties: false
@@ -16356,6 +16489,9 @@ components:
         - workgroup_contribution
         - member_gift
         - content_tip
+        - torrent_reseed_requested
+        - torrent_reseed_restored
+        - torrent_reseed_rewarded
     MyNotification:
       type: object
       additionalProperties: false
@@ -16378,6 +16514,8 @@ components:
           type: string
           minLength: 1
           maxLength: 240
+        reseed_reward:
+          $ref: '#/components/schemas/ReseedRewardOffer'
         outcome:
           type: string
           enum:
@@ -19670,6 +19808,7 @@ components:
             - legacy_opening
             - seeding_reward
             - harem_reward
+            - reseed_reward
             - activity_reward
             - torrent_purchase
             - promotion_product_purchase
@@ -25016,6 +25155,79 @@ components:
         - torrent:purchase:write
         - attendance:read
         - attendance:claim
+    ReseedRewardOffer:
+      type: object
+      additionalProperties: false
+      description: 补种恢复前展示当前条件，恢复后展示该轮锁定的条件及领取状态。
+      required:
+        - status
+        - required_hours
+        - magic_amount
+      properties:
+        status:
+          type: string
+          enum:
+            - upcoming
+            - active
+            - awarded
+            - ended
+        required_hours:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 720
+        magic_amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000
+    OpenTorrentReseedRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent_id
+        - torrent_title
+        - requester_count
+      properties:
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
+        torrent_title:
+          type: string
+          minLength: 1
+          maxLength: 240
+        requester_count:
+          type: integer
+          format: int64
+          minimum: 1
+        reseed_reward:
+          $ref: '#/components/schemas/ReseedRewardOffer'
+    OpenTorrentReseedRequestPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/OpenTorrentReseedRequest'
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 1000000
     TorrentPurchaseHistoryItem:
       type: object
       additionalProperties: false
@@ -27303,6 +27515,60 @@ components:
       enum:
         - global
         - torrent
+    ReseedRewardSettings:
+      type: object
+      additionalProperties: false
+      required:
+        - revision
+        - enabled
+        - required_hours
+        - magic_amount
+        - issued_at
+      properties:
+        revision:
+          type: integer
+          format: int64
+          minimum: 1
+        enabled:
+          type: boolean
+        required_hours:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 720
+        magic_amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000
+        issued_at:
+          type: string
+          format: date-time
+    UpdateReseedRewardSettingsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_revision
+        - enabled
+        - required_hours
+        - magic_amount
+      properties:
+        expected_revision:
+          type: integer
+          format: int64
+          minimum: 1
+        enabled:
+          type: boolean
+        required_hours:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 720
+        magic_amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000
     MagicStoreSettingsRevision:
       type: object
       additionalProperties: false

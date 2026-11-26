@@ -34,9 +34,12 @@ describe("TorrentDownloadButton", () => {
     renderDownloadButton(queryClient, {
       torrentId: 42,
       torrentName: "测试种子",
+      hasNoSeeders: true,
     })
 
     await openPurchaseDialog(user, "测试种子")
+    expect(screen.getByText(/暂无做种者/)).toBeVisible()
+    expect(requestIds).toHaveLength(0)
     await user.click(screen.getByRole("button", { name: "确认购买并下载" }))
     await waitFor(() => expect(requestIds).toHaveLength(1))
     expect(await screen.findByRole("alert")).toHaveTextContent("请求标识冲突")
@@ -88,17 +91,23 @@ describe("TorrentDownloadButton", () => {
 
 function renderDownloadButton(
   queryClient: QueryClient,
-  input: { torrentId: number; torrentName: string }
+  input: { torrentId: number; torrentName: string; hasNoSeeders?: boolean }
 ) {
   return render(
-    downloadButtonTree(queryClient, input.torrentId, input.torrentName)
+    downloadButtonTree(
+      queryClient,
+      input.torrentId,
+      input.torrentName,
+      input.hasNoSeeders
+    )
   )
 }
 
 function downloadButtonTree(
   queryClient: QueryClient,
   torrentId: number,
-  torrentName: string
+  torrentName: string,
+  hasNoSeeders?: boolean
 ) {
   return (
     <MemoryRouter>
@@ -108,6 +117,7 @@ function downloadButtonTree(
             torrentId={torrentId}
             torrentName={torrentName}
             purchaseAware
+            hasNoSeeders={hasNoSeeders}
             showLabel
           />
         </TooltipProvider>

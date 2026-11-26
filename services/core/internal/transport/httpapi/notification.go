@@ -188,6 +188,11 @@ func notificationPageDTO(page notifications.Page) generated.MyNotificationPage {
 			CreatedAt: item.CreatedAt, ReadAt: item.ReadAt,
 		}
 		switch item.Kind {
+		case notifications.KindTorrentReseedRequested, notifications.KindTorrentReseedRestored, notifications.KindTorrentReseedRewarded:
+			torrentID := int64(item.TorrentReseed.TorrentID)
+			dto.TorrentId = &torrentID
+			dto.TorrentTitle = &item.TorrentReseed.TorrentTitle
+			dto.ReseedReward = reseedRewardOfferDTO(item.TorrentReseed.Reward)
 		case notifications.KindTorrentReview:
 			torrentID := int64(item.TorrentReview.TorrentID)
 			outcome := notificationOutcomeDTO(item.TorrentReview.Outcome)

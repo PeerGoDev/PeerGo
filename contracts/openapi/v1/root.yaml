@@ -190,6 +190,10 @@ paths:
     $ref: "./domains/integrations.yaml#/PersonalAPIKeyRotationsPath"
   /api/v1/torrents/{torrent_id}/reports:
     $ref: "./domains/torrents.yaml#/TorrentReportsPath"
+  /api/v1/torrents/{torrent_id}/reseed-requests:
+    $ref: "./domains/torrents.yaml#/TorrentReseedRequestsPath"
+  /api/v1/torrents/reseed-requests:
+    $ref: "./domains/torrents.yaml#/OpenTorrentReseedRequestsPath"
   /api/v1/me/torrent-bookmarks:
     $ref: "./domains/torrents.yaml#/MyTorrentBookmarksPath"
   /api/v1/me/torrent-bookmark-statuses:
@@ -438,6 +442,8 @@ paths:
     $ref: "./domains/promotions.yaml#/PromotionProductPolicyPath"
   /api/v1/admin/settings/seeding-rewards:
     $ref: "./domains/economy.yaml#/SeedingRewardPoliciesPath"
+  /api/v1/admin/settings/reseed-reward:
+    $ref: "./domains/economy.yaml#/ReseedRewardSettingsPath"
   /api/v1/admin/settings/attendance:
     $ref: "./domains/economy.yaml#/AttendancePoliciesPath"
   /api/v1/admin/settings/magic-store:

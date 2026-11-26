@@ -1641,6 +1641,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/torrents/{torrent_id}/reseed-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 请求为暂无做种者的种子补种，或加入该种子的进行中请求 */
+        post: operations["requestTorrentReseed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/torrents/reseed-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取仍在等待补种的已发布种子 */
+        get: operations["listOpenTorrentReseedRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/torrent-bookmarks": {
         parameters: {
             query?: never;
@@ -3834,6 +3868,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/settings/reseed-reward": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取种子复活奖励设置 */
+        get: operations["getReseedRewardSettings"];
+        /** 更新后续种子复活轮次采用的奖励设置 */
+        put: operations["updateReseedRewardSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/settings/attendance": {
         parameters: {
             query?: never;
@@ -4705,7 +4757,7 @@ export interface components {
             expected_state_version: number;
         };
         /** @enum {string} */
-        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.magicgame.play.self" | "economy.magicgame.read.self" | "economy.magicshop.purchase.self" | "economy.magicshop.read.self" | "economy.magicstore.manage.read" | "economy.magicstore.update" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.namestyle.read" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.adjust" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.network.read" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
+        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.magicgame.play.self" | "economy.magicgame.read.self" | "economy.magicshop.purchase.self" | "economy.magicshop.read.self" | "economy.magicstore.manage.read" | "economy.magicstore.update" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.namestyle.read" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.reseed.request.self" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.adjust" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.network.read" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
         CapabilityScope: {
             /** @enum {string} */
             type: "site" | "category";
@@ -5780,6 +5832,7 @@ export interface components {
              * @enum {string}
              */
             confidence: "fresh" | "stale" | "unavailable";
+            reseed_reward?: components["schemas"]["ReseedRewardOffer"];
         };
         TorrentFile: {
             file_index: number;
@@ -5861,7 +5914,7 @@ export interface components {
             bookmarked_at: string;
         };
         /** @enum {string} */
-        MyNotificationKind: "torrent_review" | "ratio_watch" | "ratio_appeal" | "hnr" | "hnr_appeal" | "workgroup_contribution" | "member_gift" | "content_tip";
+        MyNotificationKind: "torrent_review" | "ratio_watch" | "ratio_appeal" | "hnr" | "hnr_appeal" | "workgroup_contribution" | "member_gift" | "content_tip" | "torrent_reseed_requested" | "torrent_reseed_restored" | "torrent_reseed_rewarded";
         MyNotification: {
             /** Format: uuid */
             id: string;
@@ -5869,6 +5922,7 @@ export interface components {
             /** Format: int64 */
             torrent_id?: number;
             torrent_title?: string;
+            reseed_reward?: components["schemas"]["ReseedRewardOffer"];
             /** @enum {string} */
             outcome?: "published" | "rejected";
             reason_code?: components["schemas"]["TorrentReviewReasonCode"];
@@ -6999,7 +7053,7 @@ export interface components {
         MagicStatementEntry: {
             sequence: components["schemas"]["UnsignedIntegerText"];
             /** @enum {string} */
-            transaction_type: "legacy_opening" | "seeding_reward" | "harem_reward" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "magic_shop_purchase" | "scratch_card_purchase" | "scratch_card_payout" | "lottery_ticket_purchase" | "lottery_payout" | "lottery_burn" | "pvp_stake" | "pvp_payout" | "pvp_refund" | "refund" | "adjustment";
+            transaction_type: "legacy_opening" | "seeding_reward" | "harem_reward" | "reseed_reward" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "magic_shop_purchase" | "scratch_card_purchase" | "scratch_card_payout" | "lottery_ticket_purchase" | "lottery_payout" | "lottery_burn" | "pvp_stake" | "pvp_payout" | "pvp_refund" | "refund" | "adjustment";
             /** @enum {string} */
             entry_type: "legacy_opening" | "earn" | "spend" | "adjustment";
             amount: components["schemas"]["SignedIntegerText"];
@@ -8868,6 +8922,29 @@ export interface components {
          * @enum {string}
          */
         PersonalAPIKeyScope: "profile:read" | "torrent:read" | "torrent:download" | "torrent:upload" | "torrent:purchase:read" | "torrent:purchase:write" | "attendance:read" | "attendance:claim";
+        /** @description 补种恢复前展示当前条件，恢复后展示该轮锁定的条件及领取状态。 */
+        ReseedRewardOffer: {
+            /** @enum {string} */
+            status: "upcoming" | "active" | "awarded" | "ended";
+            /** Format: int32 */
+            required_hours: number;
+            /** Format: int64 */
+            magic_amount: number;
+        };
+        OpenTorrentReseedRequest: {
+            /** Format: int64 */
+            torrent_id: number;
+            torrent_title: string;
+            /** Format: int64 */
+            requester_count: number;
+            reseed_reward?: components["schemas"]["ReseedRewardOffer"];
+        };
+        OpenTorrentReseedRequestPage: {
+            items: components["schemas"]["OpenTorrentReseedRequest"][];
+            total: number;
+            limit: number;
+            offset: number;
+        };
         TorrentPurchaseHistoryItem: {
             /** Format: int64 */
             torrent_id: number;
@@ -9611,6 +9688,26 @@ export interface components {
         PromotionCampaignSource: "staff_schedule" | "member_purchase";
         /** @enum {string} */
         PromotionScope: "global" | "torrent";
+        ReseedRewardSettings: {
+            /** Format: int64 */
+            revision: number;
+            enabled: boolean;
+            /** Format: int32 */
+            required_hours: number;
+            /** Format: int64 */
+            magic_amount: number;
+            /** Format: date-time */
+            issued_at: string;
+        };
+        UpdateReseedRewardSettingsRequest: {
+            /** Format: int64 */
+            expected_revision: number;
+            enabled: boolean;
+            /** Format: int32 */
+            required_hours: number;
+            /** Format: int64 */
+            magic_amount: number;
+        };
         MagicStoreSettingsRevision: {
             /** Format: int64 */
             version: number;
@@ -13752,6 +13849,62 @@ export interface operations {
             403: components["responses"]["ProblemResponse"];
             404: components["responses"]["ProblemResponse"];
             409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    requestTorrentReseed: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path: {
+                /** @description 种子的唯一正整数 ID；迁移数据保留旧站 ID，新数据从当前最大值继续递增。 */
+                torrent_id: components["parameters"]["TorrentIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已订阅本次补种恢复通知。同一用户的重复请求合并。 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listOpenTorrentReseedRequests: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                exclude_nsfw?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 等待补种的种子，按请求人数降序及请求时间升序排列。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenTorrentReseedRequestPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };
@@ -18747,6 +18900,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeedingRewardPolicy"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getReseedRewardSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前复活奖励设置。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReseedRewardSettings"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    updateReseedRewardSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReseedRewardSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description 复活奖励设置已保存。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReseedRewardSettings"];
                 };
             };
             400: components["responses"]["ProblemResponse"];

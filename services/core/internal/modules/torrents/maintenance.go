@@ -65,6 +65,7 @@ type TorrentMaintenanceRepository interface {
 	ListTorrentWithdrawals(context.Context, TorrentWithdrawalQuery) (ManagedTorrentWithdrawalPage, error)
 	DecideTorrentWithdrawal(context.Context, DecideTorrentWithdrawalCommand) (TorrentWithdrawalDecisionResult, error)
 	CreateTorrentReport(context.Context, CreateTorrentReportCommand) (TorrentReportReceipt, error)
+	RequestTorrentReseed(context.Context, TorrentID, uuid.UUID, time.Time) error
 	ListTorrentReportCases(context.Context, TorrentReportCaseQuery) (ManagedTorrentReportCasePage, error)
 	DecideTorrentReportCase(context.Context, DecideTorrentReportCaseCommand) (TorrentReportDecisionResult, error)
 }

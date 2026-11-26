@@ -2,7 +2,11 @@
 // announcements, torrent categories, and torrent list summaries.
 package catalog
 
-import "time"
+import (
+	"time"
+
+	"github.com/peergo/peergo/services/core/internal/modules/economy/reseedreward"
+)
 
 // Promotion describes the effective download promotion shown in a list row.
 type Promotion string
@@ -166,10 +170,11 @@ type CategoryFacet struct {
 // SwarmStats is an eventually consistent projection from the Tracker fault
 // domain. It never represents the live peer set and must not be used for billing.
 type SwarmStats struct {
-	Seeders    int
-	Leechers   int
-	Completed  int
-	ObservedAt time.Time
+	Seeders      int
+	Leechers     int
+	Completed    int
+	ObservedAt   time.Time
+	ReseedReward *reseedreward.Offer
 }
 
 // SwarmConfidence describes only the availability and age of a complete
@@ -184,7 +189,7 @@ const (
 )
 
 // TorrentSwarmOverview is the public-safe activity read model for one
-// published torrent. It carries aggregate counters only, never peer identity.
+// published torrent. Peer counts and reward terms carry no peer identity.
 type TorrentSwarmOverview struct {
 	TorrentID int64
 	SwarmStats

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/reseedreward"
 	"github.com/peergo/peergo/services/core/internal/modules/economy/seedingreward"
 	"github.com/peergo/peergo/services/core/internal/modules/progression"
 	"github.com/peergo/peergo/services/core/internal/platform/config"
@@ -64,16 +65,24 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("compose contribution experience worker: %w", err)
 	}
+	reseedRepository, err := reseedreward.NewPostgresRepository(pool)
+	if err != nil {
+		return fmt.Errorf("compose reseed reward repository: %w", err)
+	}
+	reseedLogger := logger.With("worker", "reseed_reward")
 	cancelStartup()
 	seedingLogger.InfoContext(ctx, "Core seeding reward worker started")
 	contributionLogger.InfoContext(ctx, "Core contribution experience worker started")
-	return runWorkers(ctx, seedingWorker.Run, contributionWorker.Run)
+	reseedLogger.InfoContext(ctx, "Core reseed reward worker started")
+	return runWorkers(ctx, seedingWorker.Run, contributionWorker.Run, func(ctx context.Context) error {
+		return reseedreward.Run(ctx, reseedRepository, reseedLogger)
+	})
 }
 
-func runWorkers(ctx context.Context, seedingRewards, contributionExperience func(context.Context) error) error {
+func runWorkers(ctx context.Context, seedingRewards, contributionExperience, reseedRewards func(context.Context) error) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	results := make(chan error, 2)
+	results := make(chan error, 3)
 	start := func(name string, run func(context.Context) error) {
 		go func() {
 			err := run(ctx)
@@ -87,7 +96,8 @@ func runWorkers(ctx context.Context, seedingRewards, contributionExperience func
 	}
 	start("seeding reward worker", seedingRewards)
 	start("contribution experience worker", contributionExperience)
+	start("reseed reward worker", reseedRewards)
 	first := <-results
 	cancel()
-	return errors.Join(first, <-results)
+	return errors.Join(first, <-results, <-results)
 }

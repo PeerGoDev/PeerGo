@@ -17,6 +17,73 @@ const approvedTorrentId = 42
 const rejectedTorrentId = 43
 
 describe("NotificationPage", () => {
+  it("shows the reseed terms and links a paid reward to the magic ledger", () => {
+    const queryClient = notificationQueryClient()
+    const torrent = {
+      torrent_id: approvedTorrentId,
+      torrent_title: "需要补种的资源",
+      created_at: "2026-08-10T10:00:00Z",
+      read_at: "2026-08-10T11:00:00Z",
+    }
+    queryClient.setQueryData(notificationKeys.page(userId, 20, 0, false), {
+      total: 3,
+      unread_count: 0,
+      limit: 20,
+      offset: 0,
+      items: [
+        {
+          ...torrent,
+          id: "0198f20a-6da8-7e51-9c64-222222222222",
+          kind: "torrent_reseed_requested",
+          reseed_reward: {
+            status: "upcoming",
+            required_hours: 24,
+            magic_amount: 1000,
+          },
+        },
+        {
+          ...torrent,
+          id: "0198f20a-6da8-7e51-9c64-333333333333",
+          kind: "torrent_reseed_restored",
+          reseed_reward: {
+            status: "active",
+            required_hours: 12,
+            magic_amount: 750,
+          },
+        },
+        {
+          ...torrent,
+          id: "0198f20a-6da8-7e51-9c64-444444444444",
+          kind: "torrent_reseed_rewarded",
+          reseed_reward: {
+            status: "awarded",
+            required_hours: 12,
+            magic_amount: 750,
+          },
+        },
+      ],
+    } satisfies MyNotificationPage)
+    renderNotificationPage(queryClient, "/notifications")
+
+    fireEvent.click(screen.getByRole("button", { name: /有人请求补种/ }))
+    expect(screen.getByText("预计复活奖励")).toBeVisible()
+    expect(screen.getByText(/累计有效做种满 24 小时/)).toBeVisible()
+    expect(screen.getByText("1,000 魔力值")).toBeVisible()
+
+    fireEvent.click(screen.getByRole("button", { name: /已恢复做种/ }))
+    expect(screen.getByText(/累计有效做种满 12 小时/)).toBeVisible()
+    expect(screen.getByText("750 魔力值")).toBeVisible()
+
+    fireEvent.click(screen.getByRole("button", { name: /复活奖励已到账/ }))
+    expect(
+      screen.getByText("你为该种子的有效做种时长已达标，奖励已记入魔力明细。")
+    ).toBeVisible()
+    expect(screen.getByRole("link", { name: "查看魔力明细" })).toHaveAttribute(
+      "href",
+      "/account/economy"
+    )
+  })
+
   it("renders private review outcomes with clear user actions", async () => {
     const queryClient = notificationQueryClient()
     const page: MyNotificationPage = {

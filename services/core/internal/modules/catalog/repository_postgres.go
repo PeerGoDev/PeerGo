@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/peergo/peergo/services/core/internal/generated/catalogdb"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/reseedreward"
 )
 
 var errCatalogProjectionInvalid = errors.New("catalog projection contains invalid data")
@@ -27,6 +28,7 @@ type catalogQueries interface {
 	ListEnabledCategoryFacetOptions(context.Context, string) ([]catalogdb.ListEnabledCategoryFacetOptionsRow, error)
 	CountPublishedTorrents(context.Context, catalogdb.CountPublishedTorrentsParams) (int64, error)
 	ListPublishedTorrents(context.Context, catalogdb.ListPublishedTorrentsParams) ([]catalogdb.ListPublishedTorrentsRow, error)
+	ListOpenTorrentReseedRequests(context.Context, catalogdb.ListOpenTorrentReseedRequestsParams) ([]catalogdb.ListOpenTorrentReseedRequestsRow, error)
 	GetPublishedTorrentSwarm(context.Context, int64) (catalogdb.GetPublishedTorrentSwarmRow, error)
 }
 
@@ -56,6 +58,7 @@ func (r *PostgresRepository) TorrentSwarm(ctx context.Context, torrentID int64) 
 	return SwarmStats{
 		Seeders: int(row.Seeders), Leechers: int(row.Leechers),
 		Completed: int(row.Completed), ObservedAt: row.ObservedAt.Time.UTC(),
+		ReseedReward: reseedreward.OfferFromProjection(row.ReseedRewardStatus, row.ReseedRewardRequiredHours, row.ReseedRewardMagicAmount),
 	}, true, nil
 }
 

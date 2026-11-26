@@ -50,6 +50,7 @@ import {
   type TorrentPublicDetail,
   useTorrentDetail,
   useTorrentFiles,
+  useTorrentSwarm,
 } from "~/features/torrent/api/torrent.queries"
 import { TorrentDownloadButton } from "~/features/torrent/components/torrent-download-button"
 import {
@@ -68,6 +69,8 @@ import { TorrentSwarmOverview } from "~/features/torrent/components/torrent-swar
 import { TorrentRichContent } from "~/features/torrent/components/torrent-rich-content"
 import { TorrentRelatedVersions } from "~/features/torrent/components/torrent-related-versions"
 import { TorrentReportDialog } from "~/features/torrent/components/torrent-report-dialog"
+import { TorrentReseedButton } from "~/features/torrent/components/torrent-reseed-button"
+import { TorrentReseedReward } from "~/features/torrent/components/torrent-reseed-reward"
 import {
   type TorrentBookmarkControls,
   useTorrentBookmarkControls,
@@ -228,6 +231,12 @@ function TorrentDetailContent({
   const tagFacets = groupedFacets.filter((facet) => facet.values.length > 1)
   const promotionLabel = torrentPromotionLabel(detail.promotion)
   const published = detail.state === "published"
+  const swarm = useTorrentSwarm(detail.id, published)
+  const hasNoSeeders =
+    published &&
+    swarm.isSuccess &&
+    swarm.data.confidence === "fresh" &&
+    swarm.data.seeders === 0
   const displayedAt = detail.published_at ?? detail.submitted_at
 
   return (
@@ -372,10 +381,26 @@ function TorrentDetailContent({
               torrentId={detail.id}
               torrentName={detail.title}
               purchaseAware={published}
+              hasNoSeeders={hasNoSeeders}
               showLabel
               showCopyAction
               className="col-span-full h-10 w-full"
             />
+            {hasNoSeeders ? (
+              <div className="col-span-full grid gap-2">
+                <p className="text-xs text-warning-foreground">
+                  暂无做种者，内容可能无法下载完成。
+                </p>
+                {userId && csrfToken ? (
+                  <TorrentReseedButton
+                    key={`${userId}:${detail.id}`}
+                    torrentId={detail.id}
+                    userId={userId}
+                    csrfToken={csrfToken}
+                  />
+                ) : null}
+              </div>
+            ) : null}
             {published ? (
               <>
                 <TorrentPromotionProductDialog
@@ -403,6 +428,12 @@ function TorrentDetailContent({
           </div>
         </div>
 
+        {published && swarm.isSuccess && swarm.data.reseed_reward ? (
+          <div className="mt-4">
+            <TorrentReseedReward reward={swarm.data.reseed_reward} />
+          </div>
+        ) : null}
+
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-t pt-3.5">
           <div className="flex items-center gap-2">
             {published ? (
@@ -427,7 +458,7 @@ function TorrentDetailContent({
           </div>
           {published ? (
             <TorrentSwarmOverview
-              torrentId={detail.id}
+              swarm={swarm}
               compact
               showFreshness={false}
               className="w-auto"

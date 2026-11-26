@@ -37,6 +37,7 @@ export function TorrentDownloadButton({
   torrentId,
   torrentName,
   purchaseAware = false,
+  hasNoSeeders = false,
   showLabel = false,
   showCopyAction = false,
   className,
@@ -44,6 +45,7 @@ export function TorrentDownloadButton({
   torrentId: number
   torrentName: string
   purchaseAware?: boolean
+  hasNoSeeders?: boolean
   showLabel?: boolean
   showCopyAction?: boolean
   className?: string
@@ -287,8 +289,12 @@ export function TorrentDownloadButton({
               </AlertDialogMedia>
               <AlertDialogTitle>购买种子下载权限</AlertDialogTitle>
               <AlertDialogDescription>
-                购买后可永久下载此种子；旧站已购买的数据会直接显示为已购买，
-                不会重复扣款。
+                购买后可永久获取种子文件。旧站已有的购买记录会继续生效。
+                {hasNoSeeders ? (
+                  <span className="mt-2 block text-warning-foreground">
+                    暂无做种者，购买后仍可能无法下载完整内容。
+                  </span>
+                ) : null}
               </AlertDialogDescription>
             </AlertDialogHeader>
 

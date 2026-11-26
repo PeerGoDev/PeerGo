@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter, Route, Routes } from "react-router"
 import { describe, expect, it, vi } from "vitest"
@@ -142,6 +142,7 @@ describe("TorrentDetailPage", () => {
     expect(screen.getByRole("button", { name: "分享到动态圈" })).toBeVisible()
     expect(screen.getByText("18 个做种")).toBeVisible()
     expect(screen.getByText("5 个下载者")).toBeVisible()
+    expect(screen.queryByText(/暂无做种者/)).not.toBeInTheDocument()
     const peerListHeader = screen
       .getByText("用户列表")
       .closest("[data-slot=card-header]")
@@ -282,7 +283,7 @@ describe("TorrentDetailPage", () => {
     )
   })
 
-  it("preserves the Rousi cover column with an explicit migrated-image fallback", () => {
+  it("preserves the migrated-image fallback and warns only for fresh zero seeders", async () => {
     const queryClient = detailTestClient()
     queryClient.setQueryData(torrentKeys.detail(torrentId), {
       id: torrentId,
@@ -309,7 +310,7 @@ describe("TorrentDetailPage", () => {
       submitted_at: "2026-08-09T10:00:00Z",
       published_at: "2026-08-09T11:00:00Z",
     } satisfies TorrentPublicDetail)
-    queryClient.setQueryData(torrentKeys.swarm(torrentId), {
+    const swarm: TorrentSwarmOverview = {
       torrent_id: torrentId,
       seeders: 0,
       leechers: 0,
@@ -317,7 +318,13 @@ describe("TorrentDetailPage", () => {
       observed_at: "2026-08-09T11:59:00Z",
       stale: false,
       confidence: "fresh",
-    } satisfies TorrentSwarmOverview)
+      reseed_reward: {
+        status: "upcoming",
+        required_hours: 24,
+        magic_amount: 1000,
+      },
+    }
+    queryClient.setQueryData(torrentKeys.swarm(torrentId), swarm)
 
     renderDetailPage(queryClient, `/torrents/${torrentId}`)
 
@@ -344,6 +351,26 @@ describe("TorrentDetailPage", () => {
     expect(
       screen.queryByRole("img", { name: "Migrated Release封面" })
     ).not.toBeInTheDocument()
+    expect(screen.getByText(/暂无做种者/)).toBeVisible()
+    expect(screen.getByText("预计复活奖励")).toBeVisible()
+    expect(screen.getByText("1,000 魔力值")).toBeVisible()
+    expect(screen.getByText(/累计有效做种满 24 小时/)).toBeVisible()
+    expect(
+      screen.getByRole("button", { name: "下载“Migrated Release”的种子文件" })
+    ).toBeEnabled()
+
+    act(() => {
+      queryClient.setQueryData(torrentKeys.swarm(torrentId), {
+        ...swarm,
+        stale: true,
+        confidence: "stale",
+        reseed_reward: undefined,
+      } satisfies TorrentSwarmOverview)
+    })
+    await waitFor(() =>
+      expect(screen.queryByText(/暂无做种者/)).not.toBeInTheDocument()
+    )
+    expect(screen.queryByText("预计复活奖励")).not.toBeInTheDocument()
   })
 
   it("preserves the Rousi description card when migrated text is empty", () => {

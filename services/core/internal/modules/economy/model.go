@@ -22,6 +22,7 @@ type TransactionType string
 
 const (
 	TransactionSeedingReward        TransactionType = "seeding_reward"
+	TransactionReseedReward         TransactionType = "reseed_reward"
 	TransactionHaremReward          TransactionType = "harem_reward"
 	TransactionActivityReward       TransactionType = "activity_reward"
 	TransactionTorrentBuy           TransactionType = "torrent_purchase"
@@ -47,6 +48,7 @@ const (
 var (
 	rousiMigrationAccountID          = uuid.MustParse("00000000-0000-7000-8000-000000000001")
 	seedingMintAccountID             = uuid.MustParse("00000000-0000-7000-8000-000000000002")
+	reseedMintAccountID              = uuid.MustParse("00000000-0000-7000-8000-000000000015")
 	activityMintAccountID            = uuid.MustParse("00000000-0000-7000-8000-000000000003")
 	torrentPurchaseSinkID            = uuid.MustParse("00000000-0000-7000-8000-000000000004")
 	feeSinkAccountID                 = uuid.MustParse("00000000-0000-7000-8000-000000000005")
@@ -78,6 +80,9 @@ func RousiMigrationAccountID() uuid.UUID { return rousiMigrationAccountID }
 
 // SeedingMintAccountID returns the system account that issues seeding rewards.
 func SeedingMintAccountID() uuid.UUID { return seedingMintAccountID }
+
+// ReseedMintAccountID returns the issuer for one-time swarm recovery rewards.
+func ReseedMintAccountID() uuid.UUID { return reseedMintAccountID }
 
 // ActivityMintAccountID returns the system account that issues activity rewards.
 func ActivityMintAccountID() uuid.UUID { return activityMintAccountID }

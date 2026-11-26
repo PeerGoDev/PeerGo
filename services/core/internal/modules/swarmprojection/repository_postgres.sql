@@ -144,6 +144,47 @@ ON CONFLICT (torrent_id) DO UPDATE SET
     completed = EXCLUDED.completed,
     observed_at = EXCLUDED.observed_at;
 
+-- name: ResolveTorrentReseedRequests :exec
+WITH closed_rounds AS (
+    UPDATE economy.reseed_reward_rounds AS round
+    SET ended_at = sqlc.arg(observed_at)::timestamptz
+    WHERE round.ended_at IS NULL
+      AND round.started_at <= sqlc.arg(observed_at)::timestamptz
+      AND NOT EXISTS (
+          SELECT 1
+          FROM catalog.torrent_swarm_stats AS stats
+          JOIN torrents.torrents AS torrent ON torrent.id = stats.torrent_id AND torrent.state = 'published'
+          WHERE stats.torrent_id = round.torrent_id
+            AND stats.observed_at = sqlc.arg(observed_at)::timestamptz AND stats.seeders > 0
+      )
+), recovered AS (
+    UPDATE torrents.reseed_requests AS request
+    SET restored_at = greatest(request.opened_at, sqlc.arg(applied_at)::timestamptz)
+    FROM catalog.torrent_swarm_stats AS stats
+    JOIN torrents.torrents AS torrent ON torrent.id = stats.torrent_id AND torrent.state = 'published'
+    WHERE request.torrent_id = stats.torrent_id
+      AND request.restored_at IS NULL
+      AND sqlc.arg(allow_recovery)::boolean
+      AND stats.seeders > 0
+      AND stats.observed_at = sqlc.arg(observed_at)::timestamptz
+      AND stats.observed_at > request.zero_observed_at
+    RETURNING request.id, request.torrent_id, request.restored_at
+), opened_rounds AS (
+    INSERT INTO economy.reseed_reward_rounds (request_id, torrent_id, policy_revision, started_at)
+    SELECT recovered.id, recovered.torrent_id, policy.revision, sqlc.arg(observed_at)::timestamptz
+    FROM recovered
+    CROSS JOIN (
+        SELECT revision, enabled FROM economy.reseed_reward_policies
+        WHERE issued_at <= sqlc.arg(observed_at)::timestamptz
+        ORDER BY revision DESC LIMIT 1
+    ) AS policy
+    WHERE policy.enabled
+)
+INSERT INTO community.torrent_reseed_notifications (request_id, recipient_user_id, kind, created_at)
+SELECT recovered.id, member.user_id, 'torrent_reseed_restored', recovered.restored_at
+FROM recovered
+JOIN torrents.reseed_request_members AS member ON member.request_id = recovered.id;
+
 -- name: AdvanceSwarmProjectionState :execrows
 UPDATE catalog.swarm_snapshot_projection_state
 SET

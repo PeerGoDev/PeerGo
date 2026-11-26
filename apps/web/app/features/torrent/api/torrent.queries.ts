@@ -14,6 +14,8 @@ export type TorrentSwarmOverview = components["schemas"]["TorrentSwarmOverview"]
 export type TorrentPeerList = components["schemas"]["TorrentPeerList"]
 export type ManagedTorrentPeerList =
   components["schemas"]["ManagedTorrentPeerList"]
+export type OpenTorrentReseedRequest =
+  components["schemas"]["OpenTorrentReseedRequest"]
 export type TorrentFilePage = components["schemas"]["TorrentFilePage"]
 export type MyTorrentSubmissionPage =
   components["schemas"]["MyTorrentSubmissionPage"]
@@ -44,6 +46,7 @@ export const torrentKeys = {
     [...torrentKeys.categories(), categoryId, "facets"] as const,
   list: (filters: TorrentListFilters) =>
     [...torrentKeys.all, "list", filters] as const,
+  reseedRequests: () => [...torrentKeys.all, "reseed-requests"] as const,
   detail: (torrentId: TorrentID) =>
     [...torrentKeys.all, "detail", torrentId] as const,
   content: (torrentId: TorrentID) =>
@@ -208,6 +211,35 @@ export function useTorrentList(
   enabled = true
 ) {
   return useQuery({ ...torrentListQueryOptions(filters), enabled })
+}
+
+export function useOpenTorrentReseedRequests(
+  filters: { limit: number; offset: number; excludeNsfw: boolean },
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...torrentKeys.reseedRequests(), filters],
+    queryFn: async () => {
+      const { data, error, response } = await apiClient.GET(
+        "/api/v1/torrents/reseed-requests",
+        {
+          params: {
+            query: {
+              limit: filters.limit,
+              offset: filters.offset,
+              exclude_nsfw: filters.excludeNsfw,
+            },
+          },
+        }
+      )
+      if (!response.ok || !data)
+        throw new ApiProblemError(response.status, error)
+      return data
+    },
+    enabled,
+    refetchInterval: 60_000,
+    retry: false,
+  })
 }
 
 export function useCategoryList(enabled = true) {

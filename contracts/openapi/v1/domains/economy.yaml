@@ -625,6 +625,62 @@ AttendancePoliciesPath:
       default:
         $ref: "../responses.yaml#/ProblemResponse"
 
+ReseedRewardSettingsPath:
+  get:
+    operationId: getReseedRewardSettings
+    summary: 读取种子复活奖励设置
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.seedingreward.policy.read
+    x-credential-audience: staff-session
+    responses:
+      "200":
+        description: 当前复活奖励设置。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ReseedRewardSettings"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+  put:
+    operationId: updateReseedRewardSettings
+    summary: 更新后续种子复活轮次采用的奖励设置
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.seedingreward.policy.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/economy.yaml#/UpdateReseedRewardSettingsRequest"
+    responses:
+      "200":
+        description: 复活奖励设置已保存。
+        content:
+          application/json:
+            schema:
+              $ref: "../schemas/economy.yaml#/ReseedRewardSettings"
+      "400":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "401":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "403":
+        $ref: "../responses.yaml#/ProblemResponse"
+      "409":
+        $ref: "../responses.yaml#/ProblemResponse"
+      default:
+        $ref: "../responses.yaml#/ProblemResponse"
+
 SeedingRewardPoliciesPath:
   get:
     operationId: listSeedingRewardPolicies

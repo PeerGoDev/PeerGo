@@ -17,6 +17,7 @@ import (
 	"github.com/peergo/peergo/contracts/go/trackerannouncev1"
 	"github.com/peergo/peergo/contracts/go/trackerswarmv1"
 	"github.com/peergo/peergo/services/core/internal/generated/swarmdb"
+	"github.com/peergo/peergo/services/core/internal/modules/catalog"
 )
 
 type PostgresRepository struct {
@@ -178,6 +179,12 @@ func (repository *PostgresRepository) ApplySnapshot(ctx context.Context, payload
 		ObservedAt: swarmTimestamp(observedAt), SnapshotID: snapshotID,
 	}); err != nil {
 		return ApplyResult{}, classifyDatabaseError("apply complete Core swarm snapshot", err)
+	}
+	if err := queries.ResolveTorrentReseedRequests(ctx, swarmdb.ResolveTorrentReseedRequestsParams{
+		ObservedAt: swarmTimestamp(observedAt), AppliedAt: swarmTimestamp(appliedAt),
+		AllowRecovery: !observedAt.Before(appliedAt.Add(-catalog.SwarmFreshness)),
+	}); err != nil {
+		return ApplyResult{}, classifyDatabaseError("update torrent reseed rounds", err)
 	}
 	rows, err := queries.AdvanceSwarmProjectionState(ctx, swarmdb.AdvanceSwarmProjectionStateParams{
 		SourceID: chunk.SourceID, RoutingEpoch: chunk.RoutingEpoch, SnapshotSequence: chunk.SnapshotSequence,

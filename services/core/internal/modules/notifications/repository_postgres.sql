@@ -57,6 +57,11 @@ WITH inbox AS (
     FROM community.content_tip_notifications AS notification
     WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
       AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT notification.read_at
+    FROM community.torrent_reseed_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
 )
 SELECT
     count(*)::bigint AS total_count,
@@ -152,6 +157,15 @@ WITH inbox AS (
     FROM community.content_tip_notifications AS notification
     WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
       AND notification.archived_at IS NULL
+    UNION ALL
+    SELECT
+        notification.id,
+        notification.kind,
+        notification.created_at,
+        notification.read_at
+    FROM community.torrent_reseed_notifications AS notification
+    WHERE notification.recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND notification.archived_at IS NULL
 )
 SELECT
     inbox.id,
@@ -218,6 +232,11 @@ SELECT
     tip_post.public_id AS content_tip_post_id,
     tip_comment.public_id AS content_tip_comment_id,
     content_tip.target_title AS content_tip_target_title,
+    reseed_request.torrent_id AS reseed_torrent_id,
+    reseed_request.torrent_title AS reseed_torrent_title,
+    coalesce(reseed_reward.status, CASE WHEN upcoming_reward.required_hours IS NOT NULL THEN 'upcoming' END, '')::text AS reseed_reward_status,
+    coalesce(reseed_reward.required_hours, upcoming_reward.required_hours, 0)::integer AS reseed_reward_required_hours,
+    coalesce(reseed_reward.magic_amount, upcoming_reward.magic_amount, 0)::bigint AS reseed_reward_magic_amount,
     inbox.created_at,
     inbox.read_at
 FROM inbox
@@ -307,6 +326,14 @@ LEFT JOIN economy.comment_content_tips AS comment_tip
   ON comment_tip.content_tip_id = content_tip.id
 LEFT JOIN social.comments AS tip_comment
   ON tip_comment.id = comment_tip.comment_id
+LEFT JOIN community.torrent_reseed_notifications AS reseed_notification
+  ON reseed_notification.id = inbox.id AND reseed_notification.kind = inbox.kind
+LEFT JOIN torrents.reseed_requests AS reseed_request
+  ON reseed_request.id = reseed_notification.request_id
+LEFT JOIN economy.reseed_reward_round_offers AS reseed_reward
+  ON reseed_reward.request_id = reseed_request.id
+LEFT JOIN economy.current_reseed_reward_offer AS upcoming_reward
+  ON reseed_notification.kind = 'torrent_reseed_requested' AND reseed_request.restored_at IS NULL
 WHERE NOT sqlc.arg(unread_only)::boolean OR inbox.read_at IS NULL
 ORDER BY inbox.created_at DESC, inbox.id DESC
 LIMIT sqlc.arg(result_limit)::integer
@@ -440,6 +467,22 @@ updated_content_tip AS (
     WHERE notification.id = target.id
     RETURNING notification.id, notification.read_at,
         (target.read_at IS NOT NULL)::boolean AS already_read
+),
+reseed_target AS (
+    SELECT id, read_at
+    FROM community.torrent_reseed_notifications
+    WHERE id = sqlc.arg(notification_id)::uuid
+      AND recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+    FOR UPDATE
+),
+updated_reseed AS (
+    UPDATE community.torrent_reseed_notifications AS notification
+    SET read_at = COALESCE(target.read_at, greatest(notification.created_at, sqlc.arg(read_at)::timestamptz))
+    FROM reseed_target AS target
+    WHERE notification.id = target.id
+    RETURNING notification.id, notification.read_at,
+        (target.read_at IS NOT NULL)::boolean AS already_read
 )
 SELECT id, read_at, already_read FROM updated_review
 UNION ALL
@@ -456,6 +499,8 @@ UNION ALL
 SELECT id, read_at, already_read FROM updated_member_gift
 UNION ALL
 SELECT id, read_at, already_read FROM updated_content_tip
+UNION ALL
+SELECT id, read_at, already_read FROM updated_reseed
 LIMIT 1;
 
 -- name: MarkAllNotificationsRead :one
@@ -530,6 +575,15 @@ updated_content_tips AS (
       AND archived_at IS NULL
       AND created_at <= sqlc.arg(read_at)::timestamptz
     RETURNING 1
+),
+updated_reseeds AS (
+    UPDATE community.torrent_reseed_notifications
+    SET read_at = sqlc.arg(read_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND read_at IS NULL
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(read_at)::timestamptz
+    RETURNING 1
 )
 SELECT (
     (SELECT count(*) FROM updated_reviews)
@@ -540,6 +594,7 @@ SELECT (
     + (SELECT count(*) FROM updated_workgroups)
     + (SELECT count(*) FROM updated_member_gifts)
     + (SELECT count(*) FROM updated_content_tips)
+    + (SELECT count(*) FROM updated_reseeds)
 )::bigint AS updated_count;
 
 -- name: ArchiveAllNotifications :one
@@ -606,6 +661,14 @@ archived_content_tips AS (
       AND archived_at IS NULL
       AND created_at <= sqlc.arg(archived_at)::timestamptz
     RETURNING 1
+),
+archived_reseeds AS (
+    UPDATE community.torrent_reseed_notifications
+    SET archived_at = sqlc.arg(archived_at)::timestamptz
+    WHERE recipient_user_id = sqlc.arg(recipient_user_id)::uuid
+      AND archived_at IS NULL
+      AND created_at <= sqlc.arg(archived_at)::timestamptz
+    RETURNING 1
 )
 SELECT (
     (SELECT count(*) FROM archived_reviews)
@@ -616,6 +679,7 @@ SELECT (
     + (SELECT count(*) FROM archived_workgroups)
     + (SELECT count(*) FROM archived_member_gifts)
     + (SELECT count(*) FROM archived_content_tips)
+    + (SELECT count(*) FROM archived_reseeds)
 )::bigint AS updated_count;
 
 -- name: InsertSupportFeedback :one

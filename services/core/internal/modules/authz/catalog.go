@@ -147,6 +147,7 @@ const (
 	ActionTorrentRead                             Action = "torrent.read"
 	ActionTorrentReportCreateSelf                 Action = "torrent.report.create.self"
 	ActionTorrentReportReview                     Action = "torrent.report.review"
+	ActionTorrentReseedRequestSelf                Action = "torrent.reseed.request.self"
 	ActionTorrentReview                           Action = "torrent.review"
 	ActionTorrentReviewVote                       Action = "torrent.review.vote"
 	ActionTorrentScreenshotChangeReview           Action = "torrent.screenshot.change.review"
@@ -906,6 +907,11 @@ var permissionCatalog = []PermissionDefinition{
 	{
 		Action: ActionTorrentReportReview, Description: "审核种子举报并执行有界下架", Risk: RiskHigh,
 		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionTorrentReseedRequestSelf, Description: "请求为暂无做种者的种子补种", Risk: RiskLow,
+		Relationship: RelationshipSelf, CredentialAudience: AudienceWebSession,
 		Grantable: true, Discoverable: true,
 	},
 	{
