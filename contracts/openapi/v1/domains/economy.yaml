@@ -994,6 +994,89 @@ MedalDefinitionsPath:
       "403": { $ref: "../responses.yaml#/ProblemResponse" }
       default: { $ref: "../responses.yaml#/ProblemResponse" }
 
+UploadMedalArtworkPath:
+  post:
+    operationId: uploadMedalArtwork
+    summary: 上传新增或编辑勋章使用的图片
+    tags: [economy]
+    x-audience: [staff]
+    x-owner: core-economy
+    x-permission: economy.medal.create
+    x-action-permissions:
+      create: economy.medal.create
+      update: economy.medal.update
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+      - name: mode
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: [create, update]
+    requestBody:
+      required: true
+      content:
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
+            minLength: 1
+            maxLength: 2097152
+    responses:
+      "201":
+        description: 图片已经校验并保存到勋章对象目录。
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [path]
+              properties:
+                path: { type: string }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "401": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "413": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MedalArtworkPath:
+  parameters:
+    - name: filename
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{64}\.(jpg|png|gif|webp)$'
+  get:
+    operationId: getMedalArtwork
+    summary: 读取勋章静态图片
+    tags: [economy]
+    x-audience: [web]
+    x-owner: core-economy
+    security: []
+    responses:
+      "200":
+        description: 已按内容摘要校验的勋章图片。
+        headers:
+          Cache-Control:
+            schema: { type: string }
+          X-Content-Type-Options:
+            schema: { type: string }
+          ETag:
+            schema: { type: string }
+        content:
+          image/jpeg:
+            schema: { type: string, format: binary }
+          image/png:
+            schema: { type: string, format: binary }
+          image/gif:
+            schema: { type: string, format: binary }
+          image/webp:
+            schema: { type: string, format: binary }
+      "404": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
 MedalDefinitionPath:
   parameters:
     - name: medal_id

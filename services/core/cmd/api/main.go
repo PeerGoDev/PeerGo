@@ -359,6 +359,7 @@ func main() {
 		logger.Error("compose medal administration service", "error", err)
 		os.Exit(1)
 	}
+	medalAdministrationService.SetArtworkStore(contentStore)
 	memberMedalService, err := medals.NewMemberService(identityService, medalRepository, authorizationService, time.Now)
 	if err != nil {
 		logger.Error("compose member medal service", "error", err)
@@ -973,6 +974,7 @@ func main() {
 		logger.Error("compose user administration service", "error", err)
 		os.Exit(1)
 	}
+	userAdministrationService.SetSeedingTotalsReader(trackerOperationsClient)
 	categoryAdministrationRepository, err := catalog.NewPostgresCategoryAdministrationRepository(
 		pool,
 		categoryChangeEventBuilder,

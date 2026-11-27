@@ -2379,6 +2379,57 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/medal-artwork/{filename}:
+    parameters:
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{64}\.(jpg|png|gif|webp)$
+    get:
+      operationId: getMedalArtwork
+      summary: 读取勋章静态图片
+      tags:
+        - economy
+      x-audience:
+        - web
+      x-owner: core-economy
+      security: []
+      responses:
+        '200':
+          description: 已按内容摘要校验的勋章图片。
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+            X-Content-Type-Options:
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/me/medals/{medal_id}/purchase:
     parameters:
       - name: medal_id
@@ -11443,6 +11494,62 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/settings/medals/artwork:
+    post:
+      operationId: uploadMedalArtwork
+      summary: 上传新增或编辑勋章使用的图片
+      tags:
+        - economy
+      x-audience:
+        - staff
+      x-owner: core-economy
+      x-permission: economy.medal.create
+      x-action-permissions:
+        create: economy.medal.create
+        update: economy.medal.update
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+        - name: mode
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - create
+              - update
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              minLength: 1
+              maxLength: 2097152
+      responses:
+        '201':
+          description: 图片已经校验并保存到勋章对象目录。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - path
+                properties:
+                  path:
+                    type: string
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '413':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/admin/settings/medals/{medal_id}:
     parameters:
       - name: medal_id
@@ -12459,6 +12566,14 @@ components:
           type: string
           pattern: ^-?[0-9]+$
           description: 唯一站内资产魔力值，始终为整数。
+        seeding_count:
+          type: integer
+          minimum: 0
+          description: Tracker 当前在线的不同做种数。实时统计不可用时省略。
+        seeding_bytes:
+          type: string
+          pattern: ^[0-9]+$
+          description: 这些种子的体积之和，使用十进制字节字符串。实时统计不可用时省略。
         level:
           type: integer
           minimum: 1
@@ -14465,7 +14580,7 @@ components:
         custom_navigation_items:
           type: array
           maxItems: 12
-          description: 按后台顺序排列的已启用侧栏链接与公开申诉联系方式。
+          description: 按后台顺序排列的侧栏链接、会员首页链接与公开申诉联系方式。
           items:
             $ref: '#/components/schemas/CustomNavigationItem'
     SiteDisplaySettings:
@@ -14590,6 +14705,9 @@ components:
         show_on_appeal:
           type: boolean
           description: 是否作为公开联系方式显示在封禁申诉页。
+        show_on_home:
+          type: boolean
+          description: 是否显示在已登录会员的首页顶部。
     RSSSubscription:
       type: object
       additionalProperties: false
@@ -22234,6 +22352,8 @@ components:
           type: integer
           minimum: 0
           maximum: 200
+        total_size_bytes:
+          $ref: '#/components/schemas/TrafficByteCount'
         leeching_connections:
           type: integer
           minimum: 0

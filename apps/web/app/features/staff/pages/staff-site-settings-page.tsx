@@ -708,8 +708,7 @@ function CustomNavigationItemsEditor({
         <FieldContent>
           <FieldLabel>菜单链接</FieldLabel>
           <FieldDescription className="text-xs">
-            最多 12 项。申诉联系方式可填写官方群的 HTTPS 地址，或使用
-            mailto:邮箱地址。
+            最多 12 项。可以填写 Telegram 群链接，开启「在首页顶部显示」。
           </FieldDescription>
         </FieldContent>
         <Button
@@ -833,6 +832,25 @@ function CustomNavigationItemsEditor({
                     disabled={disabled}
                     onCheckedChange={(enabled) =>
                       updateItem(index, { enabled })
+                    }
+                  />
+                </Field>
+                <Field
+                  orientation="horizontal"
+                  data-disabled={disabled}
+                  className="min-h-10 rounded-md border px-3 py-2"
+                >
+                  <FieldContent>
+                    <FieldLabel htmlFor={"custom-navigation-home-" + index}>
+                      在首页顶部显示
+                    </FieldLabel>
+                  </FieldContent>
+                  <Switch
+                    id={"custom-navigation-home-" + index}
+                    checked={item.show_on_home ?? false}
+                    disabled={disabled}
+                    onCheckedChange={(showOnHome) =>
+                      updateItem(index, { show_on_home: showOnHome })
                     }
                   />
                 </Field>

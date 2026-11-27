@@ -90,6 +90,7 @@ type CustomNavigationItem struct {
 	OpenInNewTab bool   `json:"open_in_new_tab"`
 	Enabled      bool   `json:"enabled"`
 	ShowOnAppeal bool   `json:"show_on_appeal,omitempty"`
+	ShowOnHome   bool   `json:"show_on_home,omitempty"`
 }
 
 type AnnouncementBodyFormat string

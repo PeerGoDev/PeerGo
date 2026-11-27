@@ -187,6 +187,9 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	case "/internal/v1/operations/runtime":
 		handler.serveOperationsRuntime(response, request)
 		return
+	case trackeroperationsv1.SeedingTotalsPath:
+		handler.serveOperationsSeedingTotals(response, request)
+		return
 	}
 	if strings.HasPrefix(request.URL.Path, "/internal/v1/operations/users/") {
 		handler.serveOperationsUserActivePeers(response, request)

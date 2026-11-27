@@ -74,7 +74,7 @@ export function ManagedUserTable({
       <p className="border-b bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground md:hidden">
         表格可左右滑动，点击末列设置按钮管理账户
       </p>
-      <Table className="min-w-[1120px] lg:min-w-[1480px]">
+      <Table className="min-w-[1290px] lg:min-w-[1650px]">
         <TableHeader className="bg-muted/50">
           <TableRow className="h-11">
             <TableHead className="w-[72px] px-3 text-right">ID</TableHead>
@@ -104,6 +104,8 @@ export function ManagedUserTable({
             >
               魔力值
             </SortableUserHeader>
+            <TableHead className="w-20 text-right">做种数</TableHead>
+            <TableHead className="w-[100px] text-right">保种体积</TableHead>
             <SortableUserHeader
               className="w-16 text-center"
               field="level"
@@ -148,6 +150,16 @@ export function ManagedUserTable({
               </TableCell>
               <TableCell className="px-2 py-2.5 text-sm font-medium text-warning-foreground tabular-nums">
                 {formatInteger(user.magic_balance)}
+              </TableCell>
+              <TableCell className="px-2 py-2.5 text-right text-sm tabular-nums">
+                {user.seeding_count == null
+                  ? "—"
+                  : formatInteger(user.seeding_count)}
+              </TableCell>
+              <TableCell className="px-2 py-2.5 text-right text-sm whitespace-nowrap tabular-nums">
+                {user.seeding_bytes == null
+                  ? "—"
+                  : formatBytes(user.seeding_bytes)}
               </TableCell>
               <TableCell className="px-2 py-2.5 text-center">
                 <Badge variant="outline" className="tabular-nums">

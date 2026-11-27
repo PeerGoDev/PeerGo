@@ -18,6 +18,7 @@ import (
 
 	generated "github.com/peergo/peergo/services/core/internal/generated/api"
 	"github.com/peergo/peergo/services/core/internal/modules/catalog"
+	"github.com/peergo/peergo/services/core/internal/modules/economy/medals"
 	"github.com/peergo/peergo/services/core/internal/modules/identity"
 	"github.com/peergo/peergo/services/core/internal/modules/torrents"
 	"github.com/peergo/peergo/services/core/internal/transport/httpapi"
@@ -208,6 +209,7 @@ func New(dependencies Dependencies, logger *slog.Logger) (http.Handler, error) {
 const (
 	torrentMultipartEnvelopeAllowance  int64 = 64 << 10
 	torrentScreenshotEnvelopeAllowance int64 = 6 * torrents.MaxTorrentScreenshotBytes
+	medalArtworkUploadPath                   = "/api/v1/admin/settings/medals/artwork"
 )
 
 // limitTorrentUploadBody runs before OpenAPI validation because kin-openapi
@@ -218,13 +220,19 @@ func limitUploadBody(maxMetainfoBytes int) func(http.Handler) http.Handler {
 	limit := int64(maxMetainfoBytes) + torrentScreenshotEnvelopeAllowance + torrentMultipartEnvelopeAllowance
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPut && r.URL.Path == "/api/v1/me/avatar" {
-				avatarLimit := int64(identity.MaxAvatarBytes)
-				if r.ContentLength > avatarLimit {
+			var binaryLimit int64
+			switch {
+			case r.Method == http.MethodPut && r.URL.Path == "/api/v1/me/avatar":
+				binaryLimit = identity.MaxAvatarBytes
+			case r.Method == http.MethodPost && r.URL.Path == medalArtworkUploadPath:
+				binaryLimit = medals.MaxArtworkBytes
+			}
+			if binaryLimit > 0 {
+				if r.ContentLength > binaryLimit {
 					writeBodyTooLargeProblem(w, r)
 					return
 				}
-				r.Body = http.MaxBytesReader(w, r.Body, avatarLimit)
+				r.Body = http.MaxBytesReader(w, r.Body, binaryLimit)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -254,6 +262,10 @@ func limitTorrentUploadBody(maxMetainfoBytes int) func(http.Handler) http.Handle
 }
 
 func writeBodyTooLargeProblem(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == medalArtworkUploadPath {
+		httpapi.WriteProblem(w, r, http.StatusRequestEntityTooLarge, "medal_artwork_too_large", "勋章图片过大", "每张图片不能超过 2 MB。")
+		return
+	}
 	if r.URL.Path == "/api/v1/me/avatar" {
 		httpapi.WriteProblem(w, r, http.StatusRequestEntityTooLarge, "avatar_too_large", "头像文件过大", "处理后的头像不能超过 1MB。")
 		return

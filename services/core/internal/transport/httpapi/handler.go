@@ -3647,6 +3647,9 @@ func customNavigationItemsDTO(items []catalog.CustomNavigationItem) []generated.
 		if item.ShowOnAppeal {
 			dto.ShowOnAppeal = &item.ShowOnAppeal
 		}
+		if item.ShowOnHome {
+			dto.ShowOnHome = &item.ShowOnHome
+		}
 		result = append(result, dto)
 	}
 	return result
@@ -3658,6 +3661,7 @@ func customNavigationItemsInput(items []generated.CustomNavigationItem) []catalo
 		result = append(result, catalog.CustomNavigationItem{
 			Label: item.Label, URL: item.Url, OpenInNewTab: item.OpenInNewTab, Enabled: item.Enabled,
 			ShowOnAppeal: item.ShowOnAppeal != nil && *item.ShowOnAppeal,
+			ShowOnHome:   item.ShowOnHome != nil && *item.ShowOnHome,
 		})
 	}
 	return result
@@ -3691,6 +3695,11 @@ func registrationPolicySettingsDTO(policy identity.RegistrationPolicy) generated
 func valuePointer[T any](value T) *T { return &value }
 
 func managedUserSummaryDTO(user identity.ManagedUserSummary) generated.ManagedUserSummary {
+	var seedingBytes *string
+	if user.SeedingBytes != nil {
+		bytes := strconv.FormatInt(*user.SeedingBytes, 10)
+		seedingBytes = &bytes
+	}
 	return generated.ManagedUserSummary{
 		Id: user.ID, NumericId: user.NumericID, Username: user.Username, DisplayName: user.DisplayName,
 		Email: openapi_types.Email(user.Email), EmailVerified: user.EmailVerified,
@@ -3701,6 +3710,8 @@ func managedUserSummaryDTO(user identity.ManagedUserSummary) generated.ManagedUs
 		UploadedBytes:          strconv.FormatInt(user.UploadedBytes, 10),
 		DownloadedBytes:        strconv.FormatInt(user.DownloadedBytes, 10),
 		MagicBalance:           strconv.FormatInt(user.MagicBalance, 10),
+		SeedingCount:           user.SeedingCount,
+		SeedingBytes:           seedingBytes,
 		Level:                  int(user.Level),
 		RoleNames:              append([]string(nil), user.RoleNames...),
 		LastActiveAt:           user.LastActiveAt,

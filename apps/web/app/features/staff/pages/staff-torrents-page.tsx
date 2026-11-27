@@ -2,8 +2,6 @@ import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "react-router"
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CircleAlertIcon,
   HardDriveIcon,
   RefreshCwIcon,
@@ -27,11 +25,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "~/components/ui/input-group"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-} from "~/components/ui/pagination"
+import { NumberedPagination } from "~/shared/components/numbered-pagination"
 import {
   Select,
   SelectContent,
@@ -385,43 +379,15 @@ function TorrentWorkbench({
             onManagePurchase={setPurchasePriceTarget}
           />
           {totalPages > 1 ? (
-            <Pagination
-              className="justify-between pt-1"
-              aria-label="种子管理分页"
-            >
-              <span className="text-sm text-muted-foreground">
-                共 {data.total.toLocaleString("zh-CN")} 条记录
-              </span>
-              <PaginationContent>
-                <PaginationItem>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={filters.page === 1}
-                    onClick={() => updateFilters({ page: filters.page - 1 })}
-                  >
-                    <ChevronLeftIcon data-icon="inline-start" />
-                    上一页
-                  </Button>
-                </PaginationItem>
-                <PaginationItem>
-                  <span className="px-3 text-sm text-muted-foreground tabular-nums">
-                    {filters.page} / {totalPages}
-                  </span>
-                </PaginationItem>
-                <PaginationItem>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={filters.page === totalPages}
-                    onClick={() => updateFilters({ page: filters.page + 1 })}
-                  >
-                    下一页
-                    <ChevronRightIcon data-icon="inline-end" />
-                  </Button>
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+            <NumberedPagination
+              currentPage={filters.page}
+              totalPages={totalPages}
+              ariaLabel="种子管理分页"
+              summary={"共 " + data.total.toLocaleString("zh-CN") + " 条记录"}
+              onPageChange={(page) => updateFilters({ page })}
+              showJump
+              className="pt-1"
+            />
           ) : null}
         </CardContent>
       </Card>

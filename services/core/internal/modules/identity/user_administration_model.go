@@ -100,6 +100,8 @@ type ManagedUserSummary struct {
 	UploadedBytes          int64
 	DownloadedBytes        int64
 	MagicBalance           int64
+	SeedingCount           *int
+	SeedingBytes           *int64
 	Level                  int32
 	RoleNames              []string
 	LastActiveAt           *time.Time

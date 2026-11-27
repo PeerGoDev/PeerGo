@@ -39,6 +39,7 @@ import {
   type MedalDefinitionWriteRequest,
   useCreateMedalDefinition,
   useUpdateMedalDefinition,
+  useUploadMedalArtwork,
 } from "~/features/staff/api/medal-administration.queries"
 import type { components } from "~/generated/api"
 import { requestErrorDescription } from "~/shared/api/problem"
@@ -103,7 +104,9 @@ export function MedalDefinitionDialog({
   const [draft, setDraft] = React.useState<MedalDraft>(() => toDraft(medal))
   const createMutation = useCreateMedalDefinition()
   const updateMutation = useUpdateMedalDefinition()
+  const artworkMutation = useUploadMedalArtwork()
   const mutation = medal ? updateMutation : createMutation
+  const busy = mutation.isPending || artworkMutation.isPending
   const validation = validateDraft(draft)
 
   React.useEffect(() => {
@@ -111,6 +114,7 @@ export function MedalDefinitionDialog({
     setDraft(toDraft(medal))
     createMutation.reset()
     updateMutation.reset()
+    artworkMutation.reset()
   }, [open, medal])
 
   function update<Key extends keyof MedalDraft>(
@@ -124,7 +128,7 @@ export function MedalDefinitionDialog({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!validation.body) return
+    if (!validation.body || busy) return
     try {
       if (medal) {
         await updateMutation.mutateAsync({
@@ -144,16 +148,29 @@ export function MedalDefinitionDialog({
     }
   }
 
+  async function uploadArtwork(
+    field: "imageSmallPath" | "imageLargePath",
+    file: File
+  ) {
+    try {
+      const { path } = await artworkMutation.mutateAsync({
+        csrfToken,
+        file,
+        mode: medal ? "update" : "create",
+      })
+      update(field, path)
+    } catch {
+      // Display the upload error and retain the current image path.
+    }
+  }
+
   const selectedMethod = acquisitionItems.find(
     (item) => item.value === draft.acquisitionMethod
   )
   const previewImage = draft.imageSmallPath || draft.imageLargePath
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}
-    >
+    <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl">
         <form onSubmit={submit}>
           <DialogHeader>
@@ -233,6 +250,11 @@ export function MedalDefinitionDialog({
                   value={draft.imageSmallPath}
                   error={validation.smallImageError}
                   onChange={(value) => update("imageSmallPath", value)}
+                  uploadLabel="上传小图"
+                  disabled={busy}
+                  onUpload={(file) =>
+                    void uploadArtwork("imageSmallPath", file)
+                  }
                 />
                 <ImagePathField
                   id="medal-large-image"
@@ -240,8 +262,33 @@ export function MedalDefinitionDialog({
                   value={draft.imageLargePath}
                   error={validation.largeImageError}
                   onChange={(value) => update("imageLargePath", value)}
+                  uploadLabel="上传大图"
+                  disabled={busy}
+                  onUpload={(file) =>
+                    void uploadArtwork("imageLargePath", file)
+                  }
                 />
               </div>
+              <FieldDescription>
+                支持 PNG、JPG、GIF 和 WebP，每张最多 2 MB。
+              </FieldDescription>
+              {artworkMutation.isPending ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  正在上传勋章图片…
+                </p>
+              ) : null}
+              {artworkMutation.isError ? (
+                <Alert variant="destructive">
+                  <CircleAlertIcon />
+                  <AlertTitle>图片上传失败</AlertTitle>
+                  <AlertDescription>
+                    {requestErrorDescription(
+                      artworkMutation.error,
+                      "请检查图片后重试。"
+                    )}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
             </FieldSet>
 
             <FieldSet>
@@ -439,15 +486,12 @@ export function MedalDefinitionDialog({
             <Button
               type="button"
               variant="outline"
-              disabled={mutation.isPending}
+              disabled={busy}
               onClick={() => onOpenChange(false)}
             >
               取消
             </Button>
-            <Button
-              type="submit"
-              disabled={!validation.body || mutation.isPending}
-            >
+            <Button type="submit" disabled={!validation.body || busy}>
               {mutation.isPending ? <Spinner data-icon="inline-start" /> : null}
               {medal ? "保存修改" : "创建勋章"}
             </Button>
@@ -464,12 +508,18 @@ function ImagePathField({
   value,
   error,
   onChange,
+  disabled,
+  uploadLabel,
+  onUpload,
 }: {
   id: string
   label: string
   value: string
   error: string | null
   onChange: (value: string) => void
+  disabled: boolean
+  uploadLabel: string
+  onUpload: (file: File) => void
 }) {
   return (
     <Field data-invalid={error !== null || undefined}>
@@ -478,8 +528,20 @@ function ImagePathField({
         id={id}
         value={value}
         aria-invalid={error !== null}
+        disabled={disabled}
         placeholder="/uploads/medals/example.webp"
         onChange={(event) => onChange(event.target.value)}
+      />
+      <Input
+        type="file"
+        aria-label={uploadLabel}
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        disabled={disabled}
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ""
+          if (file) onUpload(file)
+        }}
       />
       <FieldDescription>
         支持站内 / 路径或 HTTPS 图片直链，可用 GIF 或动态 WebP。

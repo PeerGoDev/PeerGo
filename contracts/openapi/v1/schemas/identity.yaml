@@ -1745,6 +1745,14 @@ ManagedUserSummary:
       type: string
       pattern: "^-?[0-9]+$"
       description: 唯一站内资产魔力值，始终为整数。
+    seeding_count:
+      type: integer
+      minimum: 0
+      description: Tracker 当前在线的不同做种数。实时统计不可用时省略。
+    seeding_bytes:
+      type: string
+      pattern: "^[0-9]+$"
+      description: 这些种子的体积之和，使用十进制字节字符串。实时统计不可用时省略。
     level:
       type: integer
       minimum: 1

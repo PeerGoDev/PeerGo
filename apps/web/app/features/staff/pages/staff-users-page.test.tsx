@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
 import { describe, expect, it } from "vitest"
 
@@ -13,7 +14,17 @@ const administratorId = "0198f20a-6da8-7e51-9c64-111111111111"
 
 describe("StaffUsersPage", () => {
   it("keeps the Rousi directory density while exposing only PeerGo account data", async () => {
+    const user = userEvent.setup()
     const queryClient = createQueryClient()
+    const filters = { query: "", status: "all" as const, page: 1, pageSize: 20 }
+    const firstPage = queryClient.getQueryData(
+      managedUserListQueryOptions(filters).queryKey
+    )
+    if (!firstPage) throw new Error("Missing first page fixture")
+    queryClient.setQueryData(
+      managedUserListQueryOptions({ ...filters, page: 26 }).queryKey,
+      { ...firstPage, page: 26 }
+    )
 
     render(
       <MemoryRouter initialEntries={["/staff/users"]}>
@@ -47,7 +58,20 @@ describe("StaffUsersPage", () => {
     ).toHaveTextContent("共 12,327 条记录")
     expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled()
     expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled()
-    expect(screen.getByText("1 / 617")).toBeVisible()
+    expect(screen.getByRole("button", { name: "第 1 页" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    )
+    expect(screen.getByRole("button", { name: "第 617 页" })).toBeVisible()
+    expect(screen.getByRole("spinbutton", { name: "跳转页码" })).toBeVisible()
+    expect(screen.getByRole("columnheader", { name: "做种数" })).toBeVisible()
+    expect(screen.getByRole("columnheader", { name: "保种体积" })).toBeVisible()
+    expect(screen.getByText("3.5 GB")).toBeVisible()
+    await user.type(screen.getByRole("spinbutton", { name: "跳转页码" }), "26")
+    await user.click(screen.getByRole("button", { name: "跳转" }))
+    expect(
+      await screen.findByRole("button", { name: "第 26 页" })
+    ).toHaveAttribute("aria-current", "page")
   })
 })
 
@@ -111,6 +135,8 @@ function createQueryClient() {
         uploaded_bytes: "18742348800",
         downloaded_bytes: "1073741824",
         magic_balance: "31328711552",
+        seeding_count: 3,
+        seeding_bytes: "3758096384",
         level: 7,
         role_names: ["普通成员"],
         last_active_at: "2026-08-14T07:30:00Z",

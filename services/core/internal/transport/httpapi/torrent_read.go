@@ -155,8 +155,10 @@ func userTrackerActivityDTO(activity torrents.UserTrackerActivity) generated.Use
 		for _, family := range task.AddressFamilies {
 			addressFamilies = append(addressFamilies, generated.UserTrackerTaskAddressFamilies(family))
 		}
+		totalSize := strconv.FormatInt(task.TotalSizeBytes, 10)
 		items = append(items, generated.UserTrackerTask{
 			TorrentId: int64(task.TorrentID), InfoHashV1: task.InfoHashV1,
+			TotalSizeBytes: &totalSize,
 			ClientFamilies: task.ClientFamilies, AddressFamilies: addressFamilies,
 			ActiveConnections: task.ActiveConnections, SeedingConnections: task.SeedingConnections,
 			LeechingConnections: task.LeechingConnections, ProgressBasisPoints: task.ProgressBasisPoints,

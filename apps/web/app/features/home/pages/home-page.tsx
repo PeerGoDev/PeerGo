@@ -4,11 +4,12 @@ import {
   NewspaperIcon,
   PinIcon,
   SearchIcon,
+  ExternalLinkIcon,
   TriangleAlertIcon,
 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert"
-import { Button } from "~/components/ui/button"
+import { Button, buttonVariants } from "~/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
 import {
   InputGroup,
@@ -55,6 +56,9 @@ export function HomePage() {
   const bookmarkControls = useTorrentBookmarkControls(torrentIds)
   const [view, setView] = useTorrentView(siteInfo.data?.default_torrent_view)
   const showLatestAnnouncement = siteInfo.data?.show_latest_announcement ?? true
+  const homeLinks = siteInfo.data?.custom_navigation_items?.filter(
+    (item) => item.show_on_home
+  )
 
   if (!isAuthenticated) {
     return (
@@ -74,6 +78,32 @@ export function HomePage() {
   return (
     <PageLayout>
       <PageHeader title="首页" description={siteInfo.data?.description} />
+
+      {homeLinks?.length ? (
+        <nav
+          aria-label="首页快捷链接"
+          className="flex flex-wrap items-center gap-2"
+        >
+          {homeLinks.map((item) => {
+            const openInNewTab =
+              item.open_in_new_tab && !item.url.startsWith("mailto:")
+            return (
+              <Link
+                key={item.url}
+                to={item.url}
+                target={openInNewTab ? "_blank" : undefined}
+                rel={openInNewTab ? "noopener noreferrer" : undefined}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                {item.label}
+                {openInNewTab ? (
+                  <ExternalLinkIcon data-icon="inline-end" />
+                ) : null}
+              </Link>
+            )
+          })}
+        </nav>
+      ) : null}
 
       {showLatestAnnouncement ? (
         <section

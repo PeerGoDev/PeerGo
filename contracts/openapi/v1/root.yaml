@@ -112,6 +112,8 @@ paths:
     $ref: "./domains/economy.yaml#/MyEconomyPath"
   /api/v1/me/medals:
     $ref: "./domains/economy.yaml#/MyMedalsPath"
+  /api/v1/medal-artwork/{filename}:
+    $ref: "./domains/economy.yaml#/MedalArtworkPath"
   /api/v1/me/medals/{medal_id}/purchase:
     $ref: "./domains/economy.yaml#/MyMedalPurchasePath"
   /api/v1/me/medals/{medal_id}/wearing:
@@ -476,6 +478,8 @@ paths:
     $ref: "./domains/economy.yaml#/ContributionExperiencePoliciesPath"
   /api/v1/admin/settings/medals:
     $ref: "./domains/economy.yaml#/MedalDefinitionsPath"
+  /api/v1/admin/settings/medals/artwork:
+    $ref: "./domains/economy.yaml#/UploadMedalArtworkPath"
   /api/v1/admin/settings/medals/{medal_id}:
     $ref: "./domains/economy.yaml#/MedalDefinitionPath"
   /api/v1/admin/operations/tracker:

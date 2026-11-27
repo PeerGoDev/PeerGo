@@ -25,6 +25,7 @@ describe("HomePage", () => {
       online_users: 8,
       default_torrent_view: "list",
       show_latest_announcement: true,
+      custom_navigation_items: [telegramLink],
     })
 
     render(
@@ -46,6 +47,7 @@ describe("HomePage", () => {
       "/register"
     )
     expect(screen.queryByText("最新种子暂时无法读取")).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: telegramLink.label })).toBeNull()
   })
 
   it("keeps the latest announcement publisher and date on the compact PtYes-style line", () => {
@@ -66,6 +68,7 @@ describe("HomePage", () => {
       online_users: 8,
       default_torrent_view: "list",
       show_latest_announcement: true,
+      custom_navigation_items: [telegramLink],
     })
     queryClient.setQueryData(siteKeys.latestAnnouncement(), {
       id: "welcome-to-peergo",
@@ -93,6 +96,9 @@ describe("HomePage", () => {
 
     expect(screen.getByText("PeerGo 站务")).toHaveClass("truncate")
     expect(
+      screen.getByRole("link", { name: telegramLink.label })
+    ).toHaveAttribute("href", telegramLink.url)
+    expect(
       screen.queryByText("这是一段需要保持单行显示的公告摘要")
     ).not.toBeInTheDocument()
     const pin = screen
@@ -104,6 +110,14 @@ describe("HomePage", () => {
     expect(screen.queryByText(/12:00/)).not.toBeInTheDocument()
   })
 })
+
+const telegramLink = {
+  label: "Telegram 群",
+  url: "https://t.me/peergo_example",
+  enabled: false,
+  open_in_new_tab: true,
+  show_on_home: true,
+}
 
 const disabledHumanVerification = {
   provider: "disabled" as const,

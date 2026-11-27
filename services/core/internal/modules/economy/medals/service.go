@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/peergo/peergo/services/core/internal/contracts/objectstorage"
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 )
 
@@ -41,9 +42,10 @@ func (service *Service) UpdateSettings(ctx context.Context, actor authz.StaffAct
 }
 
 type Service struct {
-	repository Repository
-	authorizer authz.Authorizer
-	now        func() time.Time
+	repository   Repository
+	authorizer   authz.Authorizer
+	artworkStore objectstorage.Store
+	now          func() time.Time
 }
 
 func NewService(repository Repository, authorizer authz.Authorizer, now func() time.Time) (*Service, error) {

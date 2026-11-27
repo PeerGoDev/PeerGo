@@ -66,6 +66,33 @@ export function useCreateMedalDefinition() {
   })
 }
 
+export function useUploadMedalArtwork() {
+  return useMutation({
+    mutationFn: async (input: {
+      file: File
+      mode: "create" | "update"
+      csrfToken: string
+    }) => {
+      const { data, error, response } = await apiClient.POST(
+        "/api/v1/admin/settings/medals/artwork",
+        {
+          params: {
+            query: { mode: input.mode },
+            header: { "X-CSRF-Token": input.csrfToken },
+          },
+          headers: { "Content-Type": "application/octet-stream" },
+          body: "",
+          bodySerializer: () => input.file,
+        }
+      )
+      if (!response.ok || !data) {
+        throw new ApiProblemError(response.status, error)
+      }
+      return data
+    },
+  })
+}
+
 export function useUpdateMedalSettings() {
   const queryClient = useQueryClient()
   return useMutation({

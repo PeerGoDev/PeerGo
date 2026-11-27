@@ -66,7 +66,7 @@ export function NumberedPagination({
   const pages = paginationWindow(currentPage, totalPages)
 
   function jumpToRequestedPage() {
-    const requestedPage = Number.parseInt(jumpPage, 10)
+    const requestedPage = Number(jumpPage)
     if (
       !Number.isSafeInteger(requestedPage) ||
       requestedPage < 1 ||

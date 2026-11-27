@@ -6456,11 +6456,15 @@ func testHandlerWithUserAdministration(t *testing.T, staffIdentityService httpap
 	)
 }
 
-func testHandlerWithEveryServiceAndUsers(t *testing.T, identityService httpapi.IdentityService, staffIdentityService httpapi.StaffIdentityService, staffEnrollmentService httpapi.StaffEnrollmentService, authorizationService httpapi.AuthorizationService, grantAdministrationService httpapi.GrantAdministrationService, categoryAdministrationService httpapi.CategoryAdministrationService, siteDisplaySettingsService httpapi.SiteDisplaySettingsService, userAdministrationService httpapi.UserAdministrationService) http.Handler {
+func testHandlerWithEveryServiceAndUsers(t *testing.T, identityService httpapi.IdentityService, staffIdentityService httpapi.StaffIdentityService, staffEnrollmentService httpapi.StaffEnrollmentService, authorizationService httpapi.AuthorizationService, grantAdministrationService httpapi.GrantAdministrationService, categoryAdministrationService httpapi.CategoryAdministrationService, siteDisplaySettingsService httpapi.SiteDisplaySettingsService, userAdministrationService httpapi.UserAdministrationService, medalServices ...httpapi.MedalAdministrationService) http.Handler {
 	t.Helper()
 
 	now := time.Date(2026, time.August, 5, 12, 0, 0, 0, time.UTC)
 	service := catalog.NewService(catalog.NewDemoRepository(now), func() time.Time { return now })
+	var medalService httpapi.MedalAdministrationService
+	if len(medalServices) > 0 {
+		medalService = medalServices[0]
+	}
 	handler, err := New(Dependencies{
 		Catalog:                     service,
 		Identity:                    identityService,
@@ -6479,6 +6483,7 @@ func testHandlerWithEveryServiceAndUsers(t *testing.T, identityService httpapi.I
 		Wiki:                        unavailableWikiService{},
 		SiteDisplaySettings:         siteDisplaySettingsService,
 		UserAdministration:          userAdministrationService,
+		MedalAdministration:         medalService,
 		Notifications:               unavailableNotificationService{},
 		TrafficOverview:             unavailableTrafficOverviewService{},
 		EconomyOverview:             unavailableEconomyOverviewService{},

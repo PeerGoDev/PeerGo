@@ -21,6 +21,9 @@ CustomNavigationItem:
     show_on_appeal:
       type: boolean
       description: 是否作为公开联系方式显示在封禁申诉页。
+    show_on_home:
+      type: boolean
+      description: 是否显示在已登录会员的首页顶部。
 
 SiteInfo:
   type: object
@@ -71,7 +74,7 @@ SiteInfo:
     custom_navigation_items:
       type: array
       maxItems: 12
-      description: 按后台顺序排列的已启用侧栏链接与公开申诉联系方式。
+      description: 按后台顺序排列的侧栏链接、会员首页链接与公开申诉联系方式。
       items:
         $ref: "#/CustomNavigationItem"
 

@@ -2,8 +2,6 @@ import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "react-router"
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CircleAlertIcon,
   CrownIcon,
   DownloadIcon,
@@ -31,11 +29,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "~/components/ui/input-group"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-} from "~/components/ui/pagination"
+import { NumberedPagination } from "~/shared/components/numbered-pagination"
 import { Skeleton } from "~/components/ui/skeleton"
 import {
   Select,
@@ -342,11 +336,16 @@ function UsersContent({
           />
 
           {totalPages > 1 ? (
-            <ManagedUserPagination
-              filters={filters}
-              total={users.data.total}
+            <NumberedPagination
+              currentPage={filters.page}
               totalPages={totalPages}
+              ariaLabel="用户列表分页"
+              summary={
+                "共 " + users.data.total.toLocaleString("zh-CN") + " 条记录"
+              }
               onPageChange={(page) => updateFilters({ page })}
+              showJump
+              className="pt-1"
             />
           ) : null}
         </CardContent>
@@ -492,58 +491,6 @@ function UserDirectorySummaryCards({
         )
       })}
     </div>
-  )
-}
-
-function ManagedUserPagination({
-  filters,
-  total,
-  totalPages,
-  onPageChange,
-}: {
-  filters: ManagedUserFilters
-  total: number
-  totalPages: number
-  onPageChange: (page: number) => void
-}) {
-  return (
-    <Pagination
-      className="flex-col gap-2 pt-1 sm:flex-row sm:justify-between"
-      aria-label="用户列表分页"
-    >
-      <span className="text-sm text-muted-foreground">
-        共 {total.toLocaleString("zh-CN")} 条记录
-      </span>
-      <PaginationContent className="max-w-full">
-        <PaginationItem>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={filters.page === 1}
-            onClick={() => onPageChange(filters.page - 1)}
-          >
-            <ChevronLeftIcon data-icon="inline-start" />
-            上一页
-          </Button>
-        </PaginationItem>
-        <PaginationItem>
-          <span className="px-3 text-sm text-muted-foreground tabular-nums">
-            {filters.page} / {totalPages}
-          </span>
-        </PaginationItem>
-        <PaginationItem>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={filters.page === totalPages}
-            onClick={() => onPageChange(filters.page + 1)}
-          >
-            下一页
-            <ChevronRightIcon data-icon="inline-end" />
-          </Button>
-        </PaginationItem>
-      </PaginationContent>
-    </Pagination>
   )
 }
 

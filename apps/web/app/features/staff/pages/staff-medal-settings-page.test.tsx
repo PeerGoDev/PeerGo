@@ -1,16 +1,62 @@
 import { QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import {
   type MedalDefinition,
   medalDefinitionOverviewQueryOptions,
 } from "~/features/staff/api/medal-administration.queries"
 import { StaffMedalSettingsPage } from "~/features/staff/pages/staff-medal-settings-page"
+import { MedalDefinitionDialog } from "~/features/staff/components/medal-definition-dialog"
 import { createStaffPageQueryClient } from "~/features/staff/test-utils/create-staff-page-query-client"
+import { apiClient } from "~/shared/api/client"
 
 describe("StaffMedalSettingsPage", () => {
+  it("fills the image address after uploading small artwork", async () => {
+    const user = userEvent.setup()
+    const csrfToken = "s".repeat(43)
+    const path = "/api/v1/medal-artwork/" + "a".repeat(64) + ".png"
+    const upload = vi.spyOn(apiClient, "POST").mockResolvedValue({
+      data: { path },
+      response: new Response(null, { status: 201 }),
+    })
+    try {
+      render(
+        <QueryClientProvider client={createStaffPageQueryClient([])}>
+          <MedalDefinitionDialog
+            open
+            onOpenChange={() => {}}
+            csrfToken={csrfToken}
+          />
+        </QueryClientProvider>
+      )
+      const file = new File(["image"], "medal.png", { type: "image/png" })
+      await user.upload(screen.getByLabelText("上传小图"), file)
+      await waitFor(() =>
+        expect(screen.getByLabelText("小图地址")).toHaveValue(path)
+      )
+      expect(screen.getByAltText("勋章图片预览")).toHaveAttribute("src", path)
+      expect(upload).toHaveBeenCalledWith(
+        "/api/v1/admin/settings/medals/artwork",
+        expect.objectContaining({
+          params: {
+            query: { mode: "create" },
+            header: { "X-CSRF-Token": csrfToken },
+          },
+          headers: { "Content-Type": "application/octet-stream" },
+        })
+      )
+      const options = upload.mock.calls[0]?.[1] as unknown as {
+        bodySerializer: () => File
+      }
+      expect(options.bodySerializer()).toBe(file)
+    } finally {
+      upload.mockRestore()
+    }
+  })
+
   it("renders imported definitions, holdings and missing-image status", async () => {
     const queryClient = createStaffPageQueryClient([
       "economy.medal.manage.read",

@@ -44,6 +44,8 @@ describe("StaffTorrentsPage", () => {
       "min-w-[1160px]",
       "lg:min-w-[1280px]"
     )
+    expect(screen.getByRole("button", { name: "第 450 页" })).toBeVisible()
+    expect(screen.getByRole("spinbutton", { name: "跳转页码" })).toBeVisible()
     expect(
       screen.getAllByRole("link", { name: /演示种子/ })[0]
     ).toHaveAttribute("href", "/torrents/1234")

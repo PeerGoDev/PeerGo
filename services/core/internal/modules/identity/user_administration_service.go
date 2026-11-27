@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/peergo/peergo/contracts/go/trackeroperationsv1"
 
 	"github.com/peergo/peergo/services/core/internal/modules/authz"
 )
@@ -51,6 +52,10 @@ type ManagedUserContactDirectory interface {
 	Emails(context.Context, []uuid.UUID) (map[uuid.UUID]string, error)
 }
 
+type ManagedUserSeedingTotalsReader interface {
+	SeedingTotals(context.Context, []string) (trackeroperationsv1.UserSeedingTotals, error)
+}
+
 type ManagedUserDataAdministrationRepository interface {
 	AdjustManagedUser(context.Context, ManagedUserAdjustmentCommand) error
 	ListManagedUserNetworkHistory(context.Context, uuid.UUID, time.Time, int) ([]ManagedUserNetworkObservation, error)
@@ -65,6 +70,7 @@ type UserAdministrationService struct {
 	restrictionRepository AccountRestrictionCommandRepository
 	authorizer            authz.Authorizer
 	contactDirectory      ManagedUserContactDirectory
+	seedingTotalsReader   ManagedUserSeedingTotalsReader
 	credentialLifecycle   ManagedUserCredentialLifecycle
 	dataRepository        ManagedUserDataAdministrationRepository
 	now                   func() time.Time
@@ -89,6 +95,11 @@ func NewUserAdministrationServiceWithData(
 	}
 	service.dataRepository = dataRepository
 	return service, nil
+}
+
+// SetSeedingTotalsReader wires the optional live Tracker projection at startup.
+func (service *UserAdministrationService) SetSeedingTotalsReader(reader ManagedUserSeedingTotalsReader) {
+	service.seedingTotalsReader = reader
 }
 
 func NewUserAdministrationService(repository UserAdministrationRepository, restrictionRepository AccountRestrictionCommandRepository, authorizer authz.Authorizer, now func() time.Time, contactDirectories ...ManagedUserContactDirectory) (*UserAdministrationService, error) {
@@ -198,6 +209,21 @@ func (service *UserAdministrationService) List(ctx context.Context, actor authz.
 	}
 	if err := service.enrichManagedUsers(ctx, result.Items); err != nil {
 		return ManagedUserPage{}, err
+	}
+	if service.seedingTotalsReader != nil && len(result.Items) > 0 {
+		userIDs := make([]string, 0, len(result.Items))
+		for _, item := range result.Items {
+			userIDs = append(userIDs, item.ID.String())
+		}
+		// A Tracker outage must not prevent staff from managing accounts.
+		if totals, err := service.seedingTotalsReader.SeedingTotals(ctx, userIDs); err == nil {
+			for i := range result.Items {
+				if total, ok := totals[userIDs[i]]; ok {
+					result.Items[i].SeedingCount = &total.Count
+					result.Items[i].SeedingBytes = &total.Bytes
+				}
+			}
+		}
 	}
 	return result, nil
 }

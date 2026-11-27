@@ -26,7 +26,11 @@ export function UserTrackerActivityCard({
   visibility: "self" | "admin"
 }) {
   const seeding =
-    activity?.items.filter((item) => item.seeding_connections > 0).length ?? 0
+    activity?.items.filter((item) => item.seeding_connections > 0) ?? []
+  const seedingBytes = seeding.reduce(
+    (total, task) => total + BigInt(task.total_size_bytes ?? "0"),
+    0n
+  )
   const leeching =
     activity?.items.filter((item) => item.leeching_connections > 0).length ?? 0
 
@@ -47,7 +51,15 @@ export function UserTrackerActivityCard({
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
-            <Badge variant="secondary">做种 {seeding}</Badge>
+            <Badge variant="secondary">做种 {seeding.length}</Badge>
+            {activity &&
+            !error &&
+            seeding.every((task) => task.total_size_bytes != null) ? (
+              <Badge variant="secondary">
+                {activity.truncated ? "已列出保种体积" : "保种体积"}{" "}
+                {formatBytes(seedingBytes)}
+              </Badge>
+            ) : null}
             <Badge variant="secondary">下载 {leeching}</Badge>
             <Badge variant="outline">
               连接 {activity?.total_connections ?? 0}

@@ -46,6 +46,8 @@ UserTrackerTask:
       type: integer
       minimum: 0
       maximum: 200
+    total_size_bytes:
+      $ref: "./traffic.yaml#/TrafficByteCount"
     leeching_connections:
       type: integer
       minimum: 0

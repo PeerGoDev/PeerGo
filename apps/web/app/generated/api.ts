@@ -950,6 +950,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/medal-artwork/{filename}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                filename: string;
+            };
+            cookie?: never;
+        };
+        /** 读取勋章静态图片 */
+        get: operations["getMedalArtwork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/medals/{medal_id}/purchase": {
         parameters: {
             query?: never;
@@ -4166,6 +4185,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/settings/medals/artwork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 上传新增或编辑勋章使用的图片 */
+        post: operations["uploadMedalArtwork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/settings/medals/{medal_id}": {
         parameters: {
             query?: never;
@@ -4615,6 +4651,10 @@ export interface components {
             downloaded_bytes: string;
             /** @description 唯一站内资产魔力值，始终为整数。 */
             magic_balance: string;
+            /** @description Tracker 当前在线的不同做种数。实时统计不可用时省略。 */
+            seeding_count?: number;
+            /** @description 这些种子的体积之和，使用十进制字节字符串。实时统计不可用时省略。 */
+            seeding_bytes?: string;
             level: number;
             /** @description 当前有效角色；待恢复或尚未完成初始化的账户可为空。 */
             role_names: string[];
@@ -5244,7 +5284,7 @@ export interface components {
             /** @enum {string} */
             default_torrent_view: "list" | "poster";
             show_latest_announcement: boolean;
-            /** @description 按后台顺序排列的已启用侧栏链接与公开申诉联系方式。 */
+            /** @description 按后台顺序排列的侧栏链接、会员首页链接与公开申诉联系方式。 */
             custom_navigation_items: components["schemas"]["CustomNavigationItem"][];
         };
         SiteDisplaySettings: {
@@ -5295,6 +5335,8 @@ export interface components {
             enabled: boolean;
             /** @description 是否作为公开联系方式显示在封禁申诉页。 */
             show_on_appeal?: boolean;
+            /** @description 是否显示在已登录会员的首页顶部。 */
+            show_on_home?: boolean;
         };
         RSSSubscription: {
             /** Format: uuid */
@@ -7913,6 +7955,7 @@ export interface components {
             address_families: ("IPv4" | "IPv6")[];
             active_connections: number;
             seeding_connections: number;
+            total_size_bytes?: components["schemas"]["TrafficByteCount"];
             leeching_connections: number;
             progress_basis_points: number;
             uploaded: components["schemas"]["TrafficByteCount"];
@@ -12427,6 +12470,36 @@ export interface operations {
             };
             401: components["responses"]["ProblemResponse"];
             403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMedalArtwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                filename: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已按内容摘要校验的勋章图片。 */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    "X-Content-Type-Options"?: string;
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/gif": string;
+                    "image/webp": string;
+                };
+            };
+            404: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };
@@ -19678,6 +19751,42 @@ export interface operations {
             400: components["responses"]["ProblemResponse"];
             401: components["responses"]["ProblemResponse"];
             403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    uploadMedalArtwork: {
+        parameters: {
+            query: {
+                mode: "create" | "update";
+            };
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description 图片已经校验并保存到勋章对象目录。 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        path: string;
+                    };
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            401: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            413: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };

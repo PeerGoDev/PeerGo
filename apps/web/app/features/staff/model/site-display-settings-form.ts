@@ -23,6 +23,7 @@ const customNavigationItemSchema = z
     open_in_new_tab: z.boolean(),
     enabled: z.boolean(),
     show_on_appeal: z.boolean().optional(),
+    show_on_home: z.boolean().optional(),
   })
   .refine((item) => isCustomNavigationURL(item.url, item.show_on_appeal), {
     path: ["url"],
@@ -182,19 +183,27 @@ function customNavigationItemsEqual(
         item.url === second[index]?.url &&
         item.open_in_new_tab === second[index]?.open_in_new_tab &&
         item.enabled === second[index]?.enabled &&
-        Boolean(item.show_on_appeal) === Boolean(second[index]?.show_on_appeal)
+        Boolean(item.show_on_appeal) ===
+          Boolean(second[index]?.show_on_appeal) &&
+        Boolean(item.show_on_home) === Boolean(second[index]?.show_on_home)
     )
   )
 }
 
 function customNavigationItemsLabel(items: CustomNavigationItem[]) {
   if (items.length === 0) return "（无）"
-  const visible = items.filter((item) => item.enabled || item.show_on_appeal)
+  const visible = items.filter(
+    (item) => item.enabled || item.show_on_appeal || item.show_on_home
+  )
   if (visible.length === 0) return `${items.length} 项（均停用）`
   const labels = visible.map((item) => {
-    if (!item.show_on_appeal) return item.label
-    const location = item.enabled ? "侧栏、申诉页" : "申诉页"
-    return `${item.label}（${location}）`
+    if (!item.show_on_home && !item.show_on_appeal) return item.label
+    const locations = [
+      item.enabled && "侧栏",
+      item.show_on_home && "首页顶部",
+      item.show_on_appeal && "申诉页",
+    ].filter(Boolean)
+    return item.label + "（" + locations.join("、") + "）"
   })
   return `${items.length} 项：${labels.join("、")}`
 }
