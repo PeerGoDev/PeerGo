@@ -37,6 +37,7 @@ MagicStatementEntry:
           seeding_reward,
           harem_reward,
           reseed_reward,
+          workgroup_payroll,
           activity_reward,
           torrent_purchase,
           promotion_product_purchase,

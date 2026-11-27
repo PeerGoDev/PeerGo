@@ -280,6 +280,14 @@ type ContentTipService interface {
 }
 
 type WorkgroupService interface {
+	MyRetentionTargets(context.Context, string, int, int) ([]workgroups.RetentionTarget, error)
+	ClaimRetentionTarget(context.Context, string, string, int64) error
+	MyRetentionProgress(context.Context, string, string) (workgroups.RetentionProgress, error)
+	StaffRetentionTargets(context.Context, authz.StaffActor, int, int) ([]workgroups.RetentionTarget, error)
+	SaveRetentionTarget(context.Context, authz.StaffActor, int64, int, bool) error
+	StaffRetentionProgress(context.Context, authz.StaffActor, uuid.UUID, string) (workgroups.RetentionProgress, error)
+	StaffReseedPublications(context.Context, authz.StaffActor, uuid.UUID, string, int, int) (workgroups.ReseedPublications, error)
+	MonthlyPayroll(context.Context, authz.StaffActor, workgroups.PayrollInput, string, string) (workgroups.PayrollPreview, error)
 	MyOverview(context.Context, string) (workgroups.MyOverview, error)
 	MyContributionCycles(context.Context, string, workgroups.GroupKind, int) (workgroups.ContributionCyclePage, error)
 	MyTasks(context.Context, string, int, int) (workgroups.TaskAssignmentPage, error)

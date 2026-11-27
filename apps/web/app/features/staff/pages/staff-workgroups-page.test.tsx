@@ -205,7 +205,9 @@ describe("StaffWorkgroupsPage", () => {
     ).toBeVisible()
     expect(screen.getByText("证据有缺口")).toBeVisible()
     expect(screen.getByText("待补证据")).toBeVisible()
-    expect(screen.getByText("证据时间窗不连续，暂不能形成结论。")).toBeVisible()
+    expect(
+      screen.getByText("部分小时的做种记录缺失，证据补齐后才能判定是否达标。")
+    ).toBeVisible()
   })
 })
 

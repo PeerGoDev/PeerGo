@@ -96,17 +96,7 @@ WITH bounds AS (
 )
 SELECT month.membership_id, month.user_id, month.version,
        month.tenure_transition_id, month.period_starts_at,
-       policy.revision, policy.target_value, policy.allowed_misses,
-       COALESCE((
-           SELECT count(*)::bigint
-           FROM review.torrent_decisions AS decision
-           JOIN workgroups.membership_transitions AS publish_transition
-             ON publish_transition.id = decision.membership_transition_id
-           WHERE decision.resolution_source = 'trusted_workgroup'
-             AND publish_transition.membership_id = month.membership_id
-             AND decision.occurred_at >= month.period_starts_at
-             AND decision.occurred_at < month.period_starts_at + interval '1 month'
-       ), 0)::bigint AS current_value
+       policy.revision, policy.target_value, policy.allowed_misses, publication.counted
 FROM eligible_months AS month
 JOIN LATERAL (
     SELECT revision, target_value, enforcement_mode, allowed_misses
@@ -116,7 +106,14 @@ JOIN LATERAL (
     ORDER BY effective_from DESC, revision DESC
     LIMIT 1
 ) AS policy ON policy.enforcement_mode = 'miss_limit'
-WHERE NOT EXISTS (
+CROSS JOIN LATERAL (
+    SELECT count(*) FILTER (WHERE contribution_status = 'counted') AS counted,
+           count(*) FILTER (WHERE contribution_status = 'pending') AS pending
+    FROM workgroups.reseed_publications(month.membership_id, month.period_starts_at,
+        month.period_starts_at + interval '1 month', $1)
+) AS publication
+WHERE (publication.pending = 0 OR publication.counted >= policy.target_value)
+AND NOT EXISTS (
     SELECT 1
     FROM workgroups.contribution_assessments AS assessment
     WHERE assessment.membership_id = month.membership_id

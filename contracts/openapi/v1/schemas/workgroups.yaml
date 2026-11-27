@@ -1,3 +1,130 @@
+WorkgroupMonth:
+  type: string
+  pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+
+RetentionTarget:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, title, size_bytes, required_hours]
+  properties:
+    torrent_id: {"type":"integer","format":"int64","minimum":1}
+    title: {"type":"string"}
+    size_bytes: {"$ref":"economy.yaml#/UnsignedIntegerText"}
+    required_hours: {"type":"integer","minimum":1,"maximum":744}
+    claimed_at: {"type":"string","format":"date-time"}
+
+RetentionTargetList:
+  type: object
+  additionalProperties: false
+  required: [items]
+  properties:
+    items: {"type":"array","items":{"$ref":"#/RetentionTarget"}}
+
+RetentionItem:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, title, size_bytes, required_hours, active_seconds, qualified]
+  properties:
+    torrent_id: {"type":"integer","format":"int64","minimum":1}
+    title: {"type":"string"}
+    size_bytes: {"$ref":"economy.yaml#/UnsignedIntegerText"}
+    required_hours: {"type":"integer","minimum":1,"maximum":744}
+    claimed_at: {"type":"string","format":"date-time"}
+    active_seconds: {"type":"integer","format":"int64","minimum":0}
+    qualified: {"type":"boolean"}
+
+RetentionProgress:
+  type: object
+  additionalProperties: false
+  required: [month, items, qualified_count, qualified_bytes, expected_hours, complete_hours]
+  properties:
+    month: {"$ref":"#/WorkgroupMonth"}
+    items: {"type":"array","items":{"$ref":"#/RetentionItem"}}
+    qualified_count: {"type":"integer","minimum":0}
+    qualified_bytes: {"$ref":"economy.yaml#/UnsignedIntegerText"}
+    expected_hours: {"type":"integer","minimum":0}
+    complete_hours: {"type":"integer","minimum":0}
+
+ReseedPublication:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, title, category, submitted_at, resolution_source, status, reason]
+  properties:
+    torrent_id: {"type":"integer","format":"int64","minimum":1}
+    title: {"type":"string"}
+    category: {"type":"string"}
+    submitted_at: {"type":"string","format":"date-time"}
+    published_at: {"type":"string","format":"date-time"}
+    resolution_source: {"type":"string"}
+    status: {"type":"string","enum":["counted","pending","excluded"]}
+    reason: {"type":"string"}
+
+ReseedPublicationPage:
+  type: object
+  additionalProperties: false
+  required: [items, counted, pending, total]
+  properties:
+    items: {"type":"array","items":{"$ref":"#/ReseedPublication"}}
+    counted: {"type":"integer","minimum":0}
+    pending: {"type":"integer","minimum":0}
+    total: {"type":"integer","minimum":0}
+
+ClaimRetentionTargetRequest:
+  type: object
+  additionalProperties: false
+  required: [torrent_id]
+  properties:
+    torrent_id: {"type":"integer","format":"int64","minimum":1}
+
+SaveRetentionTargetRequest:
+  type: object
+  additionalProperties: false
+  required: [torrent_id, retire]
+  properties:
+    torrent_id: {"type":"integer","format":"int64","minimum":1}
+    required_hours: {"type":"integer","minimum":1,"maximum":744}
+    retire: {"type":"boolean"}
+
+WorkgroupPayrollRequest:
+  type: object
+  additionalProperties: false
+  required: [month, amount, minimum_count, minimum_bytes]
+  properties:
+    month: {"$ref":"#/WorkgroupMonth"}
+    amount: {"type":"integer","format":"int64","minimum":1,"maximum":1000000}
+    minimum_count: {"type":"integer","minimum":0}
+    minimum_bytes: {"$ref":"economy.yaml#/UnsignedIntegerText"}
+
+ConfirmWorkgroupPayrollRequest:
+  type: object
+  additionalProperties: false
+  required: [month, amount, minimum_count, minimum_bytes, preview_digest]
+  properties:
+    month: {"$ref":"#/WorkgroupMonth"}
+    amount: {"type":"integer","format":"int64","minimum":1,"maximum":1000000}
+    minimum_count: {"type":"integer","minimum":0}
+    minimum_bytes: {"$ref":"economy.yaml#/UnsignedIntegerText"}
+    preview_digest: {"type":"string","pattern":"^[0-9a-f]{64}$"}
+
+WorkgroupPayrollPreview:
+  type: object
+  additionalProperties: false
+  required: [month, username, group_kind, amount, state, contribution, target, qualified_bytes, pending_count, missing_hours, preview_digest]
+  properties:
+    month: {"$ref":"#/WorkgroupMonth"}
+    username: {"type":"string"}
+    group_kind: {"$ref":"#/WorkgroupKind"}
+    amount: {"type":"integer","format":"int64","minimum":0}
+    state: {"type":"string","enum":["paid","eligible","pending_evidence","below_target","in_progress"]}
+    contribution: {"type":"integer","format":"int64","minimum":0}
+    target: {"type":"integer","format":"int64","minimum":0}
+    qualified_bytes: {"$ref":"economy.yaml#/UnsignedIntegerText"}
+    pending_count: {"type":"integer","minimum":0}
+    missing_hours: {"type":"integer","minimum":0}
+    paid_at: {"type":"string","format":"date-time"}
+    transaction_id: {"type":"string","format":"uuid"}
+    preview_digest: {"type":"string"}
+
 WorkgroupKind:
   type: string
   enum: [reseed, review, retention]

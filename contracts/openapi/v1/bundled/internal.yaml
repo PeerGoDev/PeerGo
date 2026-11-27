@@ -3231,6 +3231,327 @@ paths:
           $ref: '#/components/responses/ProblemResponse'
         default:
           $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/workgroups/retention/targets:
+    get:
+      operationId: listMyRetentionTargets
+      summary: 查看可认领的保种种子
+      tags:
+        - workgroups
+      x-audience:
+        - web
+      x-owner: core-workgroups
+      x-permission: workgroup.read.self
+      x-credential-audience: web-session
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000000
+            default: 0
+      responses:
+        '200':
+          description: 工作组业务结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionTargetList'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    post:
+      operationId: claimMyRetentionTarget
+      summary: 认领一个保种种子
+      tags:
+        - workgroups
+      x-audience:
+        - web
+      x-owner: core-workgroups
+      x-permission: workgroup.read.self
+      x-credential-audience: web-session
+      parameters:
+        - $ref: '#/components/parameters/WebCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimRetentionTargetRequest'
+      responses:
+        '204':
+          description: 操作完成。
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/me/workgroups/retention/progress:
+    get:
+      operationId: getMyRetentionProgress
+      summary: 查看本人逐种保种进度
+      tags:
+        - workgroups
+      x-audience:
+        - web
+      x-owner: core-workgroups
+      x-permission: workgroup.read.self
+      x-credential-audience: web-session
+      parameters:
+        - name: month
+          in: query
+          schema:
+            $ref: '#/components/schemas/WorkgroupMonth'
+      responses:
+        '200':
+          description: 工作组业务结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionProgress'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/workgroups/retention/targets:
+    get:
+      operationId: listStaffRetentionTargets
+      summary: 查看保种认领清单
+      tags:
+        - workgroups
+      x-audience:
+        - staff
+      x-owner: core-workgroups
+      x-permission: workgroup.manage.read
+      x-credential-audience: staff-session
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000000
+            default: 0
+      responses:
+        '200':
+          description: 工作组业务结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionTargetList'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+    post:
+      operationId: saveStaffRetentionTarget
+      summary: 添加或移出保种认领清单
+      tags:
+        - workgroups
+      x-audience:
+        - staff
+      x-owner: core-workgroups
+      x-permission: workgroup.membership.manage
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveRetentionTargetRequest'
+      responses:
+        '204':
+          description: 操作完成。
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/workgroups/retention/memberships/{membership_id}/claims:
+    get:
+      operationId: getStaffRetentionProgress
+      summary: 查看保种组成员逐种进度
+      tags:
+        - workgroups
+      x-audience:
+        - staff
+      x-owner: core-workgroups
+      x-permission: workgroup.manage.read
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/MembershipIDPathParameter'
+        - name: month
+          in: query
+          schema:
+            $ref: '#/components/schemas/WorkgroupMonth'
+      responses:
+        '200':
+          description: 工作组业务结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionProgress'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/workgroups/reseed/memberships/{membership_id}/publications:
+    get:
+      operationId: listStaffReseedPublications
+      summary: 逐条核对转种投稿及审核结果
+      tags:
+        - workgroups
+      x-audience:
+        - staff
+      x-owner: core-workgroups
+      x-permission: workgroup.manage.read
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/MembershipIDPathParameter'
+        - name: month
+          in: query
+          schema:
+            $ref: '#/components/schemas/WorkgroupMonth'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000000
+            default: 0
+      responses:
+        '200':
+          description: 工作组业务结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReseedPublicationPage'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/workgroups/{group_kind}/memberships/{membership_id}/payroll/preview:
+    post:
+      operationId: previewStaffWorkgroupPayroll
+      summary: 预览单个成员的工作组月结工资
+      tags:
+        - workgroups
+      x-audience:
+        - staff
+      x-owner: core-workgroups
+      x-permission: workgroup.manage.read
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/GroupKindPathParameter'
+        - $ref: '#/components/parameters/MembershipIDPathParameter'
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkgroupPayrollRequest'
+      responses:
+        '200':
+          description: 工作组业务结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkgroupPayrollPreview'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
+  /api/v1/admin/workgroups/{group_kind}/memberships/{membership_id}/payroll/issue:
+    post:
+      operationId: issueStaffWorkgroupPayroll
+      summary: 确认预览并发放工作组月结工资
+      tags:
+        - workgroups
+      x-audience:
+        - staff
+      x-owner: core-workgroups
+      x-permission: workgroup.payroll.issue
+      x-credential-audience: staff-session
+      parameters:
+        - $ref: '#/components/parameters/GroupKindPathParameter'
+        - $ref: '#/components/parameters/MembershipIDPathParameter'
+        - $ref: '#/components/parameters/StaffCSRFHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmWorkgroupPayrollRequest'
+      responses:
+        '200':
+          description: 工作组业务结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkgroupPayrollPreview'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '403':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        default:
+          $ref: '#/components/responses/ProblemResponse'
   /api/v1/me/workgroups/{group_kind}/applications:
     post:
       operationId: createMyWorkgroupApplication
@@ -13157,6 +13478,7 @@ components:
         - workgroup.contribution.reminder.issue
         - workgroup.manage.read
         - workgroup.membership.manage
+        - workgroup.payroll.issue
         - workgroup.read.self
         - workgroup.task.publish
         - workgroup.task.review
@@ -19927,6 +20249,7 @@ components:
             - seeding_reward
             - harem_reward
             - reseed_reward
+            - workgroup_payroll
             - activity_reward
             - torrent_purchase
             - promotion_product_purchase
@@ -24578,6 +24901,292 @@ components:
           $ref: '#/components/schemas/WorkgroupApplication'
         eligibility:
           $ref: '#/components/schemas/ReviewerEligibility'
+    RetentionTarget:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent_id
+        - title
+        - size_bytes
+        - required_hours
+      properties:
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+        size_bytes:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        required_hours:
+          type: integer
+          minimum: 1
+          maximum: 744
+        claimed_at:
+          type: string
+          format: date-time
+    RetentionTargetList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RetentionTarget'
+    ClaimRetentionTargetRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent_id
+      properties:
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
+    WorkgroupMonth:
+      type: string
+      pattern: ^[0-9]{4}-(0[1-9]|1[0-2])$
+    RetentionItem:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent_id
+        - title
+        - size_bytes
+        - required_hours
+        - active_seconds
+        - qualified
+      properties:
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+        size_bytes:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        required_hours:
+          type: integer
+          minimum: 1
+          maximum: 744
+        claimed_at:
+          type: string
+          format: date-time
+        active_seconds:
+          type: integer
+          format: int64
+          minimum: 0
+        qualified:
+          type: boolean
+    RetentionProgress:
+      type: object
+      additionalProperties: false
+      required:
+        - month
+        - items
+        - qualified_count
+        - qualified_bytes
+        - expected_hours
+        - complete_hours
+      properties:
+        month:
+          $ref: '#/components/schemas/WorkgroupMonth'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RetentionItem'
+        qualified_count:
+          type: integer
+          minimum: 0
+        qualified_bytes:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        expected_hours:
+          type: integer
+          minimum: 0
+        complete_hours:
+          type: integer
+          minimum: 0
+    SaveRetentionTargetRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent_id
+        - retire
+      properties:
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
+        required_hours:
+          type: integer
+          minimum: 1
+          maximum: 744
+        retire:
+          type: boolean
+    ReseedPublication:
+      type: object
+      additionalProperties: false
+      required:
+        - torrent_id
+        - title
+        - category
+        - submitted_at
+        - resolution_source
+        - status
+        - reason
+      properties:
+        torrent_id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+        category:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        published_at:
+          type: string
+          format: date-time
+        resolution_source:
+          type: string
+        status:
+          type: string
+          enum:
+            - counted
+            - pending
+            - excluded
+        reason:
+          type: string
+    ReseedPublicationPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - counted
+        - pending
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReseedPublication'
+        counted:
+          type: integer
+          minimum: 0
+        pending:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    WorkgroupPayrollRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - month
+        - amount
+        - minimum_count
+        - minimum_bytes
+      properties:
+        month:
+          $ref: '#/components/schemas/WorkgroupMonth'
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000
+        minimum_count:
+          type: integer
+          minimum: 0
+        minimum_bytes:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+    WorkgroupPayrollPreview:
+      type: object
+      additionalProperties: false
+      required:
+        - month
+        - username
+        - group_kind
+        - amount
+        - state
+        - contribution
+        - target
+        - qualified_bytes
+        - pending_count
+        - missing_hours
+        - preview_digest
+      properties:
+        month:
+          $ref: '#/components/schemas/WorkgroupMonth'
+        username:
+          type: string
+        group_kind:
+          $ref: '#/components/schemas/WorkgroupKind'
+        amount:
+          type: integer
+          format: int64
+          minimum: 0
+        state:
+          type: string
+          enum:
+            - paid
+            - eligible
+            - pending_evidence
+            - below_target
+            - in_progress
+        contribution:
+          type: integer
+          format: int64
+          minimum: 0
+        target:
+          type: integer
+          format: int64
+          minimum: 0
+        qualified_bytes:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        pending_count:
+          type: integer
+          minimum: 0
+        missing_hours:
+          type: integer
+          minimum: 0
+        paid_at:
+          type: string
+          format: date-time
+        transaction_id:
+          type: string
+          format: uuid
+        preview_digest:
+          type: string
+    ConfirmWorkgroupPayrollRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - month
+        - amount
+        - minimum_count
+        - minimum_bytes
+        - preview_digest
+      properties:
+        month:
+          $ref: '#/components/schemas/WorkgroupMonth'
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000
+        minimum_count:
+          type: integer
+          minimum: 0
+        minimum_bytes:
+          $ref: '#/components/schemas/UnsignedIntegerText'
+        preview_digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
     WorkgroupContributionDisciplinaryAction:
       type: string
       enum:
@@ -30194,6 +30803,13 @@ components:
       schema:
         type: string
         format: uuid
+    MembershipIDPathParameter:
+      name: membership_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     GroupKindPathParameter:
       name: group_kind
       in: path
@@ -30239,13 +30855,6 @@ components:
         format: uuid
     SubmissionIDPathParameter:
       name: submission_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    MembershipIDPathParameter:
-      name: membership_id
       in: path
       required: true
       schema:

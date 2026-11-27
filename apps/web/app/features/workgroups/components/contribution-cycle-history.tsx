@@ -102,7 +102,10 @@ function ContributionCycleRow({
       <TableCell className="align-top">
         <AssessmentBadge state={cycle.assessment_state} />
         <div className="mt-1 max-w-48 text-xs text-muted-foreground">
-          {explanationLabel(cycle.explanation_code)}
+          {cycle.group_kind === "reseed" &&
+          cycle.explanation_code === "evidence_incomplete"
+            ? "还有在组期间提交的种子待审核，暂缓判断是否达标。"
+            : explanationLabel(cycle.explanation_code)}
         </div>
         {cycle.reminder ? (
           <div className="mt-2">
@@ -215,7 +218,7 @@ export function explanationLabel(
     case "membership_inactive":
       return "该月没有有效成员资格。"
     case "evidence_incomplete":
-      return "证据时间窗不连续，暂不能形成结论。"
+      return "部分小时的做种记录缺失，证据补齐后才能判定是否达标。"
     case "evidence_unavailable":
       return "缺少可核验证据，暂不能形成结论。"
   }

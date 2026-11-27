@@ -5,11 +5,11 @@ type Metric = components["schemas"]["WorkgroupContributionProgress"]["metric"]
 export function contributionMetricLabel(metric: Metric) {
   switch (metric) {
     case "trusted_torrents_published":
-      return "本月可信发布"
+      return "本月有效发布"
     case "torrent_review_votes":
       return "本月有效审核"
     case "seeding_active_seconds":
-      return "本月有效做种"
+      return "本月累计做种时长"
   }
 }
 

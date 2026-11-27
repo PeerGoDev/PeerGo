@@ -173,6 +173,7 @@ CapabilityAction:
     - workgroup.contribution.reminder.issue
     - workgroup.manage.read
     - workgroup.membership.manage
+    - workgroup.payroll.issue
     - workgroup.read.self
     - workgroup.task.publish
     - workgroup.task.review

@@ -9,7 +9,7 @@ import {
 describe("workgroup contribution formatting", () => {
   it("keeps fixed business metric labels", () => {
     expect(contributionMetricLabel("trusted_torrents_published")).toBe(
-      "本月可信发布"
+      "本月有效发布"
     )
     expect(contributionMetricLabel("torrent_review_votes")).toBe("本月有效审核")
   })

@@ -650,6 +650,7 @@ function magicSourceLabel(value: string) {
     seeding_reward: "做种奖励",
     harem_reward: "后宫奖励",
     reseed_reward: "复活奖励",
+    workgroup_payroll: "工作组工资",
     activity_reward: "活动奖励",
     torrent_purchase: "种子购买",
     promotion_product_purchase: "种子促销",

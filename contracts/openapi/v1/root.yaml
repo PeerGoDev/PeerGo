@@ -156,6 +156,20 @@ paths:
     $ref: "./domains/magicstore.yaml#/MyPvPChallengeCancelPath"
   /api/v1/me/workgroups:
     $ref: "./domains/workgroups.yaml#/MyWorkgroupsPath"
+  /api/v1/me/workgroups/retention/targets:
+    $ref: "./domains/workgroups.yaml#/MyRetentionTargetsPath"
+  /api/v1/me/workgroups/retention/progress:
+    $ref: "./domains/workgroups.yaml#/MyRetentionProgressPath"
+  /api/v1/admin/workgroups/retention/targets:
+    $ref: "./domains/workgroups.yaml#/StaffRetentionTargetsPath"
+  /api/v1/admin/workgroups/retention/memberships/{membership_id}/claims:
+    $ref: "./domains/workgroups.yaml#/StaffRetentionProgressPath"
+  /api/v1/admin/workgroups/reseed/memberships/{membership_id}/publications:
+    $ref: "./domains/workgroups.yaml#/StaffReseedPublicationsPath"
+  /api/v1/admin/workgroups/{group_kind}/memberships/{membership_id}/payroll/preview:
+    $ref: "./domains/workgroups.yaml#/StaffPayrollPreviewPath"
+  /api/v1/admin/workgroups/{group_kind}/memberships/{membership_id}/payroll/issue:
+    $ref: "./domains/workgroups.yaml#/StaffPayrollIssuePath"
   /api/v1/me/workgroups/{group_kind}/applications:
     $ref: "./domains/workgroups.yaml#/MyWorkgroupApplicationsPath"
   /api/v1/me/workgroups/{group_kind}/contributions:

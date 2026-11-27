@@ -104,6 +104,12 @@ import {
 import { StaffAccessGate } from "~/features/staff/components/staff-access-gate"
 import { StaffPageFrame } from "~/features/staff/components/staff-page-frame"
 import { StaffWorkgroupTaskPanel } from "~/features/staff/components/staff-workgroup-task-panel"
+import {
+  ReseedPublicationPanel,
+  RetentionProgressPanel,
+  RetentionTargetList,
+  WorkgroupPayrollPanel,
+} from "~/features/workgroups/components/workgroup-monthly"
 import { hasCapability } from "~/features/staff/model/capability"
 import { requestErrorDescription } from "~/shared/api/problem"
 import { formatBytes } from "~/shared/formatters/bytes"
@@ -146,6 +152,7 @@ export function StaffWorkgroupsPage() {
       {({ session, capabilities }) => (
         <WorkgroupsContent
           csrfToken={session.csrf_token}
+          userId={session.user.id}
           canDecide={hasCapability(
             capabilities,
             "workgroup.application.decide"
@@ -161,6 +168,7 @@ export function StaffWorkgroupsPage() {
           )}
           canPublishTask={hasCapability(capabilities, "workgroup.task.publish")}
           canReviewTask={hasCapability(capabilities, "workgroup.task.review")}
+          canPay={hasCapability(capabilities, "workgroup.payroll.issue")}
         />
       )}
     </StaffAccessGate>
@@ -169,20 +177,24 @@ export function StaffWorkgroupsPage() {
 
 function WorkgroupsContent({
   csrfToken,
+  userId,
   canDecide,
   canManage,
   canIssuePolicy,
   canIssueReminder,
   canPublishTask,
   canReviewTask,
+  canPay,
 }: {
   csrfToken: string
+  userId: string
   canDecide: boolean
   canManage: boolean
   canIssuePolicy: boolean
   canIssueReminder: boolean
   canPublishTask: boolean
   canReviewTask: boolean
+  canPay: boolean
 }) {
   const [groupKind, setGroupKind] = React.useState<WorkgroupKind>("review")
   const [applicationDialog, setApplicationDialog] =
@@ -320,6 +332,14 @@ function WorkgroupsContent({
         </CardContent>
       </Card>
 
+      {groupKind === "retention" ? (
+        <RetentionTargetList
+          csrfToken={csrfToken}
+          staff
+          canManage={canManage}
+          userKey={userId}
+        />
+      ) : null}
       <StaffWorkgroupTaskPanel
         groupKind={groupKind}
         csrfToken={csrfToken}
@@ -373,6 +393,7 @@ function WorkgroupsContent({
         membership={historyMembership}
         csrfToken={csrfToken}
         canIssueReminder={canIssueReminder}
+        canPay={canPay}
         onOpenChange={(open) => !open && setHistoryMembership(undefined)}
       />
       <GrantMembershipDialog
@@ -967,18 +988,26 @@ function StaffContributionHistorySheet({
   membership,
   csrfToken,
   canIssueReminder,
+  canPay,
   onOpenChange,
 }: {
   membership?: WorkgroupMembership
   csrfToken: string
   canIssueReminder: boolean
+  canPay: boolean
   onOpenChange: (open: boolean) => void
 }) {
   const [reminderCycle, setReminderCycle] =
     React.useState<WorkgroupContributionCycle>()
+  const [panel, setPanel] = React.useState<"history" | "details" | "payroll">(
+    "history"
+  )
   const kind = membership?.group_kind ?? "review"
   const membershipId = membership?.id ?? "00000000-0000-0000-0000-000000000000"
-  React.useEffect(() => setReminderCycle(undefined), [membershipId])
+  React.useEffect(() => {
+    setReminderCycle(undefined)
+    setPanel("history")
+  }, [membershipId])
   const cycles = useQuery({
     ...adminWorkgroupContributionCyclesQueryOptions(kind, membershipId),
     enabled: Boolean(membership),
@@ -1001,65 +1030,115 @@ function StaffContributionHistorySheet({
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
-            {cycles.isPending ? <Skeleton className="h-56 w-full" /> : null}
-            {cycles.isError ? (
-              <Alert variant="destructive">
-                <CircleAlertIcon />
-                <AlertTitle>贡献历史暂时无法读取</AlertTitle>
-                <AlertDescription>
-                  {requestErrorDescription(
-                    cycles.error,
-                    "请稍后重试，历史证据不会被修改。"
-                  )}
-                </AlertDescription>
-                <AlertAction>
+            {membership ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  aria-pressed={panel === "history"}
+                  onClick={() => setPanel("history")}
+                >
+                  历史评估
+                </Button>
+                {kind !== "review" ? (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => void cycles.refetch()}
+                    aria-pressed={panel === "details"}
+                    onClick={() => setPanel("details")}
                   >
-                    <RefreshCwIcon data-icon="inline-start" />
-                    重试
+                    {kind === "retention" ? "认领进度" : "转种明细"}
                   </Button>
-                </AlertAction>
-              </Alert>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  aria-pressed={panel === "payroll"}
+                  onClick={() => setPanel("payroll")}
+                >
+                  月结工资
+                </Button>
+              </div>
             ) : null}
-            {cycles.data?.items.length === 0 ? (
-              <Empty className="border">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <HistoryIcon />
-                  </EmptyMedia>
-                  <EmptyTitle>还没有贡献周期</EmptyTitle>
-                  <EmptyDescription>
-                    成员资格生效后会从对应自然月开始形成历史。
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : null}
-            {cycles.data?.items.length ? (
-              <ContributionCycleHistory
-                items={cycles.data.items}
-                renderAction={
-                  canIssueReminder
-                    ? (cycle) =>
-                        contributionReminderAllowed(cycle) ? (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => setReminderCycle(cycle)}
-                          >
-                            <BellRingIcon data-icon="inline-start" />
-                            提醒
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            —
-                          </span>
-                        )
-                    : undefined
-                }
+            {panel === "details" && membership && kind === "retention" ? (
+              <RetentionProgressPanel
+                userKey={membership.id}
+                membershipId={membership.id}
               />
+            ) : null}
+            {panel === "details" && membership && kind === "reseed" ? (
+              <ReseedPublicationPanel membershipId={membership.id} />
+            ) : null}
+            {panel === "payroll" && membership ? (
+              <WorkgroupPayrollPanel
+                membership={membership}
+                csrfToken={csrfToken}
+                canPay={canPay}
+              />
+            ) : null}
+            {panel === "history" ? (
+              <>
+                {cycles.isPending ? <Skeleton className="h-56 w-full" /> : null}
+                {cycles.isError ? (
+                  <Alert variant="destructive">
+                    <CircleAlertIcon />
+                    <AlertTitle>贡献历史暂时无法读取</AlertTitle>
+                    <AlertDescription>
+                      {requestErrorDescription(
+                        cycles.error,
+                        "请稍后重试，历史证据不会被修改。"
+                      )}
+                    </AlertDescription>
+                    <AlertAction>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void cycles.refetch()}
+                      >
+                        <RefreshCwIcon data-icon="inline-start" />
+                        重试
+                      </Button>
+                    </AlertAction>
+                  </Alert>
+                ) : null}
+                {cycles.data?.items.length === 0 ? (
+                  <Empty className="border">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <HistoryIcon />
+                      </EmptyMedia>
+                      <EmptyTitle>还没有贡献周期</EmptyTitle>
+                      <EmptyDescription>
+                        成员资格生效后会从对应自然月开始形成历史。
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                ) : null}
+                {cycles.data?.items.length ? (
+                  <ContributionCycleHistory
+                    items={cycles.data.items}
+                    renderAction={
+                      canIssueReminder
+                        ? (cycle) =>
+                            contributionReminderAllowed(cycle) ? (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                onClick={() => setReminderCycle(cycle)}
+                              >
+                                <BellRingIcon data-icon="inline-start" />
+                                提醒
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                —
+                              </span>
+                            )
+                        : undefined
+                    }
+                  />
+                ) : null}
+              </>
             ) : null}
           </div>
         </SheetContent>

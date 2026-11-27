@@ -45,6 +45,7 @@ func (stub *authorizerStub) Authorize(_ context.Context, request authz.Request) 
 }
 
 type repositoryStub struct {
+	monthlyRepository
 	applicationCommand SubmitApplicationCommand
 	grantCommand       GrantMembershipCommand
 	policyCommand      IssueContributionPolicyCommand

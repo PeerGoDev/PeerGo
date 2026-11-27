@@ -611,7 +611,7 @@ ORDER BY occurred_at, state_version, id`, membershipID)
 			return ContributionCyclePage{}, err
 		}
 		values, _, err := repository.contributionValuesWith(
-			ctx, querier, policy.Metric, []uuid.UUID{membershipID}, periodStart, observedAt,
+			ctx, querier, policy.Metric, []uuid.UUID{membershipID}, periodStart, observedAt, asOf,
 		)
 		if err != nil {
 			return ContributionCyclePage{}, err
@@ -621,6 +621,17 @@ ORDER BY occurred_at, state_version, id`, membershipID)
 		)
 		if err != nil {
 			return ContributionCyclePage{}, err
+		}
+		if kind == GroupReseed && evidenceState == ContributionEvidenceComplete && values[membershipID] < policy.TargetValue {
+			var pending bool
+			if err := querier.QueryRow(ctx, `
+SELECT EXISTS (SELECT 1 FROM workgroups.reseed_publications($1,$2,$3,$4) WHERE contribution_status='pending')`,
+				membershipID, periodStart, periodEnd, asOf).Scan(&pending); err != nil {
+				return ContributionCyclePage{}, err
+			}
+			if pending {
+				evidenceState = ContributionEvidenceIncomplete
+			}
 		}
 		// Membership coverage comes exclusively from the append-only transition
 		// timeline. The mutable membership row is deliberately not used to
@@ -1127,7 +1138,7 @@ INSERT INTO workgroups.contribution_policy_revisions (
 }
 
 func (repository *PostgresRepository) contributionValues(ctx context.Context, metric ContributionMetric, membershipIDs []uuid.UUID, startsAt, endsAt time.Time) (map[uuid.UUID]int64, *time.Time, error) {
-	return repository.contributionValuesWith(ctx, repository.pool, metric, membershipIDs, startsAt, endsAt)
+	return repository.contributionValuesWith(ctx, repository.pool, metric, membershipIDs, startsAt, endsAt, endsAt)
 }
 
 // Resolve historical membership before reading evidence for that user/hour.
@@ -1159,21 +1170,18 @@ JOIN LATERAL (
 WHERE membership.id = ANY($1::uuid[])
 GROUP BY membership.id`
 
-func (repository *PostgresRepository) contributionValuesWith(ctx context.Context, querier workgroupQuerier, metric ContributionMetric, membershipIDs []uuid.UUID, startsAt, endsAt time.Time) (map[uuid.UUID]int64, *time.Time, error) {
+func (repository *PostgresRepository) contributionValuesWith(ctx context.Context, querier workgroupQuerier, metric ContributionMetric, membershipIDs []uuid.UUID, startsAt, endsAt, asOf time.Time) (map[uuid.UUID]int64, *time.Time, error) {
 	values := make(map[uuid.UUID]int64, len(membershipIDs))
 	var rows pgx.Rows
 	var err error
 	switch metric {
 	case MetricTrustedTorrentsPublished:
 		rows, err = querier.Query(ctx, `
-SELECT transition.membership_id, count(*)::bigint
-FROM review.torrent_decisions AS decision
-JOIN workgroups.membership_transitions AS transition
-  ON transition.id = decision.membership_transition_id
-WHERE decision.resolution_source = 'trusted_workgroup'
-  AND transition.membership_id = ANY($1::uuid[])
-  AND decision.occurred_at >= $2 AND decision.occurred_at < $3
-GROUP BY transition.membership_id`, membershipIDs, startsAt, endsAt)
+SELECT member.id, count(*)::bigint
+FROM unnest($1::uuid[]) AS member(id)
+CROSS JOIN LATERAL workgroups.reseed_publications(member.id,$2,$3,$4) AS publication
+WHERE publication.contribution_status = 'counted'
+GROUP BY member.id`, membershipIDs, startsAt, endsAt, asOf)
 	case MetricTorrentReviewVotes:
 		rows, err = querier.Query(ctx, `
 SELECT transition.membership_id, count(*)::bigint

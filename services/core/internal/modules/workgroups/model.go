@@ -487,6 +487,7 @@ type IssueContributionReminderCommand struct {
 // Repository owns both current projections and append-only history. Commands
 // that change an application and membership are committed atomically.
 type Repository interface {
+	monthlyRepository
 	MyOverview(context.Context, uuid.UUID, time.Time) (MyOverview, error)
 	SubmitApplication(context.Context, SubmitApplicationCommand) (Application, error)
 	AdminOverview(context.Context, time.Time) (AdminOverview, error)

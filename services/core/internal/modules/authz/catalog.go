@@ -192,6 +192,7 @@ const (
 	ActionWorkgroupContributionReminderIssue      Action = "workgroup.contribution.reminder.issue"
 	ActionWorkgroupManageRead                     Action = "workgroup.manage.read"
 	ActionWorkgroupMembershipManage               Action = "workgroup.membership.manage"
+	ActionWorkgroupPayrollIssue                   Action = "workgroup.payroll.issue"
 	ActionWorkgroupReadSelf                       Action = "workgroup.read.self"
 	ActionWorkgroupTaskPublish                    Action = "workgroup.task.publish"
 	ActionWorkgroupTaskReview                     Action = "workgroup.task.review"
@@ -1130,6 +1131,11 @@ var permissionCatalog = []PermissionDefinition{
 	},
 	{
 		Action: ActionWorkgroupMembershipManage, Description: "授予、暂停、恢复或结束工作组成员资格", Risk: RiskHigh,
+		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
+		Grantable: true, Discoverable: true,
+	},
+	{
+		Action: ActionWorkgroupPayrollIssue, Description: "确认工作组月结工资并发放魔力值", Risk: RiskHigh,
 		Relationship: RelationshipNone, CredentialAudience: AudienceStaffSession,
 		Grantable: true, Discoverable: true,
 	},

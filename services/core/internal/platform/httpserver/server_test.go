@@ -483,6 +483,38 @@ type unavailableSeedingRewardAdministrationService struct{}
 
 type unavailableWorkgroupService struct{}
 
+func (unavailableWorkgroupService) MyRetentionTargets(context.Context, string, int, int) ([]workgroups.RetentionTarget, error) {
+	return nil, identity.ErrSessionNotFound
+}
+
+func (unavailableWorkgroupService) ClaimRetentionTarget(context.Context, string, string, int64) error {
+	return identity.ErrSessionNotFound
+}
+
+func (unavailableWorkgroupService) MyRetentionProgress(context.Context, string, string) (workgroups.RetentionProgress, error) {
+	return workgroups.RetentionProgress{}, identity.ErrSessionNotFound
+}
+
+func (unavailableWorkgroupService) StaffRetentionTargets(context.Context, authz.StaffActor, int, int) ([]workgroups.RetentionTarget, error) {
+	return nil, identity.ErrStaffSessionNotFound
+}
+
+func (unavailableWorkgroupService) SaveRetentionTarget(context.Context, authz.StaffActor, int64, int, bool) error {
+	return identity.ErrStaffSessionNotFound
+}
+
+func (unavailableWorkgroupService) StaffRetentionProgress(context.Context, authz.StaffActor, uuid.UUID, string) (workgroups.RetentionProgress, error) {
+	return workgroups.RetentionProgress{}, identity.ErrStaffSessionNotFound
+}
+
+func (unavailableWorkgroupService) StaffReseedPublications(context.Context, authz.StaffActor, uuid.UUID, string, int, int) (workgroups.ReseedPublications, error) {
+	return workgroups.ReseedPublications{}, identity.ErrStaffSessionNotFound
+}
+
+func (unavailableWorkgroupService) MonthlyPayroll(context.Context, authz.StaffActor, workgroups.PayrollInput, string, string) (workgroups.PayrollPreview, error) {
+	return workgroups.PayrollPreview{}, identity.ErrStaffSessionNotFound
+}
+
 func (unavailableWorkgroupService) MyOverview(context.Context, string) (workgroups.MyOverview, error) {
 	return workgroups.MyOverview{}, identity.ErrSessionNotFound
 }

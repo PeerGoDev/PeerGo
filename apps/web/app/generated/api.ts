@@ -1347,6 +1347,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/workgroups/retention/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看可认领的保种种子 */
+        get: operations["listMyRetentionTargets"];
+        put?: never;
+        /** 认领一个保种种子 */
+        post: operations["claimMyRetentionTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/workgroups/retention/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看本人逐种保种进度 */
+        get: operations["getMyRetentionProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/workgroups/retention/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看保种认领清单 */
+        get: operations["listStaffRetentionTargets"];
+        put?: never;
+        /** 添加或移出保种认领清单 */
+        post: operations["saveStaffRetentionTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/workgroups/retention/memberships/{membership_id}/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查看保种组成员逐种进度 */
+        get: operations["getStaffRetentionProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/workgroups/reseed/memberships/{membership_id}/publications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 逐条核对转种投稿及审核结果 */
+        get: operations["listStaffReseedPublications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/workgroups/{group_kind}/memberships/{membership_id}/payroll/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 预览单个成员的工作组月结工资 */
+        post: operations["previewStaffWorkgroupPayroll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/workgroups/{group_kind}/memberships/{membership_id}/payroll/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 确认预览并发放工作组月结工资 */
+        post: operations["issueStaffWorkgroupPayroll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/workgroups/{group_kind}/applications": {
         parameters: {
             query?: never;
@@ -4797,7 +4918,7 @@ export interface components {
             expected_state_version: number;
         };
         /** @enum {string} */
-        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.magicgame.play.self" | "economy.magicgame.read.self" | "economy.magicshop.purchase.self" | "economy.magicshop.read.self" | "economy.magicstore.manage.read" | "economy.magicstore.update" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.namestyle.read" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.reseed.request.self" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.adjust" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.network.read" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
+        CapabilityAction: "account.email.verify.self" | "account.totp.manage.self" | "announcement.comment.create.self" | "announcement.create" | "announcement.manage.read" | "announcement.publish" | "announcement.update" | "announcement.withdraw" | "authz.capability.read.self" | "authz.grant.read" | "authz.grant.revoke.approve.governance" | "authz.grant.revoke.approve.security" | "authz.grant.revoke.propose" | "category.create" | "category.manage.read" | "category.update" | "comment.delete.self" | "comment.report.create.self" | "comment.update.self" | "economy.attendance.claim.self" | "economy.attendance.policy.issue" | "economy.attendance.policy.read" | "economy.attendance.read.self" | "economy.contenttip.create.self" | "economy.contenttip.policy.issue" | "economy.contenttip.policy.read" | "economy.contenttip.read.self" | "economy.magicgame.play.self" | "economy.magicgame.read.self" | "economy.magicshop.purchase.self" | "economy.magicshop.read.self" | "economy.magicstore.manage.read" | "economy.magicstore.update" | "economy.medal.create" | "economy.medal.manage.read" | "economy.medal.purchase.self" | "economy.medal.read.self" | "economy.medal.update" | "economy.medal.wear.self" | "economy.membergift.create.self" | "economy.membergift.policy.issue" | "economy.membergift.policy.read" | "economy.membergift.read.self" | "economy.namestyle.read" | "economy.read.self" | "economy.seedingreward.policy.issue" | "economy.seedingreward.policy.read" | "hnr.appeal.create.self" | "hnr.assessment.manage" | "hnr.policy.issue" | "hnr.policy.read" | "hnr.read.self" | "integration.apikey.manage.self" | "integration.apikey.read.self" | "invitation.issue.self" | "invitation.read.self" | "invitation.revoke.self" | "newcomer.assessment.assign" | "newcomer.assessment.exempt" | "newcomer.assessment.read" | "newcomer.assessment.read.self" | "newcomer.policy.issue" | "newcomer.policy.read" | "notification.archive.self" | "notification.feedback.create.self" | "notification.read.state.write.self" | "notification.read.self" | "operations.email.test" | "operations.monitor.read" | "progression.contribution.policy.issue" | "progression.contribution.policy.read" | "promotion.manage.read" | "promotion.schedule" | "progression.level.policy.issue" | "progression.level.policy.read" | "ratio.appeal.create.self" | "ratio.assessment.manage" | "ratio.assessment.read.self" | "ratio.policy.issue" | "ratio.policy.read" | "rss.settings.manage.read" | "rss.settings.update" | "rss.subscription.manage.self" | "rss.subscription.read.self" | "session.read.self" | "session.revoke.self" | "site.display.manage.read" | "site.display.update" | "site.registration.manage.read" | "site.registration.update" | "social.board.create" | "social.board.manage.read" | "social.board.update" | "social.follow.write.self" | "social.media.create.self" | "social.poll.vote.self" | "social.post.comment.create.self" | "social.post.create.restricted.self" | "social.post.create.self" | "social.post.delete.self" | "social.post.like.self" | "social.post.manage.read" | "social.post.moderate" | "social.post.read" | "social.post.repost.self" | "social.post.update.self" | "social.redpacket.claim.self" | "social.report.read" | "social.report.resolve" | "staff.credential.enroll.self" | "staff.session.create.self" | "torrent.bookmark.read.self" | "torrent.bookmark.write.self" | "torrent.comment.create.self" | "torrent.content.change.review" | "torrent.content.change.submit.self" | "torrent.screenshot.change.review" | "torrent.screenshot.change.submit.self" | "torrent.upload.policy.issue" | "torrent.download" | "torrent.lifecycle.update" | "torrent.manage.read" | "torrent.metadata.update.self" | "torrent.promotion.purchase.self" | "torrent.purchase.create.self" | "torrent.purchase.manage.read" | "torrent.purchase.manage.refund" | "torrent.purchase.manage.update" | "torrent.purchase.read.self" | "torrent.report.create.self" | "torrent.report.review" | "torrent.reseed.request.self" | "torrent.review" | "torrent.review.vote" | "torrent.submission.read.self" | "torrent.submission.resubmit.self" | "torrent.submit" | "torrent.withdraw.request.self" | "torrent.withdraw.review" | "tracker.policy.issue" | "tracker.policy.read" | "tracker.seedbox.read.self" | "tracker.seedbox.registry.read" | "tracker.seedbox.report.create.self" | "tracker.seedbox.report.decide" | "traffic.read.self" | "user.account.adjust" | "user.account.appeal.create.restricted" | "user.account.appeal.decide" | "user.account.appeal.read" | "user.account.read" | "user.account.restrict" | "user.account.restriction.revoke" | "user.downloadrestriction.appeal.create.self" | "user.downloadrestriction.read.self" | "user.downloadrestriction.restrict" | "user.downloadrestriction.revoke" | "user.network.read" | "user.vip.manage" | "wiki.page.create" | "wiki.page.manage.read" | "wiki.page.read" | "wiki.page.read.member" | "wiki.page.restore" | "wiki.page.update" | "wiki.page.update.assigned" | "workgroup.application.create.self" | "workgroup.application.decide" | "workgroup.contribution.policy.issue" | "workgroup.contribution.reminder.issue" | "workgroup.manage.read" | "workgroup.membership.manage" | "workgroup.payroll.issue" | "workgroup.read.self" | "workgroup.task.publish" | "workgroup.task.review" | "workgroup.task.submit.self";
         CapabilityScope: {
             /** @enum {string} */
             type: "site" | "category";
@@ -7095,7 +7216,7 @@ export interface components {
         MagicStatementEntry: {
             sequence: components["schemas"]["UnsignedIntegerText"];
             /** @enum {string} */
-            transaction_type: "legacy_opening" | "seeding_reward" | "harem_reward" | "reseed_reward" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "magic_shop_purchase" | "scratch_card_purchase" | "scratch_card_payout" | "lottery_ticket_purchase" | "lottery_payout" | "lottery_burn" | "pvp_stake" | "pvp_payout" | "pvp_refund" | "refund" | "adjustment";
+            transaction_type: "legacy_opening" | "seeding_reward" | "harem_reward" | "reseed_reward" | "workgroup_payroll" | "activity_reward" | "torrent_purchase" | "promotion_product_purchase" | "medal_purchase" | "member_gift" | "tip" | "social_red_packet_fund" | "social_red_packet_claim" | "magic_shop_purchase" | "scratch_card_purchase" | "scratch_card_payout" | "lottery_ticket_purchase" | "lottery_payout" | "lottery_burn" | "pvp_stake" | "pvp_payout" | "pvp_refund" | "refund" | "adjustment";
             /** @enum {string} */
             entry_type: "legacy_opening" | "earn" | "spend" | "adjustment";
             amount: components["schemas"]["SignedIntegerText"];
@@ -8727,6 +8848,105 @@ export interface components {
             membership?: components["schemas"]["WorkgroupMembership"];
             application?: components["schemas"]["WorkgroupApplication"];
             eligibility?: components["schemas"]["ReviewerEligibility"];
+        };
+        RetentionTarget: {
+            /** Format: int64 */
+            torrent_id: number;
+            title: string;
+            size_bytes: components["schemas"]["UnsignedIntegerText"];
+            required_hours: number;
+            /** Format: date-time */
+            claimed_at?: string;
+        };
+        RetentionTargetList: {
+            items: components["schemas"]["RetentionTarget"][];
+        };
+        ClaimRetentionTargetRequest: {
+            /** Format: int64 */
+            torrent_id: number;
+        };
+        WorkgroupMonth: string;
+        RetentionItem: {
+            /** Format: int64 */
+            torrent_id: number;
+            title: string;
+            size_bytes: components["schemas"]["UnsignedIntegerText"];
+            required_hours: number;
+            /** Format: date-time */
+            claimed_at?: string;
+            /** Format: int64 */
+            active_seconds: number;
+            qualified: boolean;
+        };
+        RetentionProgress: {
+            month: components["schemas"]["WorkgroupMonth"];
+            items: components["schemas"]["RetentionItem"][];
+            qualified_count: number;
+            qualified_bytes: components["schemas"]["UnsignedIntegerText"];
+            expected_hours: number;
+            complete_hours: number;
+        };
+        SaveRetentionTargetRequest: {
+            /** Format: int64 */
+            torrent_id: number;
+            required_hours?: number;
+            retire: boolean;
+        };
+        ReseedPublication: {
+            /** Format: int64 */
+            torrent_id: number;
+            title: string;
+            category: string;
+            /** Format: date-time */
+            submitted_at: string;
+            /** Format: date-time */
+            published_at?: string;
+            resolution_source: string;
+            /** @enum {string} */
+            status: "counted" | "pending" | "excluded";
+            reason: string;
+        };
+        ReseedPublicationPage: {
+            items: components["schemas"]["ReseedPublication"][];
+            counted: number;
+            pending: number;
+            total: number;
+        };
+        WorkgroupPayrollRequest: {
+            month: components["schemas"]["WorkgroupMonth"];
+            /** Format: int64 */
+            amount: number;
+            minimum_count: number;
+            minimum_bytes: components["schemas"]["UnsignedIntegerText"];
+        };
+        WorkgroupPayrollPreview: {
+            month: components["schemas"]["WorkgroupMonth"];
+            username: string;
+            group_kind: components["schemas"]["WorkgroupKind"];
+            /** Format: int64 */
+            amount: number;
+            /** @enum {string} */
+            state: "paid" | "eligible" | "pending_evidence" | "below_target" | "in_progress";
+            /** Format: int64 */
+            contribution: number;
+            /** Format: int64 */
+            target: number;
+            qualified_bytes: components["schemas"]["UnsignedIntegerText"];
+            pending_count: number;
+            missing_hours: number;
+            /** Format: date-time */
+            paid_at?: string;
+            /** Format: uuid */
+            transaction_id?: string;
+            preview_digest: string;
+        };
+        ConfirmWorkgroupPayrollRequest: {
+            month: components["schemas"]["WorkgroupMonth"];
+            /** Format: int64 */
+            amount: number;
+            minimum_count: number;
+            minimum_bytes: components["schemas"]["UnsignedIntegerText"];
+            preview_digest: string;
         };
         /** @enum {string} */
         WorkgroupContributionDisciplinaryAction: "none" | "marked" | "membership_ended";
@@ -10602,6 +10822,7 @@ export interface components {
         /** @description 评论的稳定公开 UUID。 */
         CommentIDPathParameter: string;
         ChallengeIDParameter: string;
+        MembershipIDPathParameter: string;
         GroupKindPathParameter: components["schemas"]["WorkgroupKind"];
         AssignmentIDPathParameter: string;
         RSSSubscriptionIDPathParameter: string;
@@ -10610,7 +10831,6 @@ export interface components {
         ApplicationIDPathParameter: string;
         TaskIDPathParameter: string;
         SubmissionIDPathParameter: string;
-        MembershipIDPathParameter: string;
         /** @description grant 撤销申请 ID。 */
         GrantRevocationRequestID: string;
         /** @description 256 位随机 RSS 令牌；服务端只保存 SHA-256 摘要。 */
@@ -13212,6 +13432,270 @@ export interface operations {
             };
             401: components["responses"]["ProblemResponse"];
             403: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listMyRetentionTargets: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 工作组业务结果。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionTargetList"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    claimMyRetentionTarget: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前普通 Web 会话绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["WebCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimRetentionTargetRequest"];
+            };
+        };
+        responses: {
+            /** @description 操作完成。 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getMyRetentionProgress: {
+        parameters: {
+            query?: {
+                month?: components["schemas"]["WorkgroupMonth"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 工作组业务结果。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionProgress"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listStaffRetentionTargets: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 工作组业务结果。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionTargetList"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    saveStaffRetentionTarget: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveRetentionTargetRequest"];
+            };
+        };
+        responses: {
+            /** @description 操作完成。 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    getStaffRetentionProgress: {
+        parameters: {
+            query?: {
+                month?: components["schemas"]["WorkgroupMonth"];
+            };
+            header?: never;
+            path: {
+                membership_id: components["parameters"]["MembershipIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 工作组业务结果。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionProgress"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    listStaffReseedPublications: {
+        parameters: {
+            query?: {
+                month?: components["schemas"]["WorkgroupMonth"];
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                membership_id: components["parameters"]["MembershipIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 工作组业务结果。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReseedPublicationPage"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    previewStaffWorkgroupPayroll: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                group_kind: components["parameters"]["GroupKindPathParameter"];
+                membership_id: components["parameters"]["MembershipIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkgroupPayrollRequest"];
+            };
+        };
+        responses: {
+            /** @description 工作组业务结果。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkgroupPayrollPreview"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            default: components["responses"]["ProblemResponse"];
+        };
+    };
+    issueStaffWorkgroupPayroll: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 与当前 staff session 绑定的 CSRF token。 */
+                "X-CSRF-Token": components["parameters"]["StaffCSRFHeader"];
+            };
+            path: {
+                group_kind: components["parameters"]["GroupKindPathParameter"];
+                membership_id: components["parameters"]["MembershipIDPathParameter"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmWorkgroupPayrollRequest"];
+            };
+        };
+        responses: {
+            /** @description 工作组业务结果。 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkgroupPayrollPreview"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+            403: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
             default: components["responses"]["ProblemResponse"];
         };
     };

@@ -70,6 +70,10 @@ import {
   useMyWorkgroups,
 } from "~/features/workgroups/api/workgroups.queries"
 import { ContributionCycleHistory } from "~/features/workgroups/components/contribution-cycle-history"
+import {
+  RetentionProgressPanel,
+  RetentionTargetList,
+} from "~/features/workgroups/components/workgroup-monthly"
 import { WorkgroupTaskPanel } from "~/features/workgroups/components/workgroup-task-panel"
 import {
   contributionMetricLabel,
@@ -180,6 +184,9 @@ function WorkgroupContent({
       item.membership?.status === "active" ||
       item.membership?.status === "suspended"
   )
+  const retention = items.find(
+    (item) => item.definition.kind === "retention"
+  )?.membership
 
   return (
     <>
@@ -206,6 +213,14 @@ function WorkgroupContent({
         </section>
       ) : null}
 
+      {retention ? <RetentionProgressPanel userKey={userId} /> : null}
+      {retention?.status === "active" ? (
+        <RetentionTargetList
+          csrfToken={csrfToken}
+          staff={false}
+          userKey={userId}
+        />
+      ) : null}
       <WorkgroupTaskPanel userId={userId} csrfToken={csrfToken} />
 
       <section
@@ -371,7 +386,9 @@ function ContributionSummary({
       <p className="text-xs text-muted-foreground">
         {contribution.enforcement_mode === "miss_limit"
           ? `完整自然月未达标将记录标记；当前 ${contribution.miss_count}/${contribution.allowed_misses} 次，第 ${contribution.allowed_misses + 1} 次自动结束资格。`
-          : "当前为观察目标，未达标不会自动变更工作组权益。"}
+          : contribution.metric === "seeding_active_seconds"
+            ? "保种考核的达标种数和体积可在逐种保种进度查看。"
+            : "当前为观察目标，未达标不会自动变更工作组权益。"}
       </p>
     </div>
   )

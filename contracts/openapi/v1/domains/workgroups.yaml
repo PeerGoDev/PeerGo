@@ -1,3 +1,239 @@
+MyRetentionTargetsPath:
+  get:
+    operationId: listMyRetentionTargets
+    summary: 查看可认领的保种种子
+    tags: [workgroups]
+    x-audience: [web]
+    x-owner: core-workgroups
+    x-permission: workgroup.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 工作组业务结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/RetentionTargetList" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: claimMyRetentionTarget
+    summary: 认领一个保种种子
+    tags: [workgroups]
+    x-audience: [web]
+    x-owner: core-workgroups
+    x-permission: workgroup.read.self
+    x-credential-audience: web-session
+    parameters:
+      - $ref: "../domains/identity.yaml#/WebCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/ClaimRetentionTargetRequest" }
+    responses:
+      "204":
+        description: 操作完成。
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+MyRetentionProgressPath:
+  get:
+    operationId: getMyRetentionProgress
+    summary: 查看本人逐种保种进度
+    tags: [workgroups]
+    x-audience: [web]
+    x-owner: core-workgroups
+    x-permission: workgroup.read.self
+    x-credential-audience: web-session
+    parameters:
+      - name: month
+        in: query
+        schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupMonth" }
+    responses:
+      "200":
+        description: 工作组业务结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/RetentionProgress" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+StaffRetentionTargetsPath:
+  get:
+    operationId: listStaffRetentionTargets
+    summary: 查看保种认领清单
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 工作组业务结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/RetentionTargetList" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+  post:
+    operationId: saveStaffRetentionTarget
+    summary: 添加或移出保种认领清单
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.membership.manage
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/SaveRetentionTargetRequest" }
+    responses:
+      "204":
+        description: 操作完成。
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+StaffRetentionProgressPath:
+  get:
+    operationId: getStaffRetentionProgress
+    summary: 查看保种组成员逐种进度
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/MembershipIDPathParameter"
+      - name: month
+        in: query
+        schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupMonth" }
+    responses:
+      "200":
+        description: 工作组业务结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/RetentionProgress" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+StaffReseedPublicationsPath:
+  get:
+    operationId: listStaffReseedPublications
+    summary: 逐条核对转种投稿及审核结果
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/MembershipIDPathParameter"
+      - name: month
+        in: query
+        schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupMonth" }
+      - name: limit
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    responses:
+      "200":
+        description: 工作组业务结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/ReseedPublicationPage" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+StaffPayrollPreviewPath:
+  post:
+    operationId: previewStaffWorkgroupPayroll
+    summary: 预览单个成员的工作组月结工资
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.manage.read
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "#/MembershipIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupPayrollRequest" }
+    responses:
+      "200":
+        description: 工作组业务结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupPayrollPreview" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
+StaffPayrollIssuePath:
+  post:
+    operationId: issueStaffWorkgroupPayroll
+    summary: 确认预览并发放工作组月结工资
+    tags: [workgroups]
+    x-audience: [staff]
+    x-owner: core-workgroups
+    x-permission: workgroup.payroll.issue
+    x-credential-audience: staff-session
+    parameters:
+      - $ref: "#/GroupKindPathParameter"
+      - $ref: "#/MembershipIDPathParameter"
+      - $ref: "../domains/authz.yaml#/StaffCSRFHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../schemas/workgroups.yaml#/ConfirmWorkgroupPayrollRequest" }
+    responses:
+      "200":
+        description: 工作组业务结果。
+        content:
+          application/json:
+            schema: { $ref: "../schemas/workgroups.yaml#/WorkgroupPayrollPreview" }
+      "400": { $ref: "../responses.yaml#/ProblemResponse" }
+      "403": { $ref: "../responses.yaml#/ProblemResponse" }
+      "409": { $ref: "../responses.yaml#/ProblemResponse" }
+      default: { $ref: "../responses.yaml#/ProblemResponse" }
+
 GroupKindPathParameter:
   name: group_kind
   in: path
