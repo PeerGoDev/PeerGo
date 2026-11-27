@@ -116,10 +116,41 @@ INSERT INTO economy.seeding_reward_evidence_windows (
 	}
 	exec("UPDATE economy.seeding_reward_evidence_packing_control SET enabled = true WHERE singleton")
 	exec("SELECT economy.seeding_reward_evidence_pack_batch(1)")
+	repair, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repair.Rollback(ctx) }()
+	recoveredHour := sharesAt.Add(2 * time.Hour)
+	for _, hour := range []time.Time{sharesAt, recoveredHour} {
+		digest := sha256.Sum256([]byte(hour.String()))
+		if _, err := repair.Exec(ctx, `
+INSERT INTO workgroups.retention_reconciled_windows (
+    window_start,window_end,source_schema,source_evidence_sha256,source_item_count,artifact_sha256,operator_reference
+) VALUES ($1,$2,'seeding.evidence.v3',$3,1,$3,'integration:retention-only')`, hour, hour.Add(time.Hour), digest[:]); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repair.Exec(ctx, `
+INSERT INTO workgroups.retention_reconciled_items (window_start,user_id,torrent_id,active_seconds,source_evidence_sha256)
+VALUES ($1,$2,$3,1800,$4)`, hour, userID, target, digest[:]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := repair.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 	progress, err := repository.RetentionProgress(ctx, uuid.Nil, retentionID, month, afterClose)
-	if err != nil || len(progress.Items) != 1 || progress.Items[0].ActiveSeconds != 5400 ||
-		progress.QualifiedCount != 1 || progress.QualifiedBytes != 4096 || progress.CompleteHours != 2 {
+	if err != nil || len(progress.Items) != 1 || progress.Items[0].ActiveSeconds != 7200 ||
+		progress.QualifiedCount != 1 || progress.QualifiedBytes != 4096 || progress.CompleteHours != 3 {
 		t.Fatalf("retention progress = %+v, error = %v", progress, err)
+	}
+	values, _, err := repository.contributionValues(ctx, MetricSeedingActiveSeconds, []uuid.UUID{retentionID}, month, afterClose)
+	if err != nil || values[retentionID] != 9000 {
+		t.Fatalf("retention contribution = %+v, error = %v", values, err)
+	}
+	var queued int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM economy.seeding_reward_work_items WHERE window_start=$1", recoveredHour).Scan(&queued); err != nil || queued != 0 {
+		t.Fatalf("retention-only evidence queued %d ordinary rewards, error = %v", queued, err)
 	}
 	input := PayrollInput{MembershipID: retentionID, Group: GroupRetention, Month: month, Amount: 500000, MinimumCount: 1}
 	preview, err := repository.PreviewPayroll(ctx, input, afterClose)

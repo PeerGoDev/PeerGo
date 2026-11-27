@@ -143,13 +143,13 @@ WITH claims AS MATERIALIZED (
     FROM workgroups.membership_transitions WHERE membership_id = $1
 ), evidence AS (
     SELECT item.torrent_id, item.window_start, item.active_seconds
-    FROM economy.seeding_reward_evidence_items_read item JOIN claims USING (torrent_id)
+    FROM workgroups.retention_evidence_items item JOIN claims USING (torrent_id)
     WHERE item.user_id = $2 AND item.window_start >= $3 AND item.window_start < $5
 ), qualified_seconds AS (
     SELECT e.torrent_id,
            sum(greatest(0,e.active_seconds - 3600 + floor(covered.seconds)::bigint))::bigint AS seconds
     FROM evidence e JOIN claims USING (torrent_id)
-    JOIN economy.seeding_reward_evidence_windows w USING (window_start)
+    JOIN workgroups.retention_evidence_windows w USING (window_start)
     JOIN LATERAL (
         SELECT COALESCE(sum(greatest(0,extract(epoch FROM
             least(w.window_end, transitions.ends_at, claims.retired_at)
@@ -173,7 +173,7 @@ func readRetentionProgress(ctx context.Context, querier workgroupQuerier, member
 	hourEnd := end.Truncate(time.Hour)
 	progress := RetentionProgress{Month: month.Format("2006-01"), ExpectedHours: int(hourEnd.Sub(month) / time.Hour)}
 	if err := querier.QueryRow(ctx, `
-SELECT count(*) FROM economy.seeding_reward_evidence_windows
+SELECT count(*) FROM workgroups.retention_evidence_windows
 WHERE window_start >= $1 AND window_start < $2 AND status = 'complete'`, month, hourEnd).Scan(&progress.CompleteHours); err != nil {
 		return RetentionProgress{}, err
 	}

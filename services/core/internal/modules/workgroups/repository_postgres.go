@@ -877,7 +877,7 @@ SELECT count(*)::bigint,
        count(*) FILTER (WHERE status = 'complete')::bigint,
        min(window_start) FILTER (WHERE status = 'complete'),
        max(window_end) FILTER (WHERE status = 'complete')
-FROM economy.seeding_reward_evidence_windows
+FROM workgroups.retention_evidence_windows
 WHERE window_start >= $1 AND window_end <= $2`,
 		periodStart, expectedThrough,
 	).Scan(&totalWindows, &completeWindows, &firstComplete, &lastComplete); err != nil {
@@ -1146,7 +1146,7 @@ func (repository *PostgresRepository) contributionValues(ctx context.Context, me
 const seedingContributionValuesSQL = `
 SELECT membership.id, COALESCE(sum(item.active_seconds), 0)::bigint
 FROM workgroups.memberships AS membership
-JOIN economy.seeding_reward_evidence_windows AS evidence_window
+JOIN workgroups.retention_evidence_windows AS evidence_window
   ON evidence_window.status = 'complete'
  AND evidence_window.window_start >= $2
  AND evidence_window.window_end <= $3
@@ -1162,8 +1162,13 @@ JOIN LATERAL (
   ON active_membership.membership_id = membership.id
  AND active_membership.to_status = 'active'
 JOIN LATERAL (
-    SELECT economy.seeding_reward_user_hour_active_seconds(
-        membership.user_id, evidence_window.window_start) AS active_seconds
+    SELECT CASE WHEN evidence_window.reconciled THEN (
+        SELECT sum(recovered.active_seconds)::bigint
+        FROM workgroups.retention_reconciled_items recovered
+        WHERE recovered.window_start = evidence_window.window_start
+          AND recovered.user_id = membership.user_id
+    ) ELSE economy.seeding_reward_user_hour_active_seconds(
+        membership.user_id, evidence_window.window_start) END AS active_seconds
     -- Evaluate once per eligible user/hour, preserving NULL for absent proof.
     OFFSET 0
 ) AS item ON item.active_seconds IS NOT NULL
@@ -1221,7 +1226,7 @@ GROUP BY transition.membership_id`, membershipIDs, startsAt, endsAt)
 	var latest *time.Time
 	if err := querier.QueryRow(ctx, `
 SELECT max(window_end)
-FROM economy.seeding_reward_evidence_windows
+FROM workgroups.retention_evidence_windows
 WHERE status = 'complete' AND window_end <= $1`, endsAt).Scan(&latest); err != nil {
 		return nil, nil, fmt.Errorf("read seeding evidence watermark: %w", err)
 	}
